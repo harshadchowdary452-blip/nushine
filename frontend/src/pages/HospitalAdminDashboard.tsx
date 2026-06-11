@@ -2,7 +2,6 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import dashboardService from '../../services/dashboardService';
 import { MetricCard, SimpleBarChart } from '../Charts/ChartComponents';
-import { useAuthStore } from '../../store/useAuthStore';
 
 export const HospitalAdminDashboard: React.FC = () => {
   const { data: dashboardData, isLoading, error } = useQuery({
