@@ -4,7 +4,7 @@ from typing import List, Optional
 import os, shutil, uuid
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.core.permissions import verify_permission, Permission, Role
+from app.core.permissions import verify_permission, verify_tenant_access, Permission, Role
 from app.services.patient_service import PatientService
 from app.schemas.patient import PatientCreate, PatientUpdate, PatientResponse
 from app.schemas.common import MessageResponse
@@ -99,6 +99,7 @@ async def get_patient(patient_id: str, db: AsyncSession = Depends(get_db), curre
     patient = await service.get(patient_id)
     if not patient:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+    await verify_tenant_access(current_user, patient, "patient", db)
     return patient
 
 
@@ -106,9 +107,11 @@ async def get_patient(patient_id: str, db: AsyncSession = Depends(get_db), curre
 async def update_patient(patient_id: str, data: PatientUpdate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_PATIENTS)
     service = PatientService(db)
-    patient = await service.update(patient_id, data.model_dump(exclude_none=True), user_id=current_user.get("sub"))
+    patient = await service.get(patient_id)
     if not patient:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+    await verify_tenant_access(current_user, patient, "patient", db)
+    patient = await service.update(patient_id, data.model_dump(exclude_none=True), user_id=current_user.get("sub"))
     return patient
 
 
@@ -119,6 +122,7 @@ async def upload_patient_photo(patient_id: str, file: UploadFile = File(...), db
     patient = await service.get(patient_id)
     if not patient:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+    await verify_tenant_access(current_user, patient, "patient", db)
     ext = os.path.splitext(file.filename)[1] if file.filename else ".jpg"
     filename = f"{uuid.uuid4()}{ext}"
     upload_path = os.path.join(settings.UPLOAD_DIR, "patient_photos")

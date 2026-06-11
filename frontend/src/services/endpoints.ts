@@ -117,13 +117,49 @@ export const billingApi = {
   create: (data: any) => api.post("/billings", data).then((r) => r.data),
   update: (id: string, data: any) => api.put(`/billings/${id}`, data).then((r) => r.data),
   updatePayment: (id: string, data: any) => api.put(`/billings/${id}/payment`, data).then((r) => r.data),
+  getPdf: (id: string) => api.get(`/billings/${id}/pdf`, { responseType: "blob" }).then((r) => r.data),
+  getTransactions: (id: string) => api.get(`/billings/${id}/transactions`).then((r) => r.data),
 };
 
 export const dashboardApi = {
-  superAdmin: () => api.get("/dashboards/super-admin").then((r) => r.data),
-  groupAdmin: () => api.get("/dashboards/group-admin").then((r) => r.data),
-  hospitalAdmin: () => api.get("/dashboards/hospital-admin").then((r) => r.data),
-  doctor: () => api.get("/dashboards/doctor").then((r) => r.data),
+  superAdmin: (params?: { period?: string; start_date?: string; end_date?: string }) =>
+    api.get("/dashboards/super-admin", { params }).then((r) => r.data),
+  groupAdmin: (params?: { period?: string; start_date?: string; end_date?: string }) =>
+    api.get("/dashboards/group-admin", { params }).then((r) => r.data),
+  hospitalAdmin: (params?: { period?: string; start_date?: string; end_date?: string }) =>
+    api.get("/dashboards/hospital-admin", { params }).then((r) => r.data),
+  doctor: (params?: { period?: string; start_date?: string; end_date?: string }) =>
+    api.get("/dashboards/doctor", { params }).then((r) => r.data),
+  quickViewAdminGroup: (id: string, params?: { period?: string; start_date?: string; end_date?: string }) =>
+    api.get(`/dashboards/quick-view/admin-group/${id}`, { params }).then((r) => r.data),
+  quickViewHospital: (id: string, params?: { period?: string; start_date?: string; end_date?: string }) =>
+    api.get(`/dashboards/quick-view/hospital/${id}`, { params }).then((r) => r.data),
+  quickViewDoctor: (id: string, params?: { period?: string; start_date?: string; end_date?: string }) =>
+    api.get(`/dashboards/quick-view/doctor/${id}`, { params }).then((r) => r.data),
+  quickViewPatient: (id: string) => api.get(`/dashboards/quick-view/patient/${id}`).then((r) => r.data),
+};
+
+export const expensesApi = {
+  list: (params?: Record<string, unknown>) => api.get("/expenses", { params }).then((r) => r.data),
+  get: (id: string) => api.get(`/expenses/${id}`).then((r) => r.data),
+  create: (data: any) => api.post("/expenses", data).then((r) => r.data),
+  update: (id: string, data: any) => api.put(`/expenses/${id}`, data).then((r) => r.data),
+  delete: (id: string) => api.delete(`/expenses/${id}`),
+};
+
+export const reportsApi = {
+  revenue: (params?: { format?: string; period?: string; start_date?: string; end_date?: string }) =>
+    api.get("/reports/revenue", { params, responseType: "blob" }).then((r) => r.data),
+  expenses: (params?: { format?: string; period?: string; start_date?: string; end_date?: string }) =>
+    api.get("/reports/expenses", { params, responseType: "blob" }).then((r) => r.data),
+  profit: (params?: { format?: string; period?: string; start_date?: string; end_date?: string }) =>
+    api.get("/reports/profit", { params, responseType: "blob" }).then((r) => r.data),
+  hospitals: (params?: { format?: string; period?: string; start_date?: string; end_date?: string }) =>
+    api.get("/reports/hospitals", { params, responseType: "blob" }).then((r) => r.data),
+  doctors: (params?: { format?: string; period?: string; start_date?: string; end_date?: string }) =>
+    api.get("/reports/doctors", { params, responseType: "blob" }).then((r) => r.data),
+  adminGroups: (params?: { format?: string; period?: string; start_date?: string; end_date?: string }) =>
+    api.get("/reports/admin-groups", { params, responseType: "blob" }).then((r) => r.data),
 };
 
 export const notificationsApi = {
@@ -135,4 +171,48 @@ export const whatsappApi = {
     api.post("/whatsapp/send", data).then((r) => r.data),
   broadcast: (data: { patient_ids: string[]; message: string }) =>
     api.post("/whatsapp/broadcast", data).then((r) => r.data),
+};
+
+export const crmApi = {
+  communications: {
+    list: (params?: { patient_id?: string; channel?: string; limit?: number; offset?: number }) =>
+      api.get("/crm/communications", { params }).then((r) => r.data),
+    getByPatient: (patientId: string) =>
+      api.get(`/crm/communications/${patientId}`).then((r) => r.data),
+  },
+  templates: {
+    list: () => api.get("/crm/templates").then((r) => r.data),
+    create: (data: { name: string; subject: string; body: string }) =>
+      api.post("/crm/templates", data).then((r) => r.data),
+    update: (id: string, data: { name?: string; subject?: string; body?: string; is_active?: boolean }) =>
+      api.put(`/crm/templates/${id}`, data).then((r) => r.data),
+  },
+  followUps: {
+    list: (params?: { patient_id?: string; status?: string }) =>
+      api.get("/crm/follow-ups", { params }).then((r) => r.data),
+    create: (data: { patient_id: string; follow_up_date: string; notes?: string; doctor_id?: string; case_id?: string }) =>
+      api.post("/crm/follow-ups", data).then((r) => r.data),
+    update: (id: string, data: { status?: string; notes?: string }) =>
+      api.put(`/crm/follow-ups/${id}`, data).then((r) => r.data),
+  },
+  feedback: {
+    list: (params?: { hospital_id?: string; doctor_id?: string }) =>
+      api.get("/crm/feedback", { params }).then((r) => r.data),
+    submit: (data: { patient_id: string; rating: number; review?: string; doctor_id?: string; case_id?: string }) =>
+      api.post("/crm/feedback", data).then((r) => r.data),
+  },
+  segments: () => api.get("/crm/segments").then((r) => r.data),
+  analytics: () => api.get("/crm/analytics").then((r) => r.data),
+  preview: (data: {
+    message: string; filter_type: string;
+    patient_ids?: string[]; appointment_date?: string;
+    doctor_id?: string; status?: string;
+  }) => api.post("/crm/whatsapp/preview", data).then((r) => r.data),
+  sendWhatsApp: (data: { patient_id: string; message: string; message_type?: string }) =>
+    api.post("/crm/whatsapp/send", data).then((r) => r.data),
+  broadcastWhatsApp: (data: {
+    message: string; message_type?: string; filter_type: string;
+    patient_ids?: string[]; appointment_date?: string;
+    doctor_id?: string; status?: string;
+  }) => api.post("/crm/whatsapp/broadcast", data).then((r) => r.data),
 };

@@ -7,11 +7,12 @@ from enum import Enum
 
 
 class PatientStatus(str, Enum):
+    NEW = "NEW"
     ACTIVE = "ACTIVE"
-    INACTIVE = "INACTIVE"
-    TREATMENT_COMPLETED = "TREATMENT_COMPLETED"
+    UNDER_TREATMENT = "UNDER_TREATMENT"
     FOLLOW_UP = "FOLLOW_UP"
-    DISCONTINUED = "DISCONTINUED"
+    COMPLETED = "COMPLETED"
+    INACTIVE = "INACTIVE"
 
 
 class Patient(Base):
@@ -28,7 +29,7 @@ class Patient(Base):
     address: Mapped[str] = mapped_column(Text, nullable=True)
     medical_history: Mapped[str] = mapped_column(Text, nullable=True)
     photo_url: Mapped[str] = mapped_column(String(500), nullable=True)
-    status: Mapped[PatientStatus] = mapped_column(SAEnum(PatientStatus, create_constraint=False), default=PatientStatus.ACTIVE, nullable=False)
+    status: Mapped[PatientStatus] = mapped_column(SAEnum(PatientStatus, create_constraint=False), default=PatientStatus.NEW, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

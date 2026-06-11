@@ -4,12 +4,14 @@ from sqlalchemy import select
 from typing import List, Optional
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.core.permissions import verify_permission, Permission, Role
+from app.core.permissions import verify_permission, verify_tenant_access, Permission, Role
 from app.services.appointment_service import AppointmentService
 from app.schemas.appointment import AppointmentCreate, AppointmentUpdate, AppointmentResponse
 from app.schemas.common import MessageResponse
 from app.models.patient import Patient
 from app.models.hospital import Hospital
+from app.models.appointment import AppointmentStatus
+from app.services.status_automation import StatusAutomationService
 
 router = APIRouter(prefix="/appointments", tags=["Appointments"])
 
@@ -83,6 +85,7 @@ async def get_appointment(appointment_id: str, db: AsyncSession = Depends(get_db
     appointment = await service.get(appointment_id)
     if not appointment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
+    await verify_tenant_access(current_user, appointment, "appointment", db)
     return appointment
 
 
@@ -90,9 +93,16 @@ async def get_appointment(appointment_id: str, db: AsyncSession = Depends(get_db
 async def update_appointment(appointment_id: str, data: AppointmentUpdate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_APPOINTMENTS)
     service = AppointmentService(db)
-    appointment = await service.update(appointment_id, data.model_dump(exclude_none=True), user_id=current_user.get("sub"))
+    appointment = await service.get(appointment_id)
     if not appointment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
+    await verify_tenant_access(current_user, appointment, "appointment", db)
+    appointment = await service.update(appointment_id, data.model_dump(exclude_none=True), user_id=current_user.get("sub"))
+    if data.status is not None:
+        from app.models.appointment import AppointmentStatus
+        svc = StatusAutomationService(db)
+        await svc.update_appointment_status(appointment_id, AppointmentStatus(data.status))
+        await db.commit()
     return appointment
 
 
@@ -100,7 +110,14 @@ async def update_appointment(appointment_id: str, data: AppointmentUpdate, db: A
 async def cancel_appointment(appointment_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_APPOINTMENTS)
     service = AppointmentService(db)
+    appointment = await service.get(appointment_id)
+    if not appointment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
+    await verify_tenant_access(current_user, appointment, "appointment", db)
     appointment = await service.cancel(appointment_id, user_id=current_user.get("sub"))
     if not appointment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
+    svc = StatusAutomationService(db)
+    await svc.update_appointment_status(appointment_id, AppointmentStatus.CANCELLED)
+    await db.commit()
     return MessageResponse(message="Appointment cancelled successfully")

@@ -1,25 +1,74 @@
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { motion } from "framer-motion"
 import { useQuery } from "@tanstack/react-query"
-import { Calendar, DollarSign, Users, FolderOpen, Building2, Sparkles, TrendingUp, Award, Activity } from "lucide-react"
+import { Calendar, DollarSign, Users, FolderOpen, Building2, Sparkles, TrendingUp, Award, Activity, BarChart3, IndianRupee, PieChart, MessageSquare, Mail, Phone } from "lucide-react"
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar } from "recharts"
 import { useAuthStore } from "@/store/authStore"
-import { dashboardApi } from "@/services/endpoints"
+import { dashboardApi, crmApi } from "@/services/endpoints"
 import { Skeleton } from "@/components/ui/skeleton"
 import KpiCard from "@/components/layout/kpi-card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import Leaderboard from "@/components/ui/leaderboard"
-import DashboardDateFilter from "@/components/ui/dashboard-date-filter"
+import QuickViewDrawer from "@/components/ui/quick-view-drawer"
+import DateFilterBar from "@/components/ui/date-filter-bar"
 import { formatIndianRupees, formatIndianNumber } from "@/lib/currency"
+
+const ChartTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="rounded-xl border border-gray-100 bg-white p-3 shadow-lg">
+        <p className="text-sm font-semibold text-gray-900 mb-1">{label}</p>
+        {payload.map((p: any, i: number) => {
+          const isFinancial = p.name === "Revenue" || p.name === "Expenses" || p.name === "Profit" || p.dataKey === "revenue" || p.dataKey === "expenses" || p.dataKey === "profit"
+          return (
+            <p key={i} className="text-xs" style={{ color: p.color }}>
+              {p.name}: {isFinancial ? formatIndianRupees(p.value != null ? p.value : 0) : formatIndianNumber(p.value != null ? p.value : 0)}
+            </p>
+          )
+        })}
+      </div>
+    )
+  }
+  return null
+}
+
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good Morning";
+  if (hour < 17) return "Good Afternoon";
+  return "Good Evening";
+}
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } }
 const item = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0 } }
 
 export default function HospitalAdminDashboard() {
   const { user } = useAuthStore()
-  const [dateRange, setDateRange] = useState<string>("month")
+  const [quickView, setQuickView] = useState<{ type: "admin-group" | "hospital" | "doctor" | "patient"; id: string; name: string } | null>(null)
+
+  const [period, setPeriod] = useState("this_month")
+  const [startDate, setStartDate] = useState("")
+  const [endDate, setEndDate] = useState("")
+
+  const dashParams = useMemo(() => {
+    const params: Record<string, string> = { period }
+    if (period === "custom" && startDate) params.start_date = startDate
+    if (period === "custom" && endDate) params.end_date = endDate
+    return params
+  }, [period, startDate, endDate])
 
   const { data: stats, isLoading } = useQuery({
-    queryKey: ["dash", "hospital", user?.id],
-    queryFn: () => dashboardApi.hospitalAdmin(),
+    queryKey: ["dash", "hospital", user?.id, dashParams],
+    queryFn: () => dashboardApi.hospitalAdmin(dashParams),
+    staleTime: 30000,
+    gcTime: 60000,
+  })
+
+  const { data: crmStats } = useQuery({
+    queryKey: ["crm", "analytics"],
+    queryFn: () => crmApi.analytics(),
+    staleTime: 30000,
+    gcTime: 60000,
   })
 
   if (!user) return null
@@ -28,8 +77,8 @@ export default function HospitalAdminDashboard() {
     return (
       <div className="space-y-6">
         <Skeleton className="h-10 w-80 rounded-xl" />
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-[130px] rounded-2xl" />)}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-[130px] rounded-2xl" />)}
         </div>
       </div>
     )
@@ -39,6 +88,32 @@ export default function HospitalAdminDashboard() {
 
   return (
     <motion.div className="space-y-8 relative" variants={container} initial="hidden" animate="show">
+      {/* Welcome Banner */}
+      <div className="gradient-hero rounded-2xl p-6 md:p-8 mb-6 relative overflow-hidden">
+        <div className="absolute inset-0 bg-grid-pattern opacity-20" />
+        <div className="relative z-10">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold text-white">
+                {getGreeting()}, {user?.full_name?.split(" ").slice(0, 2).join(" ") || "User"} 👋
+              </h1>
+              <p className="text-white/80 mt-1">
+                {new Date().toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <div className="bg-white/15 backdrop-blur-sm rounded-xl px-4 py-3 text-center min-w-[100px]">
+                <p className="text-white/70 text-xs font-medium uppercase tracking-wider">Revenue</p>
+                <p className="text-white text-xl font-bold">{formatIndianRupees(stats?.total_revenue || 0)}</p>
+              </div>
+              <div className="bg-white/15 backdrop-blur-sm rounded-xl px-4 py-3 text-center min-w-[100px]">
+                <p className="text-white/70 text-xs font-medium uppercase tracking-wider">Patients</p>
+                <p className="text-white text-xl font-bold">{stats?.total_patients || 0}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
       <div className="fixed top-40 -left-32 h-80 w-80 rounded-full bg-teal-100/20 blur-3xl pointer-events-none -z-10" />
       <div className="fixed bottom-40 -right-32 h-80 w-80 rounded-full bg-blue-100/20 blur-3xl pointer-events-none -z-10" />
       <motion.div variants={item} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -50,26 +125,120 @@ export default function HospitalAdminDashboard() {
           <p className="mt-1 text-gray-500">Hospital operations at a glance</p>
         </div>
         <div className="flex items-center gap-3">
-          <DashboardDateFilter value={dateRange as any} onChange={setDateRange} />
-          <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary-soft border border-primary-100 shadow-sm">
-            <Sparkles className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium text-primary">Hospital Dashboard</span>
-          </div>
+          <DateFilterBar
+            period={period}
+            onPeriodChange={setPeriod}
+            startDate={startDate}
+            endDate={endDate}
+            onStartDateChange={setStartDate}
+            onEndDateChange={setEndDate}
+          />
         </div>
       </motion.div>
 
-      <div className="space-y-2">
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Revenue & Operations</h2>
-        <motion.div variants={container} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <KpiCard icon={DollarSign} title="Total Revenue" value={stats?.total_revenue != null ? formatIndianRupees(stats.total_revenue) : "₹0"} color="success" delay={0}
-            trend={stats?.revenue_growth ? { value: `${stats.revenue_growth}%`, positive: stats.revenue_growth >= 0 } : undefined} />
-          <KpiCard icon={Calendar} title="Today Appointments" value={formatIndianNumber(stats?.today_appointments ?? 0)} color="warning" delay={0.05} />
-          <KpiCard icon={Users} title="Total Patients" value={formatIndianNumber(stats?.total_patients ?? 0)} color="info" delay={0.1} />
-          <KpiCard icon={FolderOpen} title="Total Cases" value={formatIndianNumber(stats?.total_cases ?? 0)} color="primary" delay={0.15} />
-        </motion.div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <KpiCard className="card-hover" icon={DollarSign} title="Total Revenue" value={stats?.total_revenue != null ? formatIndianRupees(stats.total_revenue) : "₹0"} color="success" delay={0} />
+        <KpiCard className="card-hover" icon={TrendingUp} title="Monthly Revenue" value={formatIndianRupees(stats?.monthly_revenue ?? 0)} color="primary" delay={0.05} />
+        <KpiCard className="card-hover" icon={BarChart3} title="Yearly Revenue" value={formatIndianRupees(stats?.yearly_revenue ?? 0)} color="warning" delay={0.1} />
+        <KpiCard className="card-hover" icon={Calendar} title="Today Appointments" value={formatIndianNumber(stats?.today_appointments ?? 0)} color="warning" delay={0.15} />
+        <KpiCard className="card-hover" icon={Users} title="Total Patients" value={formatIndianNumber(stats?.total_patients ?? 0)} color="info" delay={0.2} />
+        <KpiCard className="card-hover" icon={FolderOpen} title="Active Cases" value={formatIndianNumber(stats?.total_active_cases ?? 0)} color="danger" delay={0.25} />
       </div>
 
-      {!hasData ? (
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <KpiCard className="card-hover" icon={DollarSign} title="Period Revenue" value={formatIndianRupees(stats?.period_revenue ?? 0)} color="success" delay={0.28} />
+        <KpiCard className="card-hover" icon={IndianRupee} title="Expenses" value={formatIndianRupees(stats?.total_expenses ?? 0)} color="danger" delay={0.31} />
+        <KpiCard className="card-hover" icon={TrendingUp} title="Net Profit" value={formatIndianRupees(stats?.net_profit ?? 0)} color={(stats?.net_profit ?? 0) >= 0 ? "success" : "danger"} delay={0.34} />
+        <KpiCard className="card-hover" icon={PieChart} title="Profit Margin" value={stats?.profit_margin != null ? `${stats.profit_margin.toFixed(1)}%` : "0%"} color="primary" delay={0.37} />
+        <KpiCard className="card-hover" icon={BarChart3} title="Pending Billing" value={formatIndianRupees(0)} color="warning" delay={0.4} />
+      </div>
+
+      {crmStats && (
+        <div>
+          <h3 className="mb-3 text-sm font-semibold text-gray-500 uppercase tracking-wider">CRM Analytics</h3>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <KpiCard icon={MessageSquare} title="Today's Messages" value={formatIndianNumber(crmStats.todays_messages ?? 0)} color="info" delay={0} />
+            <KpiCard icon={Mail} title="Campaigns Sent" value={formatIndianNumber(crmStats.campaigns_sent ?? 0)} color="primary" delay={0.05} />
+            <KpiCard icon={BarChart3} title="Success Rate" value={`${crmStats.broadcast_success_rate?.success_rate ?? 0}%`} color="success" delay={0.1} />
+            <KpiCard icon={TrendingUp} title="Delivery Rate" value={`${crmStats.delivery_rate ?? 0}%`} color="warning" delay={0.15} />
+            <KpiCard icon={Users} title="Avg Rating" value={`${crmStats.average_rating ?? 0}/5`} color="danger" delay={0.2} />
+          </div>
+          {crmStats.top_communication_days && crmStats.top_communication_days.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-3">
+              {crmStats.top_communication_days.map((d: any) => (
+                <div key={d.date} className="rounded-lg border bg-white px-3 py-2 text-sm shadow-sm">
+                  <span className="text-gray-500">{d.date}</span>
+                  <span className="ml-2 font-semibold text-gray-900">{d.count} msgs</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {hasData && (
+        <>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Card>
+              <CardHeader><CardTitle className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Revenue vs Expenses</CardTitle></CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={260}>
+                  <LineChart data={stats?.revenue_expense_trend || stats?.revenue_trend || []}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+                    <Tooltip content={<ChartTooltip />} />
+                    <Legend />
+                    <Line type="monotone" dataKey="revenue" name="Revenue" stroke="#0ea5e9" strokeWidth={2} dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="expenses" name="Expenses" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="profit" name="Profit" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Monthly Expense Breakdown</CardTitle></CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={stats?.expense_trend || stats?.revenue_expense_trend || []}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+                    <Tooltip content={<ChartTooltip />} />
+                    <Legend />
+                    <Bar dataKey="expenses" name="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+
+          <motion.div variants={item} className="grid gap-4 lg:grid-cols-2">
+            <Leaderboard
+              title="Doctor Performance"
+              valueLabel="Revenue"
+              icon={Award}
+              items={(stats?.doctor_performance ?? []).map((d: any, i: number) => ({
+                rank: i + 1, name: d.name, value: formatIndianRupees(d.value), id: d.id,
+              }))}
+              onItemClick={(id) => {
+                const item = (stats?.doctor_performance ?? []).find((d: any) => d.id === id)
+                if (item) setQuickView({ type: "doctor", id: item.id, name: item.name })
+              }}
+            />
+            <Leaderboard
+              title="Top Treatments"
+              valueLabel="Count"
+              icon={Activity}
+              items={(stats?.treatment_performance ?? []).map((t: any, i: number) => ({
+                rank: i + 1, name: t.name, value: `${t.value} patients`,
+              }))}
+            />
+          </motion.div>
+        </>
+      )}
+
+      {!hasData && (
         <motion.div variants={item}
           className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 bg-white px-6 py-20 text-center">
           <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-warning to-amber-500 shadow-lg shadow-warning/20">
@@ -78,29 +247,16 @@ export default function HospitalAdminDashboard() {
           <h2 className="text-xl font-semibold text-gray-900">No activity yet</h2>
           <p className="mt-1.5 text-sm text-gray-500 max-w-sm">Patient registrations and appointments will appear here.</p>
         </motion.div>
-      ) : (
-        <motion.div variants={item} className="grid gap-4 lg:grid-cols-2">
-          <Leaderboard
-            title="Top Doctors"
-            valueLabel="Revenue"
-            icon={Award}
-            items={(stats?.top_doctors ?? []).map((d: any, i: number) => ({
-              rank: i + 1,
-              name: d.name,
-              value: formatIndianRupees(d.value),
-            }))}
-          />
-          <Leaderboard
-            title="Top Treatments"
-            valueLabel="Patients"
-            icon={Activity}
-            items={(stats?.top_treatments ?? []).map((t: any, i: number) => ({
-              rank: i + 1,
-              name: t.name,
-              value: `${t.value} patients`,
-            }))}
-          />
-        </motion.div>
+      )}
+
+      {quickView && (
+        <QuickViewDrawer
+          open={!!quickView}
+          onClose={() => setQuickView(null)}
+          type={quickView.type}
+          entityId={quickView.id}
+          entityName={quickView.name}
+        />
       )}
     </motion.div>
   )

@@ -203,7 +203,7 @@ export default function ConsultantList() {
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto rounded-md border">
+              <div className="overflow-x-auto rounded-md border mobile-card-view">
                 <table className="w-full text-sm">
                   <thead>
                     {table.getHeaderGroups().map((hg) => (
@@ -234,11 +234,15 @@ export default function ConsultantList() {
                         animate={{ opacity: 1 }}
                         className="border-b transition-colors hover:bg-muted/50"
                       >
-                        {row.getVisibleCells().map((cell) => (
-                          <td key={cell.id} className="px-4 py-3">
-                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                          </td>
-                        ))}
+                        {row.getVisibleCells().map((cell) => {
+                          const header = cell.column.columnDef.header
+                          const label = typeof header === "string" ? header : cell.column.id
+                          return (
+                            <td key={cell.id} className="px-4 py-3" data-label={label}>
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                            </td>
+                          )
+                        })}
                       </motion.tr>
                     ))}
                   </tbody>

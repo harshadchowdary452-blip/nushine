@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select"
 import { Card, CardContent } from "@/components/ui/card"
 import { hospitalsApi, groupsApi } from "@/services/endpoints"
+import { useAuthStore } from "@/store/authStore"
 import { useToast } from "@/components/ui/toast"
 import DentalEmptyState from "@/components/ui/dental-empty-state"
 import type { Hospital, AdminGroup } from "@/types"
@@ -59,6 +60,8 @@ function getEmptyHospitalForm(): HospitalForm {
 export default function AdminHospitals() {
   const queryClient = useQueryClient()
   const { addToast } = useToast()
+  const currentUser = useAuthStore((s) => s.user)
+  const isGroupAdmin = currentUser?.role === "GROUP_ADMIN"
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -75,7 +78,14 @@ export default function AdminHospitals() {
   const { data: groupsData } = useQuery({
     queryKey: ["admin-groups"],
     queryFn: () => groupsApi.list({ page_size: 100 }),
+    enabled: !isGroupAdmin,
   })
+
+  const groups: AdminGroup[] = isGroupAdmin
+    ? currentUser?.admin_group_id
+      ? [{ id: currentUser.admin_group_id, name: currentUser.admin_group_name || "My Group" } as AdminGroup]
+      : []
+    : groupsData || []
 
   const createMutation = useMutation({
     mutationFn: async (data: HospitalForm) => {
@@ -131,11 +141,13 @@ export default function AdminHospitals() {
     return statusFilter === "active" ? h.is_active : !h.is_active
   })
 
-  const groups: AdminGroup[] = groupsData || []
-
   function openCreateDialog() {
     setEditingHospital(null)
-    setForm(getEmptyHospitalForm())
+    const initial = getEmptyHospitalForm()
+    if (isGroupAdmin && currentUser?.admin_group_id) {
+      initial.admin_group_id = currentUser.admin_group_id
+    }
+    setForm(initial)
     setDialogOpen(true)
   }
 
@@ -241,7 +253,7 @@ export default function AdminHospitals() {
               action={<Button onClick={openCreateDialog}><Plus className="h-4 w-4" /> Add Hospital</Button>}
             />
           ) : (
-            <div className="overflow-x-auto rounded-md border">
+            <div className="overflow-x-auto rounded-md border mobile-card-view">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/50">
@@ -262,19 +274,19 @@ export default function AdminHospitals() {
                       animate={{ opacity: 1 }}
                       className="border-b transition-colors hover:bg-muted/50"
                     >
-                      <td className="px-4 py-3 font-medium">{hospital.name}</td>
-                      <td className="px-4 py-3 text-muted-foreground max-w-[200px] truncate">
+                      <td className="px-4 py-3 font-medium" data-label="Name">{hospital.name}</td>
+                      <td className="px-4 py-3 text-muted-foreground max-w-[200px] truncate" data-label="Address">
                         {hospital.address || "—"}
                       </td>
-                      <td className="px-4 py-3">{hospital.phone || "—"}</td>
-                      <td className="px-4 py-3">{hospital.email || "—"}</td>
-                      <td className="px-4 py-3">{hospital.registration_number || "—"}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3" data-label="Phone">{hospital.phone || "—"}</td>
+                      <td className="px-4 py-3" data-label="Email">{hospital.email || "—"}</td>
+                      <td className="px-4 py-3" data-label="Registration No.">{hospital.registration_number || "—"}</td>
+                      <td className="px-4 py-3" data-label="Status">
                         <Badge variant={hospital.is_active ? "success" : "secondary"}>
                           {hospital.is_active ? "Active" : "Inactive"}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3" data-label="Actions">
                         <div className="flex items-center gap-1">
                           <Button variant="ghost" size="icon" onClick={() => openEditDialog(hospital)}>
                             <Edit className="h-4 w-4" />

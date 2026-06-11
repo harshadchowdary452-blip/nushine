@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 
@@ -22,6 +22,7 @@ class AdminGroupResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     hospital_count: int = 0
+    hospital_names: List[str] = []
     doctor_count: int = 0
     patient_count: int = 0
 

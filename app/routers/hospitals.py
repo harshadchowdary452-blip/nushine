@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.core.permissions import verify_permission, Permission, Role
+from app.core.permissions import verify_permission, verify_tenant_access, Permission, Role
 from app.services.hospital_service import HospitalService
 from app.services.user_service import UserService
 from app.schemas.hospital import HospitalCreate, HospitalUpdate, HospitalResponse
@@ -49,6 +49,7 @@ async def get_hospital(hospital_id: str, db: AsyncSession = Depends(get_db), cur
     hospital = await service.get(hospital_id)
     if not hospital:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hospital not found")
+    await verify_tenant_access(current_user, hospital, "hospital", db)
     return hospital
 
 
@@ -56,9 +57,11 @@ async def get_hospital(hospital_id: str, db: AsyncSession = Depends(get_db), cur
 async def update_hospital(hospital_id: str, data: HospitalUpdate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.CREATE_HOSPITAL)
     service = HospitalService(db)
-    hospital = await service.update(hospital_id, data.model_dump(exclude_none=True), user_id=current_user.get("sub"))
+    hospital = await service.get(hospital_id)
     if not hospital:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hospital not found")
+    await verify_tenant_access(current_user, hospital, "hospital", db)
+    hospital = await service.update(hospital_id, data.model_dump(exclude_none=True), user_id=current_user.get("sub"))
     return hospital
 
 
@@ -66,9 +69,11 @@ async def update_hospital(hospital_id: str, data: HospitalUpdate, db: AsyncSessi
 async def delete_hospital(hospital_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.CREATE_HOSPITAL)
     service = HospitalService(db)
-    deleted = await service.delete(hospital_id, user_id=current_user.get("sub"))
-    if not deleted:
+    hospital = await service.get(hospital_id)
+    if not hospital:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hospital not found")
+    await verify_tenant_access(current_user, hospital, "hospital", db)
+    deleted = await service.delete(hospital_id, user_id=current_user.get("sub"))
     return MessageResponse(message="Hospital deleted successfully")
 
 

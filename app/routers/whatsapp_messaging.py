@@ -4,7 +4,7 @@ from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.core.permissions import Role, Permission
+from app.core.permissions import Role, Permission, verify_tenant_access
 from app.repositories.patient_repository import PatientRepository
 from app.utils.whatsapp import WhatsAppProvider
 
@@ -49,7 +49,10 @@ async def broadcast_whatsapp_messages(
     provider = WhatsAppProvider()
     for pid in request.patient_ids:
         patient = await patient_repo.get(pid)
-        if patient and patient.phone:
+        if not patient:
+            continue
+        await verify_tenant_access(current_user, patient, "patient", db)
+        if patient.phone:
             msg = request.message.replace("{name}", patient.full_name)
             ok = await provider.send_message(patient.phone, msg)
             if ok:

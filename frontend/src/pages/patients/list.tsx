@@ -43,6 +43,11 @@ import DentalEmptyState from "@/components/ui/dental-empty-state"
 import type { Patient, PatientStatus, User, PaginatedResponse } from "@/types"
 import { useAuthStore } from "@/store/authStore"
 
+function StatusBadge({ status }: { status: string }) {
+  const cls = `status-badge status-badge-${status?.toLowerCase().replace(/_/g, "_")}`;
+  return <span className={cls}>{status?.replace(/_/g, " ")}</span>;
+}
+
 const genderBadgeVariant: Record<string, "default" | "secondary" | "outline" | "destructive" | "success" | "warning"> = {
   MALE: "default",
   FEMALE: "success",
@@ -165,20 +170,7 @@ export default function PatientList() {
         header: "Status",
         cell: ({ row }) => {
           const status = row.getValue("status") as string
-          const variant: Record<string, "default" | "secondary" | "outline" | "destructive" | "success" | "warning"> = {
-            ACTIVE: "success",
-            INACTIVE: "secondary",
-            TREATMENT_COMPLETED: "default",
-            FOLLOW_UP: "warning",
-            DISCONTINUED: "destructive",
-          }
-          return status ? (
-            <Badge variant={variant[status] || "outline"} className="text-[10px]">
-              {status.replace(/_/g, " ")}
-            </Badge>
-          ) : (
-            <span className="text-muted-foreground">—</span>
-          )
+          return status ? <StatusBadge status={status} /> : <span className="text-muted-foreground">—</span>
         },
       },
       {
@@ -253,9 +245,11 @@ export default function PatientList() {
   return (
     <div className="space-y-6">
       <PageHeader title="Patients" description="Manage patient records">
-        <Button onClick={openDialog}>
-          <Plus className="h-4 w-4" /> Add Patient
-        </Button>
+        {currentUser?.role !== "DOCTOR" && (
+          <Button onClick={openDialog}>
+            <Plus className="h-4 w-4" /> Add Patient
+          </Button>
+        )}
       </PageHeader>
 
       <Card>
@@ -285,7 +279,7 @@ export default function PatientList() {
           </div>
           <div className="flex flex-wrap items-center gap-2 mt-2">
             <span className="text-xs text-muted-foreground mr-1">Status:</span>
-            {["all", "ACTIVE", "INACTIVE", "TREATMENT_COMPLETED", "FOLLOW_UP", "DISCONTINUED"].map((s) => (
+            {["all", "NEW", "ACTIVE", "UNDER_TREATMENT", "FOLLOW_UP", "COMPLETED", "INACTIVE"].map((s) => (
               <Button
                 key={s}
                 variant={statusFilter === s ? "default" : "outline"}
@@ -308,11 +302,11 @@ export default function PatientList() {
               icon={Users}
               title="No patients yet"
               description="Begin your patient journey by registering the first patient in your dental practice."
-              action={<Button onClick={openDialog}><UserPlus className="h-4 w-4" /> Add Patient</Button>}
+              action={currentUser?.role !== "DOCTOR" ? <Button onClick={openDialog}><UserPlus className="h-4 w-4" /> Add Patient</Button> : undefined}
             />
           ) : (
             <>
-              <div className="overflow-x-auto rounded-md border">
+              <div className="overflow-x-auto rounded-md border mobile-card-view">
                 <table className="w-full text-sm">
                   <thead>
                     {table.getHeaderGroups().map((hg) => (
@@ -344,11 +338,15 @@ export default function PatientList() {
                         className="border-b transition-colors hover:bg-muted/50 cursor-pointer"
                         onClick={() => navigate(`/patients/${row.original.id}`)}
                       >
-                        {row.getVisibleCells().map((cell) => (
-                          <td key={cell.id} className="px-4 py-3">
-                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                          </td>
-                        ))}
+                        {row.getVisibleCells().map((cell) => {
+                          const header = cell.column.columnDef.header
+                          const label = typeof header === "string" ? header : cell.column.id
+                          return (
+                            <td key={cell.id} className="px-4 py-3" data-label={label}>
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                            </td>
+                          )
+                        })}
                       </motion.tr>
                     ))}
                   </tbody>

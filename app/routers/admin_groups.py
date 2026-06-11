@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import List
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.core.permissions import verify_permission, Permission, Role
@@ -19,7 +20,7 @@ async def create_group(data: AdminGroupCreate, db: AsyncSession = Depends(get_db
     return await service.create(data.model_dump(), user_id=current_user.get("sub"))
 
 
-@router.get("/")
+@router.get("/", response_model=List[AdminGroupResponse])
 async def get_groups(skip: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=200), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_GROUP_ADMINS)
     service = AdminGroupService(db)

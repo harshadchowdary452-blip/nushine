@@ -21,12 +21,14 @@ class AdminGroupService:
     async def _compute_counts(self, group_id: str) -> dict:
         hospital_count = (await self.db.execute(select(func.count(Hospital.id)).where(Hospital.admin_group_id == group_id))).scalar() or 0
         doctor_count = (await self.db.execute(select(func.count(User.id)).where(User.admin_group_id == group_id, User.role == Role.DOCTOR.value))).scalar() or 0
-        hosp_ids_result = await self.db.execute(select(Hospital.id).where(Hospital.admin_group_id == group_id))
-        hosp_ids = [row[0] for row in hosp_ids_result.all()]
+        hosp_result = await self.db.execute(select(Hospital.id, Hospital.name).where(Hospital.admin_group_id == group_id).order_by(Hospital.name))
+        hosp_rows = hosp_result.all()
+        hosp_ids = [row[0] for row in hosp_rows]
+        hosp_names = [row[1] for row in hosp_rows]
         patient_count = 0
         if hosp_ids:
             patient_count = (await self.db.execute(select(func.count(Patient.id)).where(Patient.hospital_id.in_(hosp_ids)))).scalar() or 0
-        return {"hospital_count": hospital_count, "doctor_count": doctor_count, "patient_count": patient_count}
+        return {"hospital_count": hospital_count, "hospital_names": hosp_names, "doctor_count": doctor_count, "patient_count": patient_count}
 
     async def create(self, data: dict, user_id: str = None) -> AdminGroup:
         group = await self.repo.create(**data)

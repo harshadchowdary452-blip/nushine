@@ -90,7 +90,7 @@ class PatientService:
                     break
 
             if all_cases_completed and all_billing_settled:
-                new_status = PatientStatus.TREATMENT_COMPLETED
+                new_status = PatientStatus.COMPLETED
                 patient = await self.repo.update(patient_id, status=new_status)
                 if patient:
                     logger.info("AUTO_UPDATE_PATIENT_STATUS - Patient %s updated to %s", patient_id, new_status.value)

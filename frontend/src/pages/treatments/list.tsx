@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
-import { Plus, Stethoscope, Clock, DollarSign, FileText } from "lucide-react"
+import { Plus, Stethoscope, Clock, FileText, IndianRupee } from "lucide-react"
 import { format } from "date-fns"
 import PageHeader from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
@@ -29,6 +29,12 @@ import { treatmentApi, casesApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
 import type { TreatmentPlan, Case, PaginatedResponse } from "@/types"
 import { useAuthStore } from "@/store/authStore"
+import { formatIndianRupees } from "@/lib/currency"
+
+function StatusBadge({ status }: { status: string }) {
+  const cls = `status-badge status-badge-${status?.toLowerCase().replace(/_/g, "_")}`;
+  return <span className={cls}>{status?.replace(/_/g, " ")}</span>;
+}
 
 interface TreatmentForm {
   case_id: string
@@ -78,6 +84,17 @@ export default function TreatmentList() {
     },
     onError: (err: any) => {
       addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to create treatment plan", variant: "destructive" })
+    },
+  })
+
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) => treatmentApi.update(id, { status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["treatment-plans"] })
+      addToast({ title: "Success", description: "Status updated", variant: "success" })
+    },
+    onError: (err: any) => {
+      addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to update status", variant: "destructive" })
     },
   })
 
@@ -159,7 +176,23 @@ export default function TreatmentList() {
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <CardTitle className="text-base">{plan.treatment_name}</CardTitle>
-                      <Badge variant="outline">{totalSittings} sittings</Badge>
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={plan.status}
+                          onValueChange={(v) => statusMutation.mutate({ id: plan.id, status: v })}
+                        >
+                          <SelectTrigger className="h-7 w-[130px] text-xs border-0 p-0">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="PLANNED">Planned</SelectItem>
+                            <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                            <SelectItem value="COMPLETED">Completed</SelectItem>
+                            <SelectItem value="CANCELLED">Cancelled</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Badge variant="outline">{totalSittings} sittings</Badge>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
@@ -170,8 +203,8 @@ export default function TreatmentList() {
                     )}
                     <div className="flex items-center gap-4 text-sm">
                       <span className="flex items-center gap-1 text-muted-foreground">
-                        <DollarSign className="h-4 w-4" />
-                        {plan.cost.toLocaleString()}
+                        <IndianRupee className="h-4 w-4" />
+                        {formatIndianRupees(plan.cost)}
                       </span>
                       {plan.duration_minutes && (
                         <span className="flex items-center gap-1 text-muted-foreground">

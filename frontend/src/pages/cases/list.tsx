@@ -41,6 +41,11 @@ import { useToast } from "@/components/ui/toast"
 import type { Case, Patient, User, PaginatedResponse } from "@/types"
 import { useAuthStore } from "@/store/authStore"
 
+function StatusBadge({ status }: { status: string }) {
+  const cls = `status-badge status-badge-${status?.toLowerCase().replace(/_/g, "_")}`;
+  return <span className={cls}>{status?.replace(/_/g, " ")}</span>;
+}
+
 const statusVariant: Record<string, "default" | "secondary" | "outline" | "destructive" | "success" | "warning"> = {
   NEW: "default",
   DIAGNOSIS_PENDING: "warning",
@@ -172,11 +177,7 @@ export default function CaseList() {
       {
         accessorKey: "status",
         header: "Status",
-        cell: ({ row }) => (
-          <Badge variant={statusVariant[row.original.status] || "default"}>
-            {row.original.status.replace(/_/g, " ")}
-          </Badge>
-        ),
+        cell: ({ row }) => <StatusBadge status={row.original.status} />,
       },
       {
         accessorKey: "created_at",
@@ -269,7 +270,7 @@ export default function CaseList() {
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto rounded-md border">
+              <div className="overflow-x-auto rounded-md border mobile-card-view">
                 <table className="w-full text-sm">
                   <thead>
                     {table.getHeaderGroups().map((hg) => (
@@ -301,11 +302,15 @@ export default function CaseList() {
                         className="border-b transition-colors hover:bg-muted/50 cursor-pointer"
                         onClick={() => navigate(`/cases/${row.original.id}`)}
                       >
-                        {row.getVisibleCells().map((cell) => (
-                          <td key={cell.id} className="px-4 py-3">
-                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                          </td>
-                        ))}
+                        {row.getVisibleCells().map((cell) => {
+                          const header = cell.column.columnDef.header
+                          const label = typeof header === "string" ? header : cell.column.id
+                          return (
+                            <td key={cell.id} className="px-4 py-3" data-label={label}>
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                            </td>
+                          )
+                        })}
                       </motion.tr>
                     ))}
                   </tbody>

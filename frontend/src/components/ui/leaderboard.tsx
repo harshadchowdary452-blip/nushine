@@ -6,6 +6,7 @@ interface LeaderboardItem {
   rank: number
   name: string
   value: string
+  subtitle?: string
   growth?: string
   positive?: boolean
   id?: string
@@ -17,12 +18,13 @@ interface LeaderboardProps {
   valueLabel?: string
   loading?: boolean
   icon?: React.ElementType
+  onItemClick?: (id?: string) => void
 }
 
 const rankIcons = [Trophy, Medal, Award]
 const rankColors = ["text-yellow-500", "text-gray-400", "text-amber-700"]
 
-export default function Leaderboard({ title, items, valueLabel, loading, icon: Icon }: LeaderboardProps) {
+export default function Leaderboard({ title, items, valueLabel, loading, icon: Icon, onItemClick }: LeaderboardProps) {
   if (loading) {
     return (
       <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-kpi">
@@ -50,8 +52,8 @@ export default function Leaderboard({ title, items, valueLabel, loading, icon: I
         {valueLabel && <span className="text-xs text-gray-400">{valueLabel}</span>}
       </div>
 
-      <div className="space-y-1.5">
-        {items.map((item) => {
+      <div className="space-y-2">
+        {items.map((item, idx) => {
           const RankIcon = item.rank <= 3 ? rankIcons[item.rank - 1] : null
           const rankColor = item.rank <= 3 ? rankColors[item.rank - 1] : "text-gray-300"
           return (
@@ -60,17 +62,22 @@ export default function Leaderboard({ title, items, valueLabel, loading, icon: I
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: item.rank * 0.04 }}
+              onClick={() => onItemClick?.(item.id)}
               className={cn(
-                "flex items-center justify-between rounded-xl px-3 py-2.5 transition-colors hover:bg-gray-50",
-                item.rank <= 3 && "bg-gradient-to-r from-amber-50/50 to-transparent"
+                "flex items-center justify-between rounded-xl px-4 py-3 transition-all hover:bg-gray-50 cursor-pointer border border-transparent",
+                item.rank <= 3 && "bg-gradient-to-r from-amber-50/50 to-transparent",
+                idx < items.length - 1 && "border-b border-gray-100/80"
               )}
             >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold", rankColor)}>
-                  {RankIcon ? <RankIcon className="h-4 w-4" /> : <span className="text-gray-400">#{item.rank}</span>}
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold", rankColor)}>
+                    {RankIcon ? <RankIcon className="h-4 w-4" /> : <span className="text-gray-300">#{item.rank}</span>}
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-sm font-medium text-gray-700 truncate block">{item.name}</span>
+                    {item.subtitle && <span className="text-[10px] text-gray-400 truncate block mt-0.5">{item.subtitle}</span>}
+                  </div>
                 </div>
-                <span className="text-sm font-medium text-gray-700 truncate">{item.name}</span>
-              </div>
               <div className="flex items-center gap-3 shrink-0">
                 <span className="text-sm font-semibold text-gray-900">{item.value}</span>
                 {item.growth && (

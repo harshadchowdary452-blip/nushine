@@ -109,13 +109,21 @@ class CaseService:
 
     async def complete(self, case_id: str, user_id: str = None) -> Optional[Case]:
         try:
-            case = await self.repo.update(case_id, status=CaseStatus.COMPLETED)
+            from app.models.post_op import PostOp
+            from datetime import datetime, timezone
+            post_op_result = await self.db.execute(select(PostOp).where(PostOp.case_id == case_id))
+            post_ops = post_op_result.scalars().all()
+            if not post_ops:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Case cannot be completed without a Post-Op image. Please upload Post-Op images first.")
+            case = await self.repo.update(case_id, status=CaseStatus.COMPLETED, completion_date=datetime.now(timezone.utc))
             if case:
                 await self.audit_log_repo.create(user_id=user_id, action="COMPLETE_CASE", entity_type="CASE", entity_id=case_id, details="Case completed")
                 from app.services.patient_service import PatientService
                 patient_svc = PatientService(self.db)
                 await patient_svc.auto_update_patient_status(case.patient_id, user_id=user_id)
             return case
+        except HTTPException:
+            raise
         except Exception as e:
             logger.exception("COMPLETE_CASE - Error: %s", str(e))
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to complete case: {str(e)}")

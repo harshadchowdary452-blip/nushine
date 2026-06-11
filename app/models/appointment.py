@@ -15,6 +15,15 @@ class AppointmentStatus(str, Enum):
     NO_SHOW = "NO_SHOW"
 
 
+class AppointmentType(str, Enum):
+    CONSULTATION = "CONSULTATION"
+    FOLLOW_UP = "FOLLOW_UP"
+    TREATMENT = "TREATMENT"
+    EMERGENCY = "EMERGENCY"
+    CHECKUP = "CHECKUP"
+    SURGERY = "SURGERY"
+
+
 class Appointment(Base):
     __tablename__ = "appointments"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -23,6 +32,7 @@ class Appointment(Base):
     appointment_date: Mapped[date] = mapped_column(Date, nullable=False)
     appointment_time: Mapped[time] = mapped_column(Time, nullable=False)
     status: Mapped[AppointmentStatus] = mapped_column(SAEnum(AppointmentStatus, create_constraint=False), default=AppointmentStatus.SCHEDULED, nullable=False)
+    appointment_type: Mapped[AppointmentType] = mapped_column(SAEnum(AppointmentType, create_constraint=False), default=AppointmentType.CONSULTATION, nullable=False)
     notes: Mapped[str] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

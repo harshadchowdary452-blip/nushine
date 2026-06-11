@@ -4,12 +4,13 @@ from sqlalchemy import select
 from typing import List, Optional
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.core.permissions import verify_permission, Permission, Role
+from app.core.permissions import verify_permission, verify_tenant_access, Permission, Role
 from app.services.case_service import CaseService
 from app.schemas.case import CaseCreate, CaseUpdate, CaseResponse
 from app.schemas.common import MessageResponse
-from app.models.patient import Patient
+from app.models.patient import Patient, PatientStatus
 from app.models.hospital import Hospital
+from app.services.status_automation import StatusAutomationService
 
 router = APIRouter(prefix="/cases", tags=["Cases"])
 
@@ -18,7 +19,11 @@ router = APIRouter(prefix="/cases", tags=["Cases"])
 async def create_case(data: CaseCreate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.CREATE_CASE)
     service = CaseService(db)
-    return await service.create(data.model_dump(), user_id=current_user.get("sub"))
+    case = await service.create(data.model_dump(), user_id=current_user.get("sub"))
+    svc = StatusAutomationService(db)
+    await svc.update_patient_status(case.patient_id)
+    await db.commit()
+    return case
 
 
 @router.get("/")
@@ -65,6 +70,7 @@ async def get_case(case_id: str, db: AsyncSession = Depends(get_db), current_use
     case = await service.get(case_id)
     if not case:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
+    await verify_tenant_access(current_user, case, "case", db)
     return case
 
 
@@ -72,9 +78,11 @@ async def get_case(case_id: str, db: AsyncSession = Depends(get_db), current_use
 async def update_case(case_id: str, data: CaseUpdate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_CASES)
     service = CaseService(db)
-    case = await service.update(case_id, data.model_dump(exclude_none=True), user_id=current_user.get("sub"))
+    case = await service.get(case_id)
     if not case:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
+    await verify_tenant_access(current_user, case, "case", db)
+    case = await service.update(case_id, data.model_dump(exclude_none=True), user_id=current_user.get("sub"))
     return case
 
 
@@ -82,9 +90,11 @@ async def update_case(case_id: str, data: CaseUpdate, db: AsyncSession = Depends
 async def assign_consultant(case_id: str, consultant_id: str = Query(...), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.ASSIGN_CONSULTANT)
     service = CaseService(db)
-    case = await service.assign_consultant(case_id, consultant_id, user_id=current_user.get("sub"))
+    case = await service.get(case_id)
     if not case:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
+    await verify_tenant_access(current_user, case, "case", db)
+    case = await service.assign_consultant(case_id, consultant_id, user_id=current_user.get("sub"))
     return case
 
 
@@ -92,7 +102,27 @@ async def assign_consultant(case_id: str, consultant_id: str = Query(...), db: A
 async def complete_case(case_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.COMPLETE_TREATMENT)
     service = CaseService(db)
-    case = await service.complete(case_id, user_id=current_user.get("sub"))
+    case = await service.get(case_id)
     if not case:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
+    await verify_tenant_access(current_user, case, "case", db)
+    case = await service.complete(case_id, user_id=current_user.get("sub"))
+    svc = StatusAutomationService(db)
+    await svc.update_patient_status(case.patient_id)
+    await db.commit()
+    return case
+
+
+@router.post("/{case_id}/status", response_model=CaseResponse)
+async def update_case_status(case_id: str, status: str = Query(...), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.MANAGE_CASES)
+    service = CaseService(db)
+    case = await service.get(case_id)
+    if not case:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
+    await verify_tenant_access(current_user, case, "case", db)
+    case = await service.update(case_id, {"status": status}, user_id=current_user.get("sub"))
+    svc = StatusAutomationService(db)
+    await svc.update_patient_status(case.patient_id)
+    await db.commit()
     return case

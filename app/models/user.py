@@ -29,3 +29,4 @@ class User(Base):
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
     cases = relationship("Case", back_populates="doctor")
     appointments = relationship("Appointment", back_populates="doctor")
+    created_expenses = relationship("HospitalMonthlyExpense", back_populates="creator")

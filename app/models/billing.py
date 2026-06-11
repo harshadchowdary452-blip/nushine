@@ -24,6 +24,7 @@ class Billing(Base):
     payment_status: Mapped[PaymentStatus] = mapped_column(SAEnum(PaymentStatus, create_constraint=False), default=PaymentStatus.PENDING, nullable=False)
     payment_method: Mapped[str] = mapped_column(String(50), nullable=True)
     notes: Mapped[str] = mapped_column(Text, nullable=True)
+    pdf_path: Mapped[str] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     case = relationship("Case", back_populates="billings")

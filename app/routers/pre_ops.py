@@ -4,7 +4,9 @@ from typing import Optional
 import os, uuid, shutil
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.core.permissions import verify_permission, Permission
+from app.core.permissions import verify_permission, verify_tenant_access, Permission, Role
+from sqlalchemy import select
+from app.models.case import Case
 from app.repositories.pre_op_repository import PreOpRepository
 from app.repositories.audit_log_repository import AuditLogRepository
 from app.config import settings
@@ -15,6 +17,11 @@ router = APIRouter(prefix="/pre-ops", tags=["Pre-Op"])
 @router.post("/{case_id}")
 async def add_pre_op(case_id: str, notes: Optional[str] = Form(None), photos: Optional[UploadFile] = File(None), xrays: Optional[UploadFile] = File(None), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.ADD_PRE_OP)
+    case_result = await db.execute(select(Case).where(Case.id == case_id))
+    case_obj = case_result.scalar_one_or_none()
+    if not case_obj:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
+    await verify_tenant_access(current_user, case_obj, "case", db)
     repo = PreOpRepository(db)
     audit = AuditLogRepository(db)
     photo_urls = []

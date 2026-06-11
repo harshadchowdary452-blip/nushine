@@ -60,6 +60,8 @@ export interface AdminGroup {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  hospital_count: number;
+  hospital_names: string[];
 }
 
 export interface Hospital {
@@ -99,7 +101,7 @@ export interface Patient {
 
 export type CaseStatus = "NEW" | "DIAGNOSIS_PENDING" | "TREATMENT_PLANNED" | "IN_PROGRESS" | "FOLLOW_UP" | "COMPLETED" | "CANCELLED";
 
-export type PatientStatus = "ACTIVE" | "INACTIVE" | "TREATMENT_COMPLETED" | "FOLLOW_UP" | "DISCONTINUED";
+export type PatientStatus = "NEW" | "ACTIVE" | "UNDER_TREATMENT" | "FOLLOW_UP" | "COMPLETED" | "INACTIVE";
 
 export interface Case {
   id: string;
@@ -242,12 +244,90 @@ export interface AuditLog {
   created_at: string;
 }
 
+export interface HospitalMonthlyExpense {
+  id: string;
+  hospital_id: string;
+  expense_month: number;
+  expense_year: number;
+  expense_category: string;
+  expense_name: string;
+  description: string | null;
+  amount: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExpenseCreate {
+  hospital_id?: string;
+  expense_month: number;
+  expense_year: number;
+  expense_category: string;
+  expense_name: string;
+  description?: string;
+  amount: number;
+}
+
+export interface ExpenseUpdate {
+  expense_month?: number;
+  expense_year?: number;
+  expense_category?: string;
+  expense_name?: string;
+  description?: string;
+  amount?: number;
+}
+
+export interface TrendPoint {
+  month: string;
+  revenue?: number;
+  count?: number;
+  patients?: number;
+}
+
+export interface RevenueExpenseTrendPoint {
+  month: string;
+  revenue: number;
+  expenses: number;
+  profit: number;
+  profit_margin: number;
+}
+
+export interface ExpenseTrendPoint {
+  month: string;
+  expenses: number;
+}
+
+export interface ProfitTrendPoint {
+  month: string;
+  profit: number;
+  profit_margin?: number;
+}
+
+export interface ExpenseBreakdownItem {
+  category: string;
+  amount: number;
+}
+
+export interface Performer {
+  id?: string;
+  name: string;
+  value: number;
+}
+
 export interface DashboardStats {
   total_groups?: number;
   total_hospitals?: number;
   total_doctors?: number;
   total_patients?: number;
+  total_active_cases?: number;
+  total_appointments?: number;
   total_revenue?: number;
+  monthly_revenue?: number;
+  yearly_revenue?: number;
+  period_revenue?: number;
+  total_expenses?: number;
+  net_profit?: number;
+  profit_margin?: number;
   revenue_this_month?: number;
   revenue_this_quarter?: number;
   revenue_this_year?: number;
@@ -257,14 +337,140 @@ export interface DashboardStats {
   doctor_growth?: number;
   my_patients?: number;
   active_cases?: number;
+  total_cases?: number;
   cases_completed?: number;
   today_appointments?: number;
   personal_revenue?: number;
   treatment_success_rate?: number;
   follow_up_rate?: number;
   pending_follow_ups?: number;
-  top_groups?: { name: string; value: number }[];
-  top_hospitals?: { name: string; value: number }[];
-  top_doctors?: { name: string; value: number }[];
-  top_treatments?: { name: string; value: number }[];
+  revenue_trend?: TrendPoint[];
+  patient_growth_trend?: TrendPoint[];
+  monthly_growth_trend?: TrendPoint[];
+  case_completion_trend?: TrendPoint[];
+  revenue_expense_trend?: RevenueExpenseTrendPoint[];
+  expense_trend?: ExpenseTrendPoint[];
+  profit_trend?: ProfitTrendPoint[];
+  expense_breakdown?: ExpenseBreakdownItem[];
+  admin_group_performance?: Performer[];
+  hospital_performance?: Performer[];
+  doctor_performance?: Performer[];
+  treatment_performance?: Performer[];
+  treatment_trend?: Performer[];
+  top_groups?: Performer[];
+  top_hospitals?: Performer[];
+  top_doctors?: Performer[];
+  top_treatments?: Performer[];
+}
+
+export interface QuickViewAdminGroup {
+  id: string;
+  name: string;
+  total_hospitals: number;
+  total_doctors: number;
+  total_patients: number;
+  total_revenue: number;
+  total_active_cases: number;
+  total_expenses?: number;
+  net_profit?: number;
+  profit_margin?: number;
+  top_doctors: Performer[];
+}
+
+export interface QuickViewHospital {
+  id: string;
+  name: string;
+  total_doctors: number;
+  total_patients: number;
+  total_revenue: number;
+  total_active_cases: number;
+  total_billings: number;
+  total_pending: number;
+  today_appointments: number;
+  total_expenses?: number;
+  net_profit?: number;
+  profit_margin?: number;
+  expense_breakdown?: ExpenseBreakdownItem[];
+}
+
+export interface QuickViewDoctor {
+  id: string;
+  name: string;
+  total_patients: number;
+  today_appointments: number;
+  total_cases: number;
+  active_cases: number;
+  completed_cases: number;
+  total_revenue: number;
+  period_revenue?: number;
+  active_patients: number;
+  completed_patients: number;
+  contribution_to_profit?: number;
+}
+
+export interface QuickViewPatientCase {
+  id: string;
+  chief_complaint: string;
+  status: string;
+  diagnosis: string | null;
+  created_at: string;
+}
+
+export interface QuickViewPatientTreatment {
+  id: string;
+  treatment_name: string;
+  cost: number;
+  status: string;
+}
+
+export interface QuickViewPatientAppointment {
+  id: string;
+  date: string;
+  time: string;
+  status: string;
+  appointment_type: string | null;
+}
+
+export interface QuickViewPatientBilling {
+  id: string;
+  total_amount: number;
+  paid_amount: number;
+  pending_amount: number;
+  payment_status: string;
+  created_at: string;
+}
+
+export interface QuickViewPatientTimeline {
+  date: string;
+  event: string;
+  type: string;
+}
+
+export interface QuickViewPatientFollowUp {
+  id: string;
+  date: string;
+  time: string | null;
+  doctor_id: string | null;
+  appointment_id: string | null;
+  status: string | null;
+  notes?: string | null;
+}
+
+export interface QuickViewPatient {
+  id: string;
+  name: string;
+  total_cases: number;
+  total_treatments: number;
+  total_appointments: number;
+  total_follow_ups: number;
+  next_follow_up: QuickViewPatientFollowUp | null;
+  follow_up_history: QuickViewPatientFollowUp[];
+  total_billed: number;
+  total_paid: number;
+  total_pending: number;
+  cases: QuickViewPatientCase[];
+  treatments: QuickViewPatientTreatment[];
+  appointments: QuickViewPatientAppointment[];
+  billings: QuickViewPatientBilling[];
+  timeline: QuickViewPatientTimeline[];
 }

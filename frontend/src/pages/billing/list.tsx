@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react"
+import { useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   useReactTable,
@@ -11,7 +12,7 @@ import {
   type SortingState,
 } from "@tanstack/react-table"
 import { motion } from "framer-motion"
-import { Plus, Search, Eye, Receipt, DollarSign, CreditCard, AlertCircle } from "lucide-react"
+import { Plus, Search, Eye, Receipt, DollarSign, CreditCard, AlertCircle, Download } from "lucide-react"
 import { format } from "date-fns"
 import PageHeader from "@/components/layout/page-header"
 import KpiCard from "@/components/layout/kpi-card"
@@ -41,6 +42,11 @@ import { useToast } from "@/components/ui/toast"
 import { formatIndianRupees } from "@/lib/currency"
 import type { Billing, Case, PaginatedResponse } from "@/types"
 import { useAuthStore } from "@/store/authStore"
+
+function StatusBadge({ status }: { status: string }) {
+  const cls = `status-badge status-badge-${status?.toLowerCase().replace(/_/g, "_")}`;
+  return <span className={cls}>{status?.replace(/_/g, " ")}</span>;
+}
 
 const statusVariant: Record<string, "default" | "secondary" | "outline" | "destructive" | "success" | "warning"> = {
   PAID: "success",
@@ -74,6 +80,7 @@ export default function BillingList() {
     queryFn: () => billingApi.list({ page_size: 100 }),
   })
 
+  const navigate = useNavigate()
   const currentUser = useAuthStore((s) => s.user)
   const { data: casesData } = useQuery<PaginatedResponse<Case>>({
     queryKey: ["cases", "dropdown"],
@@ -125,6 +132,22 @@ export default function BillingList() {
     }
     const cleaned = { ...form, total_amount: total, paid_amount: form.paid_amount ?? 0 }
     createMutation.mutate(cleaned)
+  }
+
+  const downloadPdf = async (id: string) => {
+    try {
+      const blob = await billingApi.getPdf(id)
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `invoice_${id.slice(0, 8)}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+    } catch {
+      addToast({ title: "Error", description: "Failed to download PDF", variant: "destructive" })
+    }
   }
 
   function resetForm() {
@@ -200,11 +223,7 @@ export default function BillingList() {
       {
         accessorKey: "payment_status",
         header: "Status",
-        cell: ({ row }) => (
-          <Badge variant={statusVariant[row.original.payment_status] || "default"}>
-            {row.original.payment_status}
-          </Badge>
-        ),
+        cell: ({ row }) => <StatusBadge status={row.original.payment_status} />,
       },
       {
         accessorKey: "created_at",
@@ -215,10 +234,15 @@ export default function BillingList() {
       {
         id: "actions",
         header: "Actions",
-        cell: () => (
-          <Button variant="ghost" size="icon">
-            <Eye className="h-4 w-4" />
-          </Button>
+        cell: ({ row }) => (
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" onClick={() => navigate(`/billing/${row.original.id}`)} title="View Invoice">
+              <Eye className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => downloadPdf(row.original.id)} title="Download PDF">
+              <Download className="h-4 w-4" />
+            </Button>
+          </div>
         ),
       },
     ],
@@ -302,7 +326,7 @@ export default function BillingList() {
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto rounded-md border">
+              <div className="overflow-x-auto rounded-md border mobile-card-view">
                 <table className="w-full text-sm">
                   <thead>
                     {table.getHeaderGroups().map((hg) => (
@@ -333,11 +357,15 @@ export default function BillingList() {
                         animate={{ opacity: 1 }}
                         className="border-b transition-colors hover:bg-muted/50"
                       >
-                        {row.getVisibleCells().map((cell) => (
-                          <td key={cell.id} className="px-4 py-3">
-                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                          </td>
-                        ))}
+                        {row.getVisibleCells().map((cell) => {
+                          const header = cell.column.columnDef.header
+                          const label = typeof header === "string" ? header : cell.column.id
+                          return (
+                            <td key={cell.id} className="px-4 py-3" data-label={label}>
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                            </td>
+                          )
+                        })}
                       </motion.tr>
                     ))}
                   </tbody>

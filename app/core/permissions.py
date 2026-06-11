@@ -1,6 +1,7 @@
 from enum import Enum
 from typing import List
 from fastapi import HTTPException, status
+from sqlalchemy import select
 
 
 class Role(str, Enum):
@@ -41,6 +42,8 @@ class Permission(str, Enum):
     ASSIGN_CONSULTANT = "ASSIGN_CONSULTANT"
     UPDATE_BILLING = "UPDATE_BILLING"
     COMPLETE_TREATMENT = "COMPLETE_TREATMENT"
+    MANAGE_EXPENSES = "MANAGE_EXPENSES"
+    VIEW_EXPENSES = "VIEW_EXPENSES"
 
 
 ROLE_PERMISSIONS = {
@@ -58,6 +61,7 @@ ROLE_PERMISSIONS = {
         Permission.CREATE_TREATMENT_PLAN, Permission.ADD_PRE_OP,
         Permission.ADD_POST_OP, Permission.ASSIGN_CONSULTANT,
         Permission.UPDATE_BILLING, Permission.COMPLETE_TREATMENT,
+        Permission.MANAGE_EXPENSES, Permission.VIEW_EXPENSES,
     ],
     Role.GROUP_ADMIN: [
         Permission.CREATE_HOSPITAL, Permission.CREATE_HOSPITAL_ADMIN,
@@ -69,6 +73,8 @@ ROLE_PERMISSIONS = {
         Permission.MANAGE_BILLING, Permission.MANAGE_CASES,
         Permission.CREATE_CASE, Permission.CREATE_TREATMENT_PLAN,
         Permission.CREATE_CONSULTANT,
+        Permission.UPDATE_BILLING,
+        Permission.VIEW_EXPENSES,
     ],
     Role.HOSPITAL_ADMIN: [
         Permission.CREATE_DOCTOR, Permission.CREATE_CONSULTANT,
@@ -76,10 +82,12 @@ ROLE_PERMISSIONS = {
         Permission.MANAGE_CASES, Permission.MANAGE_BILLING, Permission.MANAGE_STAFF,
         Permission.CREATE_PATIENT, Permission.CREATE_APPOINTMENT, Permission.CREATE_CASE,
         Permission.CREATE_TREATMENT_PLAN,
+        Permission.UPDATE_BILLING,
+        Permission.MANAGE_EXPENSES,
     ],
     Role.DOCTOR: [
-        Permission.CREATE_PATIENT, Permission.MANAGE_PATIENTS,
-        Permission.CREATE_APPOINTMENT, Permission.MANAGE_APPOINTMENTS,
+        Permission.MANAGE_PATIENTS,
+        Permission.MANAGE_APPOINTMENTS,
         Permission.CREATE_CASE, Permission.MANAGE_CASES,
         Permission.CREATE_TREATMENT_PLAN, Permission.CREATE_CONSULTANT,
         Permission.ADD_PRE_OP, Permission.ADD_POST_OP,
@@ -113,3 +121,76 @@ def verify_permission(current_user: dict, *permissions: Permission):
         logger.error("VERIFY_PERMISSION FAIL: role=%s missing %s, user_permissions=%s", user_role, [p.value for p in permissions], [p.value for p in user_permissions])
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Missing required permission: {', '.join(p.value for p in permissions)}")
     logger.warning("VERIFY_PERMISSION OK: sub=%s role=%s", user_sub, user_role)
+
+
+async def verify_tenant_access(current_user: dict, entity: object, entity_type: str, db=None):
+    """Verify GROUP_ADMIN has tenant-level access to an entity.
+    For SUPER_ADMIN/HOSPITAL_ADMIN/DOCTOR, permissions are checked by verify_permission instead.
+    """
+    role = current_user.get("role")
+    if role != Role.GROUP_ADMIN.value:
+        return True
+    agid = current_user.get("admin_group_id")
+    if not agid:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: no admin group")
+
+    entity_agid = None
+    if entity_type == "hospital":
+        entity_agid = str(getattr(entity, "admin_group_id", ""))
+    elif entity_type == "doctor":
+        entity_agid = str(getattr(entity, "admin_group_id", ""))
+    elif entity_type == "patient":
+        from app.models.hospital import Hospital
+        from sqlalchemy import select
+        hid = getattr(entity, "hospital_id", None)
+        if hid and db:
+            result = await db.execute(select(Hospital.admin_group_id).where(Hospital.id == hid))
+            row = result.one_or_none()
+            entity_agid = str(row[0]) if row else None
+    elif entity_type in ("case", "billing", "treatment_plan", "appointment", "sitting"):
+        if db:
+            from app.models.case import Case as CaseModel
+            from app.models.patient import Patient as PatientModel
+            from app.models.hospital import Hospital as HospitalModel
+            from app.models.billing import Billing
+            from app.models.treatment_plan import TreatmentPlan
+            from app.models.appointment import Appointment
+            from sqlalchemy import select
+            if entity_type == "case":
+                case_id = getattr(entity, "id", None)
+            elif entity_type == "billing":
+                case_id = getattr(entity, "case_id", None)
+            elif entity_type == "treatment_plan":
+                case_id = getattr(entity, "case_id", None)
+            elif entity_type == "appointment":
+                patient_id = getattr(entity, "patient_id", None)
+            elif entity_type == "sitting":
+                plan_id = getattr(entity, "treatment_plan_id", None)
+                if plan_id:
+                    plan_result = await db.execute(select(TreatmentPlan.case_id).where(TreatmentPlan.id == plan_id))
+                    plan_row = plan_result.one_or_none()
+                    case_id = plan_row[0] if plan_row else None
+            if case_id:
+                case_result = await db.execute(select(CaseModel.patient_id).where(CaseModel.id == case_id))
+                case_row = case_result.one_or_none()
+                patient_id = case_row[0] if case_row else None
+            if patient_id:
+                pat_result = await db.execute(select(PatientModel.hospital_id).where(PatientModel.id == patient_id))
+                pat_row = pat_result.one_or_none()
+                hid = pat_row[0] if pat_row else None
+                if hid:
+                    hosp_result = await db.execute(select(HospitalModel.admin_group_id).where(HospitalModel.id == hid))
+                    hosp_row = hosp_result.one_or_none()
+                    entity_agid = str(hosp_row[0]) if hosp_row else None
+    elif entity_type == "consultant":
+        hid = getattr(entity, "hospital_id", None)
+        if hid and db:
+            from app.models.hospital import Hospital
+            from sqlalchemy import select
+            result = await db.execute(select(Hospital.admin_group_id).where(Hospital.id == hid))
+            row = result.one_or_none()
+            entity_agid = str(row[0]) if row else None
+
+    if entity_agid and entity_agid != str(agid):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: not in your admin group")
+    return True

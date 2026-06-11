@@ -22,3 +22,4 @@ class Hospital(Base):
     users = relationship("User", back_populates="hospital", cascade="all, delete-orphan")
     patients = relationship("Patient", back_populates="hospital", cascade="all, delete-orphan")
     consultants = relationship("Consultant", back_populates="hospital", cascade="all, delete-orphan")
+    expenses = relationship("HospitalMonthlyExpense", back_populates="hospital", cascade="all, delete-orphan")

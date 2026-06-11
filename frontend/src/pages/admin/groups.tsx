@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
-import { Plus, Search, Edit, Trash2, Shield, UserCog } from "lucide-react"
+import { Plus, Search, Edit, Trash2, Shield, UserCog, Building2, ChevronDown, ChevronUp } from "lucide-react"
 import { format } from "date-fns"
 import PageHeader from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
@@ -181,7 +181,7 @@ export default function AdminGroups() {
               </Button>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-md border">
+            <div className="overflow-x-auto rounded-md border mobile-card-view">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/50">
@@ -201,20 +201,30 @@ export default function AdminGroups() {
                       animate={{ opacity: 1 }}
                       className="border-b transition-colors hover:bg-muted/50"
                     >
-                      <td className="px-4 py-3 font-medium">{group.name}</td>
-                      <td className="px-4 py-3 text-muted-foreground">
+                      <td className="px-4 py-3 font-medium" data-label="Name">{group.name}</td>
+                      <td className="px-4 py-3 text-muted-foreground" data-label="Description">
                         {group.description || "—"}
                       </td>
-                      <td className="px-4 py-3">{(group as any).hospitals_count ?? 0}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3" data-label="Hospitals">
+                        <span className="inline-flex items-center gap-1.5" title={group.hospital_names?.length ? group.hospital_names.join(", ") : "No hospitals"}>
+                          <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                          <Badge variant="secondary" className="font-mono text-xs">{group.hospital_count ?? 0}</Badge>
+                          {group.hospital_names?.length > 0 && (
+                            <span className="text-xs text-muted-foreground hidden sm:inline truncate max-w-[120px]">
+                              {group.hospital_names.slice(0, 2).join(", ")}{group.hospital_names.length > 2 ? "..." : ""}
+                            </span>
+                          )}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3" data-label="Status">
                         <Badge variant={group.is_active ? "success" : "secondary"}>
                           {group.is_active ? "Active" : "Inactive"}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground">
+                      <td className="px-4 py-3 text-muted-foreground" data-label="Created At">
                         {format(new Date(group.created_at), "MMM dd, yyyy")}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3" data-label="Actions">
                         <div className="flex items-center gap-1">
                           <Button variant="ghost" size="icon" onClick={() => openEditDialog(group)}>
                             <Edit className="h-4 w-4" />

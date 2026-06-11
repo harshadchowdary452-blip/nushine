@@ -19,7 +19,14 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Card, CardContent } from "@/components/ui/card"
-import { doctorsApi } from "@/services/endpoints"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { doctorsApi, hospitalsApi, groupsApi } from "@/services/endpoints"
 import { useAuthStore } from "@/store/authStore"
 import { useToast } from "@/components/ui/toast"
 import DentalEmptyState from "@/components/ui/dental-empty-state"
@@ -32,20 +39,35 @@ interface DoctorForm {
   phone: string
   specialization: string
   license_number: string
+  hospital_id?: string
+  admin_group_id?: string
 }
 
 function getEmptyDoctorForm(): DoctorForm {
-  return { email: "", password: "", full_name: "", phone: "", specialization: "", license_number: "" }
+  return { email: "", password: "", full_name: "", phone: "", specialization: "", license_number: "", hospital_id: "", admin_group_id: "" }
 }
 
 export default function AdminDoctors() {
   const queryClient = useQueryClient()
   const { addToast } = useToast()
   const { user: currentUser } = useAuthStore()
+  const isSuperAdmin = currentUser?.role === "SUPER_ADMIN"
   const [search, setSearch] = useState("")
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingDoctor, setEditingDoctor] = useState<User | null>(null)
   const [form, setForm] = useState<DoctorForm>(getEmptyDoctorForm)
+
+  const { data: hospitals } = useQuery({
+    queryKey: ["hospitals", "list"],
+    queryFn: () => hospitalsApi.list({ page_size: 100 }),
+    enabled: isSuperAdmin,
+  })
+
+  const { data: adminGroups } = useQuery({
+    queryKey: ["admin-groups", "list"],
+    queryFn: () => groupsApi.list({ page_size: 100 }),
+    enabled: isSuperAdmin,
+  })
 
   const { data, isLoading } = useQuery({
     queryKey: ["doctors", { search }],
@@ -146,7 +168,7 @@ export default function AdminDoctors() {
   return (
     <div className="space-y-6">
       <PageHeader title="Doctors" description="Manage doctors across hospitals">
-        <Button onClick={openCreateDialog}><Plus className="h-4 w-4" /> Add Doctor</Button>
+        <Button id="add-doctor-btn" onClick={openCreateDialog}><Plus className="h-4 w-4" /> Add Doctor</Button>
       </PageHeader>
 
       <Card>
@@ -167,7 +189,7 @@ export default function AdminDoctors() {
               action={!search && <Button onClick={openCreateDialog}><Plus className="h-4 w-4" /> Add Doctor</Button>}
             />
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-gray-100">
+            <div className="overflow-x-auto rounded-xl border border-gray-100 mobile-card-view">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50/50">
@@ -183,18 +205,18 @@ export default function AdminDoctors() {
                   {doctors.map((doctor) => (
                     <motion.tr key={doctor.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                       className="border-b border-gray-50 transition-colors hover:bg-gray-50/50">
-                      <td className="px-4 py-3 font-medium text-gray-900">{doctor.full_name}</td>
-                      <td className="px-4 py-3 text-gray-500">{doctor.email}</td>
-                      <td className="px-4 py-3 text-gray-500">{doctor.specialization || "—"}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 font-medium text-gray-900" data-label="Name">{doctor.full_name}</td>
+                      <td className="px-4 py-3 text-gray-500" data-label="Email">{doctor.email}</td>
+                      <td className="px-4 py-3 text-gray-500" data-label="Specialization">{doctor.specialization || "—"}</td>
+                      <td className="px-4 py-3" data-label="Status">
                         <Badge variant={doctor.is_active ? "success" : "secondary"}>
                           {doctor.is_active ? "Active" : "Inactive"}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3 text-gray-400">
+                      <td className="px-4 py-3 text-gray-400" data-label="Created">
                         {format(new Date(doctor.created_at), "MMM dd, yyyy")}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3" data-label="Actions">
                         <div className="flex items-center gap-1">
                           <Button variant="ghost" size="icon" onClick={() => openEditDialog(doctor)}>
                             <Edit className="h-4 w-4" />
@@ -222,7 +244,13 @@ export default function AdminDoctors() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent
+          className="sm:max-w-[500px]"
+          onCloseAutoFocus={(e) => {
+            e.preventDefault()
+            document.getElementById("add-doctor-btn")?.focus()
+          }}
+        >
           <DialogHeader className="px-6 pt-6 pb-0 shrink-0">
             <DialogTitle>{editingDoctor ? "Edit Doctor" : "Add Doctor"}</DialogTitle>
             <DialogDescription>
@@ -258,6 +286,32 @@ export default function AdminDoctors() {
                 <Label htmlFor="license_number">License Number</Label>
                 <Input id="license_number" value={form.license_number} onChange={(e) => setForm({ ...form, license_number: e.target.value })} />
               </div>
+              {isSuperAdmin && !editingDoctor && (
+                <>
+                  <div className="grid gap-2">
+                    <Label htmlFor="hospital_id">Hospital</Label>
+                    <Select value={form.hospital_id || ""} onValueChange={(v) => setForm({ ...form, hospital_id: v })} required>
+                      <SelectTrigger><SelectValue placeholder="Select hospital" /></SelectTrigger>
+                      <SelectContent>
+                        {(Array.isArray(hospitals) ? hospitals : []).map((h: any) => (
+                          <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="admin_group_id">Admin Group</Label>
+                    <Select value={form.admin_group_id || ""} onValueChange={(v) => setForm({ ...form, admin_group_id: v })} required>
+                      <SelectTrigger><SelectValue placeholder="Select admin group" /></SelectTrigger>
+                      <SelectContent>
+                        {(Array.isArray(adminGroups) ? adminGroups : []).map((g: any) => (
+                          <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              )}
             </div>
             <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-gray-100">
               <Button type="button" variant="outline" onClick={closeDialog}>Cancel</Button>

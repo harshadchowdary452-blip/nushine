@@ -5,7 +5,7 @@ from sqlalchemy import select
 from typing import List, Optional
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.core.permissions import verify_permission, Permission, Role
+from app.core.permissions import verify_permission, verify_tenant_access, Permission, Role
 from app.services.treatment_plan_service import TreatmentPlanService
 from app.schemas.treatment_plan import TreatmentPlanCreate, TreatmentPlanUpdate, TreatmentPlanResponse
 from app.schemas.common import MessageResponse
@@ -79,6 +79,12 @@ async def get_treatment_plans(skip: int = Query(0, ge=0), limit: int = Query(100
 @router.get("/by-case/{case_id}", response_model=List[TreatmentPlanResponse])
 async def get_plans_by_case(case_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.CREATE_TREATMENT_PLAN, Permission.MANAGE_CASES)
+    from app.models.case import Case
+    case_result = await db.execute(select(Case).where(Case.id == case_id))
+    case = case_result.scalar_one_or_none()
+    if not case:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
+    await verify_tenant_access(current_user, case, "case", db)
     service = TreatmentPlanService(db)
     return await service.get_by_case(case_id)
 
@@ -90,6 +96,7 @@ async def get_treatment_plan(plan_id: str, db: AsyncSession = Depends(get_db), c
     plan = await service.get(plan_id)
     if not plan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Treatment plan not found")
+    await verify_tenant_access(current_user, plan, "treatment_plan", db)
     return plan
 
 
@@ -97,9 +104,23 @@ async def get_treatment_plan(plan_id: str, db: AsyncSession = Depends(get_db), c
 async def update_treatment_plan(plan_id: str, data: TreatmentPlanUpdate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.CREATE_TREATMENT_PLAN)
     service = TreatmentPlanService(db)
-    plan = await service.update(plan_id, data.model_dump(exclude_none=True), user_id=current_user.get("sub"))
+    plan = await service.get(plan_id)
     if not plan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Treatment plan not found")
+    await verify_tenant_access(current_user, plan, "treatment_plan", db)
+    plan = await service.update(plan_id, data.model_dump(exclude_none=True), user_id=current_user.get("sub"))
+    return plan
+
+
+@router.put("/{plan_id}/status", response_model=TreatmentPlanResponse)
+async def update_treatment_plan_status(plan_id: str, status: str = Query(...), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.CREATE_TREATMENT_PLAN)
+    service = TreatmentPlanService(db)
+    plan = await service.get(plan_id)
+    if not plan:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Treatment plan not found")
+    await verify_tenant_access(current_user, plan, "treatment_plan", db)
+    plan = await service.update_status(plan_id, status, user_id=current_user.get("sub"))
     return plan
 
 
@@ -107,7 +128,9 @@ async def update_treatment_plan(plan_id: str, data: TreatmentPlanUpdate, db: Asy
 async def delete_treatment_plan(plan_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.CREATE_TREATMENT_PLAN)
     service = TreatmentPlanService(db)
-    deleted = await service.delete(plan_id, user_id=current_user.get("sub"))
-    if not deleted:
+    plan = await service.get(plan_id)
+    if not plan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Treatment plan not found")
+    await verify_tenant_access(current_user, plan, "treatment_plan", db)
+    deleted = await service.delete(plan_id, user_id=current_user.get("sub"))
     return MessageResponse(message="Treatment plan deleted successfully")

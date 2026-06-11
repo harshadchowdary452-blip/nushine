@@ -73,6 +73,25 @@ class TreatmentPlanService:
             logger.exception("UPDATE_TREATMENT_PLAN - Error: %s", str(e))
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update treatment plan: {str(e)}")
 
+    async def update_status(self, plan_id: str, status: str, user_id: str = None) -> Optional[TreatmentPlan]:
+        try:
+            from app.models.treatment_plan import TreatmentPlanStatus
+            plan = await self.repo.update(plan_id, status=TreatmentPlanStatus(status))
+            if plan:
+                await self.audit_log_repo.create(user_id=user_id, action="UPDATE_TREATMENT_STATUS", entity_type="TREATMENT_PLAN", entity_id=plan_id, details=f"Status changed to {status}")
+                if status == TreatmentPlanStatus.COMPLETED.value:
+                    from app.services.case_service import CaseService
+                    from app.models.case import CaseStatus
+                    case_svc = CaseService(self.db)
+                    all_treatments = await self.repo.get_all(filters={"case_id": plan.case_id})
+                    all_done = all(t.status == TreatmentPlanStatus.COMPLETED for t in all_treatments)
+                    if all_done:
+                        await case_svc.update(plan.case_id, {"status": CaseStatus.IN_PROGRESS.value}, user_id=user_id)
+            return plan
+        except Exception as e:
+            logger.exception("UPDATE_TREATMENT_STATUS - Error: %s", str(e))
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update treatment status: {str(e)}")
+
     async def delete(self, plan_id: str, user_id: str = None) -> bool:
         try:
             result = await self.repo.delete(plan_id)
