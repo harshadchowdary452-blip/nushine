@@ -19,7 +19,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       accessToken: null,
       refreshToken: null,
-      _hasHydrated: false,
+      _hasHydrated: true,
       setAuth: (user, accessToken, refreshToken) =>
         set({ user, accessToken, refreshToken }),
       setTokens: (accessToken, refreshToken) =>
@@ -30,18 +30,20 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: "auth-storage",
+      partialize: (state) => ({
+        user: state.user,
+        accessToken: state.accessToken,
+        refreshToken: state.refreshToken,
+      }),
       onRehydrateStorage: () => (state) => {
         const hasValidSession = !!state?.user && !!state?.accessToken && !!state?.refreshToken;
-        useAuthStore.setState(
-          hasValidSession
-            ? { _hasHydrated: true }
-            : {
-                user: null,
-                accessToken: null,
-                refreshToken: null,
-                _hasHydrated: true,
-              }
-        );
+        if (!hasValidSession) {
+          useAuthStore.setState({
+            user: null,
+            accessToken: null,
+            refreshToken: null,
+          });
+        }
       },
     }
   )

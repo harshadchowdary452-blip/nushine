@@ -16,9 +16,9 @@ import type { Patient } from "@/types"
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } }
 
 const templates = [
-  { label: "Appointment Reminder", message: "Dear {name}, this is a reminder about your upcoming dental appointment. Please arrive 15 minutes early. - Dental Hospital" },
-  { label: "Follow-Up", message: "Dear {name}, this is a follow-up reminder for your dental visit. Please contact us to schedule. - Dental Hospital" },
-  { label: "Payment Reminder", message: "Dear {name}, this is a gentle reminder about your pending payment. Please clear it at your earliest convenience. - Dental Hospital" },
+  { label: "Appointment Reminder", message: "Dear {name}, this is a reminder about your upcoming dental appointment. Please arrive 15 minutes early. - NuShine Dental" },
+  { label: "Follow-Up", message: "Dear {name}, this is a follow-up reminder for your dental visit. Please contact us to schedule. - NuShine Dental" },
+  { label: "Payment Reminder", message: "Dear {name}, this is a gentle reminder about your pending payment. Please clear it at your earliest convenience. - NuShine Dental" },
   { label: "Custom", message: "" },
 ]
 
@@ -168,7 +168,7 @@ export default function WhatsAppMessaging() {
             <CardContent>
               <div className="relative mb-4">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                <Input placeholder="Search patients..." className="pl-9" />
+                <Input placeholder="Search patients..." className="pl-10" />
               </div>
               <div className="max-h-96 space-y-1 overflow-y-auto">
                 {patientList.map((p: any) => (

@@ -17,50 +17,108 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
-import { treatmentApi } from "@/services/endpoints"
-import type { TreatmentPlan, PaginatedResponse } from "@/types"
+import { treatmentApi, casesApi } from "@/services/endpoints"
+import { useToast } from "@/components/ui/toast"
+import type { TreatmentPlan, Case, PaginatedResponse } from "@/types"
+import { useAuthStore } from "@/store/authStore"
+
+interface TreatmentForm {
+  case_id: string
+  treatment_name: string
+  description: string
+  cost: number | null
+  duration_minutes: number | null
+  notes: string
+}
+
+function getEmptyTreatmentForm(): TreatmentForm {
+  return { case_id: "", treatment_name: "", description: "", cost: null, duration_minutes: null, notes: "" }
+}
 
 export default function TreatmentList() {
   const queryClient = useQueryClient()
+  const { addToast } = useToast()
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [form, setForm] = useState({
-    case_id: "",
-    treatment_name: "",
-    description: "",
-    cost: 0,
-    duration_minutes: 0,
-    notes: "",
-  })
+  const [form, setForm] = useState<TreatmentForm>(getEmptyTreatmentForm)
 
   const { data, isLoading } = useQuery<PaginatedResponse<TreatmentPlan>>({
     queryKey: ["treatment-plans"],
     queryFn: () => treatmentApi.list({ page_size: 100 }),
   })
 
+  const currentUser = useAuthStore((s) => s.user)
+  const { data: casesData } = useQuery<PaginatedResponse<Case>>({
+    queryKey: ["cases", "dropdown"],
+    queryFn: () => casesApi.list({ page_size: 200, hospital_id: currentUser?.hospital_id || undefined }),
+  })
+
+  const cases: Case[] = useMemo(
+    () => {
+      if (Array.isArray(casesData)) return casesData
+      return casesData?.items || []
+    },
+    [casesData]
+  )
+
   const createMutation = useMutation({
     mutationFn: (data: any) => treatmentApi.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["treatment-plans"] })
-      setDialogOpen(false)
-      setForm({ case_id: "", treatment_name: "", description: "", cost: 0, duration_minutes: 0, notes: "" })
+      queryClient.invalidateQueries({ queryKey: ["treatment-plans"], refetchType: "all" })
+      queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" })
+      addToast({ title: "Success", description: "Treatment plan created successfully", variant: "success" })
+      resetForm()
+    },
+    onError: (err: any) => {
+      addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to create treatment plan", variant: "destructive" })
     },
   })
 
+  function resetForm() {
+    setForm(getEmptyTreatmentForm())
+    setDialogOpen(false)
+  }
+
+  function openDialog() {
+    setForm(getEmptyTreatmentForm())
+    setDialogOpen(true)
+  }
+
+  function handleDialogOpenChange(open: boolean) {
+    if (!open) resetForm()
+    setDialogOpen(open)
+  }
+
   const plans: TreatmentPlan[] = useMemo(
-    () => (data?.items || data || []) as TreatmentPlan[],
+    () => {
+      if (Array.isArray(data)) return data
+      return data?.items || []
+    },
     [data]
   )
 
-  const handleSubmit = (e: React.FormEvent) => {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    createMutation.mutate(form)
+    const cleaned: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(form)) {
+      if (value === null || value === "" || value === undefined) continue
+      cleaned[key] = value
+    }
+    if (cleaned.cost === undefined) cleaned.cost = 0
+    createMutation.mutate(cleaned)
   }
 
   return (
     <div className="space-y-6">
       <PageHeader title="Treatment Plans" description="Manage treatment plans">
-        <Button onClick={() => setDialogOpen(true)}>
+        <Button onClick={openDialog}>
           <Plus className="h-4 w-4" /> New Plan
         </Button>
       </PageHeader>
@@ -80,7 +138,7 @@ export default function TreatmentList() {
           <p className="mt-1 text-sm text-muted-foreground">
             Create your first treatment plan.
           </p>
-          <Button className="mt-4" onClick={() => setDialogOpen(true)}>
+          <Button className="mt-4" onClick={openDialog}>
             <Plus className="h-4 w-4" /> New Plan
           </Button>
         </div>
@@ -145,24 +203,34 @@ export default function TreatmentList() {
         </div>
       )}
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
+      <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
+          <DialogHeader className="px-6 pt-6 pb-0 shrink-0">
             <DialogTitle>New Treatment Plan</DialogTitle>
             <DialogDescription>
               Create a new treatment plan.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit}>
-            <div className="grid gap-4 py-4">
+          <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
+            <div className="overflow-y-auto px-6 py-4 space-y-4 flex-1">
               <div className="grid gap-2">
-                <Label htmlFor="case">Case ID</Label>
-                <Input
-                  id="case"
+                <Label htmlFor="case">Case</Label>
+                <Select
                   value={form.case_id}
-                  onChange={(e) => setForm({ ...form, case_id: e.target.value })}
+                  onValueChange={(v) => setForm({ ...form, case_id: v })}
                   required
-                />
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select case" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {cases.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.chief_complaint} — {c.patient_name || c.patient?.full_name || "Unknown"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="name">Treatment Name</Label>
@@ -191,9 +259,9 @@ export default function TreatmentList() {
                   <Input
                     id="cost"
                     type="number"
-                    value={form.cost}
+                    value={form.cost ?? ""}
                     onChange={(e) =>
-                      setForm({ ...form, cost: Number(e.target.value) })
+                      setForm({ ...form, cost: e.target.value ? Number(e.target.value) : null })
                     }
                     required
                   />
@@ -203,9 +271,9 @@ export default function TreatmentList() {
                   <Input
                     id="duration"
                     type="number"
-                    value={form.duration_minutes}
+                    value={form.duration_minutes ?? ""}
                     onChange={(e) =>
-                      setForm({ ...form, duration_minutes: Number(e.target.value) })
+                      setForm({ ...form, duration_minutes: e.target.value ? Number(e.target.value) : null })
                     }
                   />
                 </div>
@@ -219,11 +287,11 @@ export default function TreatmentList() {
                 />
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-gray-100">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setDialogOpen(false)}
+                onClick={resetForm}
               >
                 Cancel
               </Button>

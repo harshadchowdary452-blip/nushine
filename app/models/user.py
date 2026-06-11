@@ -10,6 +10,7 @@ class User(Base):
     __tablename__ = "users"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     hospital_id: Mapped[str] = mapped_column(String(36), ForeignKey("hospitals.id"), nullable=True)
+    admin_group_id: Mapped[str] = mapped_column(String(36), ForeignKey("admin_groups.id"), nullable=True)
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -23,6 +24,7 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     hospital = relationship("Hospital", back_populates="users")
+    admin_group = relationship("AdminGroup", back_populates="users")
     patients = relationship("Patient", back_populates="doctor")
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
     cases = relationship("Case", back_populates="doctor")

@@ -49,33 +49,67 @@ ROLE_PERMISSIONS = {
         Permission.VIEW_ALL_HOSPITALS, Permission.VIEW_GLOBAL_REVENUE,
         Permission.VIEW_GLOBAL_REPORTS, Permission.VIEW_ALL_PATIENTS,
         Permission.VIEW_ALL_DOCTORS, Permission.MANAGE_PLATFORM,
+        Permission.CREATE_HOSPITAL, Permission.CREATE_HOSPITAL_ADMIN,
+        Permission.CREATE_DOCTOR, Permission.MANAGE_STAFF,
+        Permission.MANAGE_PATIENTS, Permission.MANAGE_BILLING,
+        Permission.CREATE_CONSULTANT, Permission.CREATE_PATIENT,
+        Permission.CREATE_APPOINTMENT, Permission.MANAGE_APPOINTMENTS,
+        Permission.CREATE_CASE, Permission.MANAGE_CASES,
+        Permission.CREATE_TREATMENT_PLAN, Permission.ADD_PRE_OP,
+        Permission.ADD_POST_OP, Permission.ASSIGN_CONSULTANT,
+        Permission.UPDATE_BILLING, Permission.COMPLETE_TREATMENT,
     ],
     Role.GROUP_ADMIN: [
         Permission.CREATE_HOSPITAL, Permission.CREATE_HOSPITAL_ADMIN,
         Permission.VIEW_OWN_HOSPITALS, Permission.VIEW_REVENUE_ANALYTICS,
         Permission.VIEW_DOCTOR_PERFORMANCE, Permission.VIEW_HOSPITAL_PERFORMANCE,
+        Permission.CREATE_DOCTOR, Permission.MANAGE_STAFF,
+        Permission.MANAGE_PATIENTS, Permission.CREATE_PATIENT,
+        Permission.MANAGE_APPOINTMENTS, Permission.CREATE_APPOINTMENT,
+        Permission.MANAGE_BILLING, Permission.MANAGE_CASES,
+        Permission.CREATE_CASE, Permission.CREATE_TREATMENT_PLAN,
+        Permission.CREATE_CONSULTANT,
     ],
     Role.HOSPITAL_ADMIN: [
         Permission.CREATE_DOCTOR, Permission.CREATE_CONSULTANT,
         Permission.MANAGE_PATIENTS, Permission.MANAGE_APPOINTMENTS,
         Permission.MANAGE_CASES, Permission.MANAGE_BILLING, Permission.MANAGE_STAFF,
+        Permission.CREATE_PATIENT, Permission.CREATE_APPOINTMENT, Permission.CREATE_CASE,
+        Permission.CREATE_TREATMENT_PLAN,
     ],
     Role.DOCTOR: [
-        Permission.CREATE_PATIENT, Permission.CREATE_APPOINTMENT,
-        Permission.CREATE_CASE, Permission.CREATE_TREATMENT_PLAN,
+        Permission.CREATE_PATIENT, Permission.MANAGE_PATIENTS,
+        Permission.CREATE_APPOINTMENT, Permission.MANAGE_APPOINTMENTS,
+        Permission.CREATE_CASE, Permission.MANAGE_CASES,
+        Permission.CREATE_TREATMENT_PLAN, Permission.CREATE_CONSULTANT,
         Permission.ADD_PRE_OP, Permission.ADD_POST_OP,
-        Permission.ASSIGN_CONSULTANT, Permission.UPDATE_BILLING,
+        Permission.ASSIGN_CONSULTANT,
+        Permission.UPDATE_BILLING, Permission.MANAGE_BILLING,
         Permission.COMPLETE_TREATMENT,
+        Permission.VIEW_ALL_DOCTORS, Permission.VIEW_OWN_HOSPITALS,
     ],
 }
 
 
-def verify_permission(current_user: dict, *permissions: Permission):
-    user_role = current_user.get("role")
+def has_permission(user_role: str, *permissions: Permission) -> bool:
     if user_role not in [r.value for r in Role]:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid role")
+        return False
     user_permissions = ROLE_PERMISSIONS.get(Role(user_role), [])
-    for perm in permissions:
-        if perm in user_permissions:
-            return
-    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Missing required permission: {permissions[0].value}")
+    return any(perm in user_permissions for perm in permissions)
+
+
+def verify_permission(current_user: dict, *permissions: Permission):
+    import logging
+    logger = logging.getLogger(__name__)
+    user_role = current_user.get("role")
+    user_sub = current_user.get("sub", "unknown")
+    logger.warning("VERIFY_PERMISSION sub=%s role=%s checking=%s", user_sub, user_role, [p.value for p in permissions])
+    if user_role not in [r.value for r in Role]:
+        logger.error("VERIFY_PERMISSION FAIL: role '%s' not in %s", user_role, [r.value for r in Role])
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Invalid role: '{user_role}'")
+    user_permissions = ROLE_PERMISSIONS.get(Role(user_role), [])
+    has_any = any(p in user_permissions for p in permissions)
+    if not has_any:
+        logger.error("VERIFY_PERMISSION FAIL: role=%s missing %s, user_permissions=%s", user_role, [p.value for p in permissions], [p.value for p in user_permissions])
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Missing required permission: {', '.join(p.value for p in permissions)}")
+    logger.warning("VERIFY_PERMISSION OK: sub=%s role=%s", user_sub, user_role)

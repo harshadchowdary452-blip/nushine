@@ -25,6 +25,8 @@ class CaseResponse(BaseModel):
     patient_id: str
     doctor_id: Optional[str]
     consultant_id: Optional[str]
+    patient_name: Optional[str] = None
+    doctor_name: Optional[str] = None
     chief_complaint: str
     diagnosis: Optional[str]
     status: str
@@ -33,5 +35,4 @@ class CaseResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}

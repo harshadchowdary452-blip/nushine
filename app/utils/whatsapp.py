@@ -34,15 +34,15 @@ whatsapp_provider = WhatsAppProvider()
 
 
 async def send_appointment_reminder(phone: str, patient_name: str, appointment_date: str, appointment_time: str):
-    message = f"Reminder: Dear {patient_name}, you have a dental appointment on {appointment_date} at {appointment_time}. Please arrive 15 minutes early. - Dental Hospital"
+    message = f"Reminder: Dear {patient_name}, you have a dental appointment on {appointment_date} at {appointment_time}. Please arrive 15 minutes early. - NuShine Dental"
     return await whatsapp_provider.send_message(phone, message)
 
 
 async def send_missed_appointment(phone: str, patient_name: str):
-    message = f"Dear {patient_name}, you missed your dental appointment. Please reschedule at your earliest convenience. - Dental Hospital"
+    message = f"Dear {patient_name}, you missed your dental appointment. Please reschedule at your earliest convenience. - NuShine Dental"
     return await whatsapp_provider.send_message(phone, message)
 
 
 async def send_follow_up_reminder(phone: str, patient_name: str, next_date: str):
-    message = f"Dear {patient_name}, this is a follow-up reminder for your next dental visit on {next_date}. - Dental Hospital"
+    message = f"Dear {patient_name}, this is a follow-up reminder for your next dental visit on {next_date}. - NuShine Dental"
     return await whatsapp_provider.send_message(phone, message)

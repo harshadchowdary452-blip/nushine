@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
 import { format } from "date-fns"
-import { ArrowLeft, Check, Circle, User, Stethoscope } from "lucide-react"
+import { ArrowLeft, Check, Circle, User, Stethoscope, Info, FileText, Eye, EyeOff, Receipt } from "lucide-react"
 import PageHeader from "@/components/layout/page-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -13,29 +13,33 @@ import { casesApi, consultantNotesApi } from "@/services/endpoints"
 import type { Case, PaginatedResponse, ConsultantNote } from "@/types"
 
 const statusVariant: Record<string, "default" | "secondary" | "outline" | "destructive" | "success" | "warning"> = {
-  OPEN: "default",
-  IN_DIAGNOSIS: "warning",
-  IN_TREATMENT: "secondary",
+  NEW: "default",
+  DIAGNOSIS_PENDING: "warning",
+  TREATMENT_PLANNED: "secondary",
+  IN_PROGRESS: "secondary",
   FOLLOW_UP: "outline",
-  CLOSED: "success",
+  COMPLETED: "success",
+  CANCELLED: "destructive",
 }
 
 const timelineSteps = [
-  { key: "CREATED", label: "Created" },
+  { key: "NEW", label: "New" },
   { key: "DIAGNOSIS", label: "Diagnosis" },
   { key: "TREATMENT_PLAN", label: "Treatment Plan" },
   { key: "PRE_OP", label: "Pre-Op" },
-  { key: "TREATMENT", label: "Treatment" },
+  { key: "IN_PROGRESS", label: "In Progress" },
   { key: "POST_OP", label: "Post-Op" },
   { key: "COMPLETED", label: "Completed" },
 ]
 
 const statusToStepIndex: Record<string, number> = {
-  OPEN: 0,
-  IN_DIAGNOSIS: 1,
-  IN_TREATMENT: 4,
+  NEW: 0,
+  DIAGNOSIS_PENDING: 1,
+  TREATMENT_PLANNED: 2,
+  IN_PROGRESS: 4,
   FOLLOW_UP: 5,
-  CLOSED: 6,
+  COMPLETED: 6,
+  CANCELLED: -1,
 }
 
 export default function CaseDetail() {
@@ -92,7 +96,7 @@ export default function CaseDetail() {
             <div className="space-y-1">
               <div className="flex items-center gap-3">
                 <h2 className="text-xl font-bold">
-                  {caseData.patient?.full_name || "Patient"}
+                  {caseData.patient_name || caseData.patient?.full_name || "Patient"}
                 </h2>
                 <Badge variant={statusVariant[caseData.status] || "default"}>
                   {caseData.status.replace(/_/g, " ")}
@@ -158,12 +162,12 @@ export default function CaseDetail() {
 
       <Tabs defaultValue="details">
         <TabsList>
-          <TabsTrigger value="details">Details</TabsTrigger>
-          <TabsTrigger value="treatment-plans">Treatment Plans</TabsTrigger>
-          <TabsTrigger value="consultant-notes">Consultant Notes</TabsTrigger>
-          <TabsTrigger value="pre-op">Pre-Op</TabsTrigger>
-          <TabsTrigger value="post-op">Post-Op</TabsTrigger>
-          <TabsTrigger value="billing">Billing</TabsTrigger>
+          <TabsTrigger value="details"><Info className="h-4 w-4" />Details</TabsTrigger>
+          <TabsTrigger value="treatment-plans"><Stethoscope className="h-4 w-4" />Treatment Plans</TabsTrigger>
+          <TabsTrigger value="consultant-notes"><FileText className="h-4 w-4" />Consultant Notes</TabsTrigger>
+          <TabsTrigger value="pre-op"><Eye className="h-4 w-4" />Pre-Op</TabsTrigger>
+          <TabsTrigger value="post-op"><EyeOff className="h-4 w-4" />Post-Op</TabsTrigger>
+          <TabsTrigger value="billing"><Receipt className="h-4 w-4" />Billing</TabsTrigger>
         </TabsList>
 
         <TabsContent value="details" className="space-y-4 mt-4">

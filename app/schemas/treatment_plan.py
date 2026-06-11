@@ -9,6 +9,7 @@ class TreatmentPlanCreate(BaseModel):
     description: Optional[str] = None
     cost: float = Field(default=0.0, ge=0)
     duration_minutes: Optional[int] = None
+    status: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -17,6 +18,7 @@ class TreatmentPlanUpdate(BaseModel):
     description: Optional[str] = None
     cost: Optional[float] = None
     duration_minutes: Optional[int] = None
+    status: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -27,10 +29,10 @@ class TreatmentPlanResponse(BaseModel):
     description: Optional[str]
     cost: float
     duration_minutes: Optional[int]
+    status: str
     notes: Optional[str]
     is_active: bool
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}

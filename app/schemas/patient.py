@@ -4,7 +4,7 @@ from datetime import datetime, date
 
 
 class PatientCreate(BaseModel):
-    hospital_id: str
+    hospital_id: Optional[str] = None
     doctor_id: Optional[str] = None
     full_name: str = Field(..., min_length=2, max_length=255)
     gender: Optional[str] = None
@@ -14,6 +14,7 @@ class PatientCreate(BaseModel):
     email: Optional[str] = None
     address: Optional[str] = None
     medical_history: Optional[str] = None
+    status: Optional[str] = None
 
 
 class PatientUpdate(BaseModel):
@@ -25,6 +26,7 @@ class PatientUpdate(BaseModel):
     email: Optional[str] = None
     address: Optional[str] = None
     medical_history: Optional[str] = None
+    status: Optional[str] = None
 
 
 class PatientResponse(BaseModel):
@@ -40,9 +42,9 @@ class PatientResponse(BaseModel):
     address: Optional[str]
     medical_history: Optional[str]
     photo_url: Optional[str]
+    status: str
     is_active: bool
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}

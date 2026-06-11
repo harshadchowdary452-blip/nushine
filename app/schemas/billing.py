@@ -21,6 +21,8 @@ class BillingUpdate(BaseModel):
 class BillingResponse(BaseModel):
     id: str
     case_id: str
+    patient_name: Optional[str] = None
+    case_chief_complaint: Optional[str] = None
     total_amount: float
     paid_amount: float
     pending_amount: float
@@ -30,5 +32,4 @@ class BillingResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}

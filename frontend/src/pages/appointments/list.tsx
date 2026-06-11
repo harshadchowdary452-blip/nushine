@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, useCallback, useRef } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   useReactTable,
@@ -20,6 +20,10 @@ import {
   ChevronLeft,
   ChevronRight,
   CalendarDays,
+  Phone,
+  User as UserIcon,
+  BadgeCheck,
+  X,
 } from "lucide-react"
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay } from "date-fns"
 import PageHeader from "@/components/layout/page-header"
@@ -43,10 +47,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import { Label } from "@/components/ui/label"
-import { appointmentsApi } from "@/services/endpoints"
-import type { Appointment, PaginatedResponse } from "@/types"
+import { Separator } from "@/components/ui/separator"
+import { appointmentsApi, patientsApi, doctorsApi } from "@/services/endpoints"
+import { useToast } from "@/components/ui/toast"
+import type { Appointment, Patient, User, PaginatedResponse } from "@/types"
 import { cn } from "@/lib/utils"
+import { useAuthStore } from "@/store/authStore"
 
 const statusVariant: Record<string, "default" | "secondary" | "outline" | "destructive" | "success" | "warning"> = {
   SCHEDULED: "default",
@@ -57,53 +69,146 @@ const statusVariant: Record<string, "default" | "secondary" | "outline" | "destr
   NO_SHOW: "outline",
 }
 
+interface AppointmentForm {
+  patient_id: string
+  doctor_id: string
+  appointment_date: string
+  appointment_time: string
+  notes: string
+}
+
+function getEmptyAppointmentForm(): AppointmentForm {
+  return { patient_id: "", doctor_id: "", appointment_date: "", appointment_time: "", notes: "" }
+}
+
 export default function AppointmentList() {
   const queryClient = useQueryClient()
+  const { addToast } = useToast()
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState("")
   const [view, setView] = useState<"list" | "calendar">("list")
   const [dialogOpen, setDialogOpen] = useState(false)
   const [currentMonth, setCurrentMonth] = useState(new Date())
-  const [form, setForm] = useState({
-    patient_id: "",
-    doctor_id: "",
-    appointment_date: "",
-    appointment_time: "",
-    notes: "",
-  })
+  const [form, setForm] = useState<AppointmentForm>(getEmptyAppointmentForm)
 
   const { data, isLoading } = useQuery<PaginatedResponse<Appointment>>({
     queryKey: ["appointments"],
     queryFn: () => appointmentsApi.list({ page_size: 100 }),
   })
 
+  const currentUser = useAuthStore((s) => s.user)
+  const { data: patientsData } = useQuery<PaginatedResponse<Patient>>({
+    queryKey: ["patients", "dropdown"],
+    queryFn: () => patientsApi.list({ page_size: 200, hospital_id: currentUser?.hospital_id || undefined }),
+  })
+
+  const { data: doctorsData } = useQuery<PaginatedResponse<User>>({
+    queryKey: ["doctors", "dropdown"],
+    queryFn: () => doctorsApi.list({ page_size: 200, hospital_id: currentUser?.hospital_id || undefined }),
+  })
+
+  const [patientSearch, setPatientSearch] = useState("")
+  const [patientPopoverOpen, setPatientPopoverOpen] = useState(false)
+  const patientSearchRef = useRef<HTMLInputElement>(null)
+
+  const patients: Patient[] = useMemo(
+    () => {
+      if (Array.isArray(patientsData)) return patientsData
+      return patientsData?.items || []
+    },
+    [patientsData]
+  )
+
+  const doctors: User[] = useMemo(
+    () => {
+      if (Array.isArray(doctorsData)) return doctorsData
+      return doctorsData?.items || []
+    },
+    [doctorsData]
+  )
+
+  const filteredPatients = useMemo(() => {
+    if (!patientSearch) return patients
+    const q = patientSearch.toLowerCase()
+    return patients.filter(
+      (p) =>
+        p.full_name.toLowerCase().includes(q) ||
+        (p.phone && p.phone.includes(q)) ||
+        p.id.toLowerCase().includes(q)
+    )
+  }, [patients, patientSearch])
+
+  const selectedPatient = useMemo(
+    () => patients.find((p) => p.id === form.patient_id),
+    [patients, form.patient_id]
+  )
+
+  function handlePatientSelect(patientId: string) {
+    setForm({ ...form, patient_id: patientId })
+    setPatientPopoverOpen(false)
+    setPatientSearch("")
+  }
+
+  function handlePatientPopoverOpen(open: boolean) {
+    setPatientPopoverOpen(open)
+    if (open) {
+      setTimeout(() => patientSearchRef.current?.focus(), 50)
+    } else {
+      setPatientSearch("")
+    }
+  }
+
   const createMutation = useMutation({
     mutationFn: (data: any) => appointmentsApi.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["appointments"] })
-      setDialogOpen(false)
-      setForm({ patient_id: "", doctor_id: "", appointment_date: "", appointment_time: "", notes: "" })
+      queryClient.invalidateQueries({ queryKey: ["appointments"], refetchType: "all" })
+      queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" })
+      addToast({ title: "Success", description: "Appointment created successfully", variant: "success" })
+      resetForm()
+    },
+    onError: (err: any) => {
+      addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to create appointment", variant: "destructive" })
     },
   })
 
+  function resetForm() {
+    setForm(getEmptyAppointmentForm())
+    setPatientSearch("")
+    setDialogOpen(false)
+  }
+
+  function openDialog() {
+    setForm(getEmptyAppointmentForm())
+    setPatientSearch("")
+    setDialogOpen(true)
+  }
+
+  function handleDialogOpenChange(open: boolean) {
+    if (!open) resetForm()
+    setDialogOpen(open)
+  }
+
   const appointments: Appointment[] = useMemo(
-    () => (data?.items || data || []) as Appointment[],
+    () => {
+      if (Array.isArray(data)) return data
+      return data?.items || []
+    },
     [data]
   )
 
   const columns = useMemo<ColumnDef<Appointment>[]>(
     () => [
       {
-        accessorKey: "patient.full_name",
+        accessorKey: "patient_name",
         header: "Patient Name",
         cell: ({ row }) => (
-          <span className="font-medium">{row.original.patient?.full_name || "—"}</span>
+          <span className="font-medium">{row.original.patient_name || "—"}</span>
         ),
       },
       {
-        accessorKey: "doctor.full_name",
+        accessorKey: "doctor_name",
         header: "Doctor",
-        cell: ({ row }) => row.original.doctor?.full_name || "—",
+        cell: ({ row }) => row.original.doctor_name || "—",
       },
       {
         accessorKey: "appointment_date",
@@ -173,13 +278,23 @@ export default function AppointmentList() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    createMutation.mutate(form)
+    if (!form.appointment_date || !form.appointment_time) {
+      addToast({ title: "Validation Error", description: "Please select both date and time", variant: "destructive" })
+      return
+    }
+    const cleaned: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(form)) {
+      if (value !== "" && value !== undefined) {
+        cleaned[key] = value
+      }
+    }
+    createMutation.mutate(cleaned)
   }
 
   return (
     <div className="space-y-6">
       <PageHeader title="Appointments" description="Manage appointments">
-        <Button onClick={() => setDialogOpen(true)}>
+        <Button onClick={openDialog}>
           <Plus className="h-4 w-4" /> New Appointment
         </Button>
       </PageHeader>
@@ -193,7 +308,7 @@ export default function AppointmentList() {
                 placeholder="Search appointments..."
                 value={globalFilter}
                 onChange={(e) => setGlobalFilter(e.target.value)}
-                className="pl-9"
+                className="pl-10"
               />
             </div>
             <div className="flex items-center gap-2">
@@ -304,7 +419,7 @@ export default function AppointmentList() {
                   <p className="mt-1 text-sm text-muted-foreground">
                     Schedule your first appointment.
                   </p>
-                  <Button className="mt-4" onClick={() => setDialogOpen(true)}>
+                  <Button className="mt-4" onClick={openDialog}>
                     <Plus className="h-4 w-4" /> New Appointment
                   </Button>
                 </div>
@@ -382,31 +497,86 @@ export default function AppointmentList() {
         </CardContent>
       </Card>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
+      <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
+          <DialogHeader className="px-6 pt-6 pb-0 shrink-0">
             <DialogTitle>New Appointment</DialogTitle>
             <DialogDescription>
               Schedule a new appointment for a patient.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit}>
-            <div className="grid gap-4 py-4">
+          <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
+            <div className="overflow-y-auto px-6 py-4 space-y-4 flex-1">
               <div className="grid gap-2">
                 <Label htmlFor="patient">Patient</Label>
-                <Select
-                  value={form.patient_id}
-                  onValueChange={(v) => setForm({ ...form, patient_id: v })}
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select patient" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="patient-1">Patient 1</SelectItem>
-                    <SelectItem value="patient-2">Patient 2</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Popover open={patientPopoverOpen} onOpenChange={handlePatientPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-start text-left font-normal"
+                    >
+                      {selectedPatient ? (
+                        <div className="flex items-center gap-2 truncate w-full">
+                          <UserIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          <span className="truncate">{selectedPatient.full_name}</span>
+                          <Badge variant="outline" className="ml-auto shrink-0 text-[10px] px-1 py-0">
+                            {selectedPatient.status}
+                          </Badge>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">Select patient...</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[400px] p-0" align="start">
+                    <div className="p-3 border-b">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          ref={patientSearchRef}
+                          placeholder="Search by name, phone or ID..."
+                          value={patientSearch}
+                          onChange={(e) => setPatientSearch(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                    </div>
+                    <div className="max-h-[300px] overflow-y-auto">
+                      {filteredPatients.length === 0 ? (
+                        <div className="p-6 text-center text-sm text-muted-foreground">
+                          No patients found
+                        </div>
+                      ) : (
+                        filteredPatients.map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            className={`w-full px-4 py-3 text-left hover:bg-muted/50 transition-colors flex flex-col gap-1 ${
+                              form.patient_id === p.id ? "bg-muted" : ""
+                            }`}
+                            onClick={() => handlePatientSelect(p.id)}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium text-sm">{p.full_name}</span>
+                              <Badge variant="outline" className="text-[10px] px-1 py-0">
+                                {p.status}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                              {p.phone && (
+                                <span className="flex items-center gap-1">
+                                  <Phone className="h-3 w-3" /> {p.phone}
+                                </span>
+                              )}
+                              <span>ID: {p.id.slice(0, 8)}</span>
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="doctor">Doctor</Label>
@@ -419,8 +589,11 @@ export default function AppointmentList() {
                     <SelectValue placeholder="Select doctor" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="doctor-1">Doctor 1</SelectItem>
-                    <SelectItem value="doctor-2">Doctor 2</SelectItem>
+                    {doctors.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>
+                        {d.full_name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -459,11 +632,11 @@ export default function AppointmentList() {
                 />
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-gray-100">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setDialogOpen(false)}
+                onClick={resetForm}
               >
                 Cancel
               </Button>

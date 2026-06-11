@@ -7,11 +7,13 @@ from enum import Enum
 
 
 class CaseStatus(str, Enum):
-    OPEN = "OPEN"
-    IN_DIAGNOSIS = "IN_DIAGNOSIS"
-    IN_TREATMENT = "IN_TREATMENT"
+    NEW = "NEW"
+    DIAGNOSIS_PENDING = "DIAGNOSIS_PENDING"
+    TREATMENT_PLANNED = "TREATMENT_PLANNED"
+    IN_PROGRESS = "IN_PROGRESS"
     FOLLOW_UP = "FOLLOW_UP"
-    CLOSED = "CLOSED"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
 
 
 class Case(Base):
@@ -22,7 +24,7 @@ class Case(Base):
     consultant_id: Mapped[str] = mapped_column(String(36), ForeignKey("consultants.id"), nullable=True)
     chief_complaint: Mapped[str] = mapped_column(Text, nullable=False)
     diagnosis: Mapped[str] = mapped_column(Text, nullable=True)
-    status: Mapped[CaseStatus] = mapped_column(SAEnum(CaseStatus, create_constraint=False), default=CaseStatus.OPEN, nullable=False)
+    status: Mapped[CaseStatus] = mapped_column(SAEnum(CaseStatus, create_constraint=False), default=CaseStatus.NEW, nullable=False)
     notes: Mapped[str] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

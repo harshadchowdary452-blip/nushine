@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
 import { format } from "date-fns"
-import { ArrowLeft, Mail, Phone, Calendar, MapPin } from "lucide-react"
+import { ArrowLeft, Mail, Phone, Calendar, MapPin, LayoutDashboard, FolderOpen, CalendarDays, Stethoscope, Receipt } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -117,11 +117,11 @@ export default function PatientDetail() {
 
       <Tabs defaultValue="overview">
         <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="cases">Cases</TabsTrigger>
-          <TabsTrigger value="appointments">Appointments</TabsTrigger>
-          <TabsTrigger value="treatment-plans">Treatment Plans</TabsTrigger>
-          <TabsTrigger value="billing">Billing</TabsTrigger>
+          <TabsTrigger value="overview"><LayoutDashboard className="h-4 w-4" />Overview</TabsTrigger>
+          <TabsTrigger value="cases"><FolderOpen className="h-4 w-4" />Cases</TabsTrigger>
+          <TabsTrigger value="appointments"><CalendarDays className="h-4 w-4" />Appointments</TabsTrigger>
+          <TabsTrigger value="treatment-plans"><Stethoscope className="h-4 w-4" />Treatment Plans</TabsTrigger>
+          <TabsTrigger value="billing"><Receipt className="h-4 w-4" />Billing</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4 mt-4">

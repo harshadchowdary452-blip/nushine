@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   useReactTable,
   getCoreRowModel,
@@ -20,31 +20,133 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent } from "@/components/ui/card"
-import { casesApi } from "@/services/endpoints"
-import type { Case, PaginatedResponse } from "@/types"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
+import { casesApi, patientsApi, doctorsApi } from "@/services/endpoints"
+import { useToast } from "@/components/ui/toast"
+import type { Case, Patient, User, PaginatedResponse } from "@/types"
+import { useAuthStore } from "@/store/authStore"
 
 const statusVariant: Record<string, "default" | "secondary" | "outline" | "destructive" | "success" | "warning"> = {
-  OPEN: "default",
-  IN_DIAGNOSIS: "warning",
-  IN_TREATMENT: "secondary",
+  NEW: "default",
+  DIAGNOSIS_PENDING: "warning",
+  TREATMENT_PLANNED: "secondary",
+  IN_PROGRESS: "secondary",
   FOLLOW_UP: "outline",
-  CLOSED: "success",
+  COMPLETED: "success",
+  CANCELLED: "destructive",
+}
+
+interface CaseForm {
+  patient_id: string
+  doctor_id: string
+  chief_complaint: string
+  diagnosis: string
+  notes: string
+}
+
+function getEmptyCaseForm(): CaseForm {
+  return { patient_id: "", doctor_id: "", chief_complaint: "", diagnosis: "", notes: "" }
 }
 
 export default function CaseList() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const { addToast } = useToast()
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [form, setForm] = useState<CaseForm>(getEmptyCaseForm)
 
   const { data, isLoading } = useQuery<PaginatedResponse<Case>>({
     queryKey: ["cases", { search: globalFilter }],
     queryFn: () => casesApi.list({ search: globalFilter, page_size: 100 }),
   })
 
+  const currentUser = useAuthStore((s) => s.user)
+  const { data: patientsData } = useQuery<PaginatedResponse<Patient>>({
+    queryKey: ["patients", "dropdown"],
+    queryFn: () => patientsApi.list({ page_size: 200, hospital_id: currentUser?.hospital_id || undefined }),
+  })
+
+  const { data: doctorsData } = useQuery<PaginatedResponse<User>>({
+    queryKey: ["doctors", "dropdown"],
+    queryFn: () => doctorsApi.list({ page_size: 200, hospital_id: currentUser?.hospital_id || undefined }),
+  })
+
+  const patients: Patient[] = useMemo(
+    () => {
+      if (Array.isArray(patientsData)) return patientsData
+      return patientsData?.items || []
+    },
+    [patientsData]
+  )
+
+  const doctors: User[] = useMemo(
+    () => {
+      if (Array.isArray(doctorsData)) return doctorsData
+      return doctorsData?.items || []
+    },
+    [doctorsData]
+  )
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => casesApi.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cases"], refetchType: "all" })
+      queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" })
+      addToast({ title: "Success", description: "Case created successfully", variant: "success" })
+      resetForm()
+    },
+    onError: (err: any) => {
+      addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to create case", variant: "destructive" })
+    },
+  })
+
+  function resetForm() {
+    setForm(getEmptyCaseForm())
+    setDialogOpen(false)
+  }
+
+  function openDialog() {
+    setForm(getEmptyCaseForm())
+    setDialogOpen(true)
+  }
+
+  function handleDialogOpenChange(open: boolean) {
+    if (!open) resetForm()
+    setDialogOpen(open)
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const cleaned: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(form)) {
+      if (value !== "" && value !== undefined) {
+        cleaned[key] = value
+      }
+    }
+    createMutation.mutate(cleaned)
+  }
+
   const cases = useMemo(() => {
     if (!data) return []
-    let items = data.items || data || []
+    let items = Array.isArray(data) ? data : (data.items || [])
     if (statusFilter !== "all") {
       items = items.filter((c: Case) => c.status === statusFilter)
     }
@@ -54,18 +156,18 @@ export default function CaseList() {
   const columns = useMemo<ColumnDef<Case>[]>(
     () => [
       {
-        accessorKey: "patient.full_name",
+        accessorKey: "patient_name",
         header: "Patient",
         cell: ({ row }) => (
           <span className="font-medium">
-            {row.original.patient?.full_name || "—"}
+            {row.original.patient_name || "—"}
           </span>
         ),
       },
       {
-        accessorKey: "doctor.full_name",
+        accessorKey: "doctor_name",
         header: "Doctor",
-        cell: ({ row }) => row.original.doctor?.full_name || "—",
+        cell: ({ row }) => row.original.doctor_name || "—",
       },
       {
         accessorKey: "status",
@@ -115,7 +217,7 @@ export default function CaseList() {
   return (
     <div className="space-y-6">
       <PageHeader title="Cases" description="Manage patient cases">
-        <Button>
+        <Button onClick={openDialog}>
           <Plus className="h-4 w-4" /> Add Case
         </Button>
       </PageHeader>
@@ -129,11 +231,11 @@ export default function CaseList() {
                 placeholder="Search cases..."
                 value={globalFilter}
                 onChange={(e) => setGlobalFilter(e.target.value)}
-                className="pl-9"
+                className="pl-10"
               />
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              {["all", "OPEN", "IN_DIAGNOSIS", "IN_TREATMENT", "FOLLOW_UP", "CLOSED"].map((s) => (
+              {["all", "NEW", "DIAGNOSIS_PENDING", "TREATMENT_PLANNED", "IN_PROGRESS", "FOLLOW_UP", "COMPLETED", "CANCELLED"].map((s) => (
                 <Button
                   key={s}
                   variant={statusFilter === s ? "default" : "outline"}
@@ -161,7 +263,7 @@ export default function CaseList() {
               <p className="mt-1 text-sm text-muted-foreground">
                 No cases have been created yet.
               </p>
-              <Button className="mt-4">
+              <Button className="mt-4" onClick={openDialog}>
                 <FilePlus className="h-4 w-4" /> Add Case
               </Button>
             </div>
@@ -237,6 +339,90 @@ export default function CaseList() {
           )}
         </CardContent>
       </Card>
+      <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
+          <DialogHeader className="px-6 pt-6 pb-0 shrink-0">
+            <DialogTitle>Add Case</DialogTitle>
+            <DialogDescription>
+              Create a new patient case.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
+            <div className="overflow-y-auto px-6 py-4 space-y-4 flex-1">
+              <div className="grid gap-2">
+                <Label htmlFor="patient">Patient</Label>
+                <Select
+                  value={form.patient_id}
+                  onValueChange={(v) => setForm({ ...form, patient_id: v })}
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select patient" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {patients.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.full_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="doctor">Doctor</Label>
+                <Select
+                  value={form.doctor_id}
+                  onValueChange={(v) => setForm({ ...form, doctor_id: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select doctor (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {doctors.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>
+                        {d.full_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="complaint">Chief Complaint</Label>
+                <Input
+                  id="complaint"
+                  value={form.chief_complaint}
+                  onChange={(e) => setForm({ ...form, chief_complaint: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="diagnosis">Diagnosis</Label>
+                <Input
+                  id="diagnosis"
+                  value={form.diagnosis}
+                  onChange={(e) => setForm({ ...form, diagnosis: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="notes">Notes</Label>
+                <Input
+                  id="notes"
+                  value={form.notes}
+                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                />
+              </div>
+            </div>
+            <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-gray-100">
+              <Button type="button" variant="outline" onClick={resetForm}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={createMutation.isPending}>
+                {createMutation.isPending ? "Saving..." : "Save"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

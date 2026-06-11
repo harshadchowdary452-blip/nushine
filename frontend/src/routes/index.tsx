@@ -1,4 +1,5 @@
 import { createBrowserRouter, Navigate, Outlet, useLocation } from "react-router-dom";
+import { AnimatePresence } from "framer-motion";
 import type { ReactElement } from "react";
 import { useAuthStore } from "@/store/authStore";
 import type { Role } from "@/types";
@@ -10,6 +11,7 @@ import HospitalAdminDashboard from "@/pages/dashboard/hospital-admin";
 import DoctorDashboard from "@/pages/dashboard/doctor";
 import AdminGroups from "@/pages/admin/groups";
 import AdminHospitals from "@/pages/admin/hospitals";
+import AdminDoctors from "@/pages/admin/doctors";
 import PatientList from "@/pages/patients/list";
 import PatientDetail from "@/pages/patients/detail";
 import CaseList from "@/pages/cases/list";
@@ -40,21 +42,21 @@ function DashboardRedirect() {
 
 function ProtectedLayout() {
   const location = useLocation();
-  const { user, accessToken, refreshToken, _hasHydrated } = useAuthStore();
+  const { user, accessToken, refreshToken } = useAuthStore();
   const isAuthenticated = !!user && !!accessToken && !!refreshToken;
-  if (!_hasHydrated) return null;
   if (!isAuthenticated) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   return (
     <AppLayout>
-      <Outlet />
+      <AnimatePresence mode="wait">
+        <Outlet key={location.pathname} />
+      </AnimatePresence>
     </AppLayout>
   );
 }
 
 function PublicRoute() {
-  const { user, accessToken, refreshToken, _hasHydrated } = useAuthStore();
+  const { user, accessToken, refreshToken } = useAuthStore();
   const isAuthenticated = !!user && !!accessToken && !!refreshToken;
-  if (!_hasHydrated) return null;
   if (isAuthenticated) return <Navigate to={getDashboardPath(user?.role)} replace />;
   return <Outlet />;
 }
@@ -90,6 +92,7 @@ export const router = createBrowserRouter([
       { path: "/doctor", element: withRoles(<DoctorDashboard />, ["DOCTOR"]) },
       { path: "/admin/groups", element: withRoles(<AdminGroups />, ["SUPER_ADMIN"]) },
       { path: "/admin/hospitals", element: withRoles(<AdminHospitals />, ["SUPER_ADMIN", "GROUP_ADMIN"]) },
+      { path: "/admin/doctors", element: withRoles(<AdminDoctors />, ["SUPER_ADMIN", "GROUP_ADMIN", "HOSPITAL_ADMIN"]) },
       { path: "/patients", element: withRoles(<PatientList />, CARE_ROLES) },
       { path: "/patients/:id", element: withRoles(<PatientDetail />, CARE_ROLES) },
       { path: "/appointments", element: withRoles(<AppointmentList />, CARE_ROLES) },

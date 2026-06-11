@@ -17,30 +17,84 @@ router = APIRouter(prefix="/patients", tags=["Patients"])
 async def create_patient(data: PatientCreate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.CREATE_PATIENT)
     service = PatientService(db)
-    return await service.create(data.model_dump(), user_id=current_user.get("sub"))
+    data_dict = data.model_dump(exclude_none=True)
+    role = current_user.get("role")
+    if role in (Role.DOCTOR.value, Role.HOSPITAL_ADMIN.value):
+        data_dict["hospital_id"] = current_user.get("hospital_id")
+    elif not data_dict.get("hospital_id") and current_user.get("hospital_id"):
+        data_dict["hospital_id"] = current_user.get("hospital_id")
+    if not data_dict.get("hospital_id"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="hospital_id is required")
+    if role == Role.DOCTOR.value:
+        if not data_dict.get("doctor_id"):
+            data_dict["doctor_id"] = current_user.get("sub")
+    elif role == Role.HOSPITAL_ADMIN.value:
+        if not data_dict.get("doctor_id"):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="doctor_id is required for hospital admin creating patients")
+    return await service.create(data_dict, user_id=current_user.get("sub"))
 
 
 @router.get("/")
-async def get_patients(skip: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=200), hospital_id: Optional[str] = Query(None), doctor_id: Optional[str] = Query(None), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+async def get_patients(skip: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=200), hospital_id: Optional[str] = Query(None), doctor_id: Optional[str] = Query(None), status_filter: Optional[str] = Query(None, alias="status"), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.MANAGE_PATIENTS, Permission.VIEW_ALL_PATIENTS)
     service = PatientService(db)
     filters = {}
-    if hospital_id:
-        filters["hospital_id"] = hospital_id
     if doctor_id:
         filters["doctor_id"] = doctor_id
-    if current_user.get("role") == Role.DOCTOR.value:
+    if status_filter:
+        filters["status"] = status_filter
+    role = current_user.get("role")
+    if role == Role.DOCTOR.value:
+        if current_user.get("hospital_id"):
+            filters["hospital_id"] = current_user.get("hospital_id")
         filters["doctor_id"] = current_user.get("sub")
+    elif role == Role.HOSPITAL_ADMIN.value:
+        filters["hospital_id"] = current_user.get("hospital_id")
+    elif role == Role.GROUP_ADMIN.value:
+        from app.models.hospital import Hospital
+        from sqlalchemy import select
+        agid = current_user.get("admin_group_id")
+        if agid:
+            hospital_result = await db.execute(select(Hospital.id).where(Hospital.admin_group_id == agid))
+            hids = [row[0] for row in hospital_result.all()]
+            if hids:
+                filters["hospital_id__in"] = hids
+            else:
+                return []
+    else:
+        if hospital_id:
+            filters["hospital_id"] = hospital_id
     return await service.get_all(skip=skip, limit=limit, filters=filters or None)
 
 
 @router.get("/search")
-async def search_patients(q: str = Query(..., min_length=1), hospital_id: Optional[str] = Query(None), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+async def search_patients(q: str = Query(..., min_length=1), hospital_id: Optional[str] = Query(None), doctor_id: Optional[str] = Query(None), status_filter: Optional[str] = Query(None, alias="status"), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.MANAGE_PATIENTS, Permission.VIEW_ALL_PATIENTS)
     service = PatientService(db)
-    return await service.search(q, hospital_id=hospital_id)
+    role = current_user.get("role")
+    effective_hospital_id = hospital_id
+    effective_doctor_id = doctor_id
+    if role == Role.DOCTOR.value:
+        if not effective_hospital_id and current_user.get("hospital_id"):
+            effective_hospital_id = current_user.get("hospital_id")
+        effective_doctor_id = current_user.get("sub")
+    elif role == Role.HOSPITAL_ADMIN.value:
+        effective_hospital_id = current_user.get("hospital_id")
+    elif role == Role.GROUP_ADMIN.value:
+        from app.models.hospital import Hospital
+        from sqlalchemy import select
+        agid = current_user.get("admin_group_id")
+        if agid:
+            hospital_result = await db.execute(select(Hospital.id).where(Hospital.admin_group_id == agid))
+            hospital_ids = [row[0] for row in hospital_result.all()]
+            if hospital_ids:
+                return await service.search(q, hospital_ids_in=hospital_ids, doctor_id=effective_doctor_id, status_filter=status_filter)
+    return await service.search(q, hospital_id=effective_hospital_id, doctor_id=effective_doctor_id, status_filter=status_filter)
 
 
 @router.get("/{patient_id}", response_model=PatientResponse)
 async def get_patient(patient_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.MANAGE_PATIENTS, Permission.VIEW_ALL_PATIENTS)
     service = PatientService(db)
     patient = await service.get(patient_id)
     if not patient:

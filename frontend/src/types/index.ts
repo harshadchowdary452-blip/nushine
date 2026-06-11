@@ -3,6 +3,7 @@ export type Role = "SUPER_ADMIN" | "GROUP_ADMIN" | "HOSPITAL_ADMIN" | "DOCTOR";
 export interface User {
   id: string;
   hospital_id: string | null;
+  admin_group_id: string | null;
   email: string;
   full_name: string;
   phone: string | null;
@@ -90,18 +91,23 @@ export interface Patient {
   address: string | null;
   medical_history: string | null;
   photo_url: string | null;
+  status: PatientStatus;
   is_active: boolean;
   created_at: string;
   updated_at: string;
 }
 
-export type CaseStatus = "OPEN" | "IN_DIAGNOSIS" | "IN_TREATMENT" | "FOLLOW_UP" | "CLOSED";
+export type CaseStatus = "NEW" | "DIAGNOSIS_PENDING" | "TREATMENT_PLANNED" | "IN_PROGRESS" | "FOLLOW_UP" | "COMPLETED" | "CANCELLED";
+
+export type PatientStatus = "ACTIVE" | "INACTIVE" | "TREATMENT_COMPLETED" | "FOLLOW_UP" | "DISCONTINUED";
 
 export interface Case {
   id: string;
   patient_id: string;
   doctor_id: string | null;
   consultant_id: string | null;
+  patient_name?: string;
+  doctor_name?: string;
   chief_complaint: string;
   diagnosis: string | null;
   status: CaseStatus;
@@ -137,6 +143,8 @@ export interface ConsultantNote {
   consultant?: Consultant;
 }
 
+export type TreatmentPlanStatus = "PLANNED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+
 export interface TreatmentPlan {
   id: string;
   case_id: string;
@@ -144,6 +152,7 @@ export interface TreatmentPlan {
   description: string | null;
   cost: number;
   duration_minutes: number | null;
+  status: TreatmentPlanStatus;
   notes: string | null;
   is_active: boolean;
   created_at: string;
@@ -151,11 +160,14 @@ export interface TreatmentPlan {
   sittings?: TreatmentSitting[];
 }
 
+export type TreatmentSittingStatus = "PLANNED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+
 export interface TreatmentSitting {
   id: string;
   treatment_plan_id: string;
   sitting_number: number;
   work_done: string | null;
+  status: TreatmentSittingStatus;
   doctor_notes: string | null;
   next_appointment_date: string | null;
   created_at: string;
@@ -168,6 +180,8 @@ export interface Appointment {
   id: string;
   patient_id: string;
   doctor_id: string;
+  patient_name?: string;
+  doctor_name?: string;
   appointment_date: string;
   appointment_time: string;
   status: AppointmentStatus;
@@ -184,6 +198,8 @@ export type PaymentStatus = "PENDING" | "PARTIAL" | "PAID" | "OVERDUE";
 export interface Billing {
   id: string;
   case_id: string;
+  patient_name?: string;
+  case_chief_complaint?: string;
   total_amount: number;
   paid_amount: number;
   pending_amount: number;
@@ -232,7 +248,23 @@ export interface DashboardStats {
   total_doctors?: number;
   total_patients?: number;
   total_revenue?: number;
+  revenue_this_month?: number;
+  revenue_this_quarter?: number;
+  revenue_this_year?: number;
+  revenue_growth?: number;
+  patient_growth?: number;
+  hospital_growth?: number;
+  doctor_growth?: number;
+  my_patients?: number;
   active_cases?: number;
+  cases_completed?: number;
   today_appointments?: number;
+  personal_revenue?: number;
+  treatment_success_rate?: number;
+  follow_up_rate?: number;
   pending_follow_ups?: number;
+  top_groups?: { name: string; value: number }[];
+  top_hospitals?: { name: string; value: number }[];
+  top_doctors?: { name: string; value: number }[];
+  top_treatments?: { name: string; value: number }[];
 }

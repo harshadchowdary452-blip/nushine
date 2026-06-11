@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
-import { Plus, Search, Edit, Trash2, Building2 } from "lucide-react"
+import { Plus, Search, Edit, Trash2, Building2, UserCog } from "lucide-react"
 import { format } from "date-fns"
 import PageHeader from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
@@ -27,6 +27,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card"
 import { hospitalsApi, groupsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
+import DentalEmptyState from "@/components/ui/dental-empty-state"
 import type { Hospital, AdminGroup } from "@/types"
 
 interface HospitalForm {
@@ -36,15 +37,23 @@ interface HospitalForm {
   email: string
   registration_number: string
   admin_group_id: string
+  admin_email: string
+  admin_password: string
+  admin_full_name: string
 }
 
-const emptyForm: HospitalForm = {
-  name: "",
-  address: "",
-  phone: "",
-  email: "",
-  registration_number: "",
-  admin_group_id: "",
+function getEmptyHospitalForm(): HospitalForm {
+  return {
+    name: "",
+    address: "",
+    phone: "",
+    email: "",
+    registration_number: "",
+    admin_group_id: "",
+    admin_email: "",
+    admin_password: "",
+    admin_full_name: "",
+  }
 }
 
 export default function AdminHospitals() {
@@ -56,7 +65,7 @@ export default function AdminHospitals() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [editingHospital, setEditingHospital] = useState<Hospital | null>(null)
   const [deletingHospital, setDeletingHospital] = useState<Hospital | null>(null)
-  const [form, setForm] = useState<HospitalForm>(emptyForm)
+  const [form, setForm] = useState<HospitalForm>(getEmptyHospitalForm)
 
   const { data: hospitalsData, isLoading } = useQuery({
     queryKey: ["hospitals", { search }],
@@ -69,7 +78,19 @@ export default function AdminHospitals() {
   })
 
   const createMutation = useMutation({
-    mutationFn: (data: HospitalForm) => hospitalsApi.create(data),
+    mutationFn: async (data: HospitalForm) => {
+      const { admin_email, admin_password, admin_full_name, ...hospitalData } = data
+      const newHospital: any = await hospitalsApi.create(hospitalData)
+      if (admin_email && admin_password) {
+        await hospitalsApi.createAdmin(newHospital.id, {
+          email: admin_email,
+          password: admin_password,
+          full_name: admin_full_name || "Hospital Admin",
+          role: "HOSPITAL_ADMIN",
+        })
+      }
+      return newHospital
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["hospitals"] })
       addToast({ title: "Success", description: "Hospital created successfully", variant: "success" })
@@ -114,7 +135,7 @@ export default function AdminHospitals() {
 
   function openCreateDialog() {
     setEditingHospital(null)
-    setForm(emptyForm)
+    setForm(getEmptyHospitalForm())
     setDialogOpen(true)
   }
 
@@ -127,6 +148,9 @@ export default function AdminHospitals() {
       email: hospital.email || "",
       registration_number: hospital.registration_number || "",
       admin_group_id: hospital.admin_group_id,
+      admin_email: "",
+      admin_password: "",
+      admin_full_name: "",
     })
     setDialogOpen(true)
   }
@@ -134,13 +158,23 @@ export default function AdminHospitals() {
   function closeDialog() {
     setDialogOpen(false)
     setEditingHospital(null)
-    setForm(emptyForm)
+    setForm(getEmptyHospitalForm())
+  }
+
+  function handleDialogOpenChange(open: boolean) {
+    if (!open) closeDialog()
+    setDialogOpen(open)
   }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!form.admin_group_id && !editingHospital) {
+      addToast({ title: "Validation Error", description: "Please select an admin group", variant: "destructive" })
+      return
+    }
     if (editingHospital) {
-      updateMutation.mutate({ id: editingHospital.id, payload: form })
+      const { admin_email, admin_password, admin_full_name, ...hospitalData } = form
+      updateMutation.mutate({ id: editingHospital.id, payload: hospitalData as any })
     } else {
       createMutation.mutate(form)
     }
@@ -176,7 +210,7 @@ export default function AdminHospitals() {
                 placeholder="Search hospitals..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
+                className="pl-10"
               />
             </div>
             <div className="flex items-center gap-2">
@@ -200,18 +234,12 @@ export default function AdminHospitals() {
               ))}
             </div>
           ) : hospitals.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-muted">
-                <Building2 className="h-10 w-10 text-muted-foreground" />
-              </div>
-              <h3 className="text-lg font-semibold">No hospitals yet</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Get started by adding your first hospital.
-              </p>
-              <Button className="mt-4" onClick={openCreateDialog}>
-                <Plus className="h-4 w-4" /> Add Hospital
-              </Button>
-            </div>
+            <DentalEmptyState
+              icon={Building2}
+              title="No hospitals yet"
+              description="Get started by adding your first hospital to begin managing dental care."
+              action={<Button onClick={openCreateDialog}><Plus className="h-4 w-4" /> Add Hospital</Button>}
+            />
           ) : (
             <div className="overflow-x-auto rounded-md border">
               <table className="w-full text-sm">
@@ -265,16 +293,16 @@ export default function AdminHospitals() {
         </CardContent>
       </Card>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
+      <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
+          <DialogHeader className="px-6 pt-6 pb-0 shrink-0">
             <DialogTitle>{editingHospital ? "Edit Hospital" : "Add Hospital"}</DialogTitle>
             <DialogDescription>
               {editingHospital ? "Update the hospital details." : "Fill in the details to add a new hospital."}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit}>
-            <div className="grid gap-4 py-4">
+          <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
+            <div className="overflow-y-auto px-6 py-4 space-y-4 flex-1">
               <div className="grid gap-2">
                 <Label htmlFor="name">Name</Label>
                 <Input
@@ -320,10 +348,11 @@ export default function AdminHospitals() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="admin_group">Admin Group</Label>
+                <Label htmlFor="admin_group">Admin Group <span className="text-red-500">*</span></Label>
                 <Select
                   value={form.admin_group_id}
                   onValueChange={(v) => setForm({ ...form, admin_group_id: v })}
+                  required
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select admin group" />
@@ -337,8 +366,44 @@ export default function AdminHospitals() {
                   </SelectContent>
                 </Select>
               </div>
+              {!editingHospital && (
+                <>
+                  <div className="border-t border-gray-100 pt-4">
+                    <p className="text-sm font-medium text-gray-700 mb-3">Admin Credentials</p>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="admin_full_name">Admin Full Name</Label>
+                    <Input
+                      id="admin_full_name"
+                      value={form.admin_full_name}
+                      onChange={(e) => setForm({ ...form, admin_full_name: e.target.value })}
+                      placeholder="e.g. Jane Smith"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="admin_email">Admin Email</Label>
+                    <Input
+                      id="admin_email"
+                      type="email"
+                      value={form.admin_email}
+                      onChange={(e) => setForm({ ...form, admin_email: e.target.value })}
+                      placeholder="admin@hospital.com"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="admin_password">Admin Password</Label>
+                    <Input
+                      id="admin_password"
+                      type="password"
+                      value={form.admin_password}
+                      onChange={(e) => setForm({ ...form, admin_password: e.target.value })}
+                      placeholder="Min. 8 characters"
+                    />
+                  </div>
+                </>
+              )}
             </div>
-            <DialogFooter>
+            <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-gray-100">
               <Button type="button" variant="outline" onClick={closeDialog}>
                 Cancel
               </Button>

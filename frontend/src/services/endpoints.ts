@@ -28,6 +28,7 @@ export const groupsApi = {
   create: (data: any) => api.post("/admin-groups", data).then((r) => r.data),
   update: (id: string, data: any) => api.put(`/admin-groups/${id}`, data).then((r) => r.data),
   delete: (id: string) => api.delete(`/admin-groups/${id}`),
+  createAdmin: (groupId: string, data: any) => api.post(`/admin-groups/${groupId}/admins`, data).then((r) => r.data),
 };
 
 export const hospitalsApi = {
@@ -36,6 +37,7 @@ export const hospitalsApi = {
   create: (data: any) => api.post("/hospitals", data).then((r) => r.data),
   update: (id: string, data: any) => api.put(`/hospitals/${id}`, data).then((r) => r.data),
   delete: (id: string) => api.delete(`/hospitals/${id}`),
+  createAdmin: (hospitalId: string, data: any) => api.post(`/hospitals/${hospitalId}/admins`, data).then((r) => r.data),
 };
 
 export const usersApi = {
@@ -51,6 +53,8 @@ export const doctorsApi = {
   get: (id: string) => api.get(`/doctors/${id}`).then((r) => r.data),
   create: (data: any) => api.post("/doctors", data).then((r) => r.data),
   update: (id: string, data: any) => api.put(`/doctors/${id}`, data).then((r) => r.data),
+  deactivate: (id: string) => api.post(`/doctors/${id}/deactivate`),
+  activate: (id: string) => api.post(`/doctors/${id}/activate`),
 };
 
 export const patientsApi = {
@@ -59,6 +63,7 @@ export const patientsApi = {
   create: (data: any) => api.post("/patients", data).then((r) => r.data),
   update: (id: string, data: any) => api.put(`/patients/${id}`, data).then((r) => r.data),
   delete: (id: string) => api.delete(`/patients/${id}`),
+  search: (params?: PaginationParams) => api.get("/patients/search", { params: withPagination(params) }).then((r) => r.data),
 };
 
 export const casesApi = {
@@ -99,11 +104,19 @@ export const treatmentApi = {
   delete: (id: string) => api.delete(`/treatment-plans/${id}`),
 };
 
+export const treatmentSittingsApi = {
+  listByPlan: (planId: string) => api.get(`/treatment-sittings/by-plan/${planId}`).then((r) => r.data),
+  get: (id: string) => api.get(`/treatment-sittings/${id}`).then((r) => r.data),
+  create: (data: any) => api.post("/treatment-sittings", data).then((r) => r.data),
+  update: (id: string, data: any) => api.put(`/treatment-sittings/${id}`, data).then((r) => r.data),
+};
+
 export const billingApi = {
   list: (params?: PaginationParams) => api.get("/billings", { params: withPagination(params) }).then((r) => r.data),
   get: (id: string) => api.get(`/billings/${id}`).then((r) => r.data),
   create: (data: any) => api.post("/billings", data).then((r) => r.data),
   update: (id: string, data: any) => api.put(`/billings/${id}`, data).then((r) => r.data),
+  updatePayment: (id: string, data: any) => api.put(`/billings/${id}/payment`, data).then((r) => r.data),
 };
 
 export const dashboardApi = {
@@ -111,6 +124,10 @@ export const dashboardApi = {
   groupAdmin: () => api.get("/dashboards/group-admin").then((r) => r.data),
   hospitalAdmin: () => api.get("/dashboards/hospital-admin").then((r) => r.data),
   doctor: () => api.get("/dashboards/doctor").then((r) => r.data),
+};
+
+export const notificationsApi = {
+  list: () => api.get("/notifications").then((r) => r.data),
 };
 
 export const whatsappApi = {

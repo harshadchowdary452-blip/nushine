@@ -19,5 +19,6 @@ async def create_note(data: ConsultantNoteCreate, db: AsyncSession = Depends(get
 
 @router.get("/by-case/{case_id}")
 async def get_notes_by_case(case_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.ASSIGN_CONSULTANT, Permission.MANAGE_CASES)
     service = ConsultantNoteService(db)
     return await service.get_by_case(case_id)

@@ -37,8 +37,11 @@ import {
 } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
-import { patientsApi } from "@/services/endpoints"
-import type { Patient } from "@/types"
+import { patientsApi, doctorsApi } from "@/services/endpoints"
+import { useToast } from "@/components/ui/toast"
+import DentalEmptyState from "@/components/ui/dental-empty-state"
+import type { Patient, PatientStatus, User, PaginatedResponse } from "@/types"
+import { useAuthStore } from "@/store/authStore"
 
 const genderBadgeVariant: Record<string, "default" | "secondary" | "outline" | "destructive" | "success" | "warning"> = {
   MALE: "default",
@@ -46,44 +49,93 @@ const genderBadgeVariant: Record<string, "default" | "secondary" | "outline" | "
   OTHER: "secondary",
 }
 
+interface PatientForm {
+  full_name: string
+  email: string
+  phone: string
+  gender: string
+  date_of_birth: string
+  address: string
+  doctor_id: string
+}
+
+function getEmptyForm(): PatientForm {
+  return { full_name: "", email: "", phone: "", gender: "", date_of_birth: "", address: "", doctor_id: "" }
+}
+
+function stripEmptyFormFields(data: PatientForm): Record<string, unknown> {
+  const cleaned: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(data)) {
+    if (value !== "" && value !== undefined) {
+      cleaned[key] = value
+    }
+  }
+  return cleaned
+}
+
 export default function PatientList() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { addToast } = useToast()
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [globalFilter, setGlobalFilter] = useState("")
   const [genderFilter, setGenderFilter] = useState<string>("all")
+  const [statusFilter, setStatusFilter] = useState<string>("all")
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [form, setForm] = useState({
-    full_name: "",
-    email: "",
-    phone: "",
-    gender: "",
-    date_of_birth: "",
-    address: "",
-  })
+  const [form, setForm] = useState<PatientForm>(getEmptyForm)
 
+  const currentUser = useAuthStore((s) => s.user)
   const { data, isLoading } = useQuery<Patient[]>({
     queryKey: ["patients", { search: globalFilter }],
-    queryFn: () => patientsApi.list({ search: globalFilter, page_size: 100 }),
+    queryFn: () => patientsApi.list({ search: globalFilter, page_size: 100, hospital_id: currentUser?.hospital_id || undefined }),
   })
+
+  const { data: doctorsData } = useQuery<PaginatedResponse<User>>({
+    queryKey: ["doctors", "dropdown"],
+    queryFn: () => doctorsApi.list({ page_size: 200, hospital_id: currentUser?.hospital_id || undefined }),
+    enabled: currentUser?.role === "HOSPITAL_ADMIN",
+  })
+
+  const doctors: User[] = useMemo(() => {
+    if (Array.isArray(doctorsData)) return doctorsData
+    return doctorsData?.items || []
+  }, [doctorsData])
 
   const createMutation = useMutation({
     mutationFn: (data: any) => patientsApi.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["patients"] })
-      setDialogOpen(false)
-      setForm({ full_name: "", email: "", phone: "", gender: "", date_of_birth: "", address: "" })
+      queryClient.invalidateQueries({ queryKey: ["patients"], refetchType: "all" })
+      queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" })
+      addToast({ title: "Success", description: "Patient created successfully", variant: "success" })
+      resetForm()
+    },
+    onError: (err: any) => {
+      addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to create patient", variant: "destructive" })
     },
   })
 
+  function resetForm() {
+    setForm(getEmptyForm())
+    setDialogOpen(false)
+  }
+
+  function openDialog() {
+    setForm(getEmptyForm())
+    setDialogOpen(true)
+  }
+
   const patients = useMemo(() => {
     if (!data) return []
+    let filtered = data
     if (genderFilter !== "all") {
-      return data.filter((p: Patient) => p.gender === genderFilter)
+      filtered = filtered.filter((p: Patient) => p.gender === genderFilter)
     }
-    return data
-  }, [data, genderFilter])
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((p: Patient) => p.status === statusFilter)
+    }
+    return filtered
+  }, [data, genderFilter, statusFilter])
 
   const columns = useMemo<ColumnDef<Patient>[]>(
     () => [
@@ -102,6 +154,27 @@ export default function PatientList() {
           return gender ? (
             <Badge variant={genderBadgeVariant[gender] || "secondary"}>
               {gender}
+            </Badge>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          )
+        },
+      },
+      {
+        accessorKey: "status",
+        header: "Status",
+        cell: ({ row }) => {
+          const status = row.getValue("status") as string
+          const variant: Record<string, "default" | "secondary" | "outline" | "destructive" | "success" | "warning"> = {
+            ACTIVE: "success",
+            INACTIVE: "secondary",
+            TREATMENT_COMPLETED: "default",
+            FOLLOW_UP: "warning",
+            DISCONTINUED: "destructive",
+          }
+          return status ? (
+            <Badge variant={variant[status] || "outline"} className="text-[10px]">
+              {status.replace(/_/g, " ")}
             </Badge>
           ) : (
             <span className="text-muted-foreground">—</span>
@@ -169,13 +242,18 @@ export default function PatientList() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    createMutation.mutate(form)
+    createMutation.mutate(stripEmptyFormFields(form))
+  }
+
+  function handleDialogOpenChange(open: boolean) {
+    if (!open) resetForm()
+    setDialogOpen(open)
   }
 
   return (
     <div className="space-y-6">
       <PageHeader title="Patients" description="Manage patient records">
-        <Button onClick={() => setDialogOpen(true)}>
+        <Button onClick={openDialog}>
           <Plus className="h-4 w-4" /> Add Patient
         </Button>
       </PageHeader>
@@ -189,10 +267,10 @@ export default function PatientList() {
                 placeholder="Search patients..."
                 value={globalFilter}
                 onChange={(e) => setGlobalFilter(e.target.value)}
-                className="pl-9"
+                className="pl-10"
               />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {["all", "MALE", "FEMALE", "OTHER"].map((g) => (
                 <Button
                   key={g}
@@ -205,6 +283,19 @@ export default function PatientList() {
               ))}
             </div>
           </div>
+          <div className="flex flex-wrap items-center gap-2 mt-2">
+            <span className="text-xs text-muted-foreground mr-1">Status:</span>
+            {["all", "ACTIVE", "INACTIVE", "TREATMENT_COMPLETED", "FOLLOW_UP", "DISCONTINUED"].map((s) => (
+              <Button
+                key={s}
+                variant={statusFilter === s ? "default" : "outline"}
+                size="sm"
+                onClick={() => setStatusFilter(s)}
+              >
+                {s === "all" ? "All" : s.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}
+              </Button>
+            ))}
+          </div>
 
           {isLoading ? (
             <div className="space-y-3">
@@ -213,18 +304,12 @@ export default function PatientList() {
               ))}
             </div>
           ) : patients.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-muted">
-                <Users className="h-10 w-10 text-muted-foreground" />
-              </div>
-              <h3 className="text-lg font-semibold">No patients yet</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Get started by adding your first patient.
-              </p>
-              <Button className="mt-4" onClick={() => setDialogOpen(true)}>
-                <UserPlus className="h-4 w-4" /> Add Patient
-              </Button>
-            </div>
+            <DentalEmptyState
+              icon={Users}
+              title="No patients yet"
+              description="Begin your patient journey by registering the first patient in your dental practice."
+              action={<Button onClick={openDialog}><UserPlus className="h-4 w-4" /> Add Patient</Button>}
+            />
           ) : (
             <>
               <div className="overflow-x-auto rounded-md border">
@@ -299,16 +384,16 @@ export default function PatientList() {
         </CardContent>
       </Card>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
+      <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
+          <DialogHeader className="px-6 pt-6 pb-0 shrink-0">
             <DialogTitle>Add Patient</DialogTitle>
             <DialogDescription>
               Fill in the details to register a new patient.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit}>
-            <div className="grid gap-4 py-4">
+          <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
+            <div className="overflow-y-auto px-6 py-4 space-y-4 flex-1">
               <div className="grid gap-2">
                 <Label htmlFor="name">Full Name</Label>
                 <Input
@@ -372,9 +457,30 @@ export default function PatientList() {
                   onChange={(e) => setForm({ ...form, address: e.target.value })}
                 />
               </div>
+              {currentUser?.role === "HOSPITAL_ADMIN" && (
+                <div className="grid gap-2">
+                  <Label htmlFor="doctor">Assign Doctor</Label>
+                  <Select
+                    value={form.doctor_id}
+                    onValueChange={(v) => setForm({ ...form, doctor_id: v })}
+                    required
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select doctor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {doctors.map((d) => (
+                        <SelectItem key={d.id} value={d.id}>
+                          {d.full_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+            <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-gray-100">
+              <Button type="button" variant="outline" onClick={resetForm}>
                 Cancel
               </Button>
               <Button type="submit" disabled={createMutation.isPending}>

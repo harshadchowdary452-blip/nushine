@@ -22,6 +22,8 @@ class AppointmentResponse(BaseModel):
     id: str
     patient_id: str
     doctor_id: str
+    patient_name: Optional[str] = None
+    doctor_name: Optional[str] = None
     appointment_date: date
     appointment_time: time
     status: str
@@ -30,5 +32,4 @@ class AppointmentResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}

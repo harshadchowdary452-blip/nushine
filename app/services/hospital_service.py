@@ -1,5 +1,7 @@
 from typing import Optional, List, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
+from fastapi import HTTPException, status
 from app.repositories.hospital_repository import HospitalRepository
 from app.repositories.user_repository import UserRepository
 from app.repositories.patient_repository import PatientRepository
@@ -17,7 +19,21 @@ class HospitalService:
         self.db = db
 
     async def create(self, data: dict, user_id: str = None) -> Hospital:
-        hospital = await self.repo.create(**data)
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info("CREATE_HOSPITAL - Request data: %s", data)
+        clean_data = {k: v for k, v in data.items() if v is not None and v != ""}
+        if "admin_group_id" not in clean_data:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="admin_group_id is required")
+        try:
+            hospital = await self.repo.create(**clean_data)
+            logger.info("CREATE_HOSPITAL - Success: %s", hospital.id)
+        except IntegrityError as e:
+            logger.error("CREATE_HOSPITAL - Integrity error: %s", str(e))
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Database integrity error: {str(e.orig)}")
+        except Exception as e:
+            logger.exception("CREATE_HOSPITAL - Unexpected error: %s", str(e))
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create hospital: {str(e)}")
         await self.audit_log_repo.create(user_id=user_id, action="CREATE_HOSPITAL", entity_type="HOSPITAL", entity_id=str(hospital.id), details=f"Hospital '{hospital.name}' created")
         return hospital
 
@@ -28,7 +44,8 @@ class HospitalService:
         return await self.repo.get_all(skip=skip, limit=limit, filters=filters)
 
     async def update(self, hospital_id: str, data: dict, user_id: str = None) -> Optional[Hospital]:
-        hospital = await self.repo.update(hospital_id, **data)
+        clean_data = {k: v for k, v in data.items() if v is not None and v != ""}
+        hospital = await self.repo.update(hospital_id, **clean_data)
         if hospital:
             await self.audit_log_repo.create(user_id=user_id, action="UPDATE_HOSPITAL", entity_type="HOSPITAL", entity_id=hospital_id, details="Hospital updated")
         return hospital

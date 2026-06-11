@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
-import { Plus, Search, Edit, Trash2, Shield } from "lucide-react"
+import { Plus, Search, Edit, Trash2, Shield, UserCog } from "lucide-react"
 import { format } from "date-fns"
 import PageHeader from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
@@ -27,9 +27,12 @@ interface GroupForm {
   name: string
   description: string
   is_active: boolean
+  admin_email: string
+  admin_password: string
+  admin_full_name: string
 }
 
-const emptyForm: GroupForm = { name: "", description: "", is_active: true }
+const emptyForm: GroupForm = { name: "", description: "", is_active: true, admin_email: "", admin_password: "", admin_full_name: "" }
 
 export default function AdminGroups() {
   console.log("[PAGE] AdminGroups mounted", { path: window.location.pathname })
@@ -48,7 +51,19 @@ export default function AdminGroups() {
   })
 
   const createMutation = useMutation({
-    mutationFn: (data: GroupForm) => groupsApi.create(data),
+    mutationFn: async (data: GroupForm) => {
+      const { admin_email, admin_password, admin_full_name, ...groupData } = data
+      const newGroup: any = await groupsApi.create(groupData)
+      if (admin_email && admin_password) {
+        await groupsApi.createAdmin(newGroup.id, {
+          email: admin_email,
+          password: admin_password,
+          full_name: admin_full_name || "Group Admin",
+          role: "GROUP_ADMIN",
+        })
+      }
+      return newGroup
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-groups"] })
       addToast({ title: "Success", description: "Group created successfully", variant: "success" })
@@ -94,7 +109,7 @@ export default function AdminGroups() {
 
   function openEditDialog(group: AdminGroup) {
     setEditingGroup(group)
-    setForm({ name: group.name, description: group.description || "", is_active: group.is_active })
+    setForm({ name: group.name, description: group.description || "", is_active: group.is_active, admin_email: "", admin_password: "", admin_full_name: "" })
     setDialogOpen(true)
   }
 
@@ -142,7 +157,7 @@ export default function AdminGroups() {
               placeholder="Search groups..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
+              className="pl-10"
             />
           </div>
 
@@ -219,15 +234,15 @@ export default function AdminGroups() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
+          <DialogHeader className="px-6 pt-6 pb-0 shrink-0">
             <DialogTitle>{editingGroup ? "Edit Group" : "Create Group"}</DialogTitle>
             <DialogDescription>
               {editingGroup ? "Update the admin group details." : "Fill in the details to create a new admin group."}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit}>
-            <div className="grid gap-4 py-4">
+          <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
+            <div className="overflow-y-auto px-6 py-4 space-y-4 flex-1">
               <div className="grid gap-2">
                 <Label htmlFor="name">Name</Label>
                 <Input
@@ -246,6 +261,42 @@ export default function AdminGroups() {
                   className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                 />
               </div>
+              {!editingGroup && (
+                <>
+                  <div className="border-t border-gray-100 pt-4">
+                    <p className="text-sm font-medium text-gray-700 mb-3">Admin Credentials</p>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="admin_full_name">Admin Full Name</Label>
+                    <Input
+                      id="admin_full_name"
+                      value={form.admin_full_name}
+                      onChange={(e) => setForm({ ...form, admin_full_name: e.target.value })}
+                      placeholder="e.g. John Doe"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="admin_email">Admin Email</Label>
+                    <Input
+                      id="admin_email"
+                      type="email"
+                      value={form.admin_email}
+                      onChange={(e) => setForm({ ...form, admin_email: e.target.value })}
+                      placeholder="admin@example.com"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="admin_password">Admin Password</Label>
+                    <Input
+                      id="admin_password"
+                      type="password"
+                      value={form.admin_password}
+                      onChange={(e) => setForm({ ...form, admin_password: e.target.value })}
+                      placeholder="Min. 8 characters"
+                    />
+                  </div>
+                </>
+              )}
               <div className="flex items-center gap-2">
                 <Switch
                   id="is_active"
@@ -255,7 +306,7 @@ export default function AdminGroups() {
                 <Label htmlFor="is_active">Active</Label>
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-gray-100">
               <Button type="button" variant="outline" onClick={closeDialog}>
                 Cancel
               </Button>

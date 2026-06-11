@@ -1,0 +1,9 @@
+{
+  "name": "NuShine Dental",
+  "short_name": "NuShine",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0EA5E9",
+  "icons": [{ "src": "/favicon.svg", "sizes": "48x48", "type": "image/svg+xml" }]
+}

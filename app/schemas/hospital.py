@@ -4,7 +4,7 @@ from datetime import datetime
 
 
 class HospitalCreate(BaseModel):
-    admin_group_id: str
+    admin_group_id: Optional[str] = None
     name: str = Field(..., min_length=2, max_length=255)
     address: Optional[str] = None
     phone: Optional[str] = None
@@ -33,5 +33,4 @@ class HospitalResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}

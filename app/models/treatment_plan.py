@@ -1,8 +1,16 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import String, DateTime, Text, Float, Integer, Boolean, ForeignKey
+from sqlalchemy import String, DateTime, Text, Float, Integer, Boolean, ForeignKey, Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
+from enum import Enum
+
+
+class TreatmentPlanStatus(str, Enum):
+    PLANNED = "PLANNED"
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
 
 
 class TreatmentPlan(Base):
@@ -13,6 +21,7 @@ class TreatmentPlan(Base):
     description: Mapped[str] = mapped_column(Text, nullable=True)
     cost: Mapped[float] = mapped_column(Float, nullable=False)
     duration_minutes: Mapped[int] = mapped_column(Integer, nullable=True)
+    status: Mapped[TreatmentPlanStatus] = mapped_column(SAEnum(TreatmentPlanStatus, create_constraint=False), default=TreatmentPlanStatus.PLANNED, nullable=False)
     notes: Mapped[str] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

@@ -28,9 +28,7 @@ async def send_whatsapp_message(
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    role = current_user.get("role")
-    if role not in ("SUPER_ADMIN", "GROUP_ADMIN", "HOSPITAL_ADMIN", "DOCTOR"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    verify_permission(current_user, Permission.MANAGE_PATIENTS, Permission.VIEW_ALL_PATIENTS)
     provider = WhatsAppProvider()
     success = await provider.send_message(request.phone, request.message)
     if not success:
@@ -44,15 +42,13 @@ async def broadcast_whatsapp_messages(
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    role = current_user.get("role")
-    if role not in ("SUPER_ADMIN", "GROUP_ADMIN", "HOSPITAL_ADMIN"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    verify_permission(current_user, Permission.MANAGE_PATIENTS)
     patient_repo = PatientRepository(db)
     sent = 0
     failed = 0
     provider = WhatsAppProvider()
     for pid in request.patient_ids:
-        patient = await patient_repo.get_by_id(pid)
+        patient = await patient_repo.get(pid)
         if patient and patient.phone:
             msg = request.message.replace("{name}", patient.full_name)
             ok = await provider.send_message(patient.phone, msg)

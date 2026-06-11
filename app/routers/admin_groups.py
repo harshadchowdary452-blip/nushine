@@ -2,9 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.core.permissions import verify_permission, Permission
+from app.core.permissions import verify_permission, Permission, Role
 from app.services.admin_group_service import AdminGroupService
+from app.services.user_service import UserService
 from app.schemas.admin_group import AdminGroupCreate, AdminGroupUpdate, AdminGroupResponse
+from app.schemas.user import UserCreate, UserResponse
 from app.schemas.common import MessageResponse
 
 router = APIRouter(prefix="/admin-groups", tags=["Admin Groups"])
@@ -52,3 +54,13 @@ async def delete_group(group_id: str, db: AsyncSession = Depends(get_db), curren
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admin group not found")
     return MessageResponse(message="Admin group deleted successfully")
+
+
+@router.post("/{group_id}/admins", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+async def create_group_admin(group_id: str, data: UserCreate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.MANAGE_GROUP_ADMINS)
+    service = UserService(db)
+    data_dict = data.model_dump()
+    data_dict["admin_group_id"] = group_id
+    data_dict["role"] = Role.GROUP_ADMIN.value
+    return await service.create(data_dict, user_id=current_user.get("sub"))

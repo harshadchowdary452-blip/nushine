@@ -35,20 +35,28 @@ import {
 } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { consultantsApi } from "@/services/endpoints"
+import { useToast } from "@/components/ui/toast"
 import type { Consultant, PaginatedResponse } from "@/types"
+
+interface ConsultantForm {
+  full_name: string
+  email: string
+  phone: string
+  specialization: string
+  license_number: string
+}
+
+function getEmptyConsultantForm(): ConsultantForm {
+  return { full_name: "", email: "", phone: "", specialization: "", license_number: "" }
+}
 
 export default function ConsultantList() {
   const queryClient = useQueryClient()
+  const { addToast } = useToast()
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState("")
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [form, setForm] = useState({
-    full_name: "",
-    email: "",
-    phone: "",
-    specialization: "",
-    license_number: "",
-  })
+  const [form, setForm] = useState<ConsultantForm>(getEmptyConsultantForm)
 
   const { data, isLoading } = useQuery<PaginatedResponse<Consultant>>({
     queryKey: ["consultants", { search: globalFilter }],
@@ -59,10 +67,24 @@ export default function ConsultantList() {
     mutationFn: (data: any) => consultantsApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["consultants"] })
-      setDialogOpen(false)
-      setForm({ full_name: "", email: "", phone: "", specialization: "", license_number: "" })
+      queryClient.invalidateQueries({ queryKey: ["dash"] })
+      addToast({ title: "Success", description: "Consultant created successfully", variant: "success" })
+      resetForm()
+    },
+    onError: (err: any) => {
+      addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to create consultant", variant: "destructive" })
     },
   })
+
+  function resetForm() {
+    setForm(getEmptyConsultantForm())
+    setDialogOpen(false)
+  }
+
+  function handleDialogOpenChange(open: boolean) {
+    if (!open) resetForm()
+    setDialogOpen(open)
+  }
 
   const consultants: Consultant[] = useMemo(
     () => (data?.items || data || []) as Consultant[],
@@ -155,7 +177,7 @@ export default function ConsultantList() {
                 placeholder="Search consultants..."
                 value={globalFilter}
                 onChange={(e) => setGlobalFilter(e.target.value)}
-                className="pl-9"
+                className="pl-10"
               />
             </div>
           </div>
@@ -251,16 +273,16 @@ export default function ConsultantList() {
         </CardContent>
       </Card>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
+      <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
+          <DialogHeader className="px-6 pt-6 pb-0 shrink-0">
             <DialogTitle>Add Consultant</DialogTitle>
             <DialogDescription>
               Register a new consultant.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit}>
-            <div className="grid gap-4 py-4">
+          <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
+            <div className="overflow-y-auto px-6 py-4 space-y-4 flex-1">
               <div className="grid gap-2">
                 <Label htmlFor="name">Full Name</Label>
                 <Input
@@ -317,11 +339,11 @@ export default function ConsultantList() {
                 />
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-gray-100">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setDialogOpen(false)}
+                onClick={resetForm}
               >
                 Cancel
               </Button>

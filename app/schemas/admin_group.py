@@ -21,6 +21,8 @@ class AdminGroupResponse(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+    hospital_count: int = 0
+    doctor_count: int = 0
+    patient_count: int = 0
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}

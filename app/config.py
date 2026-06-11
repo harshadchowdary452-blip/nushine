@@ -1,9 +1,12 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
 
 
 class Settings(BaseSettings):
-    APP_NAME: str = "Dental Hospital Management System"
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
+
+    APP_NAME: str = "NuShine Dental"
+    APP_TAGLINE: str = "Modern Dental Practice Management Platform"
     DEBUG: bool = False
     ENVIRONMENT: str = "development"
 
@@ -35,10 +38,6 @@ class Settings(BaseSettings):
 
     SUPER_ADMIN_EMAIL: str = "superadmin@dental.com"
     SUPER_ADMIN_PASSWORD: str = "SuperAdmin@123"
-
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
 
 
 settings = Settings()

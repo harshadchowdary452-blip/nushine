@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   useReactTable,
   getCoreRowModel,
@@ -36,8 +36,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { billingApi } from "@/services/endpoints"
-import type { Billing, PaginatedResponse } from "@/types"
+import { billingApi, casesApi } from "@/services/endpoints"
+import { useToast } from "@/components/ui/toast"
+import { formatIndianRupees } from "@/lib/currency"
+import type { Billing, Case, PaginatedResponse } from "@/types"
+import { useAuthStore } from "@/store/authStore"
 
 const statusVariant: Record<string, "default" | "secondary" | "outline" | "destructive" | "success" | "warning"> = {
   PAID: "success",
@@ -46,19 +49,51 @@ const statusVariant: Record<string, "default" | "secondary" | "outline" | "destr
   OVERDUE: "destructive",
 }
 
+interface InvoiceForm {
+  case_id: string
+  total_amount: number | null
+  paid_amount: number | null
+  payment_method: string
+  notes: string
+}
+
+function getEmptyInvoiceForm(): InvoiceForm {
+  return { case_id: "", total_amount: null, paid_amount: null, payment_method: "", notes: "" }
+}
+
 export default function BillingList() {
+  const queryClient = useQueryClient()
+  const { addToast } = useToast()
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState("")
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [form, setForm] = useState<InvoiceForm>(getEmptyInvoiceForm)
 
   const { data, isLoading } = useQuery<PaginatedResponse<Billing>>({
     queryKey: ["billings"],
     queryFn: () => billingApi.list({ page_size: 100 }),
   })
 
+  const currentUser = useAuthStore((s) => s.user)
+  const { data: casesData } = useQuery<PaginatedResponse<Case>>({
+    queryKey: ["cases", "dropdown"],
+    queryFn: () => casesApi.list({ page_size: 200, hospital_id: currentUser?.hospital_id || undefined }),
+  })
+
   const billings: Billing[] = useMemo(
-    () => (data?.items || data || []) as Billing[],
+    () => {
+      if (Array.isArray(data)) return data
+      return data?.items || []
+    },
     [data]
+  )
+
+  const cases: Case[] = useMemo(
+    () => {
+      if (Array.isArray(casesData)) return casesData
+      return casesData?.items || []
+    },
+    [casesData]
   )
 
   const kpis = useMemo(() => {
@@ -67,6 +102,45 @@ export default function BillingList() {
     const pending = billings.reduce((s, b) => s + b.pending_amount, 0)
     return { total, paid, pending }
   }, [billings])
+
+  const createMutation = useMutation({
+    mutationFn: (data: InvoiceForm) => billingApi.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["billings"], refetchType: "all" })
+      queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" })
+      addToast({ title: "Success", description: "Invoice created successfully", variant: "success" })
+      resetForm()
+    },
+    onError: (err: any) => {
+      addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to create invoice", variant: "destructive" })
+    },
+  })
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const total = form.total_amount ?? 0
+    if (total <= 0) {
+      addToast({ title: "Validation Error", description: "Total amount must be greater than 0", variant: "destructive" })
+      return
+    }
+    const cleaned = { ...form, total_amount: total, paid_amount: form.paid_amount ?? 0 }
+    createMutation.mutate(cleaned)
+  }
+
+  function resetForm() {
+    setForm(getEmptyInvoiceForm())
+    setDialogOpen(false)
+  }
+
+  function openDialog() {
+    setForm(getEmptyInvoiceForm())
+    setDialogOpen(true)
+  }
+
+  function handleDialogOpenChange(open: boolean) {
+    if (!open) resetForm()
+    setDialogOpen(open)
+  }
 
   const columns = useMemo<ColumnDef<Billing>[]>(
     () => [
@@ -80,15 +154,15 @@ export default function BillingList() {
         ),
       },
       {
-        accessorKey: "case.patient.full_name",
+        accessorKey: "patient_name",
         header: "Patient",
-        cell: ({ row }) => row.original.case?.patient?.full_name || "—",
+        cell: ({ row }) => row.original.patient_name || "—",
       },
       {
-        accessorKey: "case.chief_complaint",
+        accessorKey: "case_chief_complaint",
         header: "Case",
         cell: ({ row }) => {
-          const complaint = row.original.case?.chief_complaint
+          const complaint = row.original.case_chief_complaint
           return complaint ? (
             <span className="max-w-[120px] truncate block">{complaint}</span>
           ) : (
@@ -100,8 +174,8 @@ export default function BillingList() {
         accessorKey: "total_amount",
         header: "Total",
         cell: ({ row }) => (
-          <span className="font-medium">
-            ${row.original.total_amount.toLocaleString()}
+            <span className="font-medium">
+            {formatIndianRupees(row.original.total_amount)}
           </span>
         ),
       },
@@ -109,8 +183,8 @@ export default function BillingList() {
         accessorKey: "paid_amount",
         header: "Paid",
         cell: ({ row }) => (
-          <span className="text-green-600">
-            ${row.original.paid_amount.toLocaleString()}
+            <span className="text-green-600">
+            {formatIndianRupees(row.original.paid_amount)}
           </span>
         ),
       },
@@ -118,8 +192,8 @@ export default function BillingList() {
         accessorKey: "pending_amount",
         header: "Pending",
         cell: ({ row }) => (
-          <span className="text-amber-600">
-            ${row.original.pending_amount.toLocaleString()}
+            <span className="text-amber-600">
+            {formatIndianRupees(row.original.pending_amount)}
           </span>
         ),
       },
@@ -167,7 +241,7 @@ export default function BillingList() {
   return (
     <div className="space-y-6">
       <PageHeader title="Billing" description="Manage invoices and payments">
-        <Button onClick={() => setDialogOpen(true)}>
+        <Button onClick={openDialog}>
           <Plus className="h-4 w-4" /> New Invoice
         </Button>
       </PageHeader>
@@ -175,19 +249,19 @@ export default function BillingList() {
       <div className="grid gap-4 sm:grid-cols-3">
         <KpiCard
           title="Total Revenue"
-          value={`$${kpis.total.toLocaleString()}`}
+          value={formatIndianRupees(kpis.total)}
           icon={DollarSign}
           description="All time revenue"
         />
         <KpiCard
           title="Paid Amount"
-          value={`$${kpis.paid.toLocaleString()}`}
+          value={formatIndianRupees(kpis.paid)}
           icon={CreditCard}
           description="Total collected"
         />
         <KpiCard
           title="Pending Amount"
-          value={`$${kpis.pending.toLocaleString()}`}
+          value={formatIndianRupees(kpis.pending)}
           icon={AlertCircle}
           description="Outstanding payments"
         />
@@ -202,7 +276,7 @@ export default function BillingList() {
                 placeholder="Search invoices..."
                 value={globalFilter}
                 onChange={(e) => setGlobalFilter(e.target.value)}
-                className="pl-9"
+                className="pl-10"
               />
             </div>
           </div>
@@ -222,7 +296,7 @@ export default function BillingList() {
               <p className="mt-1 text-sm text-muted-foreground">
                 Create your first invoice.
               </p>
-              <Button className="mt-4" onClick={() => setDialogOpen(true)}>
+              <Button className="mt-4" onClick={openDialog}>
                 <Plus className="h-4 w-4" /> New Invoice
               </Button>
             </div>
@@ -298,39 +372,61 @@ export default function BillingList() {
         </CardContent>
       </Card>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
+      <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
+          <DialogHeader className="px-6 pt-6 pb-0 shrink-0">
             <DialogTitle>New Invoice</DialogTitle>
             <DialogDescription>
               Create a new invoice for a patient.
             </DialogDescription>
           </DialogHeader>
-          <form>
-            <div className="grid gap-4 py-4">
+          <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
+            <div className="overflow-y-auto px-6 py-4 space-y-4 flex-1">
               <div className="grid gap-2">
                 <Label htmlFor="case">Case</Label>
-                <Select>
+                <Select
+                  value={form.case_id}
+                  onValueChange={(v) => setForm({ ...form, case_id: v })}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select case" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="case-1">Case 1</SelectItem>
-                    <SelectItem value="case-2">Case 2</SelectItem>
+                    {cases.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.chief_complaint} — {c.patient_name || c.patient?.full_name || "Unknown"}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="total">Total Amount</Label>
-                <Input id="total" type="number" placeholder="0" />
+                  <Input
+                    id="total"
+                    type="number"
+                    placeholder="0"
+                    required
+                    value={form.total_amount ?? ""}
+                    onChange={(e) => setForm({ ...form, total_amount: e.target.value ? Number(e.target.value) : null })}
+                  />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="paid">Paid Amount</Label>
-                <Input id="paid" type="number" placeholder="0" />
+                  <Input
+                    id="paid"
+                    type="number"
+                    placeholder="0"
+                    value={form.paid_amount ?? ""}
+                    onChange={(e) => setForm({ ...form, paid_amount: e.target.value ? Number(e.target.value) : null })}
+                  />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="method">Payment Method</Label>
-                <Select>
+                <Select
+                  value={form.payment_method}
+                  onValueChange={(v) => setForm({ ...form, payment_method: v })}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select method" />
                   </SelectTrigger>
@@ -344,18 +440,24 @@ export default function BillingList() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="notes">Notes</Label>
-                <Input id="notes" />
+                <Input
+                  id="notes"
+                  value={form.notes}
+                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                />
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-gray-100">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setDialogOpen(false)}
+                onClick={resetForm}
               >
                 Cancel
               </Button>
-              <Button type="submit">Save</Button>
+              <Button type="submit" disabled={createMutation.isPending}>
+                {createMutation.isPending ? "Saving..." : "Save"}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>

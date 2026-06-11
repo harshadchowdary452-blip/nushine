@@ -27,7 +27,13 @@ class BaseRepository(Generic[ModelType]):
         query = select(self.model)
         if filters:
             for key, value in filters.items():
-                if hasattr(self.model, key) and value is not None:
+                if key.endswith("__in") and value is not None and isinstance(value, (list, tuple)):
+                    attr_name = key[:-4]
+                    if hasattr(self.model, attr_name):
+                        query = query.where(getattr(self.model, attr_name).in_(value))
+                elif key == "search" and value and hasattr(self.model, "full_name"):
+                    query = query.where(self.model.full_name.ilike(f"%{value}%"))
+                elif hasattr(self.model, key) and value is not None:
                     query = query.where(getattr(self.model, key) == value)
         if order_by and hasattr(self.model, order_by):
             order_col = getattr(self.model, order_by)

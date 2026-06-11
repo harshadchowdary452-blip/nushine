@@ -4,7 +4,7 @@ from datetime import datetime
 
 
 class ConsultantCreate(BaseModel):
-    hospital_id: str
+    hospital_id: Optional[str] = None
     full_name: str = Field(..., min_length=2, max_length=255)
     email: Optional[str] = None
     phone: Optional[str] = None
@@ -33,5 +33,4 @@ class ConsultantResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}

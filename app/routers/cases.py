@@ -1,12 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from typing import List, Optional
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.core.permissions import verify_permission, Permission
+from app.core.permissions import verify_permission, Permission, Role
 from app.services.case_service import CaseService
 from app.schemas.case import CaseCreate, CaseUpdate, CaseResponse
 from app.schemas.common import MessageResponse
+from app.models.patient import Patient
+from app.models.hospital import Hospital
 
 router = APIRouter(prefix="/cases", tags=["Cases"])
 
@@ -19,7 +22,8 @@ async def create_case(data: CaseCreate, db: AsyncSession = Depends(get_db), curr
 
 
 @router.get("/")
-async def get_cases(skip: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=200), patient_id: Optional[str] = Query(None), doctor_id: Optional[str] = Query(None), status_filter: Optional[str] = Query(None, alias="status"), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+async def get_cases(skip: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=200), patient_id: Optional[str] = Query(None), doctor_id: Optional[str] = Query(None), status_filter: Optional[str] = Query(None, alias="status"), hospital_id: Optional[str] = Query(None), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.MANAGE_CASES, Permission.VIEW_ALL_PATIENTS)
     service = CaseService(db)
     filters = {}
     if patient_id:
@@ -28,11 +32,35 @@ async def get_cases(skip: int = Query(0, ge=0), limit: int = Query(100, ge=1, le
         filters["doctor_id"] = doctor_id
     if status_filter:
         filters["status"] = status_filter
+    role = current_user.get("role")
+    if role == Role.DOCTOR.value:
+        filters["doctor_id"] = current_user.get("sub")
+    elif role == Role.HOSPITAL_ADMIN.value:
+        hid = hospital_id or current_user.get("hospital_id")
+        if hid:
+            patient_result = await db.execute(select(Patient.id).where(Patient.hospital_id == hid))
+            pids = [row[0] for row in patient_result.all()]
+            if not pids:
+                return []
+            filters["patient_id__in"] = pids
+    elif role == Role.GROUP_ADMIN.value:
+        agid = current_user.get("admin_group_id")
+        if agid:
+            hosp_result = await db.execute(select(Hospital.id).where(Hospital.admin_group_id == agid))
+            hids = [row[0] for row in hosp_result.all()]
+            if not hids:
+                return []
+            patient_result = await db.execute(select(Patient.id).where(Patient.hospital_id.in_(hids)))
+            pids = [row[0] for row in patient_result.all()]
+            if not pids:
+                return []
+            filters["patient_id__in"] = pids
     return await service.get_all(skip=skip, limit=limit, filters=filters or None)
 
 
 @router.get("/{case_id}", response_model=CaseResponse)
 async def get_case(case_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.MANAGE_CASES, Permission.VIEW_ALL_PATIENTS)
     service = CaseService(db)
     case = await service.get(case_id)
     if not case:

@@ -15,22 +15,46 @@ router = APIRouter(prefix="/doctors", tags=["Doctors"])
 async def create_doctor(data: UserCreate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.CREATE_DOCTOR)
     service = UserService(db)
-    data_dict = data.model_dump()
+    data_dict = data.model_dump(exclude_none=True)
     data_dict["role"] = Role.DOCTOR.value
+    role = current_user.get("role")
+    if role in (Role.HOSPITAL_ADMIN.value, Role.GROUP_ADMIN.value):
+        data_dict["hospital_id"] = current_user.get("hospital_id")
+        data_dict["admin_group_id"] = current_user.get("admin_group_id")
+    else:
+        if not data_dict.get("hospital_id") and current_user.get("hospital_id"):
+            data_dict["hospital_id"] = current_user.get("hospital_id")
+        if not data_dict.get("admin_group_id") and current_user.get("admin_group_id"):
+            data_dict["admin_group_id"] = current_user.get("admin_group_id")
+    if not data_dict.get("hospital_id"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="hospital_id is required")
     return await service.create(data_dict, user_id=current_user.get("sub"))
 
 
 @router.get("/")
-async def get_doctors(skip: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=200), hospital_id: Optional[str] = Query(None), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+async def get_doctors(skip: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=200), search: Optional[str] = Query(None), hospital_id: Optional[str] = Query(None), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.VIEW_ALL_DOCTORS, Permission.MANAGE_STAFF)
     service = UserService(db)
     filters = {"role": Role.DOCTOR.value}
-    if hospital_id:
+    if search:
+        filters["search"] = search
+    role = current_user.get("role")
+    if role == Role.DOCTOR.value:
+        if current_user.get("hospital_id"):
+            filters["hospital_id"] = current_user.get("hospital_id")
+    elif role == Role.HOSPITAL_ADMIN.value:
+        if current_user.get("hospital_id"):
+            filters["hospital_id"] = current_user.get("hospital_id")
+    elif role == Role.GROUP_ADMIN.value:
+        filters["admin_group_id"] = current_user.get("admin_group_id")
+    elif role == Role.SUPER_ADMIN.value and hospital_id:
         filters["hospital_id"] = hospital_id
     return await service.get_all(skip=skip, limit=limit, filters=filters)
 
 
 @router.get("/{doctor_id}", response_model=UserResponse)
 async def get_doctor(doctor_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.VIEW_ALL_DOCTORS, Permission.MANAGE_STAFF)
     service = UserService(db)
     doctor = await service.get(doctor_id)
     if not doctor or doctor.role != Role.DOCTOR:

@@ -25,14 +25,14 @@ class AuthService:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
         if not user.is_active:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is deactivated")
-        access_token = create_access_token(data={"sub": str(user.id), "role": user.role.value, "hospital_id": str(user.hospital_id) if user.hospital_id else None})
-        refresh_token = create_refresh_token(data={"sub": str(user.id), "role": user.role.value})
+        access_token = create_access_token(data={"sub": str(user.id), "role": user.role.value, "hospital_id": str(user.hospital_id) if user.hospital_id else None, "admin_group_id": str(user.admin_group_id) if user.admin_group_id else None})
+        refresh_token = create_refresh_token(data={"sub": str(user.id), "role": user.role.value, "admin_group_id": str(user.admin_group_id) if user.admin_group_id else None})
         token_hash = sha256(refresh_token.encode()).hexdigest()
         await self.refresh_token_repo.create(user_id=user.id, token_hash=token_hash, expires_at=datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS))
         user.last_login = datetime.now(timezone.utc)
         await self.db.flush()
         await self.audit_log_repo.create(user_id=user.id, action="LOGIN", entity_type="USER", entity_id=str(user.id), details=f"User {user.email} logged in", ip_address=ip_address)
-        return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer", "user": {"id": str(user.id), "email": user.email, "full_name": user.full_name, "role": user.role.value, "hospital_id": str(user.hospital_id) if user.hospital_id else None, "phone": user.phone, "is_active": user.is_active, "specialization": user.specialization, "license_number": user.license_number, "is_verified": user.is_verified, "last_login": user.last_login.isoformat() if user.last_login else None, "created_at": user.created_at.isoformat() if user.created_at else None, "updated_at": user.updated_at.isoformat() if user.updated_at else None}}
+        return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer", "user": {"id": str(user.id), "email": user.email, "full_name": user.full_name, "role": user.role.value, "hospital_id": str(user.hospital_id) if user.hospital_id else None, "admin_group_id": str(user.admin_group_id) if user.admin_group_id else None, "phone": user.phone, "is_active": user.is_active, "specialization": user.specialization, "license_number": user.license_number, "is_verified": user.is_verified, "last_login": user.last_login.isoformat() if user.last_login else None, "created_at": user.created_at.isoformat() if user.created_at else None, "updated_at": user.updated_at.isoformat() if user.updated_at else None}}
 
     async def refresh_access_token(self, refresh_token: str, ip_address: Optional[str] = None):
         payload = decode_token(refresh_token)
@@ -49,8 +49,8 @@ class AuthService:
         user = await self.user_repo.get(payload["sub"])
         if not user or not user.is_active:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
-        new_access_token = create_access_token(data={"sub": str(user.id), "role": user.role.value, "hospital_id": str(user.hospital_id) if user.hospital_id else None})
-        new_refresh_token = create_refresh_token(data={"sub": str(user.id), "role": user.role.value})
+        new_access_token = create_access_token(data={"sub": str(user.id), "role": user.role.value, "hospital_id": str(user.hospital_id) if user.hospital_id else None, "admin_group_id": str(user.admin_group_id) if user.admin_group_id else None})
+        new_refresh_token = create_refresh_token(data={"sub": str(user.id), "role": user.role.value, "admin_group_id": str(user.admin_group_id) if user.admin_group_id else None})
         new_token_hash = sha256(new_refresh_token.encode()).hexdigest()
         await self.refresh_token_repo.create(user_id=user.id, token_hash=new_token_hash, expires_at=datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS))
         return {"access_token": new_access_token, "refresh_token": new_refresh_token, "token_type": "bearer"}
