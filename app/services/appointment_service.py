@@ -25,29 +25,74 @@ class AppointmentService:
             patient_id = data.get("patient_id")
             doctor_id = data.get("doctor_id")
 
+            # ===== STRUCTURED LOGGING: Input Validation =====
+            logger.warning("=" * 60)
+            logger.warning("Appointment Create Validation - START")
+            logger.warning("=" * 60)
+            logger.warning(f"Current User: {user_id}")
+            logger.warning(f"Patient: {patient_id}")
+            logger.warning(f"Doctor: {doctor_id}")
+
             if not patient_id:
+                logger.warning("VALIDATION FAILED: patient_id is required")
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="patient_id is required")
             if not doctor_id:
+                logger.warning("VALIDATION FAILED: doctor_id is required")
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="doctor_id is required")
 
+            # ===== STEP 1: Validate Patient Exists =====
+            logger.warning("STEP 1: Validating patient exists...")
             patient_result = await self.db.execute(select(Patient).where(Patient.id == patient_id))
             patient = patient_result.scalar_one_or_none()
             if not patient:
-                logger.error("CREATE_APPOINTMENT - Patient not found: %s", patient_id)
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Patient with id {patient_id} not found")
+                logger.warning(f"VALIDATION FAILED: Patient not found - {patient_id}")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Patient not found"
+                )
+            logger.warning(f"✓ Patient exists: {patient_id}, Hospital: {patient.hospital_id}")
 
+            # ===== STEP 2: Validate Doctor Exists =====
+            logger.warning("STEP 2: Validating doctor exists...")
             doctor_result = await self.db.execute(select(User).where(User.id == doctor_id))
             doctor = doctor_result.scalar_one_or_none()
             if not doctor:
-                logger.error("CREATE_APPOINTMENT - Doctor not found: %s", doctor_id)
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Doctor with id {doctor_id} not found")
+                logger.warning(f"VALIDATION FAILED: Doctor not found - {doctor_id}")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Doctor not found"
+                )
+            logger.warning(f"✓ Doctor exists: {doctor_id}, Hospital: {doctor.hospital_id}, Role: {doctor.role}")
 
+            # ===== STEP 3: Validate Hospital Mismatch =====
+            logger.warning("STEP 3: Checking hospital isolation...")
             if doctor.hospital_id and patient.hospital_id and doctor.hospital_id != patient.hospital_id:
-                logger.error("CREATE_APPOINTMENT - Doctor %s and Patient %s belong to different hospitals", doctor_id, patient_id)
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Doctor and Patient must belong to the same hospital")
+                logger.warning(f"VALIDATION FAILED: Hospital mismatch - Patient hospital: {patient.hospital_id}, Doctor hospital: {doctor.hospital_id}")
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Doctor and Patient must belong to the same hospital"
+                )
+            logger.warning(f"✓ Hospital isolation check passed - Same hospital: {patient.hospital_id}")
 
+            # ===== STEP 4: Validate Doctor is in the DOCTOR role =====
+            logger.warning("STEP 4: Checking doctor role...")
+            if doctor.role not in ("DOCTOR", "CONSULTANT"):
+                logger.warning(f"VALIDATION FAILED: User is not a doctor - Role: {doctor.role}")
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"User {doctor_id} is not a doctor"
+                )
+            logger.warning(f"✓ Doctor role valid: {doctor.role}")
+
+            # ===== STEP 5: Create Appointment =====
+            logger.warning("STEP 5: Creating appointment...")
             appointment = await self.repo.create(**data)
-            logger.info("CREATE_APPOINTMENT - Success: %s", appointment.id)
+            logger.warning(f"✓ Appointment created: {appointment.id}")
+
+            logger.warning("=" * 60)
+            logger.warning("Appointment Create Validation - SUCCESS")
+            logger.warning("=" * 60)
+
             await self.audit_log_repo.create(user_id=user_id, action="CREATE_APPOINTMENT", entity_type="APPOINTMENT", entity_id=str(appointment.id), details="Appointment created")
             return appointment
         except HTTPException:
