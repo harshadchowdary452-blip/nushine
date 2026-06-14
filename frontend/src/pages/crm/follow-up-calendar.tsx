@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react"
+import { format } from "date-fns"
 import { motion } from "framer-motion"
 import { useQuery } from "@tanstack/react-query"
 import { ChevronLeft, ChevronRight, CalendarDays, Clock, User, Phone, FileText, Activity, Tag } from "lucide-react"
@@ -22,7 +23,7 @@ const statusColors: Record<string, string> = {
 }
 
 const typeLabels: Record<string, string> = {
-  "1_DAY": "1-Day Follow-Up",
+  "1_DAY_POST_TREATMENT": "1-Day Post Treatment",
   "6_MONTH_RECALL": "6-Month Recall",
   MANUAL: "Manual",
 }
@@ -39,8 +40,8 @@ export default function FollowUpCalendar() {
   const monthStart = new Date(currentYear, currentMonth, 1)
   const monthEnd = new Date(currentYear, currentMonth + 1, 0)
 
-  const startStr = monthStart.toISOString().split("T")[0]
-  const endStr = monthEnd.toISOString().split("T")[0]
+  const startStr = format(monthStart, "yyyy-MM-dd")
+  const endStr = format(monthEnd, "yyyy-MM-dd")
 
   const { data: events, isLoading } = useQuery({
     queryKey: ["follow-up-calendar", startStr, endStr],

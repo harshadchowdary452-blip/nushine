@@ -14,6 +14,8 @@ class Hospital(Base):
     phone: Mapped[str] = mapped_column(String(50), nullable=True)
     email: Mapped[str] = mapped_column(String(255), nullable=True)
     registration_number: Mapped[str] = mapped_column(String(100), nullable=True)
+    gst_number: Mapped[str] = mapped_column(String(50), nullable=True)
+    logo_url: Mapped[str] = mapped_column(String(500), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     settings: Mapped[str] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

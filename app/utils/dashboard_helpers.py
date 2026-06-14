@@ -2,6 +2,7 @@ from datetime import datetime, date, timezone, timedelta
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, text
+from app.config import settings
 from app.models.billing import Billing
 from app.models.hospital_monthly_expense import HospitalMonthlyExpense
 from app.models.case import Case
@@ -9,6 +10,14 @@ from app.models.patient import Patient
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.user import User
 from app.core.permissions import Role
+
+
+def get_previous_date_range(period: str = "this_month", start_date: Optional[str] = None, end_date: Optional[str] = None):
+    date_start, date_end = get_date_range(period, start_date, end_date)
+    range_seconds = (date_end - date_start).total_seconds()
+    prev_end = date_start
+    prev_start = prev_end - timedelta(seconds=range_seconds)
+    return prev_start, prev_end
 
 
 def get_date_range(period: str = "this_month", start_date: Optional[str] = None, end_date: Optional[str] = None):
@@ -152,17 +161,21 @@ async def revenue_trend_with_expenses(db: AsyncSession, case_ids: list[str] = No
     range_days = (date_end - date_start).days
 
     if range_days <= 1:
-        date_format = '%Y-%m-%d %H:00'
+        python_format = '%Y-%m-%d %H:00'
+        sql_format = 'YYYY-MM-DD HH24:00' if settings.DB_IS_POSTGRESQL else python_format
         group_label = 'hour'
     elif range_days <= 31:
-        date_format = '%Y-%m-%d'
+        python_format = '%Y-%m-%d'
+        sql_format = 'YYYY-MM-DD' if settings.DB_IS_POSTGRESQL else python_format
         group_label = 'day'
     else:
-        date_format = '%Y-%m'
+        python_format = '%Y-%m'
+        sql_format = 'YYYY-MM' if settings.DB_IS_POSTGRESQL else python_format
         group_label = 'month'
 
+    date_format = python_format
     query = select(
-        func.strftime(date_format, Billing.updated_at).label(group_label),
+        (func.to_char(Billing.updated_at, sql_format) if settings.DB_IS_POSTGRESQL else func.strftime(python_format, Billing.updated_at)).label(group_label),
         func.sum(Billing.paid_amount).label('revenue'),
     ).where(Billing.updated_at >= date_start, Billing.updated_at < date_end)
     if case_ids is not None:

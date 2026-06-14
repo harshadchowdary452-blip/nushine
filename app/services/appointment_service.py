@@ -1,13 +1,17 @@
 import logging
+import json
+from datetime import time
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func, extract
 from fastapi import HTTPException, status
 from app.repositories.appointment_repository import AppointmentRepository
 from app.repositories.audit_log_repository import AuditLogRepository
-from app.models.appointment import Appointment, AppointmentStatus
+from app.models.appointment import Appointment, AppointmentStatus, Appointment as ApptModel
 from app.models.patient import Patient
 from app.models.user import User
+from app.models.notification import Notification
+from app.models.hospital import Hospital
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +28,8 @@ class AppointmentService:
 
             patient_id = data.get("patient_id")
             doctor_id = data.get("doctor_id")
+            appointment_date = data.get("appointment_date")
+            appointment_time = data.get("appointment_time")
 
             # ===== STRUCTURED LOGGING: Input Validation =====
             logger.warning("=" * 60)
@@ -84,10 +90,39 @@ class AppointmentService:
                 )
             logger.warning(f"✓ Doctor role valid: {doctor.role}")
 
+            # ===== STEP 4b: Check Doctor Appointment Capacity =====
+            logger.warning("STEP 4b: Checking doctor appointment capacity...")
+            await self._check_doctor_capacity(doctor_id, appointment_date, appointment_time)
+            logger.warning("✓ Appointment capacity check passed")
+
             # ===== STEP 5: Create Appointment =====
             logger.warning("STEP 5: Creating appointment...")
             appointment = await self.repo.create(**data)
             logger.warning(f"✓ Appointment created: {appointment.id}")
+
+            # ===== Generate appointment number =====
+            try:
+                cnt = await self.db.execute(select(func.count(ApptModel.id)))
+                appointment.appointment_number = f"APPT-{cnt.scalar():04d}"
+                await self.db.flush()
+            except Exception:
+                pass
+
+            # ===== STEP 6: Generate notification for doctor =====
+            try:
+                patient_name = patient.full_name if patient else "Unknown"
+                notification = Notification(
+                    user_id=appointment.doctor_id,
+                    type="appointment",
+                    title="New Appointment Scheduled",
+                    description=f"{patient_name} - {appointment.appointment_date} at {appointment.appointment_time}",
+                    entity_type="appointment",
+                    entity_id=str(appointment.id),
+                )
+                self.db.add(notification)
+                await self.db.flush()
+            except Exception as e:
+                logger.exception("Failed to create notification: %s", str(e))
 
             logger.warning("=" * 60)
             logger.warning("Appointment Create Validation - SUCCESS")
@@ -115,6 +150,58 @@ class AppointmentService:
             d = d_result.scalar_one_or_none()
             appointment.doctor_name = d.full_name if d else None
         return appointment
+
+    async def _check_doctor_capacity(self, doctor_id: str, appointment_date, appointment_time, raise_on_full=True):
+        max_per_hour, count = await self._get_capacity_and_count(doctor_id, appointment_date, appointment_time)
+        if count >= max_per_hour and raise_on_full:
+            hour_end = appointment_time.hour + 1
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Doctor appointment capacity reached for {appointment_time.hour:02d}:00 - {hour_end:02d}:00. Maximum {max_per_hour} appointments allowed per hour."
+            )
+        return max_per_hour, count
+
+    async def _get_capacity_and_count(self, doctor_id: str, appointment_date, appointment_time):
+        if not appointment_date or not appointment_time:
+            return 4, 0
+        hour = appointment_time.hour
+        max_per_hour = 4
+        doctor_result = await self.db.execute(select(User.hospital_id).where(User.id == doctor_id))
+        doctor_row = doctor_result.one_or_none()
+        if doctor_row and doctor_row[0]:
+            hosp_result = await self.db.execute(
+                select(Hospital.settings).where(Hospital.id == doctor_row[0])
+            )
+            hosp_row = hosp_result.one_or_none()
+            if hosp_row and hosp_row[0]:
+                try:
+                    settings = json.loads(hosp_row[0])
+                    max_per_hour = settings.get("doctor_max_appointments_per_hour", 4)
+                except (json.JSONDecodeError, TypeError):
+                    pass
+        excluded_statuses = [AppointmentStatus.CANCELLED.value, AppointmentStatus.NO_SHOW.value]
+        count_result = await self.db.execute(
+            select(func.count(Appointment.id)).where(
+                Appointment.doctor_id == doctor_id,
+                Appointment.appointment_date == appointment_date,
+                ~Appointment.status.in_(excluded_statuses),
+                extract('hour', Appointment.appointment_time) == hour,
+            )
+        )
+        count = count_result.scalar() or 0
+        return max_per_hour, count
+
+    async def check_availability(self, doctor_id: str, appointment_date, appointment_time):
+        max_per_hour, count = await self._get_capacity_and_count(doctor_id, appointment_date, appointment_time)
+        available = count < max_per_hour
+        result = {
+            "available": available,
+            "current_count": count,
+            "max_allowed": max_per_hour,
+        }
+        if not available:
+            result["message"] = "Doctor capacity reached"
+        return result
 
     async def get(self, appointment_id: str) -> Optional[Appointment]:
         appointment = await self.repo.get(appointment_id)
@@ -148,3 +235,13 @@ class AppointmentService:
 
     async def cancel(self, appointment_id: str, user_id: str = None) -> Optional[Appointment]:
         return await self.update(appointment_id, {"status": AppointmentStatus.CANCELLED.value}, user_id)
+
+    async def delete(self, appointment_id: str, user_id: str = None) -> bool:
+        try:
+            result = await self.repo.delete(appointment_id)
+            if result:
+                await self.audit_log_repo.create(user_id=user_id, action="DELETE_APPOINTMENT", entity_type="APPOINTMENT", entity_id=appointment_id, details="Appointment deleted")
+            return result
+        except Exception as e:
+            logger.exception("DELETE_APPOINTMENT - Error: %s", str(e))
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to delete appointment: {str(e)}")

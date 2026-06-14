@@ -12,7 +12,7 @@ import {
   type SortingState,
 } from "@tanstack/react-table"
 import { motion } from "framer-motion"
-import { Plus, Search, Eye, FolderOpen, FilePlus } from "lucide-react"
+import { Plus, Search, Eye, Trash2, FolderOpen, FilePlus, User as UserIcon, FileText } from "lucide-react"
 import { format } from "date-fns"
 import PageHeader from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
@@ -20,12 +20,15 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent } from "@/components/ui/card"
+import { Textarea } from "@/components/ui/textarea"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogBody,
   DialogFooter,
 } from "@/components/ui/dialog"
 import {
@@ -44,6 +47,15 @@ import { useAuthStore } from "@/store/authStore"
 function StatusBadge({ status }: { status: string }) {
   const cls = `status-badge status-badge-${status?.toLowerCase().replace(/_/g, "_")}`;
   return <span className={cls}>{status?.replace(/_/g, " ")}</span>;
+}
+
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
 }
 
 const statusVariant: Record<string, "default" | "secondary" | "outline" | "destructive" | "success" | "warning"> = {
@@ -76,6 +88,8 @@ export default function CaseList() {
   const [globalFilter, setGlobalFilter] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deletingCase, setDeletingCase] = useState<Case | null>(null)
   const [form, setForm] = useState<CaseForm>(getEmptyCaseForm)
 
   const { data, isLoading } = useQuery<PaginatedResponse<Case>>({
@@ -109,6 +123,36 @@ export default function CaseList() {
     },
     [doctorsData]
   )
+
+  const selectedPatient = useMemo(() => {
+    if (!form.patient_id) return null
+    return patients.find((p) => p.id === form.patient_id) || null
+  }, [form.patient_id, patients])
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => casesApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cases"], refetchType: "all" })
+      queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" })
+      addToast({ title: "Success", description: "Case deleted successfully", variant: "success" })
+      setDeleteDialogOpen(false)
+      setDeletingCase(null)
+    },
+    onError: () => {
+      addToast({ title: "Error", description: "Failed to delete case", variant: "destructive" })
+    },
+  })
+
+  function confirmDelete(caseItem: Case) {
+    setDeletingCase(caseItem)
+    setDeleteDialogOpen(true)
+  }
+
+  function handleDelete() {
+    if (deletingCase) {
+      deleteMutation.mutate(deletingCase.id)
+    }
+  }
 
   const createMutation = useMutation({
     mutationFn: (data: any) => casesApi.create(data),
@@ -189,13 +233,18 @@ export default function CaseList() {
         id: "actions",
         header: "Actions",
         cell: ({ row }) => (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate(`/cases/${row.original.id}`)}
-          >
-            <Eye className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate(`/cases/${row.original.id}`)}
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); confirmDelete(row.original) }}>
+              <Trash2 className="h-4 w-4 text-danger" />
+            </Button>
+          </div>
         ),
       },
     ],
@@ -345,87 +394,122 @@ export default function CaseList() {
         </CardContent>
       </Card>
       <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
-        <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
-          <DialogHeader className="px-6 pt-6 pb-0 shrink-0">
-            <DialogTitle>Add Case</DialogTitle>
-            <DialogDescription>
-              Create a new patient case.
-            </DialogDescription>
+        <DialogContent className="sm:max-w-[550px]">
+          <DialogHeader>
+            <DialogTitle>Create New Case</DialogTitle>
+            <DialogDescription>Fill in the details below to create a new patient case.</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
-            <div className="overflow-y-auto px-6 py-4 space-y-4 flex-1">
-              <div className="grid gap-2">
-                <Label htmlFor="patient">Patient</Label>
-                <Select
-                  value={form.patient_id}
-                  onValueChange={(v) => setForm({ ...form, patient_id: v })}
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select patient" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {patients.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.full_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <DialogBody>
+              {/* Patient Information */}
+              <div className="space-y-3 mb-6">
+                <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
+                  <UserIcon className="h-4 w-4" />
+                  Patient Information
+                </h4>
+                <div className="grid gap-2">
+                  <Label>Patient</Label>
+                  <Select value={form.patient_id} onValueChange={(v) => setForm({ ...form, patient_id: v })} required>
+                    <SelectTrigger><SelectValue placeholder="Select patient" /></SelectTrigger>
+                    <SelectContent>
+                      {patients.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {selectedPatient && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="rounded-xl bg-primary-light/50 border border-primary/10 p-3 flex items-center gap-3"
+                  >
+                    <Avatar className="h-10 w-10 ring-2 ring-primary-light">
+                      <AvatarFallback className="bg-primary text-white text-xs font-bold">
+                        {getInitials(selectedPatient.full_name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm text-gray-900 dark:text-[#F8FAFC]">{selectedPatient.full_name}</p>
+                      <p className="text-xs text-gray-500 dark:text-[#94A3B8]">
+                        {[selectedPatient.age && `${selectedPatient.age} yrs`, selectedPatient.gender, selectedPatient.phone].filter(Boolean).join(" | ")}
+                      </p>
+                    </div>
+                    <StatusBadge status={selectedPatient.status} />
+                  </motion.div>
+                )}
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="doctor">Doctor</Label>
-                <Select
-                  value={form.doctor_id}
-                  onValueChange={(v) => setForm({ ...form, doctor_id: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select doctor (optional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {doctors.map((d) => (
-                      <SelectItem key={d.id} value={d.id}>
-                        {d.full_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+
+              {/* Clinical Details */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Clinical Details
+                </h4>
+                <div className="grid gap-2">
+                  <Label>Doctor (optional)</Label>
+                  <Select value={form.doctor_id} onValueChange={(v) => setForm({ ...form, doctor_id: v })}>
+                    <SelectTrigger><SelectValue placeholder="Select doctor" /></SelectTrigger>
+                    <SelectContent>
+                      {doctors.map((d) => (
+                        <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label>Chief Complaint</Label>
+                  <Textarea
+                    value={form.chief_complaint}
+                    onChange={(e) => setForm({ ...form, chief_complaint: e.target.value })}
+                    placeholder="Describe the patient's primary complaint..."
+                    required
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Diagnosis</Label>
+                  <Textarea
+                    value={form.diagnosis}
+                    onChange={(e) => setForm({ ...form, diagnosis: e.target.value })}
+                    placeholder="Enter initial diagnosis..."
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Notes</Label>
+                  <Textarea
+                    value={form.notes}
+                    onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                    placeholder="Additional notes or observations..."
+                  />
+                </div>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="complaint">Chief Complaint</Label>
-                <Input
-                  id="complaint"
-                  value={form.chief_complaint}
-                  onChange={(e) => setForm({ ...form, chief_complaint: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="diagnosis">Diagnosis</Label>
-                <Input
-                  id="diagnosis"
-                  value={form.diagnosis}
-                  onChange={(e) => setForm({ ...form, diagnosis: e.target.value })}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="notes">Notes</Label>
-                <Input
-                  id="notes"
-                  value={form.notes}
-                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                />
-              </div>
-            </div>
-            <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-gray-100">
-              <Button type="button" variant="outline" onClick={resetForm}>
-                Cancel
-              </Button>
+            </DialogBody>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={resetForm}>Cancel</Button>
               <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending ? "Saving..." : "Save"}
+                {createMutation.isPending ? "Creating..." : "Create Case"}
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Delete Case</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this case? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" onClick={handleDelete} disabled={deleteMutation.isPending}>
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

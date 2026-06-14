@@ -12,7 +12,7 @@ import {
   type SortingState,
 } from "@tanstack/react-table"
 import { motion } from "framer-motion"
-import { Plus, Search, Eye, Receipt, DollarSign, CreditCard, AlertCircle, Download } from "lucide-react"
+import { Plus, Search, Eye, Trash2, Receipt, DollarSign, CreditCard, AlertCircle, Download, History } from "lucide-react"
 import { format } from "date-fns"
 import PageHeader from "@/components/layout/page-header"
 import KpiCard from "@/components/layout/kpi-card"
@@ -61,10 +61,14 @@ interface InvoiceForm {
   paid_amount: number | null
   payment_method: string
   notes: string
+  discount_type: string
+  discount_percent: number
+  discount_amount: number
+  discount_reason: string
 }
 
 function getEmptyInvoiceForm(): InvoiceForm {
-  return { case_id: "", total_amount: null, paid_amount: null, payment_method: "", notes: "" }
+  return { case_id: "", total_amount: null, paid_amount: null, payment_method: "", notes: "", discount_type: "PERCENTAGE", discount_percent: 0, discount_amount: 0, discount_reason: "" }
 }
 
 export default function BillingList() {
@@ -73,7 +77,15 @@ export default function BillingList() {
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState("")
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deletingBilling, setDeletingBilling] = useState<Billing | null>(null)
   const [form, setForm] = useState<InvoiceForm>(getEmptyInvoiceForm)
+  const [historyBilling, setHistoryBilling] = useState<Billing | null>(null)
+  const { data: transactions } = useQuery({
+    queryKey: ["billing", historyBilling?.id, "transactions"],
+    queryFn: () => billingApi.getTransactions(historyBilling!.id),
+    enabled: !!historyBilling,
+  })
 
   const { data, isLoading } = useQuery<PaginatedResponse<Billing>>({
     queryKey: ["billings"],
@@ -109,6 +121,31 @@ export default function BillingList() {
     const pending = billings.reduce((s, b) => s + b.pending_amount, 0)
     return { total, paid, pending }
   }, [billings])
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => billingApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["billings"], refetchType: "all" })
+      queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" })
+      addToast({ title: "Success", description: "Invoice deleted successfully", variant: "success" })
+      setDeleteDialogOpen(false)
+      setDeletingBilling(null)
+    },
+    onError: () => {
+      addToast({ title: "Error", description: "Failed to delete invoice", variant: "destructive" })
+    },
+  })
+
+  function confirmDelete(billing: Billing) {
+    setDeletingBilling(billing)
+    setDeleteDialogOpen(true)
+  }
+
+  function handleDelete() {
+    if (deletingBilling) {
+      deleteMutation.mutate(deletingBilling.id)
+    }
+  }
 
   const createMutation = useMutation({
     mutationFn: (data: InvoiceForm) => billingApi.create(data),
@@ -239,8 +276,14 @@ export default function BillingList() {
             <Button variant="ghost" size="icon" onClick={() => navigate(`/billing/${row.original.id}`)} title="View Invoice">
               <Eye className="h-4 w-4" />
             </Button>
+            <Button variant="ghost" size="icon" onClick={() => setHistoryBilling(row.original)} title="Payment History">
+              <History className="h-4 w-4" />
+            </Button>
             <Button variant="ghost" size="icon" onClick={() => downloadPdf(row.original.id)} title="Download PDF">
               <Download className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => confirmDelete(row.original)} title="Delete Invoice">
+              <Trash2 className="h-4 w-4 text-danger" />
             </Button>
           </div>
         ),
@@ -449,6 +492,76 @@ export default function BillingList() {
                     onChange={(e) => setForm({ ...form, paid_amount: e.target.value ? Number(e.target.value) : null })}
                   />
               </div>
+              <div className="border-t pt-4">
+                <Label className="mb-2 block text-sm font-medium">Discount</Label>
+                <div className="flex gap-2 mb-3">
+                  <Button
+                    type="button"
+                    variant={form.discount_type === "PERCENTAGE" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setForm({ ...form, discount_type: "PERCENTAGE", discount_percent: 0, discount_amount: 0 })}
+                  >
+                    Percentage (%)
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={form.discount_type === "FIXED" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setForm({ ...form, discount_type: "FIXED", discount_percent: 0, discount_amount: 0 })}
+                  >
+                    Fixed (Rs.)
+                  </Button>
+                </div>
+                {form.discount_type === "PERCENTAGE" ? (
+                  <div className="grid gap-2">
+                    <Label>Discount %</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      placeholder="0"
+                      value={form.discount_percent || ""}
+                      onChange={(e) => {
+                        const pct = Math.min(100, Math.max(0, Number(e.target.value) || 0))
+                        const gross = form.total_amount ?? 0
+                        const amt = Math.round(gross * pct / 100 * 100) / 100
+                        setForm({ ...form, discount_percent: pct, discount_amount: amt })
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div className="grid gap-2">
+                    <Label>Discount Amount (Rs.)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="1"
+                      placeholder="0"
+                      value={form.discount_amount || ""}
+                      onChange={(e) => {
+                        const gross = form.total_amount ?? 0
+                        const amt = Math.min(gross, Math.max(0, Number(e.target.value) || 0))
+                        const pct = gross > 0 ? Math.round(amt / gross * 100 * 100) / 100 : 0
+                        setForm({ ...form, discount_amount: amt, discount_percent: pct })
+                      }}
+                    />
+                  </div>
+                )}
+                <div className="grid gap-2 mt-3">
+                  <Label>Discount Reason (optional)</Label>
+                  <Input
+                    value={form.discount_reason}
+                    onChange={(e) => setForm({ ...form, discount_reason: e.target.value })}
+                    placeholder="e.g. New patient offer"
+                  />
+                </div>
+                {form.discount_amount > 0 && (form.total_amount ?? 0) > 0 && (
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Net after discount: <span className="font-semibold text-green-600">{formatIndianRupees(Math.max(0, (form.total_amount ?? 0) - form.discount_amount))}</span>
+                  </p>
+                )}
+              </div>
               <div className="grid gap-2">
                 <Label htmlFor="method">Payment Method</Label>
                 <Select
@@ -488,6 +601,56 @@ export default function BillingList() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!historyBilling} onOpenChange={(o) => { if (!o) setHistoryBilling(null) }}>
+        <DialogContent className="sm:max-w-[550px]">
+          <DialogHeader>
+            <DialogTitle>Payment History — #{historyBilling?.id.slice(0, 8)}</DialogTitle>
+            <DialogDescription>
+              {historyBilling?.patient_name} · {formatIndianRupees(historyBilling?.total_amount ?? 0)}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[400px] overflow-y-auto space-y-3 py-4">
+            {!transactions || transactions.length === 0 ? (
+              <p className="text-center text-sm text-muted-foreground py-8">No payment transactions recorded yet.</p>
+            ) : (
+              transactions.map((txn: any) => (
+                <div key={txn.id} className="flex items-center justify-between rounded-lg border p-4">
+                  <div>
+                    <p className="font-semibold text-green-700">{formatIndianRupees(txn.amount)}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {txn.payment_method || "—"}
+                      {txn.notes ? ` · ${txn.notes}` : ""}
+                    </p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {format(new Date(txn.created_at), "MMM dd, yyyy h:mm a")}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Delete Invoice</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this invoice? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" onClick={handleDelete} disabled={deleteMutation.isPending}>
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

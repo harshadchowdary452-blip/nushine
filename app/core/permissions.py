@@ -82,6 +82,7 @@ ROLE_PERMISSIONS = {
         Permission.MANAGE_CASES, Permission.MANAGE_BILLING, Permission.MANAGE_STAFF,
         Permission.CREATE_PATIENT, Permission.CREATE_APPOINTMENT, Permission.CREATE_CASE,
         Permission.CREATE_TREATMENT_PLAN,
+        Permission.ADD_PRE_OP, Permission.ADD_POST_OP,
         Permission.UPDATE_BILLING,
         Permission.MANAGE_EXPENSES,
     ],

@@ -1,17 +1,17 @@
 @import "tailwindcss";
 
 @theme {
-  /* Primary - Dental Blue */
-  --color-primary: #0EA5E9;
-  --color-primary-hover: #0284C7;
-  --color-primary-light: #E0F2FE;
+  /* Primary - Enterprise Blue */
+  --color-primary: #2563EB;
+  --color-primary-hover: #1D4ED8;
+  --color-primary-light: #DBEAFE;
 
-  /* Secondary - Teal Healthcare */
-  --color-secondary: #14B8A6;
-  --color-secondary-hover: #0F766E;
-  --color-secondary-light: #CCFBF1;
+  /* Secondary - Indigo */
+  --color-secondary: #4F46E5;
+  --color-secondary-hover: #4338CA;
+  --color-secondary-light: #E0E7FF;
 
-  /* Accent - Dental Mint */
+  /* Accent - Success Green */
   --color-accent: #22C55E;
   --color-accent-light: #DCFCE7;
 
@@ -34,10 +34,10 @@
   --color-status-inactive-text: #6B7280;
   --color-status-discontinued-bg: #FEE2E2;
   --color-status-discontinued-text: #DC2626;
-  --color-status-new-bg: #E0F2FE;
-  --color-status-new-text: #0369A1;
-  --color-status-progress-bg: #EDE9FE;
-  --color-status-progress-text: #7C3AED;
+  --color-status-new-bg: #DBEAFE;
+  --color-status-new-text: #1D4ED8;
+  --color-status-progress-bg: #E0E7FF;
+  --color-status-progress-text: #4338CA;
   --color-status-cancelled-bg: #FEE2E2;
   --color-status-cancelled-text: #DC2626;
 
@@ -47,16 +47,61 @@
   --color-sidebar-muted: #64748B;
   --color-sidebar-border: #E2E8F0;
   --color-sidebar-hover: #F1F5F9;
-  --color-sidebar-active: #0EA5E9;
-  --color-sidebar-active-bg: #E0F2FE;
+  --color-sidebar-active: #2563EB;
+  --color-sidebar-active-bg: #DBEAFE;
 
-  /* Shadows */
-  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06);
-  --shadow-card-hover: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.04);
-  --shadow-dropdown: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.04);
-  --shadow-modal: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-  --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.08);
-  --shadow-glow: 0 0 20px rgba(14, 165, 233, 0.15);
+  /* Semantic Colors */
+  --color-danger: #EF4444;
+  --color-danger-hover: #DC2626;
+  --color-danger-soft: #FEE2E2;
+  --color-success: #22C55E;
+  --color-success-hover: #16A34A;
+  --color-success-soft: #DCFCE7;
+  --color-warning: #F59E0B;
+  --color-warning-soft: #FEF3C7;
+  --color-info: #06B6D4;
+  --color-info-soft: #CFFAFE;
+
+  /* Shadows - Soft layered shadows */
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.03);
+  --shadow-card-hover: 0 10px 15px -3px rgb(0 0 0 / 0.06), 0 4px 6px -4px rgb(0 0 0 / 0.03);
+  --shadow-dropdown: 0 10px 15px -3px rgb(0 0 0 / 0.06), 0 4px 6px -4px rgb(0 0 0 / 0.03);
+  --shadow-modal: 0 20px 25px -5px rgb(0 0 0 / 0.08), 0 8px 10px -6px rgb(0 0 0 / 0.06);
+  --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.06);
+  --shadow-glow: 0 0 20px rgba(37, 99, 235, 0.12);
+}
+
+/* Dark mode overrides */
+.dark {
+  --color-bg: #0F172A;
+  --color-card: #1E293B;
+  --color-border: #334155;
+  --color-text-primary: #F8FAFC;
+  --color-text-secondary: #94A3B8;
+  --color-text-muted: #64748B;
+  --color-sidebar-bg: #0F172A;
+  --color-sidebar-text: #E2E8F0;
+  --color-sidebar-muted: #94A3B8;
+  --color-sidebar-border: #334155;
+  --color-sidebar-hover: #1E293B;
+  --color-sidebar-active: #3B82F6;
+  --color-sidebar-active-bg: #1E3A5F;
+  --color-primary: #3B82F6;
+  --color-primary-hover: #60A5FA;
+  --color-primary-light: #1E3A5F;
+  --color-secondary: #818CF8;
+  --color-secondary-hover: #A5B4FC;
+  --color-secondary-light: #312E81;
+  --color-danger: #F87171;
+  --color-danger-hover: #FCA5A5;
+  --color-danger-soft: #450A0A;
+  --color-success: #4ADE80;
+  --color-success-hover: #86EFAC;
+  --color-success-soft: #052E16;
+  --color-warning: #FBBF24;
+  --color-warning-soft: #451A03;
+  --color-info: #22D3EE;
+  --color-info-soft: #082F49;
 }
 
 /* Base styles */
@@ -111,21 +156,6 @@ body {
 
 .animate-slide-down {
   animation: slideDown 0.3s ease-out;
-}
-
-/* Glassmorphism */
-.glass {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.glass-dark {
-  background: rgba(15, 23, 42, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 /* Card hover effects */
@@ -245,11 +275,11 @@ body {
 
 /* Gradient hero */
 .gradient-hero {
-  background: linear-gradient(135deg, #0EA5E9 0%, #14B8A6 50%, #22C55E 100%);
+  background: linear-gradient(135deg, #2563EB 0%, #4F46E5 50%, #7C3AED 100%);
 }
 
 .gradient-hero-subtle {
-  background: linear-gradient(135deg, #E0F2FE 0%, #CCFBF1 50%, #DCFCE7 100%);
+  background: linear-gradient(135deg, #DBEAFE 0%, #E0E7FF 50%, #EDE9FE 100%);
 }
 
 /* Grid backgrounds for premium feel */

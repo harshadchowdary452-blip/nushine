@@ -10,14 +10,14 @@ from app.config import settings
 from app.database import engine
 from app.core.security import hash_password
 from app.core.permissions import Role
-from app.utils.scheduler import check_appointment_reminders, check_missed_appointments
-from app.routers import auth, admin_groups, hospitals, doctors, consultants, patients, cases, consultant_notes, treatment_plans, treatment_sittings, appointments, billings, pre_ops, post_ops, dashboards, whatsapp_messaging, notifications, hospital_monthly_expenses, reports, crm, calendar, status_audit
+from app.utils.scheduler import check_appointment_reminders, check_same_day_appointments, check_missed_appointments
+from app.routers import auth, admin_groups, hospitals, doctors, consultants, patients, cases, consultant_notes, treatment_plans, treatment_sittings, appointments, billings, pre_ops, post_ops, dashboards, whatsapp_messaging, notifications, hospital_monthly_expenses, reports, crm, calendar, status_audit, campaigns
 
 
 def run_migrations():
     base_dir = Path(__file__).resolve().parents[1]
     config = Config(str(base_dir / "alembic" / "alembic.ini"))
-    config.set_main_option("sqlalchemy.url", settings.DATABASE_URL_SYNC)
+    config.set_main_option("sqlalchemy.url", settings.SYNC_DATABASE_URL)
     command.upgrade(config, "head")
 
 
@@ -36,6 +36,9 @@ async def lifespan(app: FastAPI):
     print("[STARTUP] Starting appointment reminder scheduler...")
     reminder_task = asyncio.create_task(check_appointment_reminders())
 
+    print("[STARTUP] Starting same-day appointment reminder scheduler...")
+    same_day_task = asyncio.create_task(check_same_day_appointments())
+
     print("[STARTUP] Starting missed appointment scheduler...")
     missed_task = asyncio.create_task(check_missed_appointments())
 
@@ -44,9 +47,14 @@ async def lifespan(app: FastAPI):
 
     print("[SHUTDOWN] Shutting down...")
     reminder_task.cancel()
+    same_day_task.cancel()
     missed_task.cancel()
     try:
         await reminder_task
+    except Exception:
+        pass
+    try:
+        await same_day_task
     except Exception:
         pass
     try:
@@ -97,6 +105,7 @@ app.include_router(notifications.router, prefix="/api/v1")
 app.include_router(hospital_monthly_expenses.router, prefix="/api/v1")
 app.include_router(reports.router, prefix="/api/v1")
 app.include_router(crm.router, prefix="/api/v1")
+app.include_router(campaigns.router, prefix="/api/v1")
 app.include_router(calendar.router, prefix="/api/v1")
 app.include_router(status_audit.router, prefix="/api/v1")
 

@@ -103,7 +103,7 @@ async def seed_data(db_session):
     # Create cases
     c1 = Case(id=str(uuid.uuid4()), patient_id=p1.id, doctor_id=doc1.id, chief_complaint="Tooth pain", status=CaseStatus.IN_PROGRESS, created_at=now - timedelta(days=10))
     c2 = Case(id=str(uuid.uuid4()), patient_id=p2.id, doctor_id=doc1.id, chief_complaint="Cleaning", status=CaseStatus.COMPLETED, created_at=now - timedelta(days=5))
-    c3 = Case(id=str(uuid.uuid4()), patient_id=p3.id, doctor_id=doc2.id, chief_complaint="Root canal", status=CaseStatus.NEW, created_at=now - timedelta(days=2))
+    c3 = Case(id=str(uuid.uuid4()), patient_id=p3.id, doctor_id=doc2.id, chief_complaint="Root canal", status=CaseStatus.OPEN, created_at=now - timedelta(days=2))
     c4 = Case(id=str(uuid.uuid4()), patient_id=p4.id, doctor_id=doc3.id, chief_complaint="Checkup (other)", status=CaseStatus.IN_PROGRESS)
     db_session.add_all([c1, c2, c3, c4])
     await db_session.flush()
@@ -111,7 +111,7 @@ async def seed_data(db_session):
     # Create billings
     b1 = Billing(id=str(uuid.uuid4()), case_id=c1.id, total_amount=5000, paid_amount=3000, pending_amount=2000, payment_status=PaymentStatus.PARTIAL, updated_at=now - timedelta(days=3))
     b2 = Billing(id=str(uuid.uuid4()), case_id=c2.id, total_amount=2000, paid_amount=2000, pending_amount=0, payment_status=PaymentStatus.PAID, updated_at=now - timedelta(days=1))
-    b3 = Billing(id=str(uuid.uuid4()), case_id=c3.id, total_amount=8000, paid_amount=0, pending_amount=8000, payment_status=PaymentStatus.PENDING)
+    b3 = Billing(id=str(uuid.uuid4()), case_id=c3.id, total_amount=8000, paid_amount=0, pending_amount=8000, payment_status=PaymentStatus.DRAFT)
     b4 = Billing(id=str(uuid.uuid4()), case_id=c4.id, total_amount=3000, paid_amount=3000, pending_amount=0, payment_status=PaymentStatus.PAID)
     db_session.add_all([b1, b2, b3, b4])
     await db_session.flush()

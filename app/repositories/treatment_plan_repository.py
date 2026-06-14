@@ -1,18 +1,28 @@
 from typing import Any, Dict, List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import joinedload, selectinload
 from app.repositories.base import BaseRepository
 from app.models.treatment_plan import TreatmentPlan
+from app.models.treatment_sitting import TreatmentSitting
 from app.models.case import Case
 from app.models.patient import Patient
+from app.models.user import User
 
 
 class TreatmentPlanRepository(BaseRepository[TreatmentPlan]):
     def __init__(self, db: AsyncSession):
         super().__init__(TreatmentPlan, db)
 
+    def _base_query(self):
+        return select(self.model).options(
+            selectinload(TreatmentPlan.sittings),
+            joinedload(TreatmentPlan.case).joinedload(Case.patient),
+            joinedload(TreatmentPlan.case).joinedload(Case.doctor),
+        )
+
     async def get_all(self, skip: int = 0, limit: int = 100, filters: Optional[Dict[str, Any]] = None, order_by: Optional[str] = None, descending: bool = False) -> List[TreatmentPlan]:
-        query = select(self.model)
+        query = self._base_query()
         if filters:
             hospital_id = filters.pop("hospital_id", None)
             if hospital_id:
@@ -31,4 +41,9 @@ class TreatmentPlanRepository(BaseRepository[TreatmentPlan]):
             query = query.order_by(order_col.desc() if descending else order_col)
         query = query.offset(skip).limit(limit)
         result = await self.db.execute(query)
-        return list(result.scalars().all())
+        return list(result.unique().scalars().all())
+
+    async def get(self, plan_id: str) -> Optional[TreatmentPlan]:
+        query = self._base_query().where(self.model.id == plan_id)
+        result = await self.db.execute(query)
+        return result.unique().scalars().first()

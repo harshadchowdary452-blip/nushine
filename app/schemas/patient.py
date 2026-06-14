@@ -12,8 +12,13 @@ class PatientCreate(BaseModel):
     age: Optional[int] = None
     phone: Optional[str] = None
     email: Optional[str] = None
+    patient_source: Optional[str] = None
+    source_campaign_name: Optional[str] = None
+    source_campaign_id: Optional[str] = None
+    source_campaign_date: Optional[date] = None
     address: Optional[str] = None
     medical_history: Optional[str] = None
+    diagnosis: Optional[str] = None
     status: Optional[str] = None
 
 
@@ -24,8 +29,13 @@ class PatientUpdate(BaseModel):
     age: Optional[int] = None
     phone: Optional[str] = None
     email: Optional[str] = None
+    patient_source: Optional[str] = None
+    source_campaign_name: Optional[str] = None
+    source_campaign_id: Optional[str] = None
+    source_campaign_date: Optional[date] = None
     address: Optional[str] = None
     medical_history: Optional[str] = None
+    diagnosis: Optional[str] = None
     status: Optional[str] = None
 
 
@@ -39,8 +49,13 @@ class PatientResponse(BaseModel):
     age: Optional[int]
     phone: Optional[str]
     email: Optional[str]
+    patient_source: Optional[str]
+    source_campaign_name: Optional[str]
+    source_campaign_id: Optional[str]
+    source_campaign_date: Optional[date]
     address: Optional[str]
     medical_history: Optional[str]
+    diagnosis: Optional[str]
     photo_url: Optional[str]
     status: str
     is_active: bool

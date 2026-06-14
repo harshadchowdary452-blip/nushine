@@ -7,6 +7,7 @@ class CaseCreate(BaseModel):
     patient_id: str
     doctor_id: Optional[str] = None
     consultant_id: Optional[str] = None
+    appointment_id: Optional[str] = None
     chief_complaint: str = Field(..., min_length=1)
     diagnosis: Optional[str] = None
     notes: Optional[str] = None
@@ -25,6 +26,7 @@ class CaseResponse(BaseModel):
     patient_id: str
     doctor_id: Optional[str]
     consultant_id: Optional[str]
+    appointment_id: Optional[str] = None
     patient_name: Optional[str] = None
     doctor_name: Optional[str] = None
     chief_complaint: str

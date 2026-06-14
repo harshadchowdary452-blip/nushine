@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, UploadFile, File, Form
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 import os, uuid, shutil
@@ -12,6 +12,22 @@ from app.repositories.audit_log_repository import AuditLogRepository
 from app.config import settings
 
 router = APIRouter(prefix="/post-ops", tags=["Post-Op"])
+
+
+@router.get("/{case_id}")
+async def get_post_op(case_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.MANAGE_CASES)
+    case_result = await db.execute(select(Case).where(Case.id == case_id))
+    case_obj = case_result.scalar_one_or_none()
+    if not case_obj:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
+    await verify_tenant_access(current_user, case_obj, "case", db)
+    repo = PostOpRepository(db)
+    post_ops = await repo.get_all(filters={"case_id": case_id})
+    if not post_ops:
+        return {"id": None, "notes": None, "report": None, "photo_urls": None}
+    latest = post_ops[-1]
+    return {"id": str(latest.id), "notes": latest.notes, "report": latest.report, "photo_urls": latest.photo_urls}
 
 
 @router.post("/{case_id}")

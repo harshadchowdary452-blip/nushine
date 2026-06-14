@@ -6,8 +6,10 @@ from app.database import get_db
 from app.dependencies import get_current_user
 from app.core.permissions import verify_permission, verify_tenant_access, Permission, Role
 from app.services.treatment_sitting_service import TreatmentSittingService
+from app.services.treatment_enquiry_service import TreatmentEnquiryService
+from app.models.treatment_sitting import TreatmentSitting, TreatmentSittingStatus
 from app.schemas.treatment_sitting import TreatmentSittingCreate, TreatmentSittingUpdate, TreatmentSittingResponse
-from app.models.treatment_plan import TreatmentPlan
+from app.models.treatment_plan import TreatmentPlan, TreatmentPlanStatus
 from app.models.case import Case
 from app.models.patient import Patient
 from app.models.hospital import Hospital
@@ -71,8 +73,19 @@ async def get_sitting(sitting_id: str, db: AsyncSession = Depends(get_db), curre
 @router.put("/{sitting_id}", response_model=TreatmentSittingResponse)
 async def update_sitting(sitting_id: str, data: TreatmentSittingUpdate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.CREATE_TREATMENT_PLAN)
+    old = await db.get(TreatmentSitting, sitting_id)
+    if not old:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Treatment sitting not found")
+    was_completed = old.status != TreatmentSittingStatus.COMPLETED.value and data.status == TreatmentSittingStatus.COMPLETED.value
     service = TreatmentSittingService(db)
     sitting = await service.update(sitting_id, data.model_dump(exclude_none=True), user_id=current_user.get("sub"))
     if not sitting:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Treatment sitting not found")
+    if was_completed:
+        plan_result = await db.execute(select(TreatmentPlan).where(TreatmentPlan.id == sitting.treatment_plan_id))
+        plan = plan_result.scalar_one_or_none()
+        if plan and plan.status == TreatmentPlanStatus.COMPLETED.value:
+            enquiry_svc = TreatmentEnquiryService(db)
+            await enquiry_svc.on_treatment_plan_completed(str(plan.id))
+    await db.commit()
     return sitting

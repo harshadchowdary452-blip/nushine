@@ -13,6 +13,7 @@ interface KpiCardProps {
   loading?: boolean
   color?: "primary" | "success" | "warning" | "info" | "danger"
   delay?: number
+  onClick?: () => void
 }
 
 const colorMap = {
@@ -23,16 +24,16 @@ const colorMap = {
   danger: { bg: "bg-danger-soft", text: "text-danger", icon: "text-danger" },
 }
 
-export default function KpiCard({ title, value, icon: Icon, trend, description, className, loading = false, color = "primary", delay = 0 }: KpiCardProps) {
+export default function KpiCard({ title, value, icon: Icon, trend, description, className, loading = false, color = "primary", delay = 0, onClick }: KpiCardProps) {
   const c = colorMap[color]
 
   if (loading) {
     return (
-      <div className={cn("rounded-2xl border border-gray-100 bg-white p-5 shadow-kpi", className)}>
-        <div className="space-y-3">
-          <div className="skeleton h-4 w-24" />
-          <div className="skeleton h-8 w-32" />
-          {description && <div className="skeleton h-3 w-20" />}
+      <div className={cn("rounded-2xl border border-gray-100 bg-white p-4 shadow-kpi", className)}>
+        <div className="space-y-2">
+          <div className="skeleton h-3 w-20" />
+          <div className="skeleton h-6 w-28" />
+          {description && <div className="skeleton h-3 w-16" />}
         </div>
       </div>
     )
@@ -44,35 +45,36 @@ export default function KpiCard({ title, value, icon: Icon, trend, description, 
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay, ease: "easeOut" }}
       whileHover={{ y: -2 }}
-      className={cn("group rounded-2xl border border-gray-100 bg-white p-5 shadow-kpi transition-all duration-300 hover:shadow-kpi-hover", className)}
+      onClick={onClick}
+      className={cn("group rounded-2xl border border-gray-100 bg-white p-4 shadow-kpi transition-all duration-300 hover:shadow-kpi-hover", onClick && "cursor-pointer", className)}
     >
       <div className="flex items-start justify-between">
-        <div className="space-y-2 flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-500">{title}</p>
+        <div className="space-y-1 flex-1 min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">{title}</p>
           <motion.p
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: delay + 0.1 }}
-            className="text-2xl font-bold tracking-tight text-gray-900"
+            className="text-xl font-bold tracking-tight text-gray-900"
           >
             {value}
           </motion.p>
           {trend && (
             <div className="flex items-center gap-1.5">
               <span className={cn(
-                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold",
+                "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-semibold",
                 trend.positive ? "bg-success-soft text-success" : "bg-danger-soft text-danger"
               )}>
-                {trend.positive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                {trend.positive ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
                 {trend.value}
               </span>
-              {description && <span className="text-xs text-gray-400">{description}</span>}
+              {description && <span className="text-[11px] text-gray-400">{description}</span>}
             </div>
           )}
-          {!trend && description && <p className="text-xs text-gray-400">{description}</p>}
+          {!trend && description && <p className="text-[11px] text-gray-400">{description}</p>}
         </div>
-        <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-transform duration-300 group-hover:scale-110", c.bg, c.text)}>
-          <Icon className={cn("h-5 w-5", c.icon)} />
+        <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-transform duration-300 group-hover:scale-110", c.bg, c.text)}>
+          <Icon className={cn("h-4 w-4", c.icon)} />
         </div>
       </div>
     </motion.div>

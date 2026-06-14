@@ -10,13 +10,16 @@ from app.core.permissions import Role, Permission, verify_permission
 from app.models.communication_log import CommunicationLog, CommunicationChannel, CommunicationStatus, MessageType
 from app.models.notification import Notification
 from app.models.patient_feedback import PatientFeedback
-from app.models.follow_up import FollowUp, FollowUpStatus
+from app.models.follow_up import FollowUp, FollowUpStatus, FollowUpType
+from app.models.follow_up_response import FollowUpResponse, FollowUpResponseStatus
+from app.models.whatsapp_template import WhatsAppTemplate
 from app.services.status_automation import StatusAutomationService
 from app.models.email_template import EmailTemplate
 from app.models.patient import Patient
 from app.models.user import User
 from app.models.hospital import Hospital
 from app.models.case import Case
+from app.models.treatment_plan import TreatmentPlan, TreatmentPlanStatus
 from app.models.billing import Billing
 from app.models.appointment import Appointment, AppointmentStatus, AppointmentType
 from app.utils.whatsapp import WhatsAppProvider
@@ -400,6 +403,17 @@ async def create_template(
     return {"id": str(t.id), "name": t.name}
 
 
+@router.delete("/templates/{template_id}")
+async def delete_template(template_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.MANAGE_PATIENTS)
+    t = await db.get(EmailTemplate, template_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="Template not found")
+    await db.delete(t)
+    await db.commit()
+    return {"success": True}
+
+
 @router.put("/templates/{template_id}")
 async def update_template(
     template_id: str, req: TemplateUpdate,
@@ -590,6 +604,17 @@ async def list_follow_ups(
     } for f in items]
 
 
+@router.delete("/follow-ups/{follow_up_id}")
+async def delete_follow_up(follow_up_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.MANAGE_PATIENTS)
+    fu = await db.get(FollowUp, follow_up_id)
+    if not fu:
+        raise HTTPException(status_code=404, detail="Follow-up not found")
+    await db.delete(fu)
+    await db.commit()
+    return {"success": True}
+
+
 @router.put("/follow-ups/{follow_up_id}")
 async def update_follow_up(
     follow_up_id: str, req: FollowUpUpdate,
@@ -618,6 +643,75 @@ async def update_follow_up(
         await svc.update_followup_status(follow_up_id, FollowUpStatus(req.status))
         await db.commit()
     return {"success": True}
+
+
+# --- Follow-Up Responses ---
+
+class FollowUpResponseCreate(BaseModel):
+    follow_up_id: str
+    patient_id: str
+    response_message: Optional[str] = None
+    response_status: str = "NO_RESPONSE"
+
+
+@router.post("/follow-ups/{follow_up_id}/response")
+async def record_follow_up_response(
+    follow_up_id: str,
+    req: FollowUpResponseCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    verify_permission(current_user, Permission.MANAGE_PATIENTS)
+    fu = await db.get(FollowUp, follow_up_id)
+    if not fu:
+        raise HTTPException(status_code=404, detail="Follow-up not found")
+    fr = FollowUpResponse(
+        follow_up_id=follow_up_id,
+        patient_id=req.patient_id,
+        hospital_id=fu.hospital_id,
+        response_message=req.response_message,
+        response_status=req.response_status,
+    )
+    db.add(fr)
+    fu.status = FollowUpStatus.COMPLETED.value
+    await db.commit()
+    return {"success": True, "id": str(fr.id)}
+
+
+@router.get("/follow-up-responses/{patient_id}")
+async def get_patient_follow_up_responses(
+    patient_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    q = select(FollowUpResponse).where(FollowUpResponse.patient_id == patient_id).order_by(desc(FollowUpResponse.created_at)).limit(30)
+    result = await db.execute(q)
+    items = result.scalars().all()
+    enriched = []
+    for r in items:
+        follow_up = await db.get(FollowUp, r.follow_up_id) if r.follow_up_id else None
+        doctor_name = None
+        created_by_name = None
+        if r.created_by:
+            u = await db.get(User, r.created_by)
+            if u: created_by_name = u.full_name
+        if follow_up and follow_up.doctor_id:
+            u = await db.get(User, follow_up.doctor_id)
+            if u: doctor_name = u.full_name
+        enriched.append({
+            "id": str(r.id), "follow_up_id": str(r.follow_up_id),
+            "patient_id": str(r.patient_id),
+            "response_message": r.response_message,
+            "response_status": r.response_status,
+            "feedback": r.feedback,
+            "follow_up_required": r.follow_up_required,
+            "appointment_id": r.appointment_id,
+            "follow_up_type": follow_up.follow_up_type if follow_up else None,
+            "doctor_name": doctor_name,
+            "created_by_name": created_by_name,
+            "created_at": r.created_at.isoformat(),
+        })
+    return enriched
 
 
 # --- Patient Segments ---
@@ -722,4 +816,1010 @@ async def get_crm_analytics(
         "top_communication_days": top_days,
         "average_rating": avg_rating,
         "total_feedbacks": len(feedbacks),
+    }
+
+
+# --- WhatsApp Templates ---
+
+class WhatsAppTemplateCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+    message: str = Field(..., min_length=1)
+
+
+class WhatsAppTemplateUpdate(BaseModel):
+    name: Optional[str] = None
+    message: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+@router.get("/whatsapp-templates")
+async def list_whatsapp_templates(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    hospital_id = current_user.get("hospital_id")
+    q = select(WhatsAppTemplate).where(WhatsAppTemplate.is_active == True)
+    if hospital_id:
+        q = q.where(WhatsAppTemplate.hospital_id == hospital_id)
+    q = q.order_by(WhatsAppTemplate.created_at.desc())
+    result = await db.execute(q)
+    return [{"id": str(t.id), "name": t.name, "message": t.message, "is_active": t.is_active} for t in result.scalars().all()]
+
+
+@router.post("/whatsapp-templates")
+async def create_whatsapp_template(
+    req: WhatsAppTemplateCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    verify_permission(current_user, Permission.MANAGE_PATIENTS)
+    hospital_id = current_user.get("hospital_id")
+    t = WhatsAppTemplate(hospital_id=hospital_id, name=req.name, message=req.message)
+    db.add(t)
+    await db.commit()
+    return {"id": str(t.id), "name": t.name}
+
+
+@router.put("/whatsapp-templates/{template_id}")
+async def update_whatsapp_template(
+    template_id: str, req: WhatsAppTemplateUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    verify_permission(current_user, Permission.MANAGE_PATIENTS)
+    t = await db.get(WhatsAppTemplate, template_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="Template not found")
+    if req.name is not None: t.name = req.name
+    if req.message is not None: t.message = req.message
+    if req.is_active is not None: t.is_active = req.is_active
+    await db.commit()
+    return {"success": True}
+
+
+@router.delete("/whatsapp-templates/{template_id}")
+async def delete_whatsapp_template(
+    template_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    verify_permission(current_user, Permission.MANAGE_PATIENTS)
+    t = await db.get(WhatsAppTemplate, template_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="Template not found")
+    await db.delete(t)
+    await db.commit()
+    return {"success": True}
+
+
+# --- CRM Dashboard (Follow-Up Reminders + Metrics) ---
+
+@router.get("/dashboard")
+async def get_crm_dashboard(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    hospital_id = current_user.get("hospital_id")
+    today = date.today()
+
+    base = select(FollowUp)
+    if hospital_id:
+        base = base.where(FollowUp.hospital_id == hospital_id)
+
+    # Today's follow-ups
+    today_q = base.where(FollowUp.follow_up_date == today)
+    today_fus = (await db.execute(today_q.order_by(FollowUp.follow_up_time).limit(50))).scalars().all()
+
+    # Metrics
+    all_q = base
+    total = (await db.execute(select(func.count()).select_from(all_q.subquery()))).scalar() or 0
+    pending_q = base.where(FollowUp.status.in_(["SCHEDULED", "PENDING", "CONTACTED", "NO_RESPONSE"]))
+    pending = (await db.execute(select(func.count()).select_from(pending_q.subquery()))).scalar() or 0
+    completed_q = base.where(FollowUp.status == "COMPLETED")
+    completed = (await db.execute(select(func.count()).select_from(completed_q.subquery()))).scalar() or 0
+    overdue_q = base.where(FollowUp.follow_up_date < today, FollowUp.status.in_(["SCHEDULED", "PENDING", "CONTACTED", "NO_RESPONSE"]))
+    overdue = (await db.execute(select(func.count()).select_from(overdue_q.subquery()))).scalar() or 0
+    one_day_q = base.where(FollowUp.follow_up_type == "1_DAY_POST_TREATMENT", FollowUp.follow_up_date == today)
+    one_day_due = (await db.execute(select(func.count()).select_from(one_day_q.subquery()))).scalar() or 0
+    six_month_q = base.where(FollowUp.follow_up_type == "6_MONTH_RECALL", FollowUp.follow_up_date == today)
+    six_month_due = (await db.execute(select(func.count()).select_from(six_month_q.subquery()))).scalar() or 0
+
+    # Response rate
+    responded_q = base.where(FollowUp.status.in_(["RESPONDED", "APPOINTMENT_BOOKED", "COMPLETED"]))
+    responded = (await db.execute(select(func.count()).select_from(responded_q.subquery()))).scalar() or 0
+    # WhatsApp messages sent from follow-ups
+    whatsapp_q = base.where(FollowUp.whatsapp_sent_at.isnot(None))
+    whatsapp_sent = (await db.execute(select(func.count()).select_from(whatsapp_q.subquery()))).scalar() or 0
+    # WhatsApp response rate
+    whatsapp_responded_q = base.where(FollowUp.whatsapp_sent_at.isnot(None), FollowUp.status.in_(["RESPONDED", "APPOINTMENT_BOOKED", "COMPLETED"]))
+    whatsapp_responded = (await db.execute(select(func.count()).select_from(whatsapp_responded_q.subquery()))).scalar() or 0
+
+    # Patient source analytics
+    patient_base = select(Patient)
+    if hospital_id:
+        patient_base = patient_base.where(Patient.hospital_id == hospital_id)
+    source_counts_q = patient_base.where(Patient.patient_source.isnot(None)).with_entities(
+        Patient.patient_source, func.count(Patient.id).label("count")
+    ).group_by(Patient.patient_source).order_by(func.count(Patient.id).desc())
+    source_counts = (await db.execute(source_counts_q)).all()
+    patients_by_source = [{"source": row[0], "count": row[1]} for row in source_counts]
+    total_patients_with_source = sum(row[1] for row in source_counts) or 1
+    top_source = patients_by_source[0]["source"] if patients_by_source else None
+
+    # Revenue by source (with patient count)
+    revenue_by_source_q = select(
+        Patient.patient_source,
+        func.coalesce(func.sum(Billing.paid_amount), 0).label("revenue"),
+        func.count(Patient.id.distinct()).label("patients")
+    ).outerjoin(Case, Case.patient_id == Patient.id
+    ).outerjoin(Billing, Billing.case_id == Case.id
+    ).where(Patient.patient_source.isnot(None))
+    if hospital_id:
+        revenue_by_source_q = revenue_by_source_q.where(Patient.hospital_id == hospital_id)
+    revenue_by_source_q = revenue_by_source_q.group_by(Patient.patient_source).order_by(func.sum(Billing.paid_amount).desc())
+    revenue_rows = (await db.execute(revenue_by_source_q)).all()
+    revenue_by_source = [{"source": row[0], "revenue": float(row[1]), "patients": row[2]} for row in revenue_rows]
+
+    # New patients this month
+    month_start = today.replace(day=1)
+    new_this_month_q = select(func.count(Patient.id)).where(Patient.created_at >= month_start)
+    if hospital_id:
+        new_this_month_q = new_this_month_q.where(Patient.hospital_id == hospital_id)
+    new_this_month = (await db.execute(new_this_month_q)).scalar() or 0
+
+    # Top referral source
+    referral_prefixes = ["Referral - "]
+    referral_sources = [r for r in patients_by_source if any(r["source"].startswith(p) for p in referral_prefixes)]
+    top_referral = max(referral_sources, key=lambda r: r["count"]) if referral_sources else None
+
+    # Monthly patient acquisition by source (last 6 months)
+    monthly_acquisition = []
+    for i in range(5, -1, -1):
+        ym = today - timedelta(days=30 * i)
+        m_start = ym.replace(day=1)
+        if i > 0:
+            m_end = (ym.replace(day=1) + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+        else:
+            m_end = today
+        m_sources_q = patient_base.where(
+            Patient.patient_source.isnot(None),
+            Patient.created_at >= m_start,
+            Patient.created_at <= m_end,
+        ).with_entities(
+            Patient.patient_source, func.count(Patient.id).label("count")
+        ).group_by(Patient.patient_source)
+        m_rows = (await db.execute(m_sources_q)).all()
+        month_label = m_start.strftime("%b %Y")
+        monthly_acquisition.append({
+            "month": month_label,
+            "sources": [{"source": row[0], "count": row[1]} for row in m_rows],
+        })
+
+    # Campaign analytics
+    campaign_base = patient_base.where(Patient.patient_source == "Campaign")
+    campaign_patients = (await db.execute(select(func.count()).select_from(campaign_base.subquery()))).scalar() or 0
+    campaign_revenue_q = select(
+        func.coalesce(func.sum(Billing.paid_amount), 0)
+    ).outerjoin(Case, Case.patient_id == Patient.id
+    ).outerjoin(Billing, Billing.case_id == Case.id
+    ).where(Patient.patient_source == "Campaign")
+    if hospital_id:
+        campaign_revenue_q = campaign_revenue_q.where(Patient.hospital_id == hospital_id)
+    campaign_revenue = float((await db.execute(campaign_revenue_q)).scalar() or 0)
+    total_revenue_all = float((await db.execute(
+        select(func.coalesce(func.sum(Billing.paid_amount), 0))
+    )).scalar() or 1)
+    campaign_roi = round((campaign_revenue / total_revenue_all) * 100, 1) if total_revenue_all else 0
+
+    # Enrich today's follow-ups with patient + doctor names + billing info
+    enriched = []
+    for fu in today_fus:
+        patient = await db.get(Patient, fu.patient_id)
+        doctor = await db.get(User, fu.doctor_id) if fu.doctor_id else None
+        case = await db.get(Case, fu.case_id) if fu.case_id else None
+        invoice_number = None
+        billing_id = fu.billing_id
+        if not billing_id and case:
+            billing_r = await db.execute(
+                select(Billing).where(Billing.case_id == case.id).order_by(Billing.created_at.desc()).limit(1)
+            )
+            b = billing_r.scalar_one_or_none()
+            if b:
+                billing_id = str(b.id)
+                invoice_number = b.invoice_number
+        elif billing_id:
+            b = await db.get(Billing, billing_id)
+            if b:
+                invoice_number = b.invoice_number
+        enriched.append({
+            "id": str(fu.id), "patient_id": str(fu.patient_id),
+            "patient_name": patient.full_name if patient else "Unknown",
+            "patient_phone": patient.phone if patient else None,
+            "doctor_id": str(fu.doctor_id) if fu.doctor_id else None,
+            "doctor_name": doctor.full_name if doctor else None,
+            "hospital_id": str(fu.hospital_id) if fu.hospital_id else None,
+            "case_id": str(fu.case_id) if fu.case_id else None,
+            "appointment_id": str(fu.appointment_id) if fu.appointment_id else None,
+            "billing_id": billing_id,
+            "invoice_number": invoice_number,
+            "follow_up_date": fu.follow_up_date.isoformat(),
+            "follow_up_time": str(fu.follow_up_time) if fu.follow_up_time else None,
+            "follow_up_type": fu.follow_up_type,
+            "treatment_name": fu.treatment_name,
+            "treatment_completed_date": fu.treatment_completed_date.isoformat() if fu.treatment_completed_date else None,
+            "notes": fu.notes, "status": fu.status,
+            "reminder_sent": fu.reminder_sent,
+            "completed_date": fu.completed_date.isoformat() if fu.completed_date else None,
+            "whatsapp_sent_at": fu.whatsapp_sent_at.isoformat() if fu.whatsapp_sent_at else None,
+            "call_made_at": fu.call_made_at.isoformat() if fu.call_made_at else None,
+            "created_at": fu.created_at.isoformat(),
+        })
+
+    return {
+        "todays_follow_ups": enriched,
+        "metrics": {
+            "todays_follow_ups_count": len(enriched),
+            "total_follow_ups": total,
+            "pending_follow_ups": pending,
+            "completed_follow_ups": completed,
+            "overdue_follow_ups": overdue,
+            "one_day_follow_ups_due": one_day_due,
+            "six_month_recalls_due": six_month_due,
+            "response_rate": round(responded / total * 100, 1) if total else 0,
+            "recall_success_rate": round(six_month_due / (six_month_due or 1) * 100, 1) if six_month_due else 0,
+            "whatsapp_messages_sent": whatsapp_sent,
+            "whatsapp_response_rate": round(whatsapp_responded / (whatsapp_sent or 1) * 100, 1) if whatsapp_sent else 0,
+        },
+        "source_analytics": {
+            "patients_by_source": patients_by_source,
+            "total_patients_with_source": total_patients_with_source,
+            "top_source": top_source,
+            "top_referral_source": top_referral["source"] if top_referral else None,
+            "top_referral_count": top_referral["count"] if top_referral else 0,
+            "new_patients_this_month": new_this_month,
+            "revenue_by_source": revenue_by_source,
+            "monthly_acquisition": monthly_acquisition,
+            "campaign_patients": campaign_patients,
+            "campaign_revenue": campaign_revenue,
+            "campaign_roi": campaign_roi,
+            "highest_revenue_source": max(revenue_by_source, key=lambda r: r["revenue"]) if revenue_by_source else None,
+            "highest_patient_source": max(patients_by_source, key=lambda r: r["count"]) if patients_by_source else None,
+        },
+    }
+
+
+# --- Patient Source Analytics Drawer ---
+
+@router.get("/source-analytics")
+async def get_source_analytics(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    hospital_id = current_user.get("hospital_id")
+    today = date.today()
+
+    patient_base = select(Patient)
+    if hospital_id:
+        patient_base = patient_base.where(Patient.hospital_id == hospital_id)
+
+    source_counts_q = patient_base.where(Patient.patient_source.isnot(None)).with_entities(
+        Patient.patient_source, func.count(Patient.id).label("count")
+    ).group_by(Patient.patient_source).order_by(func.count(Patient.id).desc())
+    source_counts = (await db.execute(source_counts_q)).all()
+    patients_by_source = [{"source": row[0], "count": row[1]} for row in source_counts]
+    total_with_source = sum(row[1] for row in source_counts) or 1
+
+    revenue_q = select(
+        Patient.patient_source,
+        func.coalesce(func.sum(Billing.paid_amount), 0).label("revenue"),
+        func.count(Patient.id).label("count"),
+    ).join(Case, Case.patient_id == Patient.id, isouter=True
+    ).join(Billing, Billing.case_id == Case.id, isouter=True
+    ).where(Patient.patient_source.isnot(None))
+    if hospital_id:
+        revenue_q = revenue_q.where(Patient.hospital_id == hospital_id)
+    revenue_q = revenue_q.group_by(Patient.patient_source)
+    revenue_rows = (await db.execute(revenue_q)).all()
+    revenue_by_source = [{"source": r[0], "revenue": float(r[1]), "patients": r[2]} for r in revenue_rows]
+
+    # Monthly trends (last 12 months)
+    monthly_trends = []
+    for i in range(11, -1, -1):
+        ym = today - timedelta(days=30 * i)
+        m_start = ym.replace(day=1)
+        m_sources_q = patient_base.where(
+            Patient.patient_source.isnot(None),
+            Patient.created_at >= m_start,
+            Patient.created_at <= (m_start + timedelta(days=32)).replace(day=1) - timedelta(days=1),
+        ).with_entities(
+            Patient.patient_source, func.count(Patient.id).label("count")
+        ).group_by(Patient.patient_source)
+        m_rows = (await db.execute(m_sources_q)).all()
+        monthly_trends.append({
+            "month": m_start.strftime("%b %Y"),
+            "sources": [{"source": r[0], "count": r[1]} for r in m_rows],
+        })
+
+    # Growth percentage (comparing this month vs last month)
+    this_month_start = today.replace(day=1)
+    last_month_end = this_month_start - timedelta(days=1)
+    last_month_start = last_month_end.replace(day=1)
+    this_month_count = (await db.execute(
+        select(func.count(Patient.id)).where(
+            Patient.created_at >= this_month_start,
+            Patient.patient_source.isnot(None),
+        )
+    )).scalar() or 0
+    last_month_count = (await db.execute(
+        select(func.count(Patient.id)).where(
+            Patient.created_at >= last_month_start,
+            Patient.created_at <= last_month_end,
+            Patient.patient_source.isnot(None),
+        )
+    )).scalar() or 0
+    growth_pct = round((this_month_count - last_month_count) / (last_month_count or 1) * 100, 1)
+
+    return {
+        "patients_by_source": patients_by_source,
+        "revenue_by_source": revenue_by_source,
+        "monthly_trends": monthly_trends,
+        "growth_percentage": growth_pct,
+        "total_patients_with_source": total_with_source,
+        "highest_revenue_source": max(revenue_by_source, key=lambda r: r["revenue"]) if revenue_by_source else None,
+        "highest_patient_source": max(patients_by_source, key=lambda r: r["count"]) if patients_by_source else None,
+    }
+
+
+# --- Enhanced Follow-Up List with Filters ---
+
+@router.get("/follow-ups/list")
+async def list_follow_ups_filtered(
+    filter: Optional[str] = Query(None),
+    follow_up_type: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    patient_id: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    hospital_id = current_user.get("hospital_id")
+    today = date.today()
+    q = select(FollowUp)
+    if hospital_id:
+        q = q.where(FollowUp.hospital_id == hospital_id)
+    if patient_id:
+        q = q.where(FollowUp.patient_id == patient_id)
+    if follow_up_type:
+        q = q.where(FollowUp.follow_up_type == follow_up_type)
+    if status:
+        q = q.where(FollowUp.status == status)
+
+    if filter == "today":
+        q = q.where(FollowUp.follow_up_date == today)
+    elif filter == "tomorrow":
+        q = q.where(FollowUp.follow_up_date == today + timedelta(days=1))
+    elif filter == "this_week":
+        end = today + timedelta(days=6 - today.weekday())
+        q = q.where(FollowUp.follow_up_date.between(today, end))
+    elif filter == "this_month":
+        q = q.where(
+            FollowUp.follow_up_date >= today.replace(day=1),
+            FollowUp.follow_up_date <= today.replace(day=1) + timedelta(days=31),
+        )
+    elif filter == "overdue":
+        q = q.where(
+            FollowUp.follow_up_date < today,
+            FollowUp.status.in_(["SCHEDULED", "PENDING", "CONTACTED", "NO_RESPONSE"]),
+        )
+    elif filter == "one_day":
+        q = q.where(FollowUp.follow_up_type == "1_DAY_POST_TREATMENT")
+    elif filter == "six_month":
+        q = q.where(FollowUp.follow_up_type == "6_MONTH_RECALL")
+    elif filter == "completed":
+        q = q.where(FollowUp.status == "COMPLETED")
+    elif filter == "pending":
+        q = q.where(FollowUp.status.in_(["SCHEDULED", "PENDING", "CONTACTED", "NO_RESPONSE"]))
+
+    q = q.order_by(desc(FollowUp.follow_up_date)).limit(100)
+    result = await db.execute(q)
+    items = result.scalars().all()
+
+    enriched = []
+    for fu in items:
+        patient = await db.get(Patient, fu.patient_id)
+        doctor = await db.get(User, fu.doctor_id) if fu.doctor_id else None
+        invoice_number = None
+        billing_id = fu.billing_id
+        if not billing_id and fu.case_id:
+            billing_r = await db.execute(
+                select(Billing).where(Billing.case_id == fu.case_id).order_by(Billing.created_at.desc()).limit(1)
+            )
+            b = billing_r.scalar_one_or_none()
+            if b:
+                billing_id = str(b.id)
+                invoice_number = b.invoice_number
+        elif billing_id:
+            b = await db.get(Billing, billing_id)
+            if b:
+                invoice_number = b.invoice_number
+        enriched.append({
+            "id": str(fu.id), "patient_id": str(fu.patient_id),
+            "patient_name": patient.full_name if patient else "Unknown",
+            "patient_phone": patient.phone if patient else None,
+            "doctor_id": str(fu.doctor_id) if fu.doctor_id else None,
+            "doctor_name": doctor.full_name if doctor else None,
+            "hospital_id": str(fu.hospital_id) if fu.hospital_id else None,
+            "case_id": str(fu.case_id) if fu.case_id else None,
+            "appointment_id": str(fu.appointment_id) if fu.appointment_id else None,
+            "billing_id": billing_id,
+            "invoice_number": invoice_number,
+            "follow_up_date": fu.follow_up_date.isoformat(),
+            "follow_up_time": str(fu.follow_up_time) if fu.follow_up_time else None,
+            "follow_up_type": fu.follow_up_type,
+            "treatment_name": fu.treatment_name,
+            "treatment_completed_date": fu.treatment_completed_date.isoformat() if fu.treatment_completed_date else None,
+            "notes": fu.notes, "status": fu.status,
+            "reminder_sent": fu.reminder_sent,
+            "completed_date": fu.completed_date.isoformat() if fu.completed_date else None,
+            "whatsapp_sent_at": fu.whatsapp_sent_at.isoformat() if fu.whatsapp_sent_at else None,
+            "call_made_at": fu.call_made_at.isoformat() if fu.call_made_at else None,
+            "whatsapp_message": fu.whatsapp_message,
+            "call_notes": fu.call_notes,
+            "created_at": fu.created_at.isoformat(),
+        })
+    return enriched
+
+
+# --- Follow-Up Actions ---
+
+class MarkDoneRequest(BaseModel):
+    notes: Optional[str] = None
+
+
+@router.post("/follow-ups/{follow_up_id}/mark-done")
+async def mark_follow_up_done(
+    follow_up_id: str,
+    req: MarkDoneRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    verify_permission(current_user, Permission.MANAGE_PATIENTS)
+    fu = await db.get(FollowUp, follow_up_id)
+    if not fu:
+        raise HTTPException(status_code=404, detail="Follow-up not found")
+    fu.status = FollowUpStatus.COMPLETED.value
+    fu.completed_date = datetime.now(timezone.utc)
+    fu.completed_by = current_user.get("sub")
+    if req.notes:
+        fu.notes = (fu.notes or "") + "\n[Done] " + req.notes
+    await db.commit()
+    return {"success": True}
+
+
+class LogCommunicationRequest(BaseModel):
+    channel: str = "WHATSAPP"
+    message: str = Field(..., min_length=1, max_length=1000)
+    notes: Optional[str] = None
+
+
+@router.post("/follow-ups/{follow_up_id}/communicate")
+async def log_follow_up_communication(
+    follow_up_id: str,
+    req: LogCommunicationRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    verify_permission(current_user, Permission.MANAGE_PATIENTS)
+    fu = await db.get(FollowUp, follow_up_id)
+    if not fu:
+        raise HTTPException(status_code=404, detail="Follow-up not found")
+
+    hospital_id = current_user.get("hospital_id") or fu.hospital_id
+    patient = await db.get(Patient, fu.patient_id)
+
+    if req.channel == "WHATSAPP":
+        if not patient or not patient.phone:
+            raise HTTPException(status_code=400, detail="Patient has no phone number")
+        provider = WhatsAppProvider()
+        success = await provider.send_message(patient.phone, req.message)
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to send WhatsApp")
+        fu.whatsapp_message = req.message
+        fu.whatsapp_sent_at = datetime.now(timezone.utc)
+        fu.status = FollowUpStatus.OPEN.value
+        comm_status = CommunicationStatus.SENT.value
+    elif req.channel == "CALL":
+        fu.call_made_at = datetime.now(timezone.utc)
+        if req.notes:
+            fu.call_notes = (fu.call_notes or "") + "\n" + req.notes
+        fu.status = FollowUpStatus.OPEN.value
+        comm_status = CommunicationStatus.SENT.value
+    else:
+        raise HTTPException(status_code=400, detail="Invalid channel. Use WHATSAPP or CALL")
+
+    log = CommunicationLog(
+        patient_id=fu.patient_id,
+        hospital_id=hospital_id,
+        doctor_id=current_user.get("sub"),
+        follow_up_id=follow_up_id,
+        channel=req.channel,
+        message_type="FOLLOW_UP",
+        message=req.message,
+        status=comm_status,
+        sent_at=datetime.now(timezone.utc),
+    )
+    db.add(log)
+    await db.commit()
+    return {"success": True, "log_id": str(log.id)}
+
+
+class RecordResponseRequest(BaseModel):
+    response_message: Optional[str] = None
+    response_status: str = "POSITIVE"
+    feedback: Optional[str] = None
+
+
+@router.post("/follow-ups/{follow_up_id}/record-response")
+async def record_follow_up_response_crm(
+    follow_up_id: str,
+    req: RecordResponseRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    verify_permission(current_user, Permission.MANAGE_PATIENTS)
+    fu = await db.get(FollowUp, follow_up_id)
+    if not fu:
+        raise HTTPException(status_code=404, detail="Follow-up not found")
+
+    feedback_val = req.feedback
+    if not feedback_val:
+        if req.response_status == "POSITIVE":
+            feedback_val = "POSITIVE"
+        elif req.response_status in ("NEEDS_ATTENTION", "COMPLAINT"):
+            feedback_val = "NEGATIVE"
+        elif req.response_status == "EMERGENCY":
+            feedback_val = "NEGATIVE"
+        elif req.response_status == "NO_RESPONSE":
+            feedback_val = "NEUTRAL"
+
+    fr = FollowUpResponse(
+        follow_up_id=follow_up_id,
+        patient_id=fu.patient_id,
+        hospital_id=fu.hospital_id,
+        response_message=req.response_message,
+        response_status=req.response_status,
+        feedback=feedback_val,
+        follow_up_required=req.response_status in ("NEEDS_ATTENTION", "COMPLAINT", "EMERGENCY"),
+        created_by=current_user.get("sub"),
+    )
+    db.add(fr)
+
+    if req.response_status == "POSITIVE":
+        fu.status = FollowUpStatus.COMPLETED.value
+    elif req.response_status in ("NEEDS_ATTENTION", "COMPLAINT", "EMERGENCY"):
+        fu.status = FollowUpStatus.OPEN.value
+    else:
+        fu.status = FollowUpStatus.COMPLETED.value
+
+    fu.completed_date = datetime.now(timezone.utc)
+    fu.completed_by = current_user.get("sub")
+
+    await db.commit()
+    return {
+        "success": True,
+        "response_id": str(fr.id),
+    }
+
+
+class CreateFollowUpFromEnquiryRequest(BaseModel):
+    patient_id: str
+    response_id: str
+    follow_up_reason: str = Field(..., min_length=1, max_length=500)
+    priority: str = Field(default="NORMAL")
+    doctor_id: str
+    follow_up_date: date
+    follow_up_time: Optional[time] = None
+    notes: Optional[str] = None
+
+
+@router.post("/enquiry/create-follow-up")
+async def create_follow_up_from_enquiry(
+    req: CreateFollowUpFromEnquiryRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    hospital_id = current_user.get("hospital_id")
+    if not hospital_id:
+        raise HTTPException(status_code=400, detail="User has no hospital assigned")
+
+    # Verify the response exists
+    response = await db.get(FollowUpResponse, req.response_id)
+    if not response:
+        raise HTTPException(status_code=404, detail="Response not found")
+
+    # Verify patient
+    patient = await db.get(Patient, req.patient_id)
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+
+    # Create appointment first
+    now = datetime.now(timezone.utc)
+    appt = Appointment(
+        patient_id=req.patient_id,
+        doctor_id=req.doctor_id,
+        appointment_date=req.follow_up_date,
+        appointment_time=req.follow_up_time or now.time(),
+        status=AppointmentStatus.SCHEDULED,
+        appointment_type=AppointmentType.FOLLOW_UP,
+        notes=f"Follow-Up: {req.follow_up_reason}" + (f"\n{req.notes}" if req.notes else ""),
+    )
+    db.add(appt)
+    await db.flush()
+
+    # Create follow-up record
+    follow_up = FollowUp(
+        patient_id=req.patient_id,
+        hospital_id=hospital_id,
+        doctor_id=req.doctor_id,
+        follow_up_date=req.follow_up_date,
+        follow_up_time=req.follow_up_time,
+        follow_up_type=FollowUpType.MANUAL.value,
+        notes=req.notes or req.follow_up_reason,
+        appointment_id=str(appt.id),
+        status=FollowUpStatus.SCHEDULED.value,
+        created_at=now,
+    )
+    db.add(follow_up)
+    await db.flush()
+
+    # Update the response
+    response.follow_up_required = True
+    response.appointment_id = str(appt.id)
+
+    await db.commit()
+    return {
+        "success": True,
+        "follow_up_id": str(follow_up.id),
+        "appointment_id": str(appt.id),
+        "patient_name": patient.full_name,
+        "doctor_id": req.doctor_id,
+        "follow_up_date": req.follow_up_date.isoformat(),
+    }
+
+
+# --- 6-Month Recall Dashboard ---
+
+@router.get("/recalls")
+async def get_recall_list(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    hospital_id = current_user.get("hospital_id")
+    today = date.today()
+    q = select(FollowUp).where(
+        FollowUp.follow_up_type == "6_MONTH_RECALL",
+        FollowUp.follow_up_date == today,
+    )
+    if hospital_id:
+        q = q.where(FollowUp.hospital_id == hospital_id)
+    q = q.order_by(FollowUp.follow_up_time).limit(50)
+    result = await db.execute(q)
+    items = result.scalars().all()
+    enriched = []
+    for fu in items:
+        patient = await db.get(Patient, fu.patient_id)
+        doctor = await db.get(User, fu.doctor_id) if fu.doctor_id else None
+        case = await db.get(Case, fu.case_id) if fu.case_id else None
+        enriched.append({
+            "id": str(fu.id), "patient_id": str(fu.patient_id),
+            "patient_name": patient.full_name if patient else "Unknown",
+            "patient_phone": patient.phone if patient else None,
+            "doctor_name": doctor.full_name if doctor else None,
+            "treatment_name": fu.treatment_name,
+            "treatment_completed_date": fu.treatment_completed_date.isoformat() if fu.treatment_completed_date else None,
+            "follow_up_date": fu.follow_up_date.isoformat(),
+            "status": fu.status,
+        })
+    return enriched
+
+
+# --- Follow-Up History for Patient Detail ---
+
+@router.get("/patients/{patient_id}/follow-up-history")
+async def get_patient_follow_up_history(
+    patient_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    q = select(FollowUp).where(FollowUp.patient_id == patient_id).order_by(desc(FollowUp.created_at)).limit(50)
+    result = await db.execute(q)
+    items = result.scalars().all()
+    enriched = []
+    for fu in items:
+        doctor = await db.get(User, fu.doctor_id) if fu.doctor_id else None
+        comms_q = select(CommunicationLog).where(CommunicationLog.follow_up_id == fu.id).order_by(CommunicationLog.created_at.desc()).limit(10)
+        comms_result = await db.execute(comms_q)
+        comms = [{
+            "id": str(c.id), "channel": c.channel,
+            "message": c.message, "status": c.status,
+            "sent_at": c.sent_at.isoformat() if c.sent_at else None,
+        } for c in comms_result.scalars().all()]
+        enriched.append({
+            "id": str(fu.id), "follow_up_type": fu.follow_up_type,
+            "treatment_name": fu.treatment_name,
+            "follow_up_date": fu.follow_up_date.isoformat(),
+            "status": fu.status, "notes": fu.notes,
+            "doctor_name": doctor.full_name if doctor else None,
+            "completed_date": fu.completed_date.isoformat() if fu.completed_date else None,
+            "completed_by": fu.completed_by,
+            "whatsapp_sent_at": fu.whatsapp_sent_at.isoformat() if fu.whatsapp_sent_at else None,
+            "call_made_at": fu.call_made_at.isoformat() if fu.call_made_at else None,
+            "created_at": fu.created_at.isoformat(),
+            "communications": comms,
+        })
+    return enriched
+
+
+# --- Enquiry Dashboard ---
+
+@router.get("/enquiry/dashboard")
+async def get_enquiry_dashboard(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    hospital_id = current_user.get("hospital_id")
+    today = date.today()
+    base = select(FollowUp)
+    if hospital_id:
+        base = base.where(FollowUp.hospital_id == hospital_id)
+
+    total_q = base
+    total = (await db.execute(select(func.count()).select_from(total_q.subquery()))).scalar() or 0
+
+    today_q = base.where(FollowUp.follow_up_date == today)
+    todays_enquiries = (await db.execute(select(func.count()).select_from(today_q.subquery()))).scalar() or 0
+
+    pending_q = base.where(FollowUp.status.in_(["SCHEDULED", "PENDING", "CONTACTED", "NO_RESPONSE"]))
+    pending = (await db.execute(select(func.count()).select_from(pending_q.subquery()))).scalar() or 0
+
+    completed_q = base.where(FollowUp.status == "COMPLETED")
+    completed = (await db.execute(select(func.count()).select_from(completed_q.subquery()))).scalar() or 0
+
+    emergency_q = select(FollowUpResponse).where(FollowUpResponse.response_status == "EMERGENCY")
+    if hospital_id:
+        emergency_q = emergency_q.where(FollowUpResponse.hospital_id == hospital_id)
+    emergency = (await db.execute(select(func.count()).select_from(emergency_q.subquery()))).scalar() or 0
+
+    positive_q = select(FollowUpResponse).where(FollowUpResponse.response_status == "POSITIVE")
+    if hospital_id:
+        positive_q = positive_q.where(FollowUpResponse.hospital_id == hospital_id)
+    positive = (await db.execute(select(func.count()).select_from(positive_q.subquery()))).scalar() or 0
+
+    negative_q = select(FollowUpResponse).where(FollowUpResponse.feedback == "NEGATIVE")
+    if hospital_id:
+        negative_q = negative_q.where(FollowUpResponse.hospital_id == hospital_id)
+    negative = (await db.execute(select(func.count()).select_from(negative_q.subquery()))).scalar() or 0
+
+    appointments_q = select(FollowUpResponse).where(FollowUpResponse.appointment_id.isnot(None))
+    if hospital_id:
+        appointments_q = appointments_q.where(FollowUpResponse.hospital_id == hospital_id)
+    appointments_created = (await db.execute(select(func.count()).select_from(appointments_q.subquery()))).scalar() or 0
+
+    recall_q = base.where(FollowUp.follow_up_type == "6_MONTH_RECALL", FollowUp.follow_up_date <= today, FollowUp.status == "COMPLETED")
+    if hospital_id:
+        recall_q = recall_q.where(FollowUp.hospital_id == hospital_id)
+    recall_conversions = (await db.execute(select(func.count()).select_from(recall_q.subquery()))).scalar() or 0
+
+    follow_ups_q = base.where(FollowUp.follow_up_type == "MANUAL")
+    if hospital_id:
+        follow_ups_q = follow_ups_q.where(FollowUp.hospital_id == hospital_id)
+    follow_ups_created = (await db.execute(select(func.count()).select_from(follow_ups_q.subquery()))).scalar() or 0
+
+    overdue_q = base.where(
+        FollowUp.follow_up_date < today,
+        FollowUp.status.in_(["SCHEDULED", "PENDING", "CONTACTED", "NO_RESPONSE"]),
+    )
+    overdue = (await db.execute(select(func.count()).select_from(overdue_q.subquery()))).scalar() or 0
+
+    return {
+        "total_enquiries": total,
+        "todays_enquiries": todays_enquiries,
+        "pending_enquiries": pending,
+        "completed_enquiries": completed,
+        "overdue_enquiries": overdue,
+        "emergency_responses": emergency,
+        "positive_responses": positive,
+        "negative_responses": negative,
+        "follow_ups_created": follow_ups_created,
+        "appointments_created": appointments_created,
+        "recall_conversions": recall_conversions,
+    }
+
+
+# -- Today's Enquiries List --
+
+@router.get("/enquiry/today")
+async def get_todays_enquiries(
+    tab: str = Query("today", description="Filter: today, tomorrow, week, overdue, recalls, completed, calendar"),
+    calendar_date: Optional[str] = Query(None, description="Date for calendar view (YYYY-MM-DD)"),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    hospital_id = current_user.get("hospital_id")
+    today = date.today()
+    q = select(FollowUp)
+
+    if tab == "today":
+        q = q.where(FollowUp.follow_up_date == today)
+    elif tab == "tomorrow":
+        q = q.where(FollowUp.follow_up_date == today + timedelta(days=1))
+    elif tab == "week":
+        start_of_week = today - timedelta(days=today.weekday())
+        end_of_week = start_of_week + timedelta(days=6)
+        q = q.where(FollowUp.follow_up_date.between(start_of_week, end_of_week))
+    elif tab == "overdue":
+        q = q.where(
+            FollowUp.follow_up_date < today,
+            FollowUp.status.notin_(["COMPLETED", "CANCELLED", "MISSED"]),
+        )
+    elif tab == "recalls":
+        q = q.where(
+            FollowUp.follow_up_type == "6_MONTH_RECALL",
+            FollowUp.status.notin_(["COMPLETED", "CANCELLED"]),
+        ).order_by(FollowUp.follow_up_date)
+    elif tab == "completed":
+        q = q.where(FollowUp.status == "COMPLETED")
+    elif tab == "calendar" and calendar_date:
+        q = q.where(FollowUp.follow_up_date == date.fromisoformat(calendar_date))
+    else:
+        q = q.where(FollowUp.follow_up_date == today)
+
+    if hospital_id:
+        q = q.where(FollowUp.hospital_id == hospital_id)
+    q = q.order_by(FollowUp.follow_up_time).limit(100)
+    result = await db.execute(q)
+    items = result.scalars().all()
+    enriched = []
+    for fu in items:
+        patient = await db.get(Patient, fu.patient_id)
+        doctor = await db.get(User, fu.doctor_id) if fu.doctor_id else None
+        case = await db.get(Case, fu.case_id) if fu.case_id else None
+        treatment_status = None
+        if fu.treatment_id:
+            tp = await db.get(TreatmentPlan, fu.treatment_id)
+            if tp:
+                treatment_status = tp.status.value if hasattr(tp.status, 'value') else tp.status
+        billing_info = {}
+        if fu.billing_id:
+            b = await db.get(Billing, fu.billing_id)
+            if b:
+                billing_info = {
+                    "billing_id": str(b.id),
+                    "invoice_number": b.invoice_number,
+                    "invoice_amount": b.total_amount,
+                    "billing_paid_at": b.paid_at.isoformat() if b.paid_at else None,
+                }
+        elif fu.case_id:
+            br = await db.execute(
+                select(Billing).where(Billing.case_id == fu.case_id).order_by(Billing.created_at.desc()).limit(1)
+            )
+            b = br.scalar_one_or_none()
+            if b:
+                billing_info = {
+                    "billing_id": str(b.id),
+                    "invoice_number": b.invoice_number,
+                    "invoice_amount": b.total_amount,
+                    "billing_paid_at": b.paid_at.isoformat() if b.paid_at else None,
+                }
+        enriched.append({
+            "id": str(fu.id),
+            "patient_id": str(fu.patient_id),
+            "patient_name": patient.full_name if patient else "Unknown",
+            "patient_phone": patient.phone if patient else None,
+            "doctor_id": str(fu.doctor_id) if fu.doctor_id else None,
+            "doctor_name": doctor.full_name if doctor else None,
+            "case_id": str(fu.case_id) if fu.case_id else None,
+            "case_number": str(case.id)[:8] if case else None,
+            "treatment_id": str(fu.treatment_id) if fu.treatment_id else None,
+            "treatment_status": treatment_status,
+            "follow_up_date": fu.follow_up_date.isoformat(),
+            "follow_up_time": str(fu.follow_up_time) if fu.follow_up_time else None,
+            "follow_up_type": fu.follow_up_type,
+            "treatment_name": fu.treatment_name or (case.chief_complaint if case else None),
+            "treatment_completed_date": fu.treatment_completed_date.isoformat() if fu.treatment_completed_date else None,
+            "status": fu.status,
+            "notes": fu.notes,
+            **billing_info,
+        })
+    return enriched
+
+
+# --- Campaign WhatsApp Sending ---
+
+class CampaignWhatsAppSendRequest(BaseModel):
+    campaign_id: str
+    template_id: Optional[str] = None
+    custom_message: Optional[str] = None
+
+
+@router.post("/campaigns/send-whatsapp")
+async def send_campaign_whatsapp(
+    req: CampaignWhatsAppSendRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    verify_permission(current_user, Permission.MANAGE_PATIENTS)
+    from app.models.campaign import Campaign, CampaignRecipient, CampaignRecipientStatus, CampaignStatus
+
+    campaign = await db.get(Campaign, req.campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    template_message = None
+    if req.template_id:
+        t = await db.get(WhatsAppTemplate, req.template_id)
+        if t:
+            template_message = t.message
+
+    message = req.custom_message or template_message or campaign.message
+    if not message:
+        raise HTTPException(status_code=400, detail="No message content")
+
+    hospital_name = None
+    if campaign.hospital_id:
+        h = await db.get(Hospital, campaign.hospital_id)
+        if h:
+            hospital_name = h.name
+
+    recipients_q = select(CampaignRecipient).where(
+        CampaignRecipient.campaign_id == req.campaign_id,
+        CampaignRecipient.status == CampaignRecipientStatus.PENDING,
+    )
+    recipients = (await db.execute(recipients_q)).scalars().all()
+
+    provider = WhatsAppProvider()
+    sent = 0
+    failed = 0
+    for r in recipients:
+        patient = await db.get(Patient, r.patient_id)
+        if not patient or not patient.phone:
+            r.status = CampaignRecipientStatus.FAILED.value if hasattr(CampaignRecipientStatus, 'FAILED') else "FAILED"
+            failed += 1
+            continue
+        doctor = await db.get(User, patient.doctor_id) if patient.doctor_id else None
+        variables = TemplateEngine.build_variables(
+            patient_name=patient.full_name,
+            doctor_name=doctor.full_name if doctor else None,
+            hospital_name=hospital_name,
+        )
+        rendered = TemplateEngine.render_template(message, variables)
+        success = await provider.send_message(patient.phone, rendered)
+        if success:
+            r.status = CampaignRecipientStatus.SENT.value
+            r.response_message = rendered
+            sent += 1
+        else:
+            r.status = "FAILED"
+            failed += 1
+
+        log = CommunicationLog(
+            patient_id=patient.id, hospital_id=campaign.hospital_id,
+            doctor_id=current_user.get("sub"),
+            channel="WHATSAPP", message_type="CAMPAIGN",
+            message=rendered,
+            status="SENT" if success else "FAILED",
+            sent_at=datetime.now(timezone.utc) if success else None,
+        )
+        db.add(log)
+
+    campaign.messages_sent = (campaign.messages_sent or 0) + sent
+    campaign.messages_delivered = (campaign.messages_delivered or 0) + sent
+    if sent > 0:
+        campaign.status = CampaignStatus.ACTIVE if hasattr(CampaignStatus, 'ACTIVE') else "ACTIVE"
+
+    await db.commit()
+    return {
+        "success": True,
+        "sent": sent,
+        "failed": failed,
+        "total": len(recipients),
     }

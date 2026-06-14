@@ -2,9 +2,9 @@ import { useState, useRef } from "react"
 import { Link, useLocation } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import {
-  LayoutDashboard, Users, FolderOpen, CalendarDays, Stethoscope, Receipt, UserCog, Settings,
+  LayoutDashboard, Users, FolderOpen,   CalendarDays, Stethoscope, Receipt, UserCog, Settings,
   ChevronLeft, X, Building2, Shield, MessageSquare, Activity, Menu, IndianRupee, TrendingUp,
-  Bell, Mail, BarChart3, FileText, Phone, ClipboardList,
+  Bell, Mail, BarChart3, FileText, Phone, ClipboardList, Calendar, Megaphone, Clock,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useSidebarStore } from "@/store/sidebarStore"
@@ -61,10 +61,12 @@ const roleNav: Record<string, NavSection[]> = {
       { label: "Billing", icon: Receipt, path: "/billing" },
     ]},
     { label: "CRM", items: [
+      { label: "Dashboard", icon: BarChart3, path: "/crm" },
+      { label: "Campaigns", icon: Megaphone, path: "/crm/campaigns" },
+      { label: "Follow-Up", icon: Clock, path: "/crm/follow-ups" },
       { label: "WhatsApp", icon: MessageSquare, path: "/whatsapp" },
-      { label: "Communications", icon: Phone, path: "/crm/communications" },
-      { label: "Email Templates", icon: Mail, path: "/crm/templates" },
-      { label: "Follow-Ups", icon: ClipboardList, path: "/crm/follow-ups" },
+      { label: "Communication", icon: MessageSquare, path: "/crm/communication" },
+      { label: "Analytics", icon: BarChart3, path: "/crm/analytics" },
     ]},
     { label: "Management", items: [
       { label: "Doctors", icon: Stethoscope, path: "/admin/doctors" },
@@ -103,7 +105,7 @@ function NavTooltip({ label, children }: { label: string; children: React.ReactN
     <div className="group/tip relative">
       {children}
       <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50 pointer-events-none opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150">
-        <div className="bg-gray-900 text-white text-xs font-medium px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap">
+        <div className="bg-gray-900 text-white text-[13px] font-medium px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap">
           {label}
         </div>
       </div>
@@ -134,24 +136,24 @@ export default function Sidebar() {
     <div className="flex h-full flex-col bg-white">
       <div className={cn(
         "flex items-center border-b border-[#E2E8F0] bg-[#F8FAFC] transition-all duration-[250ms] ease-in-out overflow-hidden",
-        isExpanded ? "h-[88px] px-5" : "h-[72px] px-0 justify-center"
+        isExpanded ? "h-[60px] px-3" : "h-[52px] px-0 justify-center"
       )}>
-        <Link to="/" className={cn("flex items-center overflow-hidden transition-all duration-[250ms] ease-in-out", isExpanded ? "gap-3" : "gap-0")} onClick={() => setMobileOpen(false)}>
-          <Logo variant="sidebar" size={isExpanded ? "md" : "sm"} showTagline={isExpanded} />
+        <Link to="/" className={cn("flex items-center overflow-hidden transition-all duration-[250ms] ease-in-out", isExpanded ? "gap-2" : "gap-0")} onClick={() => setMobileOpen(false)}>
+          <Logo variant="sidebar" size="sm" showTagline={false} />
         </Link>
         <div className="flex-1" />
         <Button variant="ghost" size="icon-sm" onClick={toggle}
           className={cn("hidden lg:flex shrink-0 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-opacity duration-[250ms]", isExpanded ? "opacity-100" : "opacity-0 w-0 overflow-hidden")}>
-          <ChevronLeft className={cn("h-4 w-4 transition-transform duration-300", isCollapsed && "rotate-180")} />
+          <ChevronLeft className={cn("h-3 w-3 transition-transform duration-300", isCollapsed && "rotate-180")} />
         </Button>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 py-5 scrollbar-hide space-y-5">
+      <nav className="flex-1 overflow-y-auto px-2 py-3 scrollbar-hide space-y-3">
         {sections.map((section) => (
           <div key={section.label}>
             <p className={cn(
-              "px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-400 mb-2 overflow-hidden transition-all duration-[250ms] ease-in-out",
-              !isExpanded ? "max-h-0 opacity-0" : "max-h-6 opacity-100"
+              "px-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-gray-400 mb-1 overflow-hidden transition-all duration-[250ms] ease-in-out",
+              !isExpanded ? "max-h-0 opacity-0" : "max-h-5 opacity-100"
             )}>
               {section.label}
             </p>
@@ -162,25 +164,25 @@ export default function Sidebar() {
                 const link = (
                   <Link key={item.path} to={item.path} onClick={() => setMobileOpen(false)}
                     className={cn(
-                      "flex items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 group relative",
+                      "flex items-center rounded-md px-2 py-1.5 text-[13px] font-medium transition-all duration-150 group relative",
                       active
                         ? "bg-[#E0F2FE] text-[#0EA5E9] font-semibold"
                         : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                     )}>
                     {active && (
-                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-[#0EA5E9]" />
+                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[2.5px] h-4 rounded-r-full bg-[#0EA5E9]" />
                     )}
-                    <span className="relative z-10 flex items-center gap-3 w-full">
+                    <span className="relative z-10 flex items-center gap-2 w-full">
                       <span className={cn(
                         "flex items-center justify-center shrink-0 transition-transform duration-150",
-                        active && "scale-110",
+                        active && "scale-105",
                         !active && "group-hover:scale-105"
                       )}>
-                        <Icon className={cn("h-5 w-5", active ? "text-[#0EA5E9]" : "text-gray-400 group-hover:text-gray-600")} />
+                        <Icon className={cn("h-[18px] w-[18px]", active ? "text-[#0EA5E9]" : "text-gray-400 group-hover:text-gray-600")} />
                       </span>
                       <span className={cn(
-                        "overflow-hidden transition-all duration-[250ms] ease-in-out",
-                        !isExpanded ? "max-w-0 opacity-0" : "max-w-48 opacity-100"
+                        "overflow-hidden transition-all duration-[250ms] ease-in-out whitespace-nowrap",
+                        !isExpanded ? "max-w-0 opacity-0" : "max-w-32 opacity-100"
                       )}>{item.label}</span>
                     </span>
                   </Link>
@@ -195,23 +197,24 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      <div className="border-t border-[#E2E8F0] p-3">
+      <div className="border-t border-[#E2E8F0] p-2">
         <div className={cn(
-          "flex items-center gap-3 rounded-lg px-3 py-2.5 overflow-hidden transition-all duration-[250ms] ease-in-out",
+          "flex items-center gap-2 rounded-md px-2 py-1.5 overflow-hidden transition-all duration-[250ms] ease-in-out",
           !isExpanded ? "justify-center" : ""
         )}>
-          <Avatar className="h-8 w-8 shrink-0 ring-2 ring-[#E2E8F0]">
-            <AvatarFallback className="bg-[#E0F2FE] text-xs font-semibold text-[#0EA5E9]">{initials}</AvatarFallback>
+          <Avatar className="h-6 w-6 shrink-0 ring-1.5 ring-[#E2E8F0]">
+            <AvatarFallback className="bg-[#E0F2FE] text-[11px] font-semibold text-[#0EA5E9]">{initials}</AvatarFallback>
           </Avatar>
           <div className={cn(
             "overflow-hidden transition-all duration-[250ms] ease-in-out",
-            !isExpanded ? "max-w-0 opacity-0" : "max-w-48 opacity-100"
+            !isExpanded ? "max-w-0 opacity-0" : "max-w-32 opacity-100"
           )}>
-            <p className="text-sm font-medium text-gray-900 truncate">{user?.full_name ?? "User"}</p>
+            <p className="text-[13px] font-medium text-gray-900 truncate">{user?.full_name ?? "User"}</p>
             <p className="text-[11px] text-gray-400 truncate">{user?.role?.replace("_", " ") ?? ""}</p>
           </div>
         </div>
       </div>
+
     </div>
   )
 
@@ -220,21 +223,21 @@ export default function Sidebar() {
       <aside onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
         className={cn(
           "hidden lg:flex flex-col shrink-0 transition-[width] duration-[250ms] ease-in-out will-change-transform",
-          isCollapsed && !hovered ? "w-[72px]" : "w-[280px]"
+          isCollapsed && !hovered ? "w-[56px]" : "w-[218px]"
         )}>
         <div className="sticky top-0 h-screen">
           {sidebarContent}
         </div>
       </aside>
 
-      <aside className="hidden md:flex lg:hidden flex-col shrink-0 w-[72px]">
+      <aside className="hidden md:flex lg:hidden flex-col shrink-0 w-[56px]">
         <div className="sticky top-0 h-screen flex flex-col bg-white border-r border-[#E2E8F0]">
-          <div className="flex h-[72px] items-center justify-center border-b border-[#E2E8F0] bg-[#F8FAFC]">
+          <div className="flex h-[52px] items-center justify-center border-b border-[#E2E8F0] bg-[#F8FAFC]">
             <Link to="/" onClick={() => setMobileOpen(false)}>
               <Logo variant="sidebar" size="sm" />
             </Link>
           </div>
-          <nav className="flex-1 overflow-y-auto px-2 py-4 scrollbar-hide space-y-1">
+          <nav className="flex-1 overflow-y-auto px-1.5 py-3 scrollbar-hide space-y-1">
             {sections.map((section) =>
               section.items.map((item) => {
                 const Icon = item.icon
@@ -242,22 +245,23 @@ export default function Sidebar() {
                 return (
                   <Link key={item.path} to={item.path}
                     className={cn(
-                      "flex items-center justify-center rounded-lg p-2.5 text-sm font-medium transition-all duration-150 relative",
+                      "flex items-center justify-center rounded-lg p-1.5 text-[13px] font-medium transition-all duration-150 relative",
                       active
                         ? "bg-[#E0F2FE] text-[#0EA5E9]"
                         : "text-gray-400 hover:bg-gray-50 hover:text-gray-600"
                     )}>
-                    {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-[#0EA5E9]" />}
-                    <Icon className="h-5 w-5 shrink-0" />
+                    {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[2.5px] h-4 rounded-r-full bg-[#0EA5E9]" />}
+                    <Icon className="h-[18px] w-[18px] shrink-0" />
                   </Link>
                 )
               })
             )}
           </nav>
-          <div className="border-t border-[#E2E8F0] p-2 flex justify-center">
-            <Avatar className="h-8 w-8 shrink-0 ring-2 ring-[#E2E8F0]">
-              <AvatarFallback className="bg-[#E0F2FE] text-xs font-semibold text-[#0EA5E9]">{initials}</AvatarFallback>
+          <div className="border-t border-[#E2E8F0] p-1.5 flex justify-center">
+            <Avatar className="h-6 w-6 shrink-0 ring-1.5 ring-[#E2E8F0]">
+              <AvatarFallback className="bg-[#E0F2FE] text-[11px] font-semibold text-[#0EA5E9]">{initials}</AvatarFallback>
             </Avatar>
+
           </div>
         </div>
       </aside>
@@ -267,15 +271,15 @@ export default function Sidebar() {
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden"
+              className="fixed inset-0 z-40 bg-black/70 md:hidden"
               onClick={() => setMobileOpen(false)} />
-            <motion.aside initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }}
+            <motion.aside initial={{ x: -200 }} animate={{ x: 0 }} exit={{ x: -200 }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="fixed inset-y-0 left-0 z-50 w-[280px] md:hidden shadow-2xl">
+              className="fixed inset-y-0 left-0 z-50 w-[200px] md:hidden shadow-2xl">
               {sidebarContent}
               <button onClick={() => setMobileOpen(false)}
                 className="absolute -right-12 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-lg text-gray-400 hover:text-gray-600">
-                <X className="h-4 w-4" />
+                <X className="h-[18px] w-[18px]" />
               </button>
             </motion.aside>
           </>
@@ -292,15 +296,15 @@ export default function Sidebar() {
                 "flex flex-col items-center justify-center gap-0.5 min-w-[56px] py-1 px-2 rounded-xl transition-colors",
                 active ? "text-[#0EA5E9]" : "text-gray-400 hover:text-gray-600"
               )}>
-              <Icon className={cn("h-5 w-5", active && "scale-110")} />
-              <span className="text-[10px] font-medium leading-tight text-center truncate w-full">{item.label}</span>
+              <Icon className={cn("h-[22px] w-[22px]", active && "scale-110")} />
+              <span className="text-[11px] font-medium leading-tight text-center truncate w-full">{item.label}</span>
             </Link>
           )
         })}
         <button onClick={() => setBottomNavOpen(!bottomNavOpen)}
           className="flex flex-col items-center justify-center gap-0.5 min-w-[56px] py-1 px-2 rounded-xl text-gray-400 hover:text-gray-600">
-          <Menu className="h-5 w-5" />
-          <span className="text-[10px] font-medium leading-tight">More</span>
+          <Menu className="h-[22px] w-[22px]" />
+          <span className="text-[11px] font-medium leading-tight">More</span>
         </button>
       </nav>
 
@@ -309,7 +313,7 @@ export default function Sidebar() {
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
-              className="fixed inset-0 z-40 bg-black/30 md:hidden"
+              className="fixed inset-0 z-40 bg-black/50 md:hidden"
               onClick={() => setBottomNavOpen(false)} />
             <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
@@ -325,8 +329,8 @@ export default function Sidebar() {
                         "flex flex-col items-center justify-center gap-1 rounded-xl p-3 transition-colors",
                         active ? "bg-[#E0F2FE] text-[#0EA5E9]" : "text-gray-500 hover:bg-gray-50"
                       )}>
-                      <Icon className="h-5 w-5" />
-                      <span className="text-[10px] font-medium text-center">{item.label}</span>
+                      <Icon className="h-[22px] w-[22px]" />
+                      <span className="text-[11px] font-medium text-center">{item.label}</span>
                     </Link>
                   )
                 })}

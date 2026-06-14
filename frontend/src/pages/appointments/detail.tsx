@@ -2,7 +2,7 @@ import { useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { format } from "date-fns"
-import { ArrowLeft, Calendar, Clock, User, Stethoscope, FileText, Edit, X } from "lucide-react"
+import { ArrowLeft, Calendar, Clock, User, Stethoscope, FileText, Edit, X, FilePlus, RotateCcw } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
 import PageHeader from "@/components/layout/page-header"
-import { appointmentsApi } from "@/services/endpoints"
+import { appointmentsApi, casesApi, doctorsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
 import type { Appointment } from "@/types"
 
@@ -35,12 +35,23 @@ export default function AppointmentDetail() {
   const [editOpen, setEditOpen] = useState(false)
   const [editStatus, setEditStatus] = useState("")
   const [editNotes, setEditNotes] = useState("")
+  const [createCaseOpen, setCreateCaseOpen] = useState(false)
+  const [caseComplaint, setCaseComplaint] = useState("")
+  const [reassignOpen, setReassignOpen] = useState(false)
+  const [newDoctorId, setNewDoctorId] = useState("")
+  const [reassignReason, setReassignReason] = useState("")
 
   const { data: appointment, isLoading } = useQuery<Appointment>({
     queryKey: ["appointment", id],
     queryFn: () => appointmentsApi.get(id!),
     enabled: !!id,
   })
+
+  const { data: doctors } = useQuery({
+    queryKey: ["doctors", "reassign"],
+    queryFn: () => doctorsApi.list({ page_size: 200 }),
+  })
+  const doctorList: any[] = doctors?.items || doctors || []
 
   const updateMutation = useMutation({
     mutationFn: (data: Record<string, unknown>) => appointmentsApi.update(id!, data),
@@ -52,6 +63,38 @@ export default function AppointmentDetail() {
     },
     onError: () => {
       addToast({ title: "Error", description: "Failed to update appointment", variant: "destructive" })
+    },
+  })
+
+  const reassignMutation = useMutation({
+    mutationFn: (data: { doctor_id: string; reason?: string }) =>
+      appointmentsApi.reassignDoctor(id!, data),
+    onSuccess: (resp: any) => {
+      queryClient.invalidateQueries({ queryKey: ["appointment", id] })
+      queryClient.invalidateQueries({ queryKey: ["appointments"] })
+      addToast({
+        title: "Doctor Reassigned",
+        description: `Changed to ${resp.new_doctor_name}`,
+        variant: "success"
+      })
+      setReassignOpen(false); setNewDoctorId(""); setReassignReason("")
+    },
+    onError: () => {
+      addToast({ title: "Error", description: "Failed to reassign doctor", variant: "destructive" })
+    },
+  })
+
+  const createCaseMutation = useMutation({
+    mutationFn: (data: { patient_id: string; doctor_id: string; appointment_id: string; chief_complaint: string }) =>
+      casesApi.create(data),
+    onSuccess: (newCase: any) => {
+      addToast({ title: "Success", description: "Case created from appointment", variant: "success" })
+      setCreateCaseOpen(false)
+      setCaseComplaint("")
+      navigate(`/cases/${newCase.id}`)
+    },
+    onError: () => {
+      addToast({ title: "Error", description: "Failed to create case", variant: "destructive" })
     },
   })
 
@@ -97,6 +140,11 @@ export default function AppointmentDetail() {
                 {appointment.status.replace(/_/g, " ")}
               </Badge>
             </div>
+            {appointment.status === "COMPLETED" && (
+              <Button variant="outline" size="sm" onClick={() => { setCaseComplaint(""); setCreateCaseOpen(true) }}>
+                <FilePlus className="h-4 w-4 mr-1" /> Create Case
+              </Button>
+            )}
             <Dialog open={editOpen} onOpenChange={setEditOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline" size="sm">
@@ -216,7 +264,14 @@ export default function AppointmentDetail() {
                   <dt className="text-sm text-muted-foreground flex items-center gap-2">
                     <Stethoscope className="h-3.5 w-3.5" /> Doctor
                   </dt>
-                  <dd className="text-sm font-medium">{appointment.doctor_name}</dd>
+                  <dd className="flex items-center gap-2">
+                    <span className="text-sm font-medium">{appointment.doctor_name}</span>
+                    <Button variant="ghost" size="icon-sm" className="text-muted-foreground"
+                      onClick={() => { setNewDoctorId(""); setReassignReason(""); setReassignOpen(true) }}
+                      title="Change Doctor">
+                      <RotateCcw className="h-3 w-3" />
+                    </Button>
+                  </dd>
                 </div>
               )}
             </dl>
@@ -237,6 +292,92 @@ export default function AppointmentDetail() {
           </Card>
         )}
       </div>
+
+      <Dialog open={createCaseOpen} onOpenChange={setCreateCaseOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Case from Appointment</DialogTitle>
+          </DialogHeader>
+          <div className="px-6 py-4 space-y-4 overflow-y-auto flex-1">
+            <div className="grid gap-2">
+              <Label>Patient</Label>
+              <p className="text-sm font-medium text-gray-900">{appointment.patient_name || appointment.patient_id}</p>
+            </div>
+            <div className="grid gap-2">
+              <Label>Doctor</Label>
+              <p className="text-sm font-medium text-gray-900">{appointment.doctor_name || appointment.doctor_id}</p>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="complaint">Chief Complaint</Label>
+              <Input id="complaint" placeholder="e.g. Tooth pain, routine checkup" value={caseComplaint} onChange={(e) => setCaseComplaint(e.target.value)} required />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 px-6 py-4 border-t">
+            <Button variant="outline" onClick={() => setCreateCaseOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => createCaseMutation.mutate({
+                patient_id: appointment.patient_id,
+                doctor_id: appointment.doctor_id,
+                appointment_id: appointment.id,
+                chief_complaint: caseComplaint || `Follow-up from ${appointment.appointment_date}`,
+              })}
+              disabled={createCaseMutation.isPending}
+            >
+              {createCaseMutation.isPending ? "Creating..." : "Create Case"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reassign Doctor Dialog */}
+      <Dialog open={reassignOpen} onOpenChange={setReassignOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Doctor</DialogTitle>
+          </DialogHeader>
+          <div className="px-6 py-4 space-y-4 overflow-y-auto flex-1">
+            <div className="grid gap-2">
+              <Label>Current Doctor</Label>
+              <p className="text-sm font-medium text-gray-900">{appointment.doctor_name || appointment.doctor_id}</p>
+            </div>
+            <div className="grid gap-2">
+              <Label>New Doctor *</Label>
+              <Select value={newDoctorId} onValueChange={setNewDoctorId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a doctor..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {doctorList.map((d: any) => (
+                    <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label>Reason for change</Label>
+              <Textarea value={reassignReason} onChange={(e) => setReassignReason(e.target.value)}
+                rows={2} placeholder="e.g. Doctor unavailable, schedule conflict..." />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 px-6 py-4 border-t">
+            <Button variant="outline" onClick={() => { setReassignOpen(false); setNewDoctorId(""); setReassignReason("") }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (!newDoctorId) {
+                  addToast({ title: "Required", description: "New Doctor ID is required", variant: "destructive" })
+                  return
+                }
+                reassignMutation.mutate({ doctor_id: newDoctorId, reason: reassignReason || undefined })
+              }}
+              disabled={reassignMutation.isPending || !newDoctorId}
+            >
+              {reassignMutation.isPending ? "Reassigning..." : "Reassign Doctor"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

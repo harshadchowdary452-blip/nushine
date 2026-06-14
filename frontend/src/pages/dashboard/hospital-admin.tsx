@@ -1,16 +1,17 @@
 import { useState, useMemo } from "react"
 import { motion } from "framer-motion"
 import { useQuery } from "@tanstack/react-query"
-import { Calendar, DollarSign, Users, FolderOpen, Building2, Sparkles, TrendingUp, Award, Activity, BarChart3, IndianRupee, PieChart, MessageSquare, Mail, Phone } from "lucide-react"
+import { Calendar, DollarSign, Users, FolderOpen, TrendingUp, Award, Activity, BarChart3, IndianRupee, PieChart } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar } from "recharts"
 import { useAuthStore } from "@/store/authStore"
-import { dashboardApi, crmApi } from "@/services/endpoints"
+import { dashboardApi } from "@/services/endpoints"
 import { Skeleton } from "@/components/ui/skeleton"
 import KpiCard from "@/components/layout/kpi-card"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import Leaderboard from "@/components/ui/leaderboard"
 import QuickViewDrawer from "@/components/ui/quick-view-drawer"
 import DateFilterBar from "@/components/ui/date-filter-bar"
+import AnalyticsDrawer from "@/components/analytics-drawer"
 import { formatIndianRupees, formatIndianNumber } from "@/lib/currency"
 
 const ChartTooltip = ({ active, payload, label }: any) => {
@@ -45,6 +46,7 @@ const item = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0 } }
 export default function HospitalAdminDashboard() {
   const { user } = useAuthStore()
   const [quickView, setQuickView] = useState<{ type: "admin-group" | "hospital" | "doctor" | "patient"; id: string; name: string } | null>(null)
+  const [drawerMetric, setDrawerMetric] = useState<string | null>(null)
 
   const [period, setPeriod] = useState("this_month")
   const [startDate, setStartDate] = useState("")
@@ -64,13 +66,6 @@ export default function HospitalAdminDashboard() {
     gcTime: 60000,
   })
 
-  const { data: crmStats } = useQuery({
-    queryKey: ["crm", "analytics"],
-    queryFn: () => crmApi.analytics(),
-    staleTime: 30000,
-    gcTime: 60000,
-  })
-
   if (!user) return null
 
   if (isLoading) {
@@ -85,6 +80,12 @@ export default function HospitalAdminDashboard() {
   }
 
   const hasData = stats && (stats.total_patients || stats.today_appointments || stats.total_cases)
+
+  const cmp = stats?.comparison as Record<string, number> | undefined
+  const revChange = cmp?.revenue_change
+  const patChange = cmp?.patient_change
+  const apptChange = cmp?.appointment_change
+  const caseChange = cmp?.case_change
 
   return (
     <motion.div className="space-y-8 relative" variants={container} initial="hidden" animate="show">
@@ -102,11 +103,11 @@ export default function HospitalAdminDashboard() {
               </p>
             </div>
             <div className="flex gap-3">
-              <div className="bg-white/15 backdrop-blur-sm rounded-xl px-4 py-3 text-center min-w-[100px]">
+              <div className="bg-white/20 rounded-xl px-4 py-3 text-center min-w-[100px]">
                 <p className="text-white/70 text-xs font-medium uppercase tracking-wider">Revenue</p>
                 <p className="text-white text-xl font-bold">{formatIndianRupees(stats?.total_revenue || 0)}</p>
               </div>
-              <div className="bg-white/15 backdrop-blur-sm rounded-xl px-4 py-3 text-center min-w-[100px]">
+              <div className="bg-white/20 rounded-xl px-4 py-3 text-center min-w-[100px]">
                 <p className="text-white/70 text-xs font-medium uppercase tracking-wider">Patients</p>
                 <p className="text-white text-xl font-bold">{stats?.total_patients || 0}</p>
               </div>
@@ -137,53 +138,75 @@ export default function HospitalAdminDashboard() {
       </motion.div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <KpiCard className="card-hover" icon={DollarSign} title="Total Revenue" value={stats?.total_revenue != null ? formatIndianRupees(stats.total_revenue) : "₹0"} color="success" delay={0} />
-        <KpiCard className="card-hover" icon={TrendingUp} title="Monthly Revenue" value={formatIndianRupees(stats?.monthly_revenue ?? 0)} color="primary" delay={0.05} />
-        <KpiCard className="card-hover" icon={BarChart3} title="Yearly Revenue" value={formatIndianRupees(stats?.yearly_revenue ?? 0)} color="warning" delay={0.1} />
-        <KpiCard className="card-hover" icon={Calendar} title="Today Appointments" value={formatIndianNumber(stats?.today_appointments ?? 0)} color="warning" delay={0.15} />
-        <KpiCard className="card-hover" icon={Users} title="Total Patients" value={formatIndianNumber(stats?.total_patients ?? 0)} color="info" delay={0.2} />
-        <KpiCard className="card-hover" icon={FolderOpen} title="Active Cases" value={formatIndianNumber(stats?.total_active_cases ?? 0)} color="danger" delay={0.25} />
+        <KpiCard className="card-hover" icon={DollarSign} title="Total Revenue" value={stats?.total_revenue != null ? formatIndianRupees(stats.total_revenue) : "₹0"} color="success" delay={0} onClick={() => setDrawerMetric("revenue")} />
+        <KpiCard className="card-hover" icon={TrendingUp} title="Monthly Revenue" value={formatIndianRupees(stats?.monthly_revenue ?? 0)} color="primary" delay={0.05} onClick={() => setDrawerMetric("monthly-revenue")} />
+        <KpiCard className="card-hover" icon={BarChart3} title="Yearly Revenue" value={formatIndianRupees(stats?.yearly_revenue ?? 0)} color="warning" delay={0.1} onClick={() => setDrawerMetric("yearly-revenue")} />
+        <KpiCard className="card-hover" icon={Calendar} title="Today Appointments" value={formatIndianNumber(stats?.today_appointments ?? 0)} color="warning" delay={0.15} onClick={() => setDrawerMetric("appointments")} />
+        <KpiCard className="card-hover" icon={Users} title="Total Patients" value={formatIndianNumber(stats?.total_patients ?? 0)} color="info" delay={0.2} onClick={() => setDrawerMetric("patients")} />
+        <KpiCard className="card-hover" icon={FolderOpen} title="Active Cases" value={formatIndianNumber(stats?.total_active_cases ?? 0)} color="danger" delay={0.25} onClick={() => setDrawerMetric("cases")} />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <KpiCard className="card-hover" icon={DollarSign} title="Period Revenue" value={formatIndianRupees(stats?.period_revenue ?? 0)} color="success" delay={0.28} />
-        <KpiCard className="card-hover" icon={IndianRupee} title="Expenses" value={formatIndianRupees(stats?.total_expenses ?? 0)} color="danger" delay={0.31} />
-        <KpiCard className="card-hover" icon={TrendingUp} title="Net Profit" value={formatIndianRupees(stats?.net_profit ?? 0)} color={(stats?.net_profit ?? 0) >= 0 ? "success" : "danger"} delay={0.34} />
-        <KpiCard className="card-hover" icon={PieChart} title="Profit Margin" value={stats?.profit_margin != null ? `${stats.profit_margin.toFixed(1)}%` : "0%"} color="primary" delay={0.37} />
-        <KpiCard className="card-hover" icon={BarChart3} title="Pending Billing" value={formatIndianRupees(0)} color="warning" delay={0.4} />
+        <KpiCard className="card-hover" icon={DollarSign} title="Period Revenue" value={formatIndianRupees(stats?.period_revenue ?? 0)} color="success" delay={0.28} onClick={() => setDrawerMetric("period-revenue")} />
+        <KpiCard className="card-hover" icon={IndianRupee} title="Expenses" value={formatIndianRupees(stats?.total_expenses ?? 0)} color="danger" delay={0.31} onClick={() => setDrawerMetric("expenses")} />
+        <KpiCard className="card-hover" icon={TrendingUp} title="Net Profit" value={formatIndianRupees(stats?.net_profit ?? 0)} color={(stats?.net_profit ?? 0) >= 0 ? "success" : "danger"} delay={0.34} onClick={() => setDrawerMetric("profit")} />
+        <KpiCard className="card-hover" icon={PieChart} title="Profit Margin" value={stats?.profit_margin != null ? `${stats.profit_margin.toFixed(1)}%` : "0%"} color="primary" delay={0.37} onClick={() => setDrawerMetric("margin")} />
+        <KpiCard className="card-hover" icon={BarChart3} title="Pending Billing" value={formatIndianRupees(stats?.total_pending_billing ?? 0)} color="warning" delay={0.4} onClick={() => setDrawerMetric("pending-billing")} />
       </div>
-
-      {crmStats && (
-        <div>
-          <h3 className="mb-3 text-sm font-semibold text-gray-500 uppercase tracking-wider">CRM Analytics</h3>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            <KpiCard icon={MessageSquare} title="Today's Messages" value={formatIndianNumber(crmStats.todays_messages ?? 0)} color="info" delay={0} />
-            <KpiCard icon={Mail} title="Campaigns Sent" value={formatIndianNumber(crmStats.campaigns_sent ?? 0)} color="primary" delay={0.05} />
-            <KpiCard icon={BarChart3} title="Success Rate" value={`${crmStats.broadcast_success_rate?.success_rate ?? 0}%`} color="success" delay={0.1} />
-            <KpiCard icon={TrendingUp} title="Delivery Rate" value={`${crmStats.delivery_rate ?? 0}%`} color="warning" delay={0.15} />
-            <KpiCard icon={Users} title="Avg Rating" value={`${crmStats.average_rating ?? 0}/5`} color="danger" delay={0.2} />
-          </div>
-          {crmStats.top_communication_days && crmStats.top_communication_days.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-3">
-              {crmStats.top_communication_days.map((d: any) => (
-                <div key={d.date} className="rounded-lg border bg-white px-3 py-2 text-sm shadow-sm">
-                  <span className="text-gray-500">{d.date}</span>
-                  <span className="ml-2 font-semibold text-gray-900">{d.count} msgs</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
       {hasData && (
         <>
+          {(stats?.capacity_most_booked_doctors?.length > 0 || stats?.capacity_peak_hours?.length > 0) && (
+            <div>
+              <h3 className="mb-3 text-sm font-semibold text-gray-500 uppercase tracking-wider">Appointment Capacity</h3>
+              <div className="grid gap-4 lg:grid-cols-2">
+                {stats?.capacity_most_booked_doctors?.length > 0 && (
+                  <Card>
+                    <CardHeader><CardTitle className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Most Booked Doctors Today</CardTitle></CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {stats.capacity_most_booked_doctors.map((d: any, i: number) => (
+                          <div key={i} className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-gray-400 w-5">#{i + 1}</span>
+                              <span className="text-sm font-medium text-gray-900">{d.doctor_name}</span>
+                            </div>
+                            <span className="text-sm font-semibold text-primary">{d.appointments} appts</span>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                {stats?.capacity_peak_hours?.length > 0 && (
+                  <Card>
+                    <CardHeader><CardTitle className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Peak Hours Today</CardTitle></CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {stats.capacity_peak_hours.map((h: any, i: number) => (
+                          <div key={i} className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-gray-900">{h.hour.toString().padStart(2, '0')}:00 - {String(h.hour + 1).padStart(2, '0')}:00</span>
+                            <div className="flex items-center gap-2">
+                              <div className="h-2 w-24 rounded-full bg-gray-100">
+                                <div className="h-2 rounded-full bg-primary" style={{ width: `${Math.min((h.appointments / 4) * 100, 100)}%` }} />
+                              </div>
+                              <span className="text-xs font-semibold text-gray-600 w-8 text-right">{h.appointments}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </div>
+          )}
           <div className="grid gap-6 lg:grid-cols-2">
             <Card>
               <CardHeader><CardTitle className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Revenue vs Expenses</CardTitle></CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={260}>
-                  <LineChart data={stats?.revenue_expense_trend || stats?.revenue_trend || []}>
+                  <LineChart data={stats?.revenue_expense_trend || stats?.revenue_trend?.map((d: any) => ({ ...d, expenses: 0, profit: 0 })) || []}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
@@ -258,6 +281,144 @@ export default function HospitalAdminDashboard() {
           entityName={quickView.name}
         />
       )}
+
+      <AnalyticsDrawer
+        open={!!drawerMetric}
+        onClose={() => setDrawerMetric(null)}
+        period={period}
+        onPeriodChange={setPeriod}
+        title={
+          drawerMetric === "revenue" ? "Total Revenue" :
+          drawerMetric === "monthly-revenue" ? "Monthly Revenue" :
+          drawerMetric === "yearly-revenue" ? "Yearly Revenue" :
+          drawerMetric === "appointments" ? "Appointments" :
+          drawerMetric === "patients" ? "Patients" :
+          drawerMetric === "cases" ? "Active Cases" :
+          drawerMetric === "period-revenue" ? "Period Revenue" :
+          drawerMetric === "expenses" ? "Expenses" :
+          drawerMetric === "profit" ? "Net Profit" :
+          drawerMetric === "margin" ? "Profit Margin" :
+          drawerMetric === "pending-billing" ? "Pending Billing" :
+          ""
+        }
+        icon={
+          drawerMetric === "revenue" || drawerMetric === "period-revenue" ? <DollarSign className="h-5 w-5" /> :
+          drawerMetric === "monthly-revenue" || drawerMetric === "yearly-revenue" || drawerMetric === "profit" ? <TrendingUp className="h-5 w-5" /> :
+          drawerMetric === "appointments" ? <Calendar className="h-5 w-5" /> :
+          drawerMetric === "patients" ? <Users className="h-5 w-5" /> :
+          drawerMetric === "cases" ? <FolderOpen className="h-5 w-5" /> :
+          drawerMetric === "expenses" ? <IndianRupee className="h-5 w-5" /> :
+          drawerMetric === "margin" ? <PieChart className="h-5 w-5" /> :
+          drawerMetric === "pending-billing" ? <BarChart3 className="h-5 w-5" /> :
+          undefined
+        }
+        color={
+          drawerMetric === "revenue" || drawerMetric === "period-revenue" ? "#22C55E" :
+          drawerMetric === "expenses" ? "#EF4444" :
+          drawerMetric === "profit" ? "#22C55E" :
+          drawerMetric === "margin" ? "#2563EB" :
+          drawerMetric === "pending-billing" ? "#F59E0B" :
+          drawerMetric === "appointments" ? "#F59E0B" :
+          drawerMetric === "patients" ? "#06B6D4" :
+          drawerMetric === "cases" ? "#EF4444" :
+          drawerMetric === "monthly-revenue" || drawerMetric === "yearly-revenue" ? "#2563EB" :
+          "#2563EB"
+        }
+        valueType={
+          drawerMetric === "appointments" || drawerMetric === "patients" || drawerMetric === "cases"
+            ? "number" : "currency"
+        }
+        data={
+          drawerMetric === "revenue" || drawerMetric === "period-revenue" || drawerMetric === "monthly-revenue" || drawerMetric === "yearly-revenue" || drawerMetric === "profit" || drawerMetric === "margin"
+            ? (stats?.revenue_expense_trend || stats?.revenue_trend || [])
+            : drawerMetric === "expenses"
+            ? (stats?.expense_trend || stats?.revenue_expense_trend || [])
+            : drawerMetric === "patients"
+            ? (stats?.patient_growth_trend || [])
+            : drawerMetric === "appointments"
+            ? (stats?.appointment_count_trend || [])
+            : drawerMetric === "cases"
+            ? (stats?.case_count_trend || [])
+            : []
+        }
+        dataKeys={
+          drawerMetric === "revenue" || drawerMetric === "period-revenue"
+            ? [{ key: "revenue", name: "Revenue", color: "#22C55E" }, { key: "expenses", name: "Expenses", color: "#EF4444" }, { key: "profit", name: "Profit", color: "#2563EB" }]
+            : drawerMetric === "monthly-revenue"
+            ? [{ key: "revenue", name: "Revenue", color: "#2563EB" }]
+            : drawerMetric === "yearly-revenue"
+            ? [{ key: "revenue", name: "Revenue", color: "#F59E0B" }]
+            : drawerMetric === "profit" || drawerMetric === "margin"
+            ? [{ key: "profit", name: "Profit", color: "#22C55E" }]
+            : drawerMetric === "expenses"
+            ? [{ key: "expenses", name: "Expenses", color: "#EF4444" }]
+            : drawerMetric === "patients"
+            ? [{ key: "count", name: "Patients", color: "#06B6D4" }]
+            : drawerMetric === "appointments"
+            ? [{ key: "count", name: "Appointments", color: "#F59E0B" }]
+            : drawerMetric === "cases"
+            ? [{ key: "count", name: "Cases", color: "#EF4444" }]
+            : [{ key: "value", name: "Value", color: "#2563EB" }]
+        }
+        xAxisKey="month"
+        chartType={drawerMetric === "pending-billing" ? "bar" : "area"}
+        trend={
+          drawerMetric === "revenue" || drawerMetric === "period-revenue"
+            ? (revChange != null ? { value: `${revChange > 0 ? "+" : ""}${revChange}%`, positive: revChange >= 0 } : null)
+            : drawerMetric === "patients"
+            ? (patChange != null ? { value: `${patChange > 0 ? "+" : ""}${patChange}%`, positive: patChange >= 0 } : null)
+            : drawerMetric === "appointments"
+            ? (apptChange != null ? { value: `${apptChange > 0 ? "+" : ""}${apptChange}%`, positive: apptChange >= 0 } : null)
+            : drawerMetric === "cases"
+            ? (caseChange != null ? { value: `${caseChange > 0 ? "+" : ""}${caseChange}%`, positive: caseChange >= 0 } : null)
+            : drawerMetric === "monthly-revenue" || drawerMetric === "yearly-revenue" || drawerMetric === "profit"
+            ? (revChange != null ? { value: `${revChange > 0 ? "+" : ""}${revChange}%`, positive: revChange >= 0 } : null)
+            : null
+        }
+        metrics={
+          drawerMetric === "revenue"
+            ? [
+                { label: "Total Revenue", value: formatIndianRupees(stats?.total_revenue ?? 0), color: "#22C55E" },
+                { label: "Monthly", value: formatIndianRupees(stats?.monthly_revenue ?? 0), color: "#2563EB" },
+                { label: "Yearly", value: formatIndianRupees(stats?.yearly_revenue ?? 0), color: "#F59E0B" },
+                { label: "Period", value: formatIndianRupees(stats?.period_revenue ?? 0), color: "#06B6D4" },
+              ]
+            : drawerMetric === "expenses"
+            ? [
+                { label: "Total Expenses", value: formatIndianRupees(stats?.total_expenses ?? 0), color: "#EF4444" },
+                { label: "Pending Billing", value: formatIndianRupees(stats?.total_pending_billing ?? 0), color: "#F59E0B" },
+              ]
+            : drawerMetric === "profit"
+            ? [
+                { label: "Net Profit", value: formatIndianRupees(stats?.net_profit ?? 0), color: "#22C55E" },
+                { label: "Margin", value: stats?.profit_margin != null ? `${stats.profit_margin.toFixed(1)}%` : "0%", color: "#2563EB" },
+              ]
+            : drawerMetric === "margin"
+            ? [
+                { label: "Profit Margin", value: stats?.profit_margin != null ? `${stats.profit_margin.toFixed(1)}%` : "0%", color: "#2563EB" },
+                { label: "Net Profit", value: formatIndianRupees(stats?.net_profit ?? 0), color: "#22C55E" },
+              ]
+            : drawerMetric === "appointments"
+            ? [
+                { label: "Today", value: formatIndianNumber(stats?.today_appointments ?? 0), color: "#F59E0B" },
+                { label: "Active Cases", value: formatIndianNumber(stats?.total_active_cases ?? 0), color: "#EF4444" },
+              ]
+            : drawerMetric === "patients"
+            ? [
+                { label: "Total Patients", value: formatIndianNumber(stats?.total_patients ?? 0), color: "#06B6D4" },
+              ]
+            : drawerMetric === "cases"
+            ? [
+                { label: "Active Cases", value: formatIndianNumber(stats?.total_active_cases ?? 0), color: "#EF4444" },
+              ]
+            : drawerMetric === "pending-billing"
+            ? [
+                { label: "Pending Billing", value: formatIndianRupees(stats?.total_pending_billing ?? 0), color: "#F59E0B" },
+                { label: "Total Expenses", value: formatIndianRupees(stats?.total_expenses ?? 0), color: "#EF4444" },
+              ]
+            : undefined
+        }
+      />
     </motion.div>
   )
 }

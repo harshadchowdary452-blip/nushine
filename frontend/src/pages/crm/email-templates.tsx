@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { motion } from "framer-motion"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Plus, Edit3, Mail, Loader2 } from "lucide-react"
+import { Plus, Edit3, Mail, Loader2, Trash2 } from "lucide-react"
 import { crmApi } from "@/services/endpoints"
 import PageHeader from "@/components/layout/page-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -26,6 +26,15 @@ export default function EmailTemplates() {
   const { data: templates, isLoading } = useQuery({
     queryKey: ["crm", "templates"],
     queryFn: () => crmApi.templates.list(),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => crmApi.templates.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["crm", "templates"] })
+      addToast({ title: "Deleted", description: "Template deleted", variant: "success" })
+    },
+    onError: () => addToast({ title: "Error", description: "Failed to delete template", variant: "destructive" }),
   })
 
   const saveMutation = useMutation({
@@ -97,9 +106,14 @@ export default function EmailTemplates() {
                     <Mail className="h-4 w-4 text-blue-500" />
                     <CardTitle className="text-base">{t.name}</CardTitle>
                   </div>
-                  <Button variant="ghost" size="icon-sm" onClick={() => editTemplate(t)}>
-                    <Edit3 className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon-sm" onClick={() => editTemplate(t)}>
+                      <Edit3 className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon-sm" onClick={() => { if (confirm("Delete this template?")) deleteMutation.mutate(t.id) }}>
+                      <Trash2 className="h-4 w-4 text-danger" />
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>

@@ -80,6 +80,10 @@ export const appointmentsApi = {
   create: (data: any) => api.post("/appointments", data).then((r) => r.data),
   update: (id: string, data: any) => api.put(`/appointments/${id}`, data).then((r) => r.data),
   delete: (id: string) => api.delete(`/appointments/${id}`),
+  checkAvailability: (params: { doctor_id: string; appointment_date: string; appointment_time: string }) =>
+    api.get("/appointments/availability", { params }).then((r) => r.data),
+  reassignDoctor: (id: string, data: { doctor_id: string; reason?: string }) =>
+    api.post(`/appointments/${id}/reassign-doctor`, data).then((r) => r.data),
 };
 
 export const consultantsApi = {
@@ -101,6 +105,7 @@ export const treatmentApi = {
   get: (id: string) => api.get(`/treatment-plans/${id}`).then((r) => r.data),
   create: (data: any) => api.post("/treatment-plans", data).then((r) => r.data),
   update: (id: string, data: any) => api.put(`/treatment-plans/${id}`, data).then((r) => r.data),
+  updateStatus: (id: string, status: string) => api.put(`/treatment-plans/${id}/status`, null, { params: { status } }).then((r) => r.data),
   delete: (id: string) => api.delete(`/treatment-plans/${id}`),
 };
 
@@ -116,9 +121,12 @@ export const billingApi = {
   get: (id: string) => api.get(`/billings/${id}`).then((r) => r.data),
   create: (data: any) => api.post("/billings", data).then((r) => r.data),
   update: (id: string, data: any) => api.put(`/billings/${id}`, data).then((r) => r.data),
+  delete: (id: string) => api.delete(`/billings/${id}`),
   updatePayment: (id: string, data: any) => api.put(`/billings/${id}/payment`, data).then((r) => r.data),
   getPdf: (id: string) => api.get(`/billings/${id}/pdf`, { responseType: "blob" }).then((r) => r.data),
   getTransactions: (id: string) => api.get(`/billings/${id}/transactions`).then((r) => r.data),
+  applyDiscount: (id: string, data: { discount_type?: string; discount_percent?: number; discount_amount?: number; discount_reason?: string }) =>
+    api.put(`/billings/${id}/discount`, data).then((r) => r.data),
 };
 
 export const dashboardApi = {
@@ -164,6 +172,11 @@ export const reportsApi = {
 
 export const notificationsApi = {
   list: () => api.get("/notifications").then((r) => r.data),
+  markRead: (id: string) => api.post(`/notifications/${id}/read`).then((r) => r.data),
+  markAllRead: () => api.post("/notifications/read-all").then((r) => r.data),
+  unreadCount: () => api.get("/notifications/unread-count").then((r) => r.data),
+  delete: (id: string) => api.delete(`/notifications/${id}`).then((r) => r.data),
+  deleteAll: () => api.delete("/notifications").then((r) => r.data),
 };
 
 export const whatsappApi = {
@@ -171,6 +184,26 @@ export const whatsappApi = {
     api.post("/whatsapp/send", data).then((r) => r.data),
   broadcast: (data: { patient_ids: string[]; message: string }) =>
     api.post("/whatsapp/broadcast", data).then((r) => r.data),
+};
+
+export const campaignsApi = {
+  list: (params?: { skip?: number; limit?: number }) =>
+    api.get("/campaigns", { params }).then((r) => r.data),
+  get: (id: string) => api.get(`/campaigns/${id}`).then((r) => r.data),
+  create: (data: any) => api.post("/campaigns", data).then((r) => r.data),
+  update: (id: string, data: any) => api.put(`/campaigns/${id}`, data).then((r) => r.data),
+  delete: (id: string) => api.delete(`/campaigns/${id}`),
+  launch: (id: string) => api.post(`/campaigns/${id}/launch`).then((r) => r.data),
+  recipients: (id: string) => api.get(`/campaigns/${id}/recipients`).then((r) => r.data),
+  analytics: {
+    overview: () => api.get("/campaigns/analytics/overview").then((r) => r.data),
+    retention: () => api.get("/campaigns/analytics/retention").then((r) => r.data),
+    followUpSuggestions: () => api.get("/campaigns/analytics/follow-up-suggestions").then((r) => r.data),
+    followUpCalendar: (start: string, end: string) =>
+      api.get("/campaigns/analytics/follow-up-calendar", { params: { start, end } }).then((r) => r.data),
+    patientInteractions: (patientId: string) =>
+      api.get(`/campaigns/analytics/patient-interactions/${patientId}`).then((r) => r.data),
+  },
 };
 
 export const crmApi = {
@@ -186,6 +219,7 @@ export const crmApi = {
       api.post("/crm/templates", data).then((r) => r.data),
     update: (id: string, data: { name?: string; subject?: string; body?: string; is_active?: boolean }) =>
       api.put(`/crm/templates/${id}`, data).then((r) => r.data),
+    delete: (id: string) => api.delete(`/crm/templates/${id}`),
   },
   followUps: {
     list: (params?: { patient_id?: string; status?: string }) =>
@@ -194,6 +228,30 @@ export const crmApi = {
       api.post("/crm/follow-ups", data).then((r) => r.data),
     update: (id: string, data: { status?: string; notes?: string }) =>
       api.put(`/crm/follow-ups/${id}`, data).then((r) => r.data),
+    delete: (id: string) => api.delete(`/crm/follow-ups/${id}`),
+  },
+  followUpsFiltered: (params?: {
+    filter?: string; follow_up_type?: string; status?: string; patient_id?: string;
+  }) => api.get("/crm/follow-ups/list", { params }).then((r) => r.data),
+  markDone: (id: string, data?: { notes?: string }) =>
+    api.post(`/crm/follow-ups/${id}/mark-done`, data || {}).then((r) => r.data),
+  communicate: (id: string, data: { channel: string; message: string; notes?: string }) =>
+    api.post(`/crm/follow-ups/${id}/communicate`, data).then((r) => r.data),
+  recordResponse: (id: string, data: { response_message?: string; response_status: string }) =>
+    api.post(`/crm/follow-ups/${id}/record-response`, data).then((r) => r.data),
+  dashboard: () => api.get("/crm/dashboard").then((r) => r.data),
+  recalls: () => api.get("/crm/recalls").then((r) => r.data),
+  patientFollowUpHistory: (patientId: string) =>
+    api.get(`/crm/patients/${patientId}/follow-up-history`).then((r) => r.data),
+  campaignSendWhatsApp: (data: { campaign_id: string; template_id?: string; custom_message?: string }) =>
+    api.post("/crm/campaigns/send-whatsapp", data).then((r) => r.data),
+  whatsappTemplates: {
+    list: () => api.get("/crm/whatsapp-templates").then((r) => r.data),
+    create: (data: { name: string; message: string }) =>
+      api.post("/crm/whatsapp-templates", data).then((r) => r.data),
+    update: (id: string, data: { name?: string; message?: string; is_active?: boolean }) =>
+      api.put(`/crm/whatsapp-templates/${id}`, data).then((r) => r.data),
+    delete: (id: string) => api.delete(`/crm/whatsapp-templates/${id}`),
   },
   feedback: {
     list: (params?: { hospital_id?: string; doctor_id?: string }) =>
@@ -210,9 +268,25 @@ export const crmApi = {
   }) => api.post("/crm/whatsapp/preview", data).then((r) => r.data),
   sendWhatsApp: (data: { patient_id: string; message: string; message_type?: string }) =>
     api.post("/crm/whatsapp/send", data).then((r) => r.data),
+  followUpResponses: {
+    record: (followUpId: string, data: { patient_id: string; response_message?: string; response_status: string }) =>
+      api.post(`/crm/follow-ups/${followUpId}/response`, data).then((r) => r.data),
+    listByPatient: (patientId: string) =>
+      api.get(`/crm/follow-up-responses/${patientId}`).then((r) => r.data),
+  },
   broadcastWhatsApp: (data: {
     message: string; message_type?: string; filter_type: string;
     patient_ids?: string[]; appointment_date?: string;
     doctor_id?: string; status?: string;
   }) => api.post("/crm/whatsapp/broadcast", data).then((r) => r.data),
+  createFollowUpFromEnquiry: (data: {
+    patient_id: string; response_id: string; follow_up_reason: string;
+    priority?: string; doctor_id: string; follow_up_date: string;
+    follow_up_time?: string; notes?: string;
+  }) => api.post("/crm/enquiry/create-follow-up", data).then((r) => r.data),
+  getEnquiryDashboard: () => api.get("/crm/enquiry/dashboard").then((r) => r.data),
+  sourceAnalytics: () => api.get("/crm/source-analytics").then((r) => r.data),
+  getTodaysEnquiries: (tab?: string, calendarDate?: string) => api.get("/crm/enquiry/today", { params: { tab, calendar_date: calendarDate } }).then((r) => r.data),
 };
+
+

@@ -7,11 +7,9 @@ from enum import Enum
 
 
 class CaseStatus(str, Enum):
-    NEW = "NEW"
-    DIAGNOSIS_PENDING = "DIAGNOSIS_PENDING"
-    TREATMENT_PLANNED = "TREATMENT_PLANNED"
+    OPEN = "OPEN"
     IN_PROGRESS = "IN_PROGRESS"
-    FOLLOW_UP = "FOLLOW_UP"
+    ON_HOLD = "ON_HOLD"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
 
@@ -19,12 +17,14 @@ class CaseStatus(str, Enum):
 class Case(Base):
     __tablename__ = "cases"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    case_number: Mapped[str] = mapped_column(String(20), nullable=True, unique=True)
     patient_id: Mapped[str] = mapped_column(String(36), ForeignKey("patients.id"), nullable=False)
     doctor_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
     consultant_id: Mapped[str] = mapped_column(String(36), ForeignKey("consultants.id"), nullable=True)
+    appointment_id: Mapped[str] = mapped_column(String(36), ForeignKey("appointments.id"), nullable=True)
     chief_complaint: Mapped[str] = mapped_column(Text, nullable=False)
     diagnosis: Mapped[str] = mapped_column(Text, nullable=True)
-    status: Mapped[CaseStatus] = mapped_column(SAEnum(CaseStatus, create_constraint=False), default=CaseStatus.NEW, nullable=False)
+    status: Mapped[CaseStatus] = mapped_column(SAEnum(CaseStatus, create_constraint=False), default=CaseStatus.OPEN, nullable=False)
     notes: Mapped[str] = mapped_column(Text, nullable=True)
     completion_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
@@ -33,6 +33,7 @@ class Case(Base):
     patient = relationship("Patient", back_populates="cases")
     doctor = relationship("User", back_populates="cases")
     consultant = relationship("Consultant", back_populates="cases")
+    appointment = relationship("Appointment", back_populates="cases")
     treatment_plans = relationship("TreatmentPlan", back_populates="case", cascade="all, delete-orphan")
     billings = relationship("Billing", back_populates="case", cascade="all, delete-orphan")
     pre_ops = relationship("PreOp", back_populates="case", cascade="all, delete-orphan")

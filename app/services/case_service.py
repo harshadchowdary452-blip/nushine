@@ -1,13 +1,14 @@
 import logging
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from fastapi import HTTPException, status
 from app.repositories.case_repository import CaseRepository
 from app.repositories.audit_log_repository import AuditLogRepository
 from app.models.case import Case, CaseStatus
 from app.models.patient import Patient
 from app.models.user import User
+from app.models.appointment import Appointment, AppointmentStatus
 
 logger = logging.getLogger(__name__)
 
@@ -45,10 +46,25 @@ class CaseService:
             if not doctor_id and user_id:
                 data["doctor_id"] = user_id
 
+            appointment_id = data.get("appointment_id")
+            if appointment_id:
+                appt_result = await self.db.execute(select(Appointment).where(Appointment.id == appointment_id))
+                appointment = appt_result.scalar_one_or_none()
+                if not appointment:
+                    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
+                if appointment.status != AppointmentStatus.COMPLETED:
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cases can only be created from COMPLETED appointments")
+
             if "status" not in data or not data.get("status"):
-                data["status"] = CaseStatus.NEW
+                data["status"] = CaseStatus.OPEN
 
             case = await self.repo.create(**data)
+            try:
+                cnt = await self.db.execute(select(func.count(Case.id)))
+                case.case_number = f"CASE-{cnt.scalar():04d}"
+                await self.db.flush()
+            except Exception:
+                pass
             logger.info("CREATE_CASE - Success: %s", case.id)
             await self.audit_log_repo.create(user_id=user_id, action="CREATE_CASE", entity_type="CASE", entity_id=str(case.id), details="Case created")
             return case
@@ -127,3 +143,13 @@ class CaseService:
         except Exception as e:
             logger.exception("COMPLETE_CASE - Error: %s", str(e))
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to complete case: {str(e)}")
+
+    async def delete(self, case_id: str, user_id: str = None) -> bool:
+        try:
+            result = await self.repo.delete(case_id)
+            if result:
+                await self.audit_log_repo.create(user_id=user_id, action="DELETE_CASE", entity_type="CASE", entity_id=case_id, details="Case deleted")
+            return result
+        except Exception as e:
+            logger.exception("DELETE_CASE - Error: %s", str(e))
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to delete case: {str(e)}")

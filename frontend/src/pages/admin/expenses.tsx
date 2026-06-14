@@ -1,13 +1,14 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
-import { Plus, Search, Edit, Trash2, Calendar, Building2, Filter } from "lucide-react"
+import { Plus, Search, Edit, Trash2, Calendar, Building2, IndianRupee, Users, Zap, Droplets, Wifi, Settings, ShoppingBag, Megaphone, Wrench, MoreHorizontal } from "lucide-react"
 import { format } from "date-fns"
 import PageHeader from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Dialog,
   DialogContent,
@@ -15,6 +16,7 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogBody,
 } from "@/components/ui/dialog"
 import { Card, CardContent } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -28,6 +30,19 @@ const EXPENSE_CATEGORIES = [
   "Staff Salaries", "Rent", "Electricity", "Water", "Internet",
   "Equipment", "Consumables", "Marketing", "Maintenance", "Miscellaneous",
 ]
+
+const CATEGORY_ICONS: Record<string, typeof Users> = {
+  "Staff Salaries": Users,
+  "Rent": Building2,
+  "Electricity": Zap,
+  "Water": Droplets,
+  "Internet": Wifi,
+  "Equipment": Settings,
+  "Consumables": ShoppingBag,
+  "Marketing": Megaphone,
+  "Maintenance": Wrench,
+  "Miscellaneous": MoreHorizontal,
+}
 
 const MONTHS = [
   { value: 1, label: "January" }, { value: 2, label: "February" },
@@ -53,6 +68,8 @@ export default function AdminExpenses() {
   const [filterHospitalId, setFilterHospitalId] = useState<string | undefined>(undefined)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingExpense, setEditingExpense] = useState<HospitalMonthlyExpense | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deletingExpense, setDeletingExpense] = useState<HospitalMonthlyExpense | null>(null)
 
   const [formData, setFormData] = useState({
     hospital_id: "",
@@ -316,10 +333,8 @@ export default function AdminExpenses() {
                           <Button variant="ghost" size="icon" onClick={() => openEditDialog(expense)}>
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => {
-                            if (confirm("Delete this expense?")) deleteMutation.mutate(expense.id)
-                          }}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
+                          <Button variant="ghost" size="icon" onClick={() => { setDeletingExpense(expense); setDeleteDialogOpen(true) }}>
+                            <Trash2 className="h-4 w-4 text-danger" />
                           </Button>
                         </div>
                       </td>
@@ -333,16 +348,16 @@ export default function AdminExpenses() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-[500px] p-0" style={{ maxHeight: "90vh" }}>
-          <DialogHeader className="sticky top-0 z-10 bg-background px-6 pt-6 pb-4 border-b rounded-t-lg">
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
             <DialogTitle>{editingExpense ? "Edit Expense" : "Add Expense"}</DialogTitle>
             <DialogDescription>
               {editingExpense ? "Update the expense details below." : "Enter the details for the new expense."}
             </DialogDescription>
           </DialogHeader>
-          <div className="overflow-y-auto px-6 py-4 space-y-4" style={{ maxHeight: "calc(90vh - 140px)" }}>
+          <DialogBody>
             {role === "SUPER_ADMIN" && Array.isArray(hospitals) && (
-              <div className="space-y-2">
+              <div className="space-y-2 mb-4">
                 <Label>Hospital</Label>
                 <Select value={formData.hospital_id} onValueChange={(v) => setFormData({ ...formData, hospital_id: v })}>
                   <SelectTrigger><SelectValue placeholder="Select hospital" /></SelectTrigger>
@@ -358,7 +373,7 @@ export default function AdminExpenses() {
               <div className="space-y-2">
                 <Label>Month</Label>
                 <Select value={String(formData.expense_month)} onValueChange={(v) => setFormData({ ...formData, expense_month: Number(v) })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {MONTHS.map((m) => (
                       <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>
@@ -369,7 +384,7 @@ export default function AdminExpenses() {
               <div className="space-y-2">
                 <Label>Year</Label>
                 <Select value={String(formData.expense_year)} onValueChange={(v) => setFormData({ ...formData, expense_year: Number(v) })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {YEARS.map((y) => (
                       <SelectItem key={y} value={String(y)}>{y}</SelectItem>
@@ -378,51 +393,100 @@ export default function AdminExpenses() {
                 </Select>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>Category</Label>
+            <div className="space-y-2 mt-4">
+              <Label>Category *</Label>
               <Select value={formData.expense_category} onValueChange={(v) => setFormData({ ...formData, expense_category: v })}>
-                <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                <SelectTrigger className="h-12"><SelectValue placeholder="Select category" /></SelectTrigger>
                 <SelectContent>
-                  {EXPENSE_CATEGORIES.map((cat) => (
-                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                  ))}
+                  {EXPENSE_CATEGORIES.map((cat) => {
+                    const Icon = CATEGORY_ICONS[cat]
+                    return (
+                      <SelectItem key={cat} value={cat}>
+                        <div className="flex items-center gap-2">
+                          <Icon className="h-4 w-4 text-gray-400" />
+                          {cat}
+                        </div>
+                      </SelectItem>
+                    )
+                  })}
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Expense Name</Label>
+            <div className="relative mt-4">
               <Input
+                id="expense-name"
                 value={formData.expense_name}
                 onChange={(e) => setFormData({ ...formData, expense_name: e.target.value })}
-                placeholder="e.g. Monthly rent payment"
+                placeholder=" "
+                className="peer h-12 pt-5 pb-1"
               />
+              <label
+                htmlFor="expense-name"
+                className="absolute left-3 top-1 text-[11px] font-medium text-gray-400 transition-all pointer-events-none peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-placeholder-shown:text-gray-400 peer-focus:top-1 peer-focus:text-[11px] peer-focus:text-primary"
+              >
+                Expense Name *
+              </label>
             </div>
-            <div className="space-y-2">
-              <Label>Description (optional)</Label>
-              <Input
+            <div className="relative mt-4">
+              <Textarea
+                id="expense-desc"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Additional details"
+                placeholder=" "
+                className="peer min-h-[80px] pt-6 pb-2"
               />
+              <label
+                htmlFor="expense-desc"
+                className="absolute left-3 top-1.5 text-[11px] font-medium text-gray-400 transition-all pointer-events-none peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-placeholder-shown:text-gray-400 peer-focus:top-1.5 peer-focus:text-[11px] peer-focus:text-primary"
+              >
+                Description (optional)
+              </label>
             </div>
-            <div className="space-y-2">
-              <Label>Amount (₹)</Label>
+            <div className="relative mt-4">
+              <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none z-10 peer-focus:text-primary" />
               <Input
+                id="amount"
                 type="number"
                 min={1}
                 step={0.01}
                 value={formData.amount || ""}
                 onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })}
-                placeholder="0.00"
+                placeholder=" "
+                className="peer h-12 pl-9 pt-5 pb-1"
               />
+              <label
+                htmlFor="amount"
+                className="absolute left-9 top-1 text-[11px] font-medium text-gray-400 transition-all pointer-events-none peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-placeholder-shown:text-gray-400 peer-focus:top-1 peer-focus:text-[11px] peer-focus:text-primary"
+              >
+                Amount *
+              </label>
             </div>
-          </div>
-          <DialogFooter className="sticky bottom-0 z-10 bg-background px-6 py-4 border-t rounded-b-lg">
+          </DialogBody>
+          <DialogFooter>
             <Button variant="outline" onClick={() => { setDialogOpen(false); setEditingExpense(null); resetForm() }}>
               Cancel
             </Button>
             <Button onClick={handleSubmit} disabled={!formData.expense_name || !formData.expense_category || !formData.amount}>
               {editingExpense ? "Update" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Delete Expense</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "{deletingExpense?.expense_name}"? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => { setDeleteDialogOpen(false); setDeletingExpense(null) }}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" onClick={() => { if (deletingExpense) deleteMutation.mutate(deletingExpense.id); setDeleteDialogOpen(false); setDeletingExpense(null) }} disabled={deleteMutation.isPending}>
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>

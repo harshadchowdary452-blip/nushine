@@ -14,8 +14,14 @@ class AppointmentCreate(BaseModel):
 class AppointmentUpdate(BaseModel):
     appointment_date: Optional[date] = None
     appointment_time: Optional[time] = None
+    doctor_id: Optional[str] = None
     status: Optional[str] = None
     notes: Optional[str] = None
+
+
+class ReassignDoctorRequest(BaseModel):
+    doctor_id: str
+    reason: Optional[str] = None
 
 
 class AppointmentResponse(BaseModel):

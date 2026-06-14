@@ -83,7 +83,7 @@ class PatientService:
             for c in cases:
                 billings = await self.billing_repo.get_all(filters={"case_id": c.id})
                 for b in billings:
-                    if b.payment_status not in (PaymentStatus.PAID, PaymentStatus.REFUNDED):
+                    if b.payment_status not in (PaymentStatus.PAID, PaymentStatus.CANCELLED):
                         all_billing_settled = False
                         break
                 if not all_billing_settled:
@@ -105,3 +105,13 @@ class PatientService:
         except Exception as e:
             logger.exception("AUTO_UPDATE_PATIENT_STATUS - Error: %s", str(e))
             return None
+
+    async def delete(self, patient_id: str, user_id: str = None) -> bool:
+        try:
+            result = await self.repo.delete(patient_id)
+            if result:
+                await self.audit_log_repo.create(user_id=user_id, action="DELETE_PATIENT", entity_type="PATIENT", entity_id=patient_id, details="Patient deleted")
+            return result
+        except Exception as e:
+            logger.exception("DELETE_PATIENT - Error: %s", str(e))
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to delete patient: {str(e)}")

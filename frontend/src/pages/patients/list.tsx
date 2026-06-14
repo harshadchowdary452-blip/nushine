@@ -13,7 +13,7 @@ import {
   type ColumnFiltersState,
 } from "@tanstack/react-table"
 import { motion } from "framer-motion"
-import { Plus, Search, Eye, Edit, Users, UserPlus } from "lucide-react"
+import { Plus, Search, Eye, Edit, Trash2, Users, UserPlus } from "lucide-react"
 import { format } from "date-fns"
 import PageHeader from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
@@ -37,10 +37,11 @@ import {
 } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
-import { patientsApi, doctorsApi } from "@/services/endpoints"
+import SearchableSelect from "@/components/ui/searchable-select"
+import { patientsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
 import DentalEmptyState from "@/components/ui/dental-empty-state"
-import type { Patient, PatientStatus, User, PaginatedResponse } from "@/types"
+import type { Patient, PatientStatus } from "@/types"
 import { useAuthStore } from "@/store/authStore"
 
 function StatusBadge({ status }: { status: string }) {
@@ -54,18 +55,33 @@ const genderBadgeVariant: Record<string, "default" | "secondary" | "outline" | "
   OTHER: "secondary",
 }
 
+const SOURCE_OPTIONS = [
+  "Walk-In", "Google Search", "Google Maps", "Instagram", "Facebook",
+  "WhatsApp", "Website", "Referral - Existing Patient", "Referral - Doctor",
+  "Referral - Clinic", "Advertisement", "Banner", "Newspaper", "YouTube",
+  "Campaign", "Event", "Other",
+]
+
 interface PatientForm {
   full_name: string
   email: string
   phone: string
   gender: string
   date_of_birth: string
+  patient_source: string
+  source_campaign_name: string
+  source_campaign_id: string
+  source_campaign_date: string
   address: string
-  doctor_id: string
+  diagnosis: string
 }
 
 function getEmptyForm(): PatientForm {
-  return { full_name: "", email: "", phone: "", gender: "", date_of_birth: "", address: "", doctor_id: "" }
+  return {
+    full_name: "", email: "", phone: "", gender: "", date_of_birth: "",
+    patient_source: "", source_campaign_name: "", source_campaign_id: "",
+    source_campaign_date: "", address: "", diagnosis: "",
+  }
 }
 
 function stripEmptyFormFields(data: PatientForm): Record<string, unknown> {
@@ -89,6 +105,8 @@ export default function PatientList() {
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [dialogOpen, setDialogOpen] = useState(false)
   const [form, setForm] = useState<PatientForm>(getEmptyForm)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deletingPatient, setDeletingPatient] = useState<Patient | null>(null)
 
   const currentUser = useAuthStore((s) => s.user)
   const { data, isLoading } = useQuery<Patient[]>({
@@ -96,22 +114,38 @@ export default function PatientList() {
     queryFn: () => patientsApi.list({ search: globalFilter, page_size: 100, hospital_id: currentUser?.hospital_id || undefined }),
   })
 
-  const { data: doctorsData } = useQuery<PaginatedResponse<User>>({
-    queryKey: ["doctors", "dropdown"],
-    queryFn: () => doctorsApi.list({ page_size: 200, hospital_id: currentUser?.hospital_id || undefined }),
-    enabled: currentUser?.role === "HOSPITAL_ADMIN",
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => patientsApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["patients"], refetchType: "all" })
+      queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" })
+      queryClient.invalidateQueries({ queryKey: ["crm"] })
+      addToast({ title: "Success", description: "Patient deleted successfully", variant: "success" })
+      setDeleteDialogOpen(false)
+      setDeletingPatient(null)
+    },
+    onError: () => {
+      addToast({ title: "Error", description: "Failed to delete patient", variant: "destructive" })
+    },
   })
 
-  const doctors: User[] = useMemo(() => {
-    if (Array.isArray(doctorsData)) return doctorsData
-    return doctorsData?.items || []
-  }, [doctorsData])
+  function confirmDelete(patient: Patient) {
+    setDeletingPatient(patient)
+    setDeleteDialogOpen(true)
+  }
+
+  function handleDelete() {
+    if (deletingPatient) {
+      deleteMutation.mutate(deletingPatient.id)
+    }
+  }
 
   const createMutation = useMutation({
     mutationFn: (data: any) => patientsApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["patients"], refetchType: "all" })
       queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" })
+      queryClient.invalidateQueries({ queryKey: ["crm"] })
       addToast({ title: "Success", description: "Patient created successfully", variant: "success" })
       resetForm()
     },
@@ -211,6 +245,9 @@ export default function PatientList() {
             <Button variant="ghost" size="icon">
               <Edit className="h-4 w-4" />
             </Button>
+            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); confirmDelete(row.original) }}>
+              <Trash2 className="h-4 w-4 text-danger" />
+            </Button>
           </div>
         ),
       },
@@ -234,6 +271,10 @@ export default function PatientList() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    if (!form.patient_source) {
+      addToast({ title: "Validation Error", description: "Please select how the patient heard about us", variant: "destructive" })
+      return
+    }
     createMutation.mutate(stripEmptyFormFields(form))
   }
 
@@ -448,6 +489,43 @@ export default function PatientList() {
                 </div>
               </div>
               <div className="grid gap-2">
+                <Label htmlFor="source">How Did You Hear About Us?</Label>
+                <SearchableSelect
+                  value={form.patient_source}
+                  onValueChange={(v) => setForm({ ...form, patient_source: v })}
+                  options={SOURCE_OPTIONS}
+                  placeholder="Search or select source..."
+                />
+              </div>
+              {form.patient_source === "Campaign" && (
+                <div className="grid grid-cols-3 gap-3 rounded-lg border border-blue-100 bg-blue-50 p-3">
+                  <div className="grid gap-1">
+                    <Label htmlFor="campaign_name" className="text-xs">Campaign Name</Label>
+                    <Input
+                      id="campaign_name" className="h-8 text-xs" placeholder="Campaign name"
+                      value={form.source_campaign_name}
+                      onChange={(e) => setForm({ ...form, source_campaign_name: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label htmlFor="campaign_id" className="text-xs">Campaign ID</Label>
+                    <Input
+                      id="campaign_id" className="h-8 text-xs" placeholder="Campaign ID"
+                      value={form.source_campaign_id}
+                      onChange={(e) => setForm({ ...form, source_campaign_id: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label htmlFor="campaign_date" className="text-xs">Campaign Date</Label>
+                    <Input
+                      id="campaign_date" type="date" className="h-8 text-xs"
+                      value={form.source_campaign_date}
+                      onChange={(e) => setForm({ ...form, source_campaign_date: e.target.value })}
+                    />
+                  </div>
+                </div>
+              )}
+              <div className="grid gap-2">
                 <Label htmlFor="address">Address</Label>
                 <Input
                   id="address"
@@ -455,27 +533,15 @@ export default function PatientList() {
                   onChange={(e) => setForm({ ...form, address: e.target.value })}
                 />
               </div>
-              {currentUser?.role === "HOSPITAL_ADMIN" && (
-                <div className="grid gap-2">
-                  <Label htmlFor="doctor">Assign Doctor</Label>
-                  <Select
-                    value={form.doctor_id}
-                    onValueChange={(v) => setForm({ ...form, doctor_id: v })}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select doctor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {doctors.map((d) => (
-                        <SelectItem key={d.id} value={d.id}>
-                          {d.full_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+              <div className="grid gap-2">
+                <Label htmlFor="diagnosis">Diagnosis</Label>
+                <Input
+                  id="diagnosis"
+                  value={form.diagnosis}
+                  onChange={(e) => setForm({ ...form, diagnosis: e.target.value })}
+                  placeholder="Initial diagnosis..."
+                />
+              </div>
             </div>
             <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-gray-100">
               <Button type="button" variant="outline" onClick={resetForm}>
@@ -486,6 +552,25 @@ export default function PatientList() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Delete Patient</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "{deletingPatient?.full_name}"? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" onClick={handleDelete} disabled={deleteMutation.isPending}>
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

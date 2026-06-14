@@ -90,8 +90,13 @@ export interface Patient {
   age: number | null;
   phone: string | null;
   email: string | null;
+  patient_source: string | null;
+  source_campaign_name: string | null;
+  source_campaign_id: string | null;
+  source_campaign_date: string | null;
   address: string | null;
   medical_history: string | null;
+  diagnosis: string | null;
   photo_url: string | null;
   status: PatientStatus;
   is_active: boolean;
@@ -108,6 +113,7 @@ export interface Case {
   patient_id: string;
   doctor_id: string | null;
   consultant_id: string | null;
+  appointment_id?: string | null;
   patient_name?: string;
   doctor_name?: string;
   chief_complaint: string;
@@ -145,18 +151,34 @@ export interface ConsultantNote {
   consultant?: Consultant;
 }
 
-export type TreatmentPlanStatus = "PLANNED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+export type TreatmentPlanStatus = "PLANNED" | "SCHEDULED" | "IN_PROGRESS" | "FOLLOW_UP" | "COMPLETED" | "CANCELLED";
 
 export interface TreatmentPlan {
   id: string;
+  treatment_number: string | null;
   case_id: string;
   treatment_name: string;
   description: string | null;
   cost: number;
+  paid_amount: number;
+  pending_amount: number;
   duration_minutes: number | null;
+  start_date: string | null;
+  expected_completion_date: string | null;
+  next_appointment_date: string | null;
   status: TreatmentPlanStatus;
   notes: string | null;
   is_active: boolean;
+  total_sittings: number;
+  completed_sittings: number;
+  remaining_sittings: number;
+  progress: number;
+  patient_name?: string;
+  patient_id?: string;
+  doctor_name?: string;
+  case_number?: string;
+  case_status?: string;
+  hospital_name?: string;
   created_at: string;
   updated_at: string;
   sittings?: TreatmentSitting[];
@@ -202,12 +224,19 @@ export interface Billing {
   case_id: string;
   patient_name?: string;
   case_chief_complaint?: string;
+  original_amount: number;
   total_amount: number;
   paid_amount: number;
   pending_amount: number;
+  discount_type: string;
+  discount_percent: number;
+  discount_amount: number;
+  discount_reason?: string;
   payment_status: PaymentStatus;
   payment_method: string | null;
+  paid_at?: string | null;
   notes: string | null;
+  invoice_number?: string;
   created_at: string;
   updated_at: string;
   case?: Case;

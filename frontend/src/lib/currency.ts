@@ -1,12 +1,9 @@
 export function formatIndianRupees(amount: number): string {
-  if (amount >= 10000000) {
-    return `₹${(amount / 10000000).toFixed(2)} Cr`
-  }
-  if (amount >= 100000) {
-    return `₹${(amount / 100000).toFixed(1)} Lakh`
-  }
-  const abs = Math.abs(amount)
   const sign = amount < 0 ? "-" : ""
+  const abs = Math.abs(amount)
+  if (abs >= 10000000) {
+    return `${sign}₹${(abs / 10000000).toFixed(2)}Cr`
+  }
   const numStr = Math.floor(abs).toString()
   const last3 = numStr.slice(-3)
   const rest = numStr.slice(0, -3)

@@ -2,17 +2,19 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List, Optional
+from datetime import datetime, timezone
 import logging
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.core.permissions import verify_permission, verify_tenant_access, Permission, Role
 from app.services.appointment_service import AppointmentService
-from app.schemas.appointment import AppointmentCreate, AppointmentUpdate, AppointmentResponse
+from app.schemas.appointment import AppointmentCreate, AppointmentUpdate, AppointmentResponse, ReassignDoctorRequest
 from app.schemas.common import MessageResponse
 from app.models.patient import Patient
 from app.models.hospital import Hospital
 from app.models.user import User
-from app.models.appointment import AppointmentStatus
+from app.models.appointment import Appointment, AppointmentStatus
+from app.models.audit_log import AuditLog
 from app.services.status_automation import StatusAutomationService
 
 router = APIRouter(prefix="/appointments", tags=["Appointments"])
@@ -172,7 +174,34 @@ async def create_appointment(data: AppointmentCreate, db: AsyncSession = Depends
     logger.warning("=" * 60)
     
     service = AppointmentService(db)
-    return await service.create(data.model_dump(), user_id=current_user.get("sub"))
+    appointment = await service.create(data.model_dump(), user_id=current_user.get("sub"))
+    
+    # Auto-create case if patient has no active case
+    from app.models.case import Case
+    existing = await db.execute(
+        select(Case).where(Case.patient_id == data.patient_id, Case.is_active == True).limit(1)
+    )
+    if not existing.scalar_one_or_none():
+        svc = StatusAutomationService(db)
+        await svc._auto_create_case_from_appointment(appointment)
+    
+    return appointment
+
+
+from datetime import date, time
+
+
+@router.get("/availability")
+async def check_appointment_availability(
+    doctor_id: str = Query(...),
+    appointment_date: date = Query(...),
+    appointment_time: time = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    verify_permission(current_user, Permission.CREATE_APPOINTMENT)
+    service = AppointmentService(db)
+    return await service.check_availability(doctor_id, appointment_date, appointment_time)
 
 
 @router.get("/")
@@ -227,6 +256,18 @@ async def update_appointment(appointment_id: str, data: AppointmentUpdate, db: A
     return appointment
 
 
+@router.delete("/{appointment_id}", response_model=MessageResponse)
+async def delete_appointment(appointment_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.MANAGE_APPOINTMENTS)
+    service = AppointmentService(db)
+    appointment = await service.get(appointment_id)
+    if not appointment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
+    await verify_tenant_access(current_user, appointment, "appointment", db)
+    deleted = await service.delete(appointment_id, user_id=current_user.get("sub"))
+    return MessageResponse(message="Appointment deleted successfully")
+
+
 @router.post("/{appointment_id}/cancel", response_model=MessageResponse)
 async def cancel_appointment(appointment_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_APPOINTMENTS)
@@ -242,3 +283,49 @@ async def cancel_appointment(appointment_id: str, db: AsyncSession = Depends(get
     await svc.update_appointment_status(appointment_id, AppointmentStatus.CANCELLED)
     await db.commit()
     return MessageResponse(message="Appointment cancelled successfully")
+
+
+@router.post("/{appointment_id}/reassign-doctor")
+async def reassign_appointment_doctor(
+    appointment_id: str,
+    req: ReassignDoctorRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    verify_permission(current_user, Permission.MANAGE_APPOINTMENTS)
+    user_id = current_user.get("sub")
+
+    appointment = await db.get(Appointment, appointment_id)
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+    await verify_tenant_access(current_user, appointment, "appointment", db)
+
+    old_doctor_id = appointment.doctor_id
+    old_doctor = await db.get(User, old_doctor_id) if old_doctor_id else None
+
+    new_doctor = await db.get(User, req.doctor_id)
+    if not new_doctor:
+        raise HTTPException(status_code=404, detail="New doctor not found")
+
+    appointment.doctor_id = req.doctor_id
+    appointment.updated_at = datetime.now(timezone.utc)
+
+    audit = AuditLog(
+        user_id=user_id,
+        action="REASSIGN_DOCTOR",
+        entity_type="APPOINTMENT",
+        entity_id=appointment_id,
+        details=f"Doctor changed from {old_doctor.full_name if old_doctor else old_doctor_id} to {new_doctor.full_name}. Reason: {req.reason or 'Not specified'}",
+    )
+    db.add(audit)
+    await db.commit()
+    await db.refresh(appointment)
+
+    return {
+        "success": True,
+        "appointment_id": appointment_id,
+        "old_doctor_id": old_doctor_id,
+        "new_doctor_id": req.doctor_id,
+        "new_doctor_name": new_doctor.full_name,
+        "reason": req.reason,
+    }

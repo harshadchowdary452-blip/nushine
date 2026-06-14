@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from "react"
+import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
@@ -16,12 +16,12 @@ import {
   Plus,
   Search,
   Eye,
+  Trash2,
   Calendar,
   List,
   ChevronLeft,
   ChevronRight,
   CalendarDays,
-  Phone,
   User as UserIcon,
   BadgeCheck,
   X,
@@ -30,7 +30,6 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay 
 import PageHeader from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -48,11 +47,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
+
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { appointmentsApi, patientsApi, doctorsApi } from "@/services/endpoints"
@@ -95,6 +90,8 @@ export default function AppointmentList() {
   const [globalFilter, setGlobalFilter] = useState("")
   const [view, setView] = useState<"list" | "calendar">("list")
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deletingAppointment, setDeletingAppointment] = useState<Appointment | null>(null)
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [form, setForm] = useState<AppointmentForm>(getEmptyAppointmentForm)
 
@@ -115,8 +112,10 @@ export default function AppointmentList() {
   })
 
   const [patientSearch, setPatientSearch] = useState("")
-  const [patientPopoverOpen, setPatientPopoverOpen] = useState(false)
   const patientSearchRef = useRef<HTMLInputElement>(null)
+  const patientResultsRef = useRef<HTMLDivElement>(null)
+  const [availability, setAvailability] = useState<{ available: boolean; current_count: number; max_allowed: number; message?: string } | null>(null)
+  const [checkingAvailability, setCheckingAvailability] = useState(false)
 
   const patients: Patient[] = useMemo(
     () => {
@@ -150,18 +149,62 @@ export default function AppointmentList() {
     [patients, form.patient_id]
   )
 
+  useEffect(() => {
+    if (form.doctor_id && form.appointment_date && form.appointment_time) {
+      setCheckingAvailability(true)
+      setAvailability(null)
+      const timer = setTimeout(async () => {
+        try {
+          const res = await appointmentsApi.checkAvailability({
+            doctor_id: form.doctor_id,
+            appointment_date: form.appointment_date,
+            appointment_time: form.appointment_time,
+          })
+          setAvailability(res)
+        } catch {
+          setAvailability(null)
+        } finally {
+          setCheckingAvailability(false)
+        }
+      }, 400)
+      return () => clearTimeout(timer)
+    } else {
+      setAvailability(null)
+      setCheckingAvailability(false)
+    }
+  }, [form.doctor_id, form.appointment_date, form.appointment_time])
+
   function handlePatientSelect(patientId: string) {
     setForm({ ...form, patient_id: patientId })
-    setPatientPopoverOpen(false)
     setPatientSearch("")
   }
 
-  function handlePatientPopoverOpen(open: boolean) {
-    setPatientPopoverOpen(open)
-    if (open) {
-      setTimeout(() => patientSearchRef.current?.focus(), 50)
-    } else {
-      setPatientSearch("")
+  function clearPatientSelection() {
+    setForm({ ...form, patient_id: "" })
+  }
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => appointmentsApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["appointments"], refetchType: "all" })
+      queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" })
+      addToast({ title: "Success", description: "Appointment deleted successfully", variant: "success" })
+      setDeleteDialogOpen(false)
+      setDeletingAppointment(null)
+    },
+    onError: () => {
+      addToast({ title: "Error", description: "Failed to delete appointment", variant: "destructive" })
+    },
+  })
+
+  function confirmDelete(appointment: Appointment) {
+    setDeletingAppointment(appointment)
+    setDeleteDialogOpen(true)
+  }
+
+  function handleDelete() {
+    if (deletingAppointment) {
+      deleteMutation.mutate(deletingAppointment.id)
     }
   }
 
@@ -237,9 +280,14 @@ export default function AppointmentList() {
         id: "actions",
         header: "Actions",
         cell: ({ row }) => (
-          <Button variant="outline" size="sm" onClick={() => navigate(`/appointments/${row.original.id}`)}>
-            <Eye className="h-4 w-4 mr-1" /> View
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="sm" onClick={() => navigate(`/appointments/${row.original.id}`)}>
+              <Eye className="h-4 w-4 mr-1" /> View
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => confirmDelete(row.original)}>
+              <Trash2 className="h-4 w-4 text-danger" />
+            </Button>
+          </div>
         ),
       },
     ],
@@ -519,75 +567,71 @@ export default function AppointmentList() {
           <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
             <div className="overflow-y-auto px-6 py-4 space-y-4 flex-1">
               <div className="grid gap-2">
-                <Label htmlFor="patient">Patient</Label>
-                <Popover open={patientPopoverOpen} onOpenChange={handlePatientPopoverOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      className="w-full justify-start text-left font-normal"
-                    >
-                      {selectedPatient ? (
-                        <div className="flex items-center gap-2 truncate w-full">
-                          <UserIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                          <span className="truncate">{selectedPatient.full_name}</span>
-                          <Badge variant="outline" className="ml-auto shrink-0 text-[10px] px-1 py-0">
-                            {selectedPatient.status}
-                          </Badge>
+                <Label>Patient</Label>
+                {selectedPatient ? (
+                  <div className="rounded-xl border border-border bg-white dark:bg-[#1E293B] p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                          <UserIcon className="h-5 w-5 text-primary" />
                         </div>
-                      ) : (
-                        <span className="text-muted-foreground">Select patient...</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[400px] p-0" align="start">
-                    <div className="p-3 border-b">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                          ref={patientSearchRef}
-                          placeholder="Search by name, phone or ID..."
-                          value={patientSearch}
-                          onChange={(e) => setPatientSearch(e.target.value)}
-                          className="pl-10"
-                        />
+                        <div>
+                          <p className="font-semibold text-[#0F172A] dark:text-[#F8FAFC]">{selectedPatient.full_name}</p>
+                          <p className="text-xs text-[#64748B] dark:text-[#CBD5E1]">ID: {selectedPatient.id.slice(0, 8)}</p>
+                        </div>
                       </div>
+                      <button type="button" onClick={clearPatientSelection} className="text-muted-foreground hover:text-foreground">
+                        <X className="h-4 w-4" />
+                      </button>
                     </div>
-                    <div className="max-h-[300px] overflow-y-auto">
-                      {filteredPatients.length === 0 ? (
-                        <div className="p-6 text-center text-sm text-muted-foreground">
-                          No patients found
-                        </div>
-                      ) : (
-                        filteredPatients.map((p) => (
-                          <button
-                            key={p.id}
-                            type="button"
-                            className={`w-full px-4 py-3 text-left hover:bg-muted/50 transition-colors flex flex-col gap-1 ${
-                              form.patient_id === p.id ? "bg-muted" : ""
-                            }`}
-                            onClick={() => handlePatientSelect(p.id)}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="font-medium text-sm">{p.full_name}</span>
-                              <Badge variant="outline" className="text-[10px] px-1 py-0">
-                                {p.status}
-                              </Badge>
-                            </div>
-                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                              {p.phone && (
-                                <span className="flex items-center gap-1">
-                                  <Phone className="h-3 w-3" /> {p.phone}
-                                </span>
-                              )}
-                              <span>ID: {p.id.slice(0, 8)}</span>
-                            </div>
-                          </button>
-                        ))
-                      )}
+                    <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-[#64748B] dark:text-[#CBD5E1]">
+                      {selectedPatient.age && <span>Age: {selectedPatient.age}</span>}
+                      {selectedPatient.gender && <span>Gender: {selectedPatient.gender}</span>}
+                      {selectedPatient.phone && <span>Phone: {selectedPatient.phone}</span>}
                     </div>
-                  </PopoverContent>
-                </Popover>
+                    <div className="mt-2">
+                      <StatusBadge status={selectedPatient.status} />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
+                      <Input
+                        ref={patientSearchRef}
+                        placeholder="Search by Name / Phone"
+                        value={patientSearch}
+                        onChange={(e) => setPatientSearch(e.target.value)}
+                        className="pl-10 bg-white dark:bg-[#1E293B] border-[#E2E8F0] dark:border-[#334155] text-[#0F172A] dark:text-[#F8FAFC]"
+                      />
+                    </div>
+                    {patientSearch && (
+                      <div ref={patientResultsRef} className="max-h-[260px] overflow-y-auto rounded-xl border border-[#E2E8F0] dark:border-[#334155] bg-white dark:bg-[#1E293B]">
+                        {filteredPatients.length === 0 ? (
+                          <div className="p-6 text-center text-sm text-[#64748B]">No patients found</div>
+                        ) : (
+                          filteredPatients.map((p) => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              className="w-full px-4 py-3 text-left border-b border-[#E2E8F0] dark:border-[#334155] last:border-0 hover:bg-gray-50 dark:hover:bg-[#334155] transition-colors"
+                              onClick={() => handlePatientSelect(p.id)}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-medium text-sm text-[#0F172A] dark:text-[#F8FAFC]">{p.full_name}</span>
+                                <StatusBadge status={p.status} />
+                              </div>
+                              <div className="flex items-center gap-3 text-xs text-[#64748B] dark:text-[#CBD5E1] mt-1">
+                                {p.phone && <span>{p.phone}</span>}
+                                <span>ID: {p.id.slice(0, 8)}</span>
+                              </div>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="doctor">Doctor</Label>
@@ -634,6 +678,50 @@ export default function AppointmentList() {
                   />
                 </div>
               </div>
+              {form.doctor_id && form.appointment_date && form.appointment_time && (
+                <div className="rounded-xl border border-[#E2E8F0] dark:border-[#334155] bg-white dark:bg-[#1E293B] p-4">
+                  {checkingAvailability ? (
+                    <div className="flex items-center gap-3">
+                      <div className="h-2 w-2 rounded-full bg-yellow-400 animate-pulse" />
+                      <span className="text-sm text-[#64748B] dark:text-[#CBD5E1]">Checking availability...</span>
+                    </div>
+                  ) : availability ? (
+                    <>
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-sm font-medium text-[#0F172A] dark:text-[#F8FAFC]">
+                          {doctors.find(d => d.id === form.doctor_id)?.full_name || "Doctor"}
+                        </h4>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                          availability.available
+                            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                            : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                        }`}>
+                          {availability.available ? "AVAILABLE" : "FULL"}
+                        </span>
+                      </div>
+                      <div className="text-xs text-[#64748B] dark:text-[#CBD5E1]">
+                        <p>{form.appointment_time.slice(0, 5)} - {String(Number(form.appointment_time.slice(0, 2)) + 1).padStart(2, '0')}:{form.appointment_time.slice(3, 5)}</p>
+                      </div>
+                      <div className="mt-3 flex items-center gap-2">
+                        <div className="flex-1 h-2 rounded-full bg-[#E2E8F0] dark:bg-[#334155]">
+                          <div
+                            className={`h-2 rounded-full transition-all ${
+                              availability.available ? "bg-green-500" : "bg-red-500"
+                            }`}
+                            style={{ width: `${(availability.current_count / availability.max_allowed) * 100}%` }}
+                          />
+                        </div>
+                        <span className="text-xs font-medium text-[#0F172A] dark:text-[#F8FAFC]">
+                          {availability.current_count} / {availability.max_allowed}
+                        </span>
+                      </div>
+                      {!availability.available && availability.message && (
+                        <p className="mt-2 text-xs text-red-600 dark:text-red-400">{availability.message}</p>
+                      )}
+                    </>
+                  ) : null}
+                </div>
+              )}
               <div className="grid gap-2">
                 <Label htmlFor="notes">Notes</Label>
                 <Input
@@ -656,6 +744,25 @@ export default function AppointmentList() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Delete Appointment</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this appointment? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" onClick={handleDelete} disabled={deleteMutation.isPending}>
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

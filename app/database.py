@@ -6,10 +6,17 @@ from app.config import settings
 def create_db_engine():
     url = settings.DATABASE_URL
     connect_args = {}
-    if url.startswith("sqlite"):
+    if settings.DB_IS_SQLITE:
         connect_args["check_same_thread"] = False
         return create_async_engine(url, echo=settings.DEBUG, connect_args=connect_args)
-    return create_async_engine(url, echo=settings.DEBUG, pool_size=20, max_overflow=10)
+    return create_async_engine(
+        url,
+        echo=settings.DEBUG,
+        pool_size=20,
+        max_overflow=10,
+        pool_pre_ping=True,
+        pool_recycle=3600,
+    )
 
 
 engine = create_db_engine()

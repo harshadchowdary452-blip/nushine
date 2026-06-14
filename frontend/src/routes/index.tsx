@@ -21,12 +21,17 @@ import AppointmentList from "@/pages/appointments/list";
 import AppointmentDetail from "@/pages/appointments/detail";
 import ConsultantList from "@/pages/consultants/list";
 import TreatmentList from "@/pages/treatments/list";
+import TreatmentDetail from "@/pages/treatments/detail";
 import BillingList from "@/pages/billing/list";
 import BillingDetail from "@/pages/billing/detail";
 import WhatsAppMessaging from "@/pages/whatsapp/messaging";
 import CommunicationHistory from "@/pages/crm/communications";
 import EmailTemplates from "@/pages/crm/email-templates";
 import FollowUps from "@/pages/crm/follow-ups";
+import Campaigns from "@/pages/crm/campaigns";
+import EnquiryCalendar from "@/pages/crm/enquiry-calendar";
+import CrmDashboard from "@/pages/dashboard/crm-dashboard";
+import CrmPage from "@/pages/crm";
 import Settings from "@/pages/settings/profile";
 
 const dashboardByRole: Record<Role, string> = {
@@ -110,10 +115,15 @@ export const router = createBrowserRouter([
       { path: "/whatsapp", element: withRoles(<WhatsAppMessaging />, ["HOSPITAL_ADMIN"]) },
       { path: "/crm/communications", element: withRoles(<CommunicationHistory />, ["HOSPITAL_ADMIN"]) },
       { path: "/crm/templates", element: withRoles(<EmailTemplates />, ["HOSPITAL_ADMIN"]) },
+      { path: "/crm/dashboard", element: withRoles(<CrmDashboard />, ADMIN_ROLES) },
       { path: "/crm/follow-ups", element: withRoles(<FollowUps />, ["HOSPITAL_ADMIN"]) },
+      { path: "/crm/campaigns", element: withRoles(<Campaigns />, ["HOSPITAL_ADMIN"]) },
+      { path: "/crm", element: withRoles(<CrmPage />, ADMIN_ROLES) },
+      { path: "/crm/enquiry-calendar", element: withRoles(<EnquiryCalendar />, ["HOSPITAL_ADMIN"]) },
       { path: "/cases", element: withRoles(<CaseList />, CARE_ROLES) },
       { path: "/cases/:id", element: withRoles(<CaseDetail />, CARE_ROLES) },
       { path: "/treatments", element: withRoles(<TreatmentList />, CARE_ROLES) },
+      { path: "/treatments/:id", element: withRoles(<TreatmentDetail />, CARE_ROLES) },
       { path: "/settings", element: withRoles(<Settings />, [...ADMIN_ROLES, "DOCTOR"]) },
       { path: "*", element: <Navigate to="/" replace /> },
     ],

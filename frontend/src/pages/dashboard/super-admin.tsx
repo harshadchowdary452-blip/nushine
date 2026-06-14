@@ -107,11 +107,11 @@ export default function SuperAdminDashboard() {
               </p>
             </div>
             <div className="flex gap-3">
-              <div className="bg-white/15 backdrop-blur-sm rounded-xl px-4 py-3 text-center min-w-[100px]">
+              <div className="bg-white/20 rounded-xl px-4 py-3 text-center min-w-[100px]">
                 <p className="text-white/70 text-xs font-medium uppercase tracking-wider">Revenue</p>
                 <p className="text-white text-xl font-bold">{formatIndianRupees(stats?.total_revenue || 0)}</p>
               </div>
-              <div className="bg-white/15 backdrop-blur-sm rounded-xl px-4 py-3 text-center min-w-[100px]">
+              <div className="bg-white/20 rounded-xl px-4 py-3 text-center min-w-[100px]">
                 <p className="text-white/70 text-xs font-medium uppercase tracking-wider">Patients</p>
                 <p className="text-white text-xl font-bold">{stats?.total_patients || 0}</p>
               </div>
@@ -170,7 +170,7 @@ export default function SuperAdminDashboard() {
               <CardHeader><CardTitle className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Revenue vs Expenses</CardTitle></CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={280}>
-                  <LineChart data={stats?.revenue_expense_trend || stats?.revenue_trend || []}>
+                  <LineChart data={stats?.revenue_expense_trend || stats?.revenue_trend?.map((d: any) => ({ ...d, expenses: 0, profit: 0 })) || []}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />

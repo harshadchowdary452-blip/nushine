@@ -339,3 +339,80 @@ async def admin_group_report(
     filename = f"admin_group_report_{date_start.strftime('%Y%m%d')}_{date_end.strftime('%Y%m%d')}.{format}"
     media_type = "text/csv" if format == "csv" else "application/vnd.ms-excel"
     return StreamingResponse(iter([output.getvalue()]), media_type=media_type, headers={"Content-Disposition": f"attachment; filename={filename}"})
+
+
+@router.get("/patient-acquisition")
+async def patient_acquisition_report(
+    format: str = Query("csv", pattern="^(csv|excel)$"),
+    period: str = Query("this_month"),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    verify_permission(current_user, Permission.VIEW_GLOBAL_REVENUE, Permission.MANAGE_PATIENTS)
+    hospital_ids, _, _ = await _get_scope(db, current_user)
+    date_start, date_end = get_date_range(period, start_date, end_date)
+
+    query = select(
+        Patient.id, Patient.full_name, Patient.patient_source,
+        Patient.source_campaign_name, Patient.source_campaign_id,
+        Patient.source_campaign_date, Patient.created_at, Patient.hospital_id,
+    ).where(Patient.created_at >= date_start, Patient.created_at < date_end)
+    if hospital_ids is not None:
+        query = query.where(Patient.hospital_id.in_(hospital_ids))
+    query = query.order_by(Patient.created_at.desc())
+
+    r = await db.execute(query)
+    rows = r.all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["ID", "Patient Name", "Source", "Campaign Name", "Campaign ID", "Campaign Date", "Registered At", "Hospital ID"])
+    for row in rows:
+        writer.writerow([str(row[0]), row[1], row[2] or "", row[3] or "", row[4] or "", str(row[5]) if row[5] else "", str(row[6]), str(row[7])])
+
+    output.seek(0)
+    filename = f"patient_acquisition_{date_start.strftime('%Y%m%d')}_{date_end.strftime('%Y%m%d')}.{format}"
+    media_type = "text/csv" if format == "csv" else "application/vnd.ms-excel"
+    return StreamingResponse(iter([output.getvalue()]), media_type=media_type, headers={"Content-Disposition": f"attachment; filename={filename}"})
+
+
+@router.get("/source-revenue")
+async def source_revenue_report(
+    format: str = Query("csv", pattern="^(csv|excel)$"),
+    period: str = Query("this_month"),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    verify_permission(current_user, Permission.VIEW_GLOBAL_REVENUE, Permission.VIEW_REVENUE_ANALYTICS)
+    hospital_ids, _, _ = await _get_scope(db, current_user)
+    date_start, date_end = get_date_range(period, start_date, end_date)
+
+    query = select(
+        Patient.patient_source,
+        func.count(Patient.id).label("patient_count"),
+        func.coalesce(func.sum(Billing.paid_amount), 0).label("total_revenue"),
+        func.coalesce(func.sum(Billing.total_amount), 0).label("total_billed"),
+    ).join(Case, Case.patient_id == Patient.id, isouter=True
+    ).join(Billing, Billing.case_id == Case.id, isouter=True
+    ).where(Patient.patient_source.isnot(None))
+    if hospital_ids is not None:
+        query = query.where(Patient.hospital_id.in_(hospital_ids))
+    query = query.group_by(Patient.patient_source).order_by(func.sum(Billing.paid_amount).desc())
+
+    r = await db.execute(query)
+    rows = r.all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Source", "Patient Count", "Total Billed", "Total Revenue"])
+    for row in rows:
+        writer.writerow([row[0], row[1], float(row[3]), float(row[2])])
+
+    output.seek(0)
+    filename = f"source_revenue_{date_start.strftime('%Y%m%d')}_{date_end.strftime('%Y%m%d')}.{format}"
+    media_type = "text/csv" if format == "csv" else "application/vnd.ms-excel"
+    return StreamingResponse(iter([output.getvalue()]), media_type=media_type, headers={"Content-Disposition": f"attachment; filename={filename}"})

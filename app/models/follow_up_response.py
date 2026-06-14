@@ -16,6 +16,19 @@ class FollowUpResponseStatus(str, Enum):
     NOT_INTERESTED = "NOT_INTERESTED"
 
 
+class FeedbackType(str, Enum):
+    POSITIVE = "POSITIVE"
+    NEGATIVE = "NEGATIVE"
+    NEUTRAL = "NEUTRAL"
+
+
+class EnquiryOutcome(str, Enum):
+    NO_ACTION_REQUIRED = "NO_ACTION_REQUIRED"
+    FOLLOW_UP_REQUIRED = "FOLLOW_UP_REQUIRED"
+    APPOINTMENT_REQUIRED = "APPOINTMENT_REQUIRED"
+    PATIENT_UNREACHABLE = "PATIENT_UNREACHABLE"
+
+
 class FollowUpResponse(Base):
     __tablename__ = "follow_up_responses"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -25,6 +38,7 @@ class FollowUpResponse(Base):
     response_message: Mapped[str] = mapped_column(Text, nullable=True)
     response_status: Mapped[FollowUpResponseStatus] = mapped_column(SAEnum(FollowUpResponseStatus, create_constraint=False), default=FollowUpResponseStatus.NO_RESPONSE, nullable=False)
     feedback: Mapped[str] = mapped_column(String(20), nullable=True)
+    outcome: Mapped[str] = mapped_column(String(30), nullable=True)
     follow_up_required: Mapped[bool] = mapped_column(Boolean, default=False)
     appointment_id: Mapped[str] = mapped_column(String(36), ForeignKey("appointments.id"), nullable=True)
     created_by: Mapped[str] = mapped_column(String(36), nullable=True)

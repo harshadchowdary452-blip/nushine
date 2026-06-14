@@ -28,9 +28,6 @@ async def create_patient(data: PatientCreate, db: AsyncSession = Depends(get_db)
     if role == Role.DOCTOR.value:
         if not data_dict.get("doctor_id"):
             data_dict["doctor_id"] = current_user.get("sub")
-    elif role == Role.HOSPITAL_ADMIN.value:
-        if not data_dict.get("doctor_id"):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="doctor_id is required for hospital admin creating patients")
     return await service.create(data_dict, user_id=current_user.get("sub"))
 
 
@@ -44,12 +41,9 @@ async def get_patients(skip: int = Query(0, ge=0), limit: int = Query(100, ge=1,
     if status_filter:
         filters["status"] = status_filter
     role = current_user.get("role")
-    if role == Role.DOCTOR.value:
+    if role in (Role.DOCTOR.value, Role.HOSPITAL_ADMIN.value):
         if current_user.get("hospital_id"):
             filters["hospital_id"] = current_user.get("hospital_id")
-        filters["doctor_id"] = current_user.get("sub")
-    elif role == Role.HOSPITAL_ADMIN.value:
-        filters["hospital_id"] = current_user.get("hospital_id")
     elif role == Role.GROUP_ADMIN.value:
         from app.models.hospital import Hospital
         from sqlalchemy import select
@@ -74,12 +68,9 @@ async def search_patients(q: str = Query(..., min_length=1), hospital_id: Option
     role = current_user.get("role")
     effective_hospital_id = hospital_id
     effective_doctor_id = doctor_id
-    if role == Role.DOCTOR.value:
+    if role in (Role.DOCTOR.value, Role.HOSPITAL_ADMIN.value):
         if not effective_hospital_id and current_user.get("hospital_id"):
             effective_hospital_id = current_user.get("hospital_id")
-        effective_doctor_id = current_user.get("sub")
-    elif role == Role.HOSPITAL_ADMIN.value:
-        effective_hospital_id = current_user.get("hospital_id")
     elif role == Role.GROUP_ADMIN.value:
         from app.models.hospital import Hospital
         from sqlalchemy import select
@@ -113,6 +104,18 @@ async def update_patient(patient_id: str, data: PatientUpdate, db: AsyncSession 
     await verify_tenant_access(current_user, patient, "patient", db)
     patient = await service.update(patient_id, data.model_dump(exclude_none=True), user_id=current_user.get("sub"))
     return patient
+
+
+@router.delete("/{patient_id}", response_model=MessageResponse)
+async def delete_patient(patient_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.MANAGE_PATIENTS)
+    service = PatientService(db)
+    patient = await service.get(patient_id)
+    if not patient:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+    await verify_tenant_access(current_user, patient, "patient", db)
+    deleted = await service.delete(patient_id, user_id=current_user.get("sub"))
+    return MessageResponse(message="Patient deleted successfully")
 
 
 @router.post("/{patient_id}/photo", response_model=PatientResponse)

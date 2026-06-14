@@ -18,6 +18,8 @@ class TreatmentSitting(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     treatment_plan_id: Mapped[str] = mapped_column(String(36), ForeignKey("treatment_plans.id"), nullable=False)
     sitting_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    sitting_date: Mapped[date] = mapped_column(Date, nullable=True)
+    doctor_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
     work_done: Mapped[str] = mapped_column(Text, nullable=True)
     status: Mapped[TreatmentSittingStatus] = mapped_column(SAEnum(TreatmentSittingStatus, create_constraint=False), default=TreatmentSittingStatus.PLANNED, nullable=False)
     doctor_notes: Mapped[str] = mapped_column(Text, nullable=True)

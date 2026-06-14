@@ -1,8 +1,9 @@
 from datetime import datetime, date, timezone, timedelta
 from typing import Optional
+import json
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, text
+from sqlalchemy import select, func, text, extract
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.core.permissions import Role
@@ -16,7 +17,7 @@ from app.models.follow_up import FollowUp, FollowUpStatus
 from app.models.billing import Billing, PaymentStatus
 from app.models.treatment_plan import TreatmentPlan
 from app.utils.dashboard_helpers import (
-    get_date_range, calculate_revenue, calculate_expenses_for_date_range,
+    get_date_range, get_previous_date_range, calculate_revenue, calculate_expenses_for_date_range,
     calculate_profit, calculate_profit_margin, revenue_trend_with_expenses
 )
 
@@ -48,7 +49,7 @@ async def _monthly_revenue_trend(db: AsyncSession, case_ids: list[str] | None = 
     twelve_months_ago = twelve_months_ago.replace(day=1)
 
     query = select(
-        func.strftime('%Y-%m', Billing.updated_at).label('month'),
+        func.to_char(Billing.updated_at, 'YYYY-MM').label('month'),
         func.sum(Billing.paid_amount).label('revenue'),
     ).where(
         Billing.updated_at >= twelve_months_ago,
@@ -68,7 +69,7 @@ async def _monthly_patient_trend(db: AsyncSession, hospital_ids: list[str] | Non
     twelve_months_ago = twelve_months_ago.replace(day=1)
 
     query = select(
-        func.strftime('%Y-%m', Patient.created_at).label('month'),
+        func.to_char(Patient.created_at, 'YYYY-MM').label('month'),
         func.count(Patient.id).label('count'),
     ).where(
         Patient.created_at >= twelve_months_ago,
@@ -88,7 +89,7 @@ async def _monthly_case_trend(db: AsyncSession, case_ids: list[str] | None = Non
     twelve_months_ago = twelve_months_ago.replace(day=1)
 
     query = select(
-        func.strftime('%Y-%m', Case.created_at).label('month'),
+        func.to_char(Case.created_at, 'YYYY-MM').label('month'),
         func.count(Case.id).label('count'),
     ).where(
         Case.created_at >= twelve_months_ago,
@@ -108,7 +109,7 @@ async def _monthly_appointment_trend(db: AsyncSession, hospital_ids: list[str] |
     twelve_months_ago = twelve_months_ago.replace(day=1)
 
     query = select(
-        func.strftime('%Y-%m', Appointment.created_at).label('month'),
+        func.to_char(Appointment.created_at, 'YYYY-MM').label('month'),
         func.count(Appointment.id).label('count'),
     ).where(
         Appointment.created_at >= twelve_months_ago,
@@ -467,9 +468,18 @@ async def hospital_admin_dashboard(
             "today_appointments": 0, "total_revenue": 0.0, "monthly_revenue": 0.0, "yearly_revenue": 0.0,
             "total_patients": 0, "total_cases": 0, "total_active_cases": 0,
             "total_expenses": 0, "net_profit": 0, "profit_margin": 0, "period_revenue": 0,
-            "revenue_trend": [], "patient_growth_trend": [],
+            "revenue_trend": [], "patient_growth_trend": [], "appointment_count_trend": [], "case_count_trend": [],
             "monthly_growth_trend": [], "doctor_performance": [], "treatment_performance": [],
             "revenue_expense_trend": [], "expense_trend": [], "profit_trend": [],
+            "total_pending_billing": 0,
+            "total_follow_ups": 0,
+            "pending_follow_ups": 0,
+            "completed_follow_ups": 0,
+            "missed_follow_ups": 0,
+            "expense_breakdown": [],
+            "capacity_most_booked_doctors": [],
+            "capacity_peak_hours": [],
+            "comparison": {},
         }
 
     now = datetime.now(timezone.utc)
@@ -519,6 +529,12 @@ async def hospital_admin_dashboard(
             )
         )).scalar() or 0)
 
+    total_pending_billing = 0.0
+    if case_ids:
+        total_pending_billing = float((await db.execute(
+            select(func.sum(Billing.pending_amount)).where(Billing.case_id.in_(case_ids))
+        )).scalar() or 0)
+
     period_revenue = await calculate_revenue(db, case_ids, period=period, start_date=start_date, end_date=end_date)
     date_start, date_end = get_date_range(period, start_date, end_date)
     total_expenses = await calculate_expenses_for_date_range(db, [hospital_id], date_start=date_start, date_end=date_end)
@@ -557,6 +573,59 @@ async def hospital_admin_dashboard(
         for row in tp_r.all():
             treatment_performance.append({"name": row[0], "value": row[1]})
 
+    # Trend data for non-financial metrics
+    appointment_count_trend = await _monthly_appointment_trend(db, [hospital_id])
+    case_count_trend = await _monthly_case_trend(db, case_ids if case_ids else [])
+
+    # Period-over-period comparison
+    prev_start, prev_end = get_previous_date_range(period, start_date, end_date)
+
+    # Current period counts
+    period_patient_count = (await db.execute(
+        select(func.count(Patient.id)).where(Patient.hospital_id == hospital_id, Patient.created_at >= date_start, Patient.created_at < date_end)
+    )).scalar() or 0
+    period_appointment_count = 0
+    if patient_ids:
+        period_appointment_count = (await db.execute(
+            select(func.count(Appointment.id)).where(
+                Appointment.patient_id.in_(patient_ids),
+                Appointment.appointment_date >= date_start.date(),
+                Appointment.appointment_date < date_end.date(),
+            )
+        )).scalar() or 0
+    period_active_case_count = 0
+    if case_ids:
+        period_active_case_count = (await db.execute(
+            select(func.count(Case.id)).where(Case.id.in_(case_ids), Case.status.in_(active_case_statuses),
+                                               Case.created_at >= date_start, Case.created_at < date_end)
+        )).scalar() or 0
+
+    # Previous period counts
+    prev_patient_count = (await db.execute(
+        select(func.count(Patient.id)).where(Patient.hospital_id == hospital_id, Patient.created_at >= prev_start, Patient.created_at < prev_end)
+    )).scalar() or 0
+    prev_appointment_count = 0
+    if patient_ids:
+        prev_appointment_count = (await db.execute(
+            select(func.count(Appointment.id)).where(
+                Appointment.patient_id.in_(patient_ids),
+                Appointment.appointment_date >= prev_start.date(),
+                Appointment.appointment_date < prev_end.date(),
+            )
+        )).scalar() or 0
+    prev_active_case_count = 0
+    if case_ids:
+        prev_active_case_count = (await db.execute(
+            select(func.count(Case.id)).where(Case.id.in_(case_ids), Case.status.in_(active_case_statuses),
+                                               Case.created_at >= prev_start, Case.created_at < prev_end)
+        )).scalar() or 0
+    prev_period_revenue = await calculate_revenue(db, case_ids, period="custom", start_date=prev_start.isoformat(), end_date=prev_end.isoformat())
+
+    def pct_change(current: float, previous: float) -> float:
+        if previous == 0:
+            return 100.0 if current > 0 else 0.0
+        return round(((current - previous) / previous) * 100, 1)
+
     # Follow-Up stats
     total_follow_ups = (await db.execute(
         select(func.count(FollowUp.id)).where(FollowUp.hospital_id == hospital_id)
@@ -576,7 +645,7 @@ async def hospital_admin_dashboard(
     missed_follow_ups = (await db.execute(
         select(func.count(FollowUp.id)).where(
             FollowUp.hospital_id == hospital_id,
-            FollowUp.status == FollowUpStatus.MISSED.value,
+            FollowUp.status == FollowUpStatus.CANCELLED.value,
         )
     )).scalar() or 0
 
@@ -601,6 +670,8 @@ async def hospital_admin_dashboard(
         "total_active_cases": total_active_cases,
         "revenue_trend": revenue_trend,
         "patient_growth_trend": patient_growth_trend,
+        "appointment_count_trend": appointment_count_trend,
+        "case_count_trend": case_count_trend,
         "monthly_growth_trend": [{"month": t["month"], "revenue": t["revenue"], "patients": 0} for t in combined_trend],
         "revenue_expense_trend": combined_trend,
         "expense_trend": [{"month": t["month"], "expenses": t["expenses"]} for t in combined_trend],
@@ -608,8 +679,65 @@ async def hospital_admin_dashboard(
         "doctor_performance": doctor_performance[:5],
         "treatment_performance": treatment_performance[:5],
         "expense_breakdown": [],
+        "total_pending_billing": total_pending_billing,
+        "capacity_most_booked_doctors": await _get_most_booked_doctors(db, hospital_id, today),
+        "capacity_peak_hours": await _get_peak_hours(db, hospital_id, today),
+        "comparison": {
+            "revenue_change": pct_change(period_revenue, prev_period_revenue),
+            "patient_change": pct_change(period_patient_count, prev_patient_count),
+            "appointment_change": pct_change(period_appointment_count, prev_appointment_count),
+            "case_change": pct_change(period_active_case_count, prev_active_case_count),
+        },
     }
 
+
+async def _get_most_booked_doctors(db: AsyncSession, hospital_id: str, today: date, limit: int = 5):
+    from app.models.appointment import Appointment, AppointmentStatus
+    excluded = [AppointmentStatus.CANCELLED.value, AppointmentStatus.NO_SHOW.value]
+    pid_r = await db.execute(select(Patient.id).where(Patient.hospital_id == hospital_id))
+    pids = [row[0] for row in pid_r.all()]
+    if not pids:
+        return []
+    r = await db.execute(
+        select(
+            User.full_name,
+            func.count(Appointment.id).label('cnt'),
+        )
+        .join(User, User.id == Appointment.doctor_id)
+        .where(
+            Appointment.patient_id.in_(pids),
+            Appointment.appointment_date == today,
+            ~Appointment.status.in_(excluded),
+        )
+        .group_by(Appointment.doctor_id, User.full_name)
+        .order_by(text('cnt DESC'))
+        .limit(limit)
+    )
+    return [{"doctor_name": row[0], "appointments": row[1]} for row in r.all()]
+
+
+async def _get_peak_hours(db: AsyncSession, hospital_id: str, today: date, limit: int = 5):
+    from app.models.appointment import Appointment, AppointmentStatus
+    excluded = [AppointmentStatus.CANCELLED.value, AppointmentStatus.NO_SHOW.value]
+    pid_r = await db.execute(select(Patient.id).where(Patient.hospital_id == hospital_id))
+    pids = [row[0] for row in pid_r.all()]
+    if not pids:
+        return []
+    r = await db.execute(
+        select(
+            extract('hour', Appointment.appointment_time).label('hour'),
+            func.count(Appointment.id).label('cnt'),
+        )
+        .where(
+            Appointment.patient_id.in_(pids),
+            Appointment.appointment_date == today,
+            ~Appointment.status.in_(excluded),
+        )
+        .group_by(text('hour'))
+        .order_by(text('cnt DESC'))
+        .limit(limit)
+    )
+    return [{"hour": int(row[0]), "appointments": row[1]} for row in r.all()]
 
 @router.get("/doctor")
 async def doctor_dashboard(db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
@@ -637,7 +765,7 @@ async def doctor_dashboard(db: AsyncSession = Depends(get_db), current_user: dic
     my_cases_r = await db.execute(select(Case).where(Case.doctor_id == doctor_id))
     my_cases = my_cases_r.scalars().all()
 
-    active_statuses = {CaseStatus.IN_PROGRESS, CaseStatus.DIAGNOSIS_PENDING, CaseStatus.TREATMENT_PLANNED, CaseStatus.FOLLOW_UP}
+    active_statuses = {CaseStatus.IN_PROGRESS, CaseStatus.OPEN, CaseStatus.ON_HOLD}
     active_cases = [c for c in my_cases if c.status in active_statuses]
     completed_cases = [c for c in my_cases if c.status == CaseStatus.COMPLETED]
 
@@ -661,9 +789,11 @@ async def doctor_dashboard(db: AsyncSession = Depends(get_db), current_user: dic
             )
         )).scalar() or 0)
 
-    follow_ups = [c for c in my_cases if c.status == CaseStatus.FOLLOW_UP]
+    total_follow_ups_count = (await db.execute(
+        select(func.count(FollowUp.id)).where(FollowUp.doctor_id == doctor_id)
+    )).scalar() or 0
     treatment_success_rate = round((len(completed_cases) / len(my_cases) * 100) if my_cases else 0, 1)
-    follow_up_rate = round((len(follow_ups) / len(my_cases) * 100) if my_cases else 0, 1)
+    follow_up_rate = round((total_follow_ups_count / len(my_cases) * 100) if my_cases else 0, 1)
 
     # Follow-Up specific stats
     upcoming_follow_ups = (await db.execute(
@@ -682,7 +812,7 @@ async def doctor_dashboard(db: AsyncSession = Depends(get_db), current_user: dic
     missed_follow_ups = (await db.execute(
         select(func.count(FollowUp.id)).where(
             FollowUp.doctor_id == doctor_id,
-            FollowUp.status == FollowUpStatus.MISSED.value,
+            FollowUp.status == FollowUpStatus.CANCELLED.value,
         )
     )).scalar() or 0
     follow_up_success_rate = round(
@@ -708,6 +838,35 @@ async def doctor_dashboard(db: AsyncSession = Depends(get_db), current_user: dic
         for row in tp_r.all():
             treatment_trend.append({"name": row[0], "value": row[1]})
 
+    # Appointment capacity
+    max_per_hour = 4
+    doctor_hosp_result = await db.execute(select(User.hospital_id).where(User.id == doctor_id))
+    dh_row = doctor_hosp_result.one_or_none()
+    if dh_row and dh_row[0]:
+        h_set_result = await db.execute(select(Hospital.settings).where(Hospital.id == dh_row[0]))
+        h_set_row = h_set_result.one_or_none()
+        if h_set_row and h_set_row[0]:
+            try:
+                s = json.loads(h_set_row[0])
+                max_per_hour = s.get("doctor_max_appointments_per_hour", 4)
+            except Exception:
+                pass
+
+    today_scheduled = (await db.execute(
+        select(func.count(Appointment.id)).where(
+            Appointment.doctor_id == doctor_id,
+            Appointment.appointment_date == today,
+            Appointment.is_active == True,
+            Appointment.status.notin_([AppointmentStatus.CANCELLED.value, AppointmentStatus.NO_SHOW.value]),
+        )
+    )).scalar() or 0
+
+    # Estimate working hours (9 AM to 6 PM = 9 hours by default)
+    working_hours = 9
+    total_capacity = max_per_hour * working_hours
+    available_capacity = max(0, total_capacity - today_scheduled)
+    utilization_pct = round((today_scheduled / total_capacity) * 100) if total_capacity > 0 else 0
+
     return {
         "my_patients": my_patients,
         "today_appointments": today_appointments,
@@ -716,7 +875,7 @@ async def doctor_dashboard(db: AsyncSession = Depends(get_db), current_user: dic
         "cases_completed": len(completed_cases),
         "treatment_success_rate": treatment_success_rate,
         "follow_up_rate": follow_up_rate,
-        "pending_follow_ups": len(follow_ups),
+        "pending_follow_ups": total_follow_ups_count,
         "upcoming_follow_ups": upcoming_follow_ups,
         "completed_follow_ups": completed_follow_ups,
         "missed_follow_ups": missed_follow_ups,
@@ -726,6 +885,11 @@ async def doctor_dashboard(db: AsyncSession = Depends(get_db), current_user: dic
         "revenue_trend": revenue_trend,
         "case_completion_trend": case_completion_trend,
         "treatment_trend": treatment_trend,
+        "today_capacity_max_per_hour": max_per_hour,
+        "today_capacity_total": total_capacity,
+        "today_appointments_scheduled": today_scheduled,
+        "today_capacity_available": available_capacity,
+        "today_capacity_utilization_pct": utilization_pct,
     }
 
 
@@ -935,7 +1099,10 @@ async def quick_view_doctor(
 ):
     role = current_user.get("role")
     if role not in (Role.HOSPITAL_ADMIN.value, Role.GROUP_ADMIN.value, Role.SUPER_ADMIN.value):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+        if role == Role.DOCTOR.value and doctor_id == current_user.get("sub"):
+            pass
+        else:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
     doctor_r = await db.execute(select(User).where(User.id == doctor_id, User.role == Role.DOCTOR.value))
     doctor = doctor_r.scalar_one_or_none()
@@ -963,7 +1130,7 @@ async def quick_view_doctor(
     my_case_ids = {c.id for c in my_cases}
 
     total_cases = len(my_cases)
-    active_statuses = {CaseStatus.IN_PROGRESS, CaseStatus.DIAGNOSIS_PENDING, CaseStatus.TREATMENT_PLANNED, CaseStatus.FOLLOW_UP}
+    active_statuses = {CaseStatus.IN_PROGRESS, CaseStatus.OPEN, CaseStatus.ON_HOLD}
     active_cases = len([c for c in my_cases if c.status in active_statuses])
     completed_cases = len([c for c in my_cases if c.status == CaseStatus.COMPLETED])
 

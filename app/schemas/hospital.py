@@ -10,6 +10,8 @@ class HospitalCreate(BaseModel):
     phone: Optional[str] = None
     email: Optional[str] = None
     registration_number: Optional[str] = None
+    gst_number: Optional[str] = None
+    logo_url: Optional[str] = None
 
 
 class HospitalUpdate(BaseModel):
@@ -18,6 +20,8 @@ class HospitalUpdate(BaseModel):
     phone: Optional[str] = None
     email: Optional[str] = None
     registration_number: Optional[str] = None
+    gst_number: Optional[str] = None
+    logo_url: Optional[str] = None
     is_active: Optional[bool] = None
 
 
@@ -29,6 +33,8 @@ class HospitalResponse(BaseModel):
     phone: Optional[str]
     email: Optional[str]
     registration_number: Optional[str]
+    gst_number: Optional[str]
+    logo_url: Optional[str]
     is_active: bool
     created_at: datetime
     updated_at: datetime

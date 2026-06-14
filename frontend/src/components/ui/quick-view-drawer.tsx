@@ -1,15 +1,14 @@
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "react-router-dom"
-import { motion } from "framer-motion"
-import { X, Building2, Stethoscope, Users, DollarSign, Activity, Calendar, Award, Clock, FolderOpen, TrendingUp, ArrowRight, Loader2, ExternalLink, IndianRupee, PieChart, RotateCcw } from "lucide-react"
+import { Building2, Stethoscope, Users, DollarSign, Activity, Calendar, Award, FolderOpen, TrendingUp, Loader2, ExternalLink, IndianRupee, PieChart, RotateCcw } from "lucide-react"
 import { dashboardApi } from "@/services/endpoints"
 import { formatIndianRupees, formatIndianNumber } from "@/lib/currency"
 import DateFilterBar from "@/components/ui/date-filter-bar"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
-  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetClose,
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from "@/components/ui/sheet"
 import type { QuickViewAdminGroup, QuickViewHospital, QuickViewDoctor, QuickViewPatient } from "@/types"
 
@@ -23,10 +22,10 @@ interface QuickViewDrawerProps {
 
 function AdminGroupContent({ id, onClose, period, startDate, endDate }: { id: string; onClose: () => void; period: string; startDate?: string; endDate?: string }) {
   const navigate = useNavigate()
-  const params = { period, ...(period === "custom" ? { start_date: startDate, end_date: endDate } : {}) }
+  const qp = useMemo(() => ({ period, ...(period === "custom" ? { start_date: startDate, end_date: endDate } : {}) }), [period, startDate, endDate])
   const { data, isLoading } = useQuery<QuickViewAdminGroup>({
-    queryKey: ["quick-view", "admin-group", id, params],
-    queryFn: () => dashboardApi.quickViewAdminGroup(id, params),
+    queryKey: ["quick-view", "admin-group", id, period, startDate, endDate],
+    queryFn: () => dashboardApi.quickViewAdminGroup(id, qp),
     enabled: !!id,
   })
 
@@ -48,10 +47,10 @@ function AdminGroupContent({ id, onClose, period, startDate, endDate }: { id: st
         <MetricCard icon={PieChart} label="Profit Margin" value={data.profit_margin != null ? `${data.profit_margin.toFixed(1)}%` : "0%"} color="primary" />
       </div>
       <div className="flex flex-wrap gap-2">
-        <button onClick={() => { onClose(); navigate("/admin/hospitals") }} className="flex items-center gap-1 text-xs font-medium text-primary hover:underline touch-target px-3 py-2">
+        <button onClick={() => { onClose(); navigate("/admin/hospitals") }} className="flex items-center gap-1 text-xs font-medium text-primary hover:underline px-3 py-2">
           <Building2 className="h-3 w-3" /> View Hospitals <ExternalLink className="h-3 w-3" />
         </button>
-        <button onClick={() => { onClose(); navigate("/admin/doctors") }} className="flex items-center gap-1 text-xs font-medium text-primary hover:underline touch-target px-3 py-2">
+        <button onClick={() => { onClose(); navigate("/admin/doctors") }} className="flex items-center gap-1 text-xs font-medium text-primary hover:underline px-3 py-2">
           <Stethoscope className="h-3 w-3" /> View Doctors <ExternalLink className="h-3 w-3" />
         </button>
       </div>
@@ -77,10 +76,10 @@ function AdminGroupContent({ id, onClose, period, startDate, endDate }: { id: st
 
 function HospitalContent({ id, onClose, period, startDate, endDate }: { id: string; onClose: () => void; period: string; startDate?: string; endDate?: string }) {
   const navigate = useNavigate()
-  const params = { period, ...(period === "custom" ? { start_date: startDate, end_date: endDate } : {}) }
+  const qp = useMemo(() => ({ period, ...(period === "custom" ? { start_date: startDate, end_date: endDate } : {}) }), [period, startDate, endDate])
   const { data, isLoading } = useQuery<QuickViewHospital>({
-    queryKey: ["quick-view", "hospital", id, params],
-    queryFn: () => dashboardApi.quickViewHospital(id, params),
+    queryKey: ["quick-view", "hospital", id, period, startDate, endDate],
+    queryFn: () => dashboardApi.quickViewHospital(id, qp),
     enabled: !!id,
   })
 
@@ -112,10 +111,10 @@ function HospitalContent({ id, onClose, period, startDate, endDate }: { id: stri
         </div>
       )}
       <div className="flex flex-wrap gap-2">
-        <button onClick={() => { onClose(); navigate("/admin/doctors") }} className="flex items-center gap-1 text-xs font-medium text-primary hover:underline touch-target px-3 py-2">
+        <button onClick={() => { onClose(); navigate("/admin/doctors") }} className="flex items-center gap-1 text-xs font-medium text-primary hover:underline px-3 py-2">
           <Stethoscope className="h-3 w-3" /> View Doctors <ExternalLink className="h-3 w-3" />
         </button>
-        <button onClick={() => { onClose(); navigate("/patients") }} className="flex items-center gap-1 text-xs font-medium text-primary hover:underline touch-target px-3 py-2">
+        <button onClick={() => { onClose(); navigate("/patients") }} className="flex items-center gap-1 text-xs font-medium text-primary hover:underline px-3 py-2">
           <Users className="h-3 w-3" /> View Patients <ExternalLink className="h-3 w-3" />
         </button>
       </div>
@@ -125,10 +124,10 @@ function HospitalContent({ id, onClose, period, startDate, endDate }: { id: stri
 
 function DoctorContent({ id, onClose, period, startDate, endDate }: { id: string; onClose: () => void; period: string; startDate?: string; endDate?: string }) {
   const navigate = useNavigate()
-  const params = { period, ...(period === "custom" ? { start_date: startDate, end_date: endDate } : {}) }
+  const qp = useMemo(() => ({ period, ...(period === "custom" ? { start_date: startDate, end_date: endDate } : {}) }), [period, startDate, endDate])
   const { data, isLoading } = useQuery<QuickViewDoctor>({
-    queryKey: ["quick-view", "doctor", id, params],
-    queryFn: () => dashboardApi.quickViewDoctor(id, params),
+    queryKey: ["quick-view", "doctor", id, period, startDate, endDate],
+    queryFn: () => dashboardApi.quickViewDoctor(id, qp),
     enabled: !!id,
   })
 
@@ -154,7 +153,7 @@ function DoctorContent({ id, onClose, period, startDate, endDate }: { id: string
         <Badge variant="info">{data.completed_patients} Completed</Badge>
       </div>
       <div className="flex flex-wrap gap-2">
-        <button onClick={() => { onClose(); navigate("/patients") }} className="flex items-center gap-1 text-xs font-medium text-primary hover:underline touch-target px-3 py-2">
+        <button onClick={() => { onClose(); navigate("/patients") }} className="flex items-center gap-1 text-xs font-medium text-primary hover:underline px-3 py-2">
           <Users className="h-3 w-3" /> View Patients <ExternalLink className="h-3 w-3" />
         </button>
       </div>
@@ -184,7 +183,7 @@ function PatientContent({ id, onClose }: QuickViewContentProps) {
       {data.next_follow_up && (
         <div className="rounded-xl border border-warning bg-warning-soft p-3">
           <p className="text-xs font-medium text-warning mb-1">Next Follow-Up</p>
-          <p className="text-sm font-bold text-gray-900">{new Date(data.next_follow_up.date).toLocaleDateString()}</p>
+          <p className="text-sm font-bold text-gray-900">{new Date(data.next_follow_up.date).toLocaleDateString("en-IN")}</p>
           {data.next_follow_up.time && <p className="text-xs text-gray-500">Time: {data.next_follow_up.time}</p>}
           <Badge variant="warning">{data.next_follow_up.status}</Badge>
         </div>
@@ -204,7 +203,7 @@ function PatientContent({ id, onClose }: QuickViewContentProps) {
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
-        <button onClick={() => { onClose(); navigate(`/patients/${id}`) }} className="flex items-center gap-1 text-xs font-medium text-primary hover:underline touch-target px-3 py-2">
+        <button onClick={() => { onClose(); navigate(`/patients/${id}`) }} className="flex items-center gap-1 text-xs font-medium text-primary hover:underline px-3 py-2">
           <ExternalLink className="h-3 w-3" /> View Full Profile
         </button>
       </div>
@@ -216,7 +215,7 @@ function PatientContent({ id, onClose }: QuickViewContentProps) {
               <div key={i} className="flex items-start gap-3 rounded-xl bg-gray-50 px-3 py-2">
                 <div className="mt-0.5 h-2 w-2 rounded-full bg-primary shrink-0" />
                 <div>
-                  <p className="text-xs text-gray-400">{new Date(t.date).toLocaleDateString()}</p>
+                  <p className="text-xs text-gray-400">{new Date(t.date).toLocaleDateString("en-IN")}</p>
                   <p className="text-sm text-gray-700">{t.event}</p>
                 </div>
               </div>
@@ -291,18 +290,26 @@ export default function QuickViewDrawer({ open, onClose, type, entityId, entityN
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
 
+  const handlePeriodChange = useCallback((p: string) => {
+    setPeriod(p)
+    if (p !== "custom") {
+      setStartDate("")
+      setEndDate("")
+    }
+  }, [])
+
   const filterBar = useMemo(() => (
     <div className="mb-4">
       <DateFilterBar
         period={period}
-        onPeriodChange={setPeriod}
+        onPeriodChange={handlePeriodChange}
         startDate={startDate}
         endDate={endDate}
         onStartDateChange={setStartDate}
         onEndDateChange={setEndDate}
       />
     </div>
-  ), [period, startDate, endDate])
+  ), [period, startDate, endDate, handlePeriodChange])
 
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose() }}>

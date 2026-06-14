@@ -97,7 +97,7 @@ export default function Settings() {
                 <Badge variant="secondary" className="mt-3 bg-white/20 text-white hover:bg-white/30">
                   {user?.role?.replace("_", " ")}
                 </Badge>
-                <div className="mt-6 grid w-full grid-cols-2 gap-3 rounded-xl bg-white/10 p-4 backdrop-blur-sm">
+                <div className="mt-6 grid w-full grid-cols-2 gap-3 rounded-xl bg-white/20 p-4">
                   <div className="text-center">
                     <p className="text-2xl font-bold">{initials.length}</p>
                     <p className="text-xs text-blue-200">Initials</p>

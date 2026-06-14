@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from "react-router-dom"
+import { useParams, useNavigate, Link } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { useState, useRef } from "react"
 import { casesApi, treatmentApi, billingApi } from "@/services/endpoints"
@@ -33,6 +33,9 @@ import {
   Stethoscope,
   User,
   Upload,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
 } from "lucide-react"
 
 function StatusBadge({ status }: { status: string }) {
@@ -44,11 +47,14 @@ export default function CaseDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { toast } = useToast()
+  const { addToast } = useToast()
   const preOpInputRef = useRef<HTMLInputElement>(null)
+  const preOpXrayInputRef = useRef<HTMLInputElement>(null)
   const postOpInputRef = useRef<HTMLInputElement>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [zoom, setZoom] = useState(1)
   const [uploadingPreOp, setUploadingPreOp] = useState(false)
+  const [uploadingPreOpXray, setUploadingPreOpXray] = useState(false)
   const [uploadingPostOp, setUploadingPostOp] = useState(false)
   const [completionDialog, setCompletionDialog] = useState(false)
 
@@ -93,15 +99,18 @@ export default function CaseDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["case", id] })
       queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" })
-      toast({ title: "Success", description: "Status updated" })
+      addToast({ title: "Success", description: "Status updated" })
     },
     onError: (err: Error) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" })
+      addToast({ title: "Error", description: err.message, variant: "destructive" })
     },
   })
 
   const preOpPhotos = preOps?.photo_urls
     ? preOps.photo_urls.split(",").filter(Boolean)
+    : []
+  const preOpXrays = preOps?.xray_urls
+    ? preOps.xray_urls.split(",").filter(Boolean)
     : []
   const postOpPhotos = postOps?.photo_urls
     ? postOps.photo_urls.split(",").filter(Boolean)
@@ -258,22 +267,25 @@ export default function CaseDetail() {
                 type="file"
                 ref={preOpInputRef}
                 className="hidden"
+                multiple
                 accept="image/jpeg,image/png,image/webp"
                 onChange={async (e) => {
-                  const file = e.target.files?.[0]
-                  if (!file) return
+                  const files = Array.from(e.target.files || [])
+                  if (files.length === 0) return
                   setUploadingPreOp(true)
                   try {
-                    const formData = new FormData()
-                    formData.append("photos", file)
-                    await api.post(`/pre-ops/${id}`, formData, {
-                      headers: { "Content-Type": "multipart/form-data" },
-                    })
+                    for (const file of files) {
+                      const formData = new FormData()
+                      formData.append("photos", file)
+                      await api.post(`/pre-ops/${id}`, formData, {
+                        headers: { "Content-Type": "multipart/form-data" },
+                      })
+                    }
                     queryClient.invalidateQueries({ queryKey: ["case-preops", id] })
-                    toast({ title: "Success", description: "Pre-op image uploaded" })
+                    addToast({ title: "Success", description: `${files.length} image(s) uploaded` })
                   } catch (err: unknown) {
                     const msg = err instanceof Error ? err.message : "Upload failed"
-                    toast({ title: "Error", description: msg, variant: "destructive" })
+                    addToast({ title: "Error", description: msg, variant: "destructive" })
                   } finally {
                     setUploadingPreOp(false)
                   }
@@ -296,10 +308,10 @@ export default function CaseDetail() {
                   {preOpPhotos.map((url: string, i: number) => (
                     <div key={i} className="relative group">
                       <img
-                        src={url.startsWith("http") ? url : `/api/v1${url}`}
+                        src={url.startsWith("http") ? url : url}
                         alt={`Pre-op ${i + 1}`}
                         className="w-full h-32 object-cover rounded-lg cursor-pointer"
-                        onClick={() => setPreviewUrl(url.startsWith("http") ? url : `/api/v1${url}`)}
+                        onClick={() => setPreviewUrl(url.startsWith("http") ? url : `${url}`)}
                       />
                     </div>
                   ))}
@@ -311,6 +323,75 @@ export default function CaseDetail() {
                   </div>
                 </>
               )}
+            </div>
+
+            <div className="mt-6 pt-6 border-t border-border">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Camera className="h-5 w-5 text-primary" />
+                  X-Ray Images
+                </h3>
+                <input
+                  type="file"
+                  ref={preOpXrayInputRef}
+                  className="hidden"
+                  multiple
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={async (e) => {
+                    const files = Array.from(e.target.files || [])
+                    if (files.length === 0) return
+                    setUploadingPreOpXray(true)
+                    try {
+                      for (const file of files) {
+                        const formData = new FormData()
+                        formData.append("xrays", file)
+                        await api.post(`/pre-ops/${id}`, formData, {
+                          headers: { "Content-Type": "multipart/form-data" },
+                        })
+                      }
+                      queryClient.invalidateQueries({ queryKey: ["case-preops", id] })
+                      addToast({ title: "Success", description: `${files.length} X-Ray(s) uploaded` })
+                    } catch (err: unknown) {
+                      const msg = err instanceof Error ? err.message : "Upload failed"
+                      addToast({ title: "Error", description: msg, variant: "destructive" })
+                    } finally {
+                      setUploadingPreOpXray(false)
+                    }
+                  }}
+                />
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {preOpXrays.length === 0 ? (
+                  <div
+                    className="col-span-full flex flex-col items-center justify-center py-12 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-primary transition-colors"
+                    onClick={() => preOpXrayInputRef.current?.click()}
+                  >
+                    <Upload className="h-10 w-10 text-text-muted mb-2" />
+                    <p className="text-text-secondary">
+                      {uploadingPreOpXray ? "Uploading..." : "Click to upload X-Ray images"}
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {preOpXrays.map((url: string, i: number) => (
+                      <div key={i} className="relative group">
+                        <img
+                          src={url.startsWith("http") ? url : url}
+                          alt={`X-Ray ${i + 1}`}
+                          className="w-full h-32 object-cover rounded-lg cursor-pointer"
+                          onClick={() => setPreviewUrl(url.startsWith("http") ? url : `${url}`)}
+                        />
+                      </div>
+                    ))}
+                    <div
+                      className="flex flex-col items-center justify-center h-32 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-primary transition-colors"
+                      onClick={() => preOpXrayInputRef.current?.click()}
+                    >
+                      <Upload className="h-6 w-6 text-text-muted" />
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </Card>
         </TabsContent>
@@ -326,22 +407,25 @@ export default function CaseDetail() {
                 type="file"
                 ref={postOpInputRef}
                 className="hidden"
+                multiple
                 accept="image/jpeg,image/png,image/webp"
                 onChange={async (e) => {
-                  const file = e.target.files?.[0]
-                  if (!file) return
+                  const files = Array.from(e.target.files || [])
+                  if (files.length === 0) return
                   setUploadingPostOp(true)
                   try {
-                    const formData = new FormData()
-                    formData.append("photos", file)
-                    await api.post(`/post-ops/${id}`, formData, {
-                      headers: { "Content-Type": "multipart/form-data" },
-                    })
+                    for (const file of files) {
+                      const formData = new FormData()
+                      formData.append("photos", file)
+                      await api.post(`/post-ops/${id}`, formData, {
+                        headers: { "Content-Type": "multipart/form-data" },
+                      })
+                    }
                     queryClient.invalidateQueries({ queryKey: ["case-postops", id] })
-                    toast({ title: "Success", description: "Post-op image uploaded" })
+                    addToast({ title: "Success", description: `${files.length} image(s) uploaded` })
                   } catch (err: unknown) {
                     const msg = err instanceof Error ? err.message : "Upload failed"
-                    toast({ title: "Error", description: msg, variant: "destructive" })
+                    addToast({ title: "Error", description: msg, variant: "destructive" })
                   } finally {
                     setUploadingPostOp(false)
                   }
@@ -364,10 +448,10 @@ export default function CaseDetail() {
                   {postOpPhotos.map((url: string, i: number) => (
                     <div key={i} className="relative group">
                       <img
-                        src={url.startsWith("http") ? url : `/api/v1${url}`}
+                        src={url.startsWith("http") ? url : url}
                         alt={`Post-op ${i + 1}`}
                         className="w-full h-32 object-cover rounded-lg cursor-pointer"
-                        onClick={() => setPreviewUrl(url.startsWith("http") ? url : `/api/v1${url}`)}
+                        onClick={() => setPreviewUrl(url.startsWith("http") ? url : `${url}`)}
                       />
                     </div>
                   ))}
@@ -392,19 +476,19 @@ export default function CaseDetail() {
                         <div className="flex-1">
                           <p className="text-xs text-text-muted mb-1 text-center">Pre-Op</p>
                           <img
-                            src={preUrl.startsWith("http") ? preUrl : `/api/v1${preUrl}`}
+                            src={preUrl.startsWith("http") ? preUrl : preUrl}
                             alt={`Before ${i + 1}`}
                             className="w-full h-40 object-cover rounded-lg cursor-pointer"
-                            onClick={() => setPreviewUrl(preUrl.startsWith("http") ? preUrl : `/api/v1${preUrl}`)}
+                            onClick={() => setPreviewUrl(preUrl.startsWith("http") ? preUrl : preUrl)}
                           />
                         </div>
                         <div className="flex-1">
                           <p className="text-xs text-text-muted mb-1 text-center">Post-Op</p>
                           <img
-                            src={postUrl.startsWith("http") ? postUrl : `/api/v1${postUrl}`}
+                            src={postUrl.startsWith("http") ? postUrl : postUrl}
                             alt={`After ${i + 1}`}
                             className="w-full h-40 object-cover rounded-lg cursor-pointer"
-                            onClick={() => setPreviewUrl(postUrl.startsWith("http") ? postUrl : `/api/v1${postUrl}`)}
+                            onClick={() => setPreviewUrl(postUrl.startsWith("http") ? postUrl : postUrl)}
                           />
                         </div>
                       </div>
@@ -428,15 +512,20 @@ export default function CaseDetail() {
           ) : (
             <div className="space-y-3">
               {treatmentsList.map((t: Record<string, unknown>) => (
-                <Card key={t.id as string} className="p-4 border-border shadow-card">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-text-primary">{t.treatment_name as string}</p>
-                      {t.cost && <p className="text-sm text-text-muted mt-1">{formatIndianRupees(t.cost as number)}</p>}
+                <Link key={t.id as string} to={`/treatments/${t.id}`}>
+                  <Card className="p-4 border-border shadow-card card-hover cursor-pointer">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-text-primary">{t.treatment_name as string}</p>
+                        <div className="flex gap-4 mt-1 text-sm text-text-muted">
+                          {t.cost ? <span>{formatIndianRupees(t.cost as number)}</span> : null}
+                          <span>Sittings: {(t as any).completed_sittings ?? "—"}/{(t as any).total_sittings ?? "—"}</span>
+                        </div>
+                      </div>
+                      <StatusBadge status={t.status as string} />
                     </div>
-                    <StatusBadge status={t.status as string} />
-                  </div>
-                </Card>
+                  </Card>
+                </Link>
               ))}
             </div>
           )}
@@ -473,13 +562,44 @@ export default function CaseDetail() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={!!previewUrl} onOpenChange={() => setPreviewUrl(null)}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
+      <Dialog open={!!previewUrl} onOpenChange={() => { setPreviewUrl(null); setZoom(1) }}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader className="flex flex-row items-center justify-between">
             <DialogTitle>Image Preview</DialogTitle>
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-muted-foreground mr-2">{Math.round(zoom * 100)}%</span>
+              <Button variant="outline" size="icon-sm" onClick={() => setZoom(z => Math.min(z + 0.25, 5))}>
+                <ZoomIn className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="icon-sm" onClick={() => setZoom(z => Math.max(z - 0.25, 0.25))}>
+                <ZoomOut className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="icon-sm" onClick={() => setZoom(1)}>
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            </div>
           </DialogHeader>
           {previewUrl && (
-            <img src={previewUrl} alt="Preview" className="w-full rounded-lg" />
+            <div
+              className="flex items-center justify-center overflow-auto max-h-[70vh] bg-gray-100 dark:bg-gray-900 rounded-lg cursor-grab active:cursor-grabbing select-none"
+              onWheel={(e) => {
+                e.preventDefault()
+                setZoom(z => {
+                  const delta = e.deltaY > 0 ? -0.1 : 0.1
+                  return Math.max(0.25, Math.min(5, z + delta))
+                })
+              }}
+              onDoubleClick={() => setZoom(z => z === 1 ? 2 : 1)}
+            >
+              <img
+                src={previewUrl}
+                alt="Preview"
+                className="transition-transform duration-200"
+                style={{ transform: `scale(${zoom})` }}
+                draggable={false}
+                loading="lazy"
+              />
+            </div>
           )}
         </DialogContent>
       </Dialog>

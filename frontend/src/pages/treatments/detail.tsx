@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useParams, useNavigate, Link } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { ArrowLeft, Calendar, Clock, IndianRupee, User, Activity, FileText, Edit3, CheckCircle, Plus, Trash2 } from "lucide-react"
+import { ArrowLeft, Calendar, CalendarDays, Clock, User, Activity, FileText, Edit3, Plus, MessageSquare, History, DollarSign } from "lucide-react"
 import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -15,6 +15,12 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs"
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -25,7 +31,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { treatmentApi, treatmentSittingsApi, patientsApi } from "@/services/endpoints"
+import { treatmentApi, treatmentSittingsApi, patientsApi, crmApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
 import { formatIndianRupees } from "@/lib/currency"
 import { cn } from "@/lib/utils"
@@ -126,6 +132,7 @@ export default function TreatmentDetail() {
       duration_minutes: plan.duration_minutes,
       start_date: plan.start_date || "",
       expected_completion_date: plan.expected_completion_date || "",
+      next_appointment_date: plan.next_appointment_date || "",
       notes: plan.notes || "",
     })
     setEditDialogOpen(true)
@@ -164,78 +171,153 @@ export default function TreatmentDetail() {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Main info column */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Treatment info card */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base">Treatment Information</CardTitle>
-              <Button variant="outline" size="sm" onClick={openEdit}><Edit3 className="h-3.5 w-3.5" /> Edit</Button>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div><span className="text-muted-foreground">Status</span>
-                  <div className="mt-1">
-                    <Select value={plan.status} onValueChange={(v) => statusMutation.mutate({ sid: plan.id, status: v })}>
-                      <SelectTrigger className="h-8 w-[160px] text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="PLANNED">Planned</SelectItem>
-                        <SelectItem value="SCHEDULED">Scheduled</SelectItem>
-                        <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-                        <SelectItem value="FOLLOW_UP">Follow Up</SelectItem>
-                        <SelectItem value="COMPLETED">Completed</SelectItem>
-                        <SelectItem value="CANCELLED">Cancelled</SelectItem>
-                      </SelectContent>
-                    </Select>
+      <Tabs defaultValue="details" className="w-full">
+        <TabsList className="bg-white border border-border rounded-xl p-1">
+          <TabsTrigger value="details">Details</TabsTrigger>
+          <TabsTrigger value="sittings">Sittings ({sittingList.length})</TabsTrigger>
+          <TabsTrigger value="billing">Billing</TabsTrigger>
+          <TabsTrigger value="enquiries">Enquiries</TabsTrigger>
+          <TabsTrigger value="history">History</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="details" className="mt-6">
+          <div className="grid gap-6 lg:grid-cols-3">
+            <div className="lg:col-span-2 space-y-6">
+              {/* Treatment info card */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-base">Treatment Information</CardTitle>
+                  <Button variant="outline" size="sm" onClick={openEdit}><Edit3 className="h-3.5 w-3.5" /> Edit</Button>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div><span className="text-muted-foreground">Status</span>
+                      <div className="mt-1">
+                        <Select value={plan.status} onValueChange={(v) => statusMutation.mutate({ sid: plan.id, status: v })}>
+                          <SelectTrigger className="h-8 w-[160px] text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="PLANNED">Planned</SelectItem>
+                            <SelectItem value="SCHEDULED">Scheduled</SelectItem>
+                            <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                            <SelectItem value="FOLLOW_UP">Follow Up</SelectItem>
+                            <SelectItem value="COMPLETED">Completed</SelectItem>
+                            <SelectItem value="CANCELLED">Cancelled</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Duration</span>
+                      <p className="font-medium flex items-center gap-1 mt-0.5"><Clock className="h-3.5 w-3.5 text-muted-foreground" /> {plan.duration_minutes || "—"} min</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Start Date</span>
+                      <p className="font-medium flex items-center gap-1 mt-0.5"><Calendar className="h-3.5 w-3.5 text-muted-foreground" /> {plan.start_date ? format(new Date(plan.start_date), "dd MMM yyyy") : "—"}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Expected Completion</span>
+                      <p className="font-medium flex items-center gap-1 mt-0.5"><Calendar className="h-3.5 w-3.5 text-muted-foreground" /> {plan.expected_completion_date ? format(new Date(plan.expected_completion_date), "dd MMM yyyy") : "—"}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Next Appointment</span>
+                      <p className="font-medium flex items-center gap-1 mt-0.5"><CalendarDays className="h-3.5 w-3.5 text-muted-foreground" /> {plan.next_appointment_date ? format(new Date(plan.next_appointment_date), "dd MMM yyyy") : "—"}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Description</span>
+                      <p className="font-medium mt-0.5">{plan.description || "—"}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Notes</span>
+                      <p className="font-medium mt-0.5">{plan.notes || "—"}</p>
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Duration</span>
-                  <p className="font-medium flex items-center gap-1 mt-0.5"><Clock className="h-3.5 w-3.5 text-muted-foreground" /> {plan.duration_minutes || "—"} min</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Start Date</span>
-                  <p className="font-medium flex items-center gap-1 mt-0.5"><Calendar className="h-3.5 w-3.5 text-muted-foreground" /> {plan.start_date ? format(new Date(plan.start_date), "dd MMM yyyy") : "—"}</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Expected Completion</span>
-                  <p className="font-medium flex items-center gap-1 mt-0.5"><Calendar className="h-3.5 w-3.5 text-muted-foreground" /> {plan.expected_completion_date ? format(new Date(plan.expected_completion_date), "dd MMM yyyy") : "—"}</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Description</span>
-                  <p className="font-medium mt-0.5">{plan.description || "—"}</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Notes</span>
-                  <p className="font-medium mt-0.5">{plan.notes || "—"}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
 
-          {/* Financial summary */}
-          <Card>
-            <CardHeader><CardTitle className="text-base">Financial Summary</CardTitle></CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="rounded-xl bg-blue-50 p-4 text-center">
-                  <p className="text-xs text-muted-foreground mb-1">Total Cost</p>
-                  <p className="text-lg font-bold text-blue-700">{formatIndianRupees(plan.cost)}</p>
-                </div>
-                <div className="rounded-xl bg-green-50 p-4 text-center">
-                  <p className="text-xs text-muted-foreground mb-1">Paid</p>
-                  <p className="text-lg font-bold text-green-700">{formatIndianRupees(plan.paid_amount)}</p>
-                </div>
-                <div className="rounded-xl bg-amber-50 p-4 text-center">
-                  <p className="text-xs text-muted-foreground mb-1">Pending</p>
-                  <p className={cn("text-lg font-bold", pendingAmount > 0 ? "text-amber-700" : "text-green-700")}>{formatIndianRupees(pendingAmount)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              {/* Case information */}
+              <Card>
+                <CardHeader><CardTitle className="text-base">Case Information</CardTitle></CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Case Number</span>
+                      <p className="font-medium mt-0.5">
+                        <Link to={`/cases/${plan.case_id}`} className="text-primary hover:underline">
+                          {plan.case_number || plan.case_id.slice(0, 8)}
+                        </Link>
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Status</span>
+                      <p className="mt-0.5"><StatusBadge status={plan.case_status || ""} /></p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Doctor</span>
+                      <p className="font-medium mt-0.5">{plan.doctor_name || "—"}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Treatment Category</span>
+                      <p className="font-medium mt-0.5">{plan.category || "—"}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
 
-          {/* Progress & sittings */}
+            {/* Right sidebar in Details tab */}
+            <div className="space-y-6">
+              <Card>
+                <CardHeader><CardTitle className="text-base">Patient Information</CardTitle></CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  {patient ? (
+                    <>
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-light text-primary font-bold text-sm">
+                          {patient.full_name?.charAt(0) || "?"}
+                        </div>
+                        <div>
+                          <p className="font-semibold">{patient.full_name}</p>
+                          <p className="text-xs text-muted-foreground font-mono">ID: {patient.id.slice(0, 8)}</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs border-t border-border pt-3">
+                        <div><span className="text-muted-foreground">Age</span><p className="font-medium">{patient.age || "—"}</p></div>
+                        <div><span className="text-muted-foreground">Gender</span><p className="font-medium">{patient.gender || "—"}</p></div>
+                        <div className="col-span-2"><span className="text-muted-foreground">Phone</span><p className="font-medium">{patient.phone || "—"}</p></div>
+                        <div className="col-span-2"><span className="text-muted-foreground">Email</span><p className="font-medium truncate">{patient.email || "—"}</p></div>
+                        <div><span className="text-muted-foreground">Status</span><p className="mt-1"><StatusBadge status={patient.status} /></p></div>
+                        <div><span className="text-muted-foreground">Cases</span><p className="font-medium">{(patient as any)?.cases_count || "—"}</p></div>
+                      </div>
+                      <Link to={`/patients/${patient.id}`}>
+                        <Button variant="outline" size="sm" className="w-full text-xs">View Full Profile</Button>
+                      </Link>
+                    </>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                        <User className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="font-semibold">{plan.patient_name || "Patient"}</p>
+                        <p className="text-xs text-muted-foreground font-mono">ID: {plan.patient_id?.slice(0, 8) || "—"}</p>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader><CardTitle className="text-base">Quick Stats</CardTitle></CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  <div className="flex justify-between"><span className="text-muted-foreground">Created</span><span className="font-medium">{format(new Date(plan.created_at), "dd MMM yy")}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Updated</span><span className="font-medium">{format(new Date(plan.updated_at), "dd MMM yy")}</span></div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="sittings" className="mt-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-base">Sittings & Progress</CardTitle>
@@ -291,83 +373,40 @@ export default function TreatmentDetail() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
 
-          {/* Case information */}
-          <Card>
-            <CardHeader><CardTitle className="text-base">Case Information</CardTitle></CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-muted-foreground">Case Number</span>
-                  <p className="font-medium mt-0.5">
-                    <Link to={`/cases/${plan.case_id}`} className="text-primary hover:underline">
-                      {plan.case_number || plan.case_id.slice(0, 8)}
-                    </Link>
-                  </p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Status</span>
-                  <p className="mt-0.5"><StatusBadge status={plan.case_status || ""} /></p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right sidebar */}
-        <div className="space-y-6">
-          {/* Patient information panel */}
-          <Card>
-            <CardHeader><CardTitle className="text-base">Patient Information</CardTitle></CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              {patient ? (
-                <>
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-light text-primary font-bold text-sm">
-                      {patient.full_name?.charAt(0) || "?"}
-                    </div>
-                    <div>
-                      <p className="font-semibold">{patient.full_name}</p>
-                      <p className="text-xs text-muted-foreground font-mono">ID: {patient.id.slice(0, 8)}</p>
-                    </div>
+        <TabsContent value="billing" className="mt-6">
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader><CardTitle className="text-base">Financial Summary</CardTitle></CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="rounded-xl bg-blue-50 p-4 text-center">
+                    <p className="text-xs text-muted-foreground mb-1">Total Cost</p>
+                    <p className="text-lg font-bold text-blue-700">{formatIndianRupees(plan.cost)}</p>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 text-xs border-t border-border pt-3">
-                    <div><span className="text-muted-foreground">Age</span><p className="font-medium">{patient.age || "—"}</p></div>
-                    <div><span className="text-muted-foreground">Gender</span><p className="font-medium">{patient.gender || "—"}</p></div>
-                    <div className="col-span-2"><span className="text-muted-foreground">Phone</span><p className="font-medium">{patient.phone || "—"}</p></div>
-                    <div className="col-span-2"><span className="text-muted-foreground">Email</span><p className="font-medium truncate">{patient.email || "—"}</p></div>
-                    <div><span className="text-muted-foreground">Status</span><p className="mt-1"><StatusBadge status={patient.status} /></p></div>
-                    <div><span className="text-muted-foreground">Cases</span><p className="font-medium">{(patient as any)?.cases_count || "—"}</p></div>
+                  <div className="rounded-xl bg-green-50 p-4 text-center">
+                    <p className="text-xs text-muted-foreground mb-1">Paid</p>
+                    <p className="text-lg font-bold text-green-700">{formatIndianRupees(plan.paid_amount)}</p>
                   </div>
-                  <Link to={`/patients/${patient.id}`}>
-                    <Button variant="outline" size="sm" className="w-full text-xs">View Full Profile</Button>
-                  </Link>
-                </>
-              ) : (
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                    <User className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <p className="font-semibold">{plan.patient_name || "Patient"}</p>
-                    <p className="text-xs text-muted-foreground font-mono">ID: {plan.patient_id?.slice(0, 8) || "—"}</p>
+                  <div className="rounded-xl bg-amber-50 p-4 text-center">
+                    <p className="text-xs text-muted-foreground mb-1">Pending</p>
+                    <p className={cn("text-lg font-bold", pendingAmount > 0 ? "text-amber-700" : "text-green-700")}>{formatIndianRupees(pendingAmount)}</p>
                   </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
-          {/* Quick stats */}
-          <Card>
-            <CardHeader><CardTitle className="text-base">Quick Stats</CardTitle></CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <div className="flex justify-between"><span className="text-muted-foreground">Doctor</span><span className="font-medium">{plan.doctor_name || "—"}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Created</span><span className="font-medium">{format(new Date(plan.created_at), "dd MMM yy")}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Updated</span><span className="font-medium">{format(new Date(plan.updated_at), "dd MMM yy")}</span></div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+        <TabsContent value="enquiries" className="mt-6">
+          <EnquiryList patientId={plan.patient_id} treatmentPlanId={id!} />
+        </TabsContent>
+
+        <TabsContent value="history" className="mt-6">
+          <TreatmentHistory plan={plan} />
+        </TabsContent>
+      </Tabs>
 
       {/* Edit dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
@@ -406,6 +445,10 @@ export default function TreatmentDetail() {
               <div className="grid gap-2">
                 <Label>Expected Completion Date</Label>
                 <Input type="date" value={editForm.expected_completion_date || ""} onChange={(e) => setEditForm({ ...editForm, expected_completion_date: e.target.value })} />
+              </div>
+              <div className="grid gap-2">
+                <Label>Next Appointment Date</Label>
+                <Input type="date" value={editForm.next_appointment_date || ""} onChange={(e) => setEditForm({ ...editForm, next_appointment_date: e.target.value })} />
               </div>
               <div className="grid gap-2">
                 <Label>Notes</Label>
@@ -459,5 +502,81 @@ export default function TreatmentDetail() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+function EnquiryList({ patientId }: { patientId?: string; treatmentPlanId: string }) {
+  const { data: followUpData, isLoading } = useQuery({
+    queryKey: ["patient-follow-ups", patientId],
+    queryFn: () => crmApi.followUps.list({ patient_id: patientId }),
+    enabled: !!patientId,
+  })
+  const items: any[] = Array.isArray(followUpData) ? followUpData : followUpData?.items || []
+
+  if (isLoading) return <div className="space-y-4">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}</div>
+
+  if (items.length === 0) {
+    return (
+      <Card className="p-12 text-center border-border shadow-card">
+        <MessageSquare className="h-12 w-12 text-text-muted mx-auto mb-3" />
+        <p className="text-text-secondary">No follow-ups found for this patient</p>
+      </Card>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      {items.map((e: any) => (
+        <Card key={e.id} className="p-4 border-border shadow-card">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Badge className="text-xs">{e.follow_up_type || "General"}</Badge>
+                {e.status && <span className={`text-xs px-1.5 py-0.5 rounded ${e.status === "COMPLETED" ? "bg-green-50 text-green-700" : "bg-yellow-50 text-yellow-700"}`}>{e.status}</span>}
+              </div>
+              {e.notes && <p className="text-sm text-text-primary">{e.notes}</p>}
+              {e.response_message && <p className="text-xs text-text-secondary mt-1">Response: {e.response_message}</p>}
+            </div>
+            <span className="text-xs text-text-muted shrink-0">{e.created_at ? format(new Date(e.created_at), "dd MMM yy") : ""}</span>
+          </div>
+        </Card>
+      ))}
+    </div>
+  )
+}
+
+function TreatmentHistory({ plan }: { plan: any }) {
+  const events = [
+    { date: plan.created_at, label: "Treatment Plan Created", detail: `${plan.treatment_name} - ${plan.category || ""}` },
+    { date: plan.start_date, label: "Treatment Started", detail: `Start date set to ${format(new Date(plan.start_date), "dd MMM yyyy")}` },
+    { date: plan.expected_completion_date, label: "Expected Completion", detail: `Expected by ${format(new Date(plan.expected_completion_date), "dd MMM yyyy")}` },
+    { date: plan.updated_at, label: "Last Updated", detail: `Status: ${plan.status}` },
+  ].filter(e => e.date)
+
+  return (
+    <Card className="p-6 border-border shadow-card">
+      <h3 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
+        <History className="h-5 w-5 text-primary" />
+        Treatment History
+      </h3>
+      {events.length === 0 ? (
+        <p className="text-text-secondary text-center py-8">No history available</p>
+      ) : (
+        <div className="relative pl-6 border-l-2 border-border space-y-6">
+          {events.map((ev, i) => (
+            <div key={i} className="relative">
+              <div className="absolute -left-[21px] p-1 rounded-full bg-primary">
+                <div className="h-2 w-2 rounded-full bg-white" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-text-primary">{ev.label}</p>
+                <p className="text-xs text-text-secondary">{ev.detail}</p>
+                <p className="text-xs text-text-muted mt-0.5">{ev.date ? format(new Date(ev.date), "dd MMM yyyy") : ""}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
   )
 }

@@ -7,11 +7,14 @@ from app.database import get_db
 from app.dependencies import get_current_user
 from app.core.permissions import verify_permission, verify_tenant_access, Permission, Role
 from app.services.treatment_plan_service import TreatmentPlanService
+from app.services.status_automation import StatusAutomationService
+from app.services.treatment_enquiry_service import TreatmentEnquiryService
 from app.schemas.treatment_plan import TreatmentPlanCreate, TreatmentPlanUpdate, TreatmentPlanResponse
 from app.schemas.common import MessageResponse
 from app.models.case import Case
 from app.models.patient import Patient
 from app.models.hospital import Hospital
+from app.models.treatment_plan import TreatmentPlanStatus
 
 router = APIRouter(prefix="/treatment-plans", tags=["Treatment Plans"])
 logger = logging.getLogger(__name__)
@@ -21,12 +24,17 @@ logger = logging.getLogger(__name__)
 async def create_treatment_plan(data: TreatmentPlanCreate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.CREATE_TREATMENT_PLAN)
     service = TreatmentPlanService(db)
-    return await service.create(data.model_dump(), user_id=current_user.get("sub"))
+    plan = await service.create(data.model_dump(), user_id=current_user.get("sub"))
+    svc = StatusAutomationService(db)
+    await svc.on_treatment_plan_created(plan.id)
+    await db.commit()
+    return plan
 
 
 @router.get("/", response_model=List[TreatmentPlanResponse])
 async def get_treatment_plans(skip: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=200),
                                case_id: Optional[str] = Query(None),
+                               patient_id: Optional[str] = Query(None),
                                hospital_id: Optional[str] = Query(None),
                                db: AsyncSession = Depends(get_db),
                                current_user: dict = Depends(get_current_user)):
@@ -36,16 +44,28 @@ async def get_treatment_plans(skip: int = Query(0, ge=0), limit: int = Query(100
         filters = {}
         if case_id:
             filters["case_id"] = case_id
+
+        if patient_id:
+            case_result = await db.execute(select(Case.id).where(Case.patient_id == patient_id))
+            pids = [row[0] for row in case_result.all()]
+            if not pids:
+                return []
+            if "case_id__in" in filters:
+                existing = set(filters["case_id__in"])
+                filters["case_id__in"] = list(existing & set(pids))
+                if not filters["case_id__in"]:
+                    return []
+            else:
+                filters["case_id__in"] = pids
+
         role = current_user.get("role")
+        role_case_ids = None
         if role == Role.DOCTOR.value:
             if hospital_id:
                 filters["hospital_id"] = hospital_id
             else:
                 case_result = await db.execute(select(Case.id).where(Case.doctor_id == current_user.get("sub")))
-                cids = [row[0] for row in case_result.all()]
-                if not cids:
-                    return []
-                filters["case_id__in"] = cids
+                role_case_ids = [row[0] for row in case_result.all()]
         elif role == Role.HOSPITAL_ADMIN.value:
             hid = hospital_id or current_user.get("hospital_id")
             if hid:
@@ -55,19 +75,26 @@ async def get_treatment_plans(skip: int = Query(0, ge=0), limit: int = Query(100
             if agid:
                 hosp_result = await db.execute(select(Hospital.id).where(Hospital.admin_group_id == agid))
                 hids = [row[0] for row in hosp_result.all()]
-                if not hids:
-                    return []
-                patient_result = await db.execute(select(Patient.id).where(Patient.hospital_id.in_(hids)))
-                pids = [row[0] for row in patient_result.all()]
-                if not pids:
-                    return []
-                case_result = await db.execute(select(Case.id).where(Case.patient_id.in_(pids)))
-                cids = [row[0] for row in case_result.all()]
-                if not cids:
-                    return []
-                filters["case_id__in"] = cids
+                if hids:
+                    patient_result = await db.execute(select(Patient.id).where(Patient.hospital_id.in_(hids)))
+                    pids = [row[0] for row in patient_result.all()]
+                    if pids:
+                        case_result = await db.execute(select(Case.id).where(Case.patient_id.in_(pids)))
+                        role_case_ids = [row[0] for row in case_result.all()]
         elif role == Role.SUPER_ADMIN.value and hospital_id:
             filters["hospital_id"] = hospital_id
+
+        if role_case_ids is not None:
+            if "case_id__in" in filters:
+                existing = set(filters["case_id__in"])
+                merged = list(existing & set(role_case_ids))
+                if not merged:
+                    return []
+                filters["case_id__in"] = merged
+            else:
+                if not role_case_ids:
+                    return []
+                filters["case_id__in"] = role_case_ids
         return await service.get_all(skip=skip, limit=limit, filters=filters or None)
     except HTTPException:
         raise
@@ -109,6 +136,7 @@ async def update_treatment_plan(plan_id: str, data: TreatmentPlanUpdate, db: Asy
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Treatment plan not found")
     await verify_tenant_access(current_user, plan, "treatment_plan", db)
     plan = await service.update(plan_id, data.model_dump(exclude_none=True), user_id=current_user.get("sub"))
+    await db.commit()
     return plan
 
 
@@ -121,6 +149,12 @@ async def update_treatment_plan_status(plan_id: str, status: str = Query(...), d
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Treatment plan not found")
     await verify_tenant_access(current_user, plan, "treatment_plan", db)
     plan = await service.update_status(plan_id, status, user_id=current_user.get("sub"))
+    svc = StatusAutomationService(db)
+    await svc.update_treatment_status(plan_id, TreatmentPlanStatus(status))
+    enquiry_svc = TreatmentEnquiryService(db)
+    if status == TreatmentPlanStatus.COMPLETED.value:
+        await enquiry_svc.on_treatment_plan_completed(plan_id)
+    await db.commit()
     return plan
 
 

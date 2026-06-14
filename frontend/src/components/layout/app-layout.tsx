@@ -22,7 +22,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           variants={pageVariants}
           className="flex-1"
         >
-          <div className="mx-auto w-full max-w-[1400px] px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+          <div className="mx-auto w-full max-w-[1190px] px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
             {children}
           </div>
         </motion.main>

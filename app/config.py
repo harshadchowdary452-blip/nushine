@@ -13,6 +13,30 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite+aiosqlite:///./dental_hospital.db"
     DATABASE_URL_SYNC: str = "sqlite:///./dental_hospital.db"
 
+    @property
+    def DB_IS_POSTGRESQL(self) -> bool:
+        return self.DATABASE_URL.startswith("postgresql")
+
+    @property
+    def DB_IS_SQLITE(self) -> bool:
+        return self.DATABASE_URL.startswith("sqlite")
+
+    @property
+    def DB_DRIVER(self) -> str:
+        if "postgresql+asyncpg" in self.DATABASE_URL or "postgresql+psycopg2" in self.DATABASE_URL:
+            return self.DATABASE_URL.split("://")[0]
+        if self.DB_IS_POSTGRESQL:
+            return "postgresql+asyncpg"
+        if self.DB_IS_SQLITE:
+            return "sqlite+aiosqlite"
+        return self.DATABASE_URL.split("://")[0]
+
+    @property
+    def SYNC_DATABASE_URL(self) -> str:
+        if self.DB_IS_POSTGRESQL:
+            return self.DATABASE_URL.replace("+asyncpg", "+psycopg2").replace("postgresql+psycopg2", "postgresql")
+        return self.DATABASE_URL_SYNC
+
     SECRET_KEY: str = "change-this-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30

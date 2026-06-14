@@ -85,6 +85,35 @@ async def unread_count(
     return {"unread": count}
 
 
+@router.delete("/{notification_id}")
+async def delete_notification(
+    notification_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    n = await db.get(Notification, notification_id)
+    if not n or n.user_id != current_user.get("sub"):
+        raise HTTPException(status_code=404, detail="Notification not found")
+    await db.delete(n)
+    await db.commit()
+    return {"success": True}
+
+
+@router.delete("/")
+async def delete_all_notifications(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    uid = current_user.get("sub")
+    result = await db.execute(
+        select(Notification).where(Notification.user_id == uid)
+    )
+    for n in result.scalars().all():
+        await db.delete(n)
+    await db.commit()
+    return {"success": True}
+
+
 @router.post("/generate")
 async def generate_notifications(
     db: AsyncSession = Depends(get_db),

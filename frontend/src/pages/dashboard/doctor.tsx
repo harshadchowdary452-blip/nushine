@@ -1,13 +1,14 @@
 import { useState } from "react"
 import { motion } from "framer-motion"
 import { useQuery } from "@tanstack/react-query"
-import { Users, Calendar, FolderOpen, ClipboardList, Stethoscope, Sparkles, TrendingUp, Award, DollarSign, Activity, BarChart3 } from "lucide-react"
+import { Users, Calendar, FolderOpen, ClipboardList, Stethoscope, Sparkles, TrendingUp, Award, DollarSign, Activity, BarChart3, Clock, Star } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar } from "recharts"
 import { useAuthStore } from "@/store/authStore"
 import { dashboardApi } from "@/services/endpoints"
 import { Skeleton } from "@/components/ui/skeleton"
 import KpiCard from "@/components/layout/kpi-card"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import Leaderboard from "@/components/ui/leaderboard"
 import QuickViewDrawer from "@/components/ui/quick-view-drawer"
 import { formatIndianRupees, formatIndianNumber } from "@/lib/currency"
 
@@ -28,6 +29,7 @@ export default function DoctorDashboard() {
   const { data: stats, isLoading } = useQuery({
     queryKey: ["dash", "doctor", user?.id],
     queryFn: () => dashboardApi.doctor(),
+    enabled: !!user?.id,
   })
 
   if (!user) return null
@@ -77,11 +79,11 @@ export default function DoctorDashboard() {
               </p>
             </div>
             <div className="flex gap-3">
-              <div className="bg-white/15 backdrop-blur-sm rounded-xl px-4 py-3 text-center min-w-[100px]">
+              <div className="bg-white/20 rounded-xl px-4 py-3 text-center min-w-[100px]">
                 <p className="text-white/70 text-xs font-medium uppercase tracking-wider">Revenue</p>
                 <p className="text-white text-xl font-bold">{formatIndianRupees(stats?.personal_revenue || 0)}</p>
               </div>
-              <div className="bg-white/15 backdrop-blur-sm rounded-xl px-4 py-3 text-center min-w-[100px]">
+              <div className="bg-white/20 rounded-xl px-4 py-3 text-center min-w-[100px]">
                 <p className="text-white/70 text-xs font-medium uppercase tracking-wider">Patients</p>
                 <p className="text-white text-xl font-bold">{stats?.my_patients || 0}</p>
               </div>
@@ -107,13 +109,22 @@ export default function DoctorDashboard() {
         </div>
       </motion.div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7">
         <KpiCard className="card-hover" icon={Users} title="My Patients" value={formatIndianNumber(stats?.my_patients ?? 0)} color="info" delay={0} />
         <KpiCard className="card-hover" icon={Calendar} title="Today Appointments" value={formatIndianNumber(stats?.today_appointments ?? 0)} color="warning" delay={0.05} />
         <KpiCard className="card-hover" icon={FolderOpen} title="Active Cases" value={formatIndianNumber(stats?.active_cases ?? 0)} color="danger" delay={0.1} />
         <KpiCard className="card-hover" icon={ClipboardList} title="Follow-Ups" value={formatIndianNumber(stats?.pending_follow_ups ?? 0)} color="success" delay={0.15} />
         <KpiCard className="card-hover" icon={DollarSign} title="Personal Revenue" value={stats?.personal_revenue != null ? formatIndianRupees(stats.personal_revenue) : "₹0"} color="success" delay={0.2} />
         <KpiCard className="card-hover" icon={Activity} title="Cases Completed" value={formatIndianNumber(stats?.cases_completed ?? 0)} color="info" delay={0.25} />
+        <KpiCard className="card-hover" icon={Clock} title="Today's Capacity" value={
+          stats?.today_capacity_total != null
+            ? `${stats?.today_appointments_scheduled ?? 0}/${stats?.today_capacity_total}`
+            : "0/0"
+        } description={
+          stats?.today_capacity_utilization_pct != null
+            ? `${stats?.today_capacity_utilization_pct}% Utilized`
+            : undefined
+        } color="info" delay={0.3} />
       </div>
 
       {hasData && (
@@ -182,6 +193,20 @@ export default function DoctorDashboard() {
               </CardContent>
             </Card>
           </div>
+
+          <motion.div variants={item}>
+            <Leaderboard
+              title="Top Treatments"
+              valueLabel="Count"
+              icon={TrendingUp}
+              items={(stats?.treatment_trend ?? []).map((t: any, i: number) => ({
+                rank: i + 1, name: t.name, value: `${t.value} patients`,
+              }))}
+              onItemClick={() => {
+                if (user?.id) setQuickView({ type: "doctor", id: user.id, name: user.full_name })
+              }}
+            />
+          </motion.div>
         </>
       )}
 

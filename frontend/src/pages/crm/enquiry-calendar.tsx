@@ -45,10 +45,7 @@ const statusColors: Record<string, string> = {
 }
 
 const typeLabels: Record<string, string> = {
-  TREATMENT_CREATED: "Treatment Created",
-  TREATMENT_UPDATED: "Treatment Updated",
-  NEXT_SITTING: "Next Sitting",
-  TREATMENT_COMPLETION: "Treatment Completion",
+  "1_DAY_POST_TREATMENT": "1-Day Post Treatment",
   "6_MONTH_RECALL": "6-Month Recall",
   MANUAL: "Follow-Up",
 }
@@ -57,7 +54,7 @@ const MONTHS = ["January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"]
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
-export default function EnquiryCalendar() {
+export default function EnquiryCalendar({ embedded }: { embedded?: boolean }) {
   const queryClient = useQueryClient()
   const { addToast } = useToast()
   const today = new Date()
@@ -91,12 +88,13 @@ export default function EnquiryCalendar() {
   const [commNotes, setCommNotes] = useState("")
 
   // Query key depends on active tab
+  const dateKey = format(calDate, "yyyy-MM-dd")
   const queryKey = activeTab === "calendar"
-    ? ["enquiry", "calendar", calDate.toISOString().split("T")[0]]
+    ? ["enquiry", "calendar", dateKey]
     : ["enquiry", activeTab]
 
   const queryFn = activeTab === "calendar"
-    ? () => crmApi.getTodaysEnquiries("calendar", format(calDate, "yyyy-MM-dd"))
+    ? () => crmApi.getTodaysEnquiries("calendar", dateKey)
     : () => crmApi.getTodaysEnquiries(activeTab)
 
   const { data: enquiries, isLoading } = useQuery({
@@ -321,10 +319,12 @@ export default function EnquiryCalendar() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Enquiry Calendar"
-        description="Manage patient enquiries, record responses, and create follow-ups."
-      />
+      {!embedded && (
+        <PageHeader
+          title="Enquiry Calendar"
+          description="Manage patient enquiries, record responses, and create follow-ups."
+        />
+      )}
 
       {/* KPI Cards */}
       <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
@@ -457,7 +457,7 @@ export default function EnquiryCalendar() {
       {/* Record Response Dialog */}
       <Dialog open={!!recordRespOpen} onOpenChange={(o) => { if (!o) { setRecordRespOpen(null); setSavedResponseId(null); setSavedPatientId(null) } }}>
         <DialogContent className={savedResponseId ? "sm:max-w-lg" : "sm:max-w-md"}>
-          <DialogHeader>
+          <DialogHeader className={savedResponseId ? "shrink-0" : ""}>
             <DialogTitle>{savedResponseId ? "Create Follow-Up" : "Record Patient Response"}</DialogTitle>
             <DialogDescription>
               {savedResponseId
@@ -466,8 +466,9 @@ export default function EnquiryCalendar() {
             </DialogDescription>
           </DialogHeader>
 
+          <div className="overflow-y-auto max-h-[65vh] space-y-4">
           {!savedResponseId ? (
-            <div className="space-y-4">
+            <>
               <div className="space-y-2">
                 <Label>Response Status</Label>
                 <Select value={respStatus} onValueChange={setRespStatus}>
@@ -513,9 +514,9 @@ export default function EnquiryCalendar() {
                 {recordRespMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                 Save Response
               </Button>
-            </div>
+            </>
           ) : (
-            <div className="space-y-4">
+            <>
               <div className="rounded-md bg-yellow-50 border border-yellow-200 p-3 text-sm text-yellow-800">
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
@@ -590,8 +591,9 @@ export default function EnquiryCalendar() {
                   Create Follow-Up & Appointment
                 </Button>
               </div>
-            </div>
+            </>
           )}
+          </div>
         </DialogContent>
       </Dialog>
 
