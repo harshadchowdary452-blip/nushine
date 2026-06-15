@@ -18,7 +18,8 @@ from app.models.email_template import EmailTemplate
 from app.models.patient import Patient
 from app.models.user import User
 from app.models.hospital import Hospital
-from app.models.lead import Lead, LeadCommunication
+from app.models.lead import Lead, LeadCommunication, LeadCall, LeadStatus
+from app.models.campaign import Campaign, CampaignRecipient
 from app.models.case import Case
 from app.models.treatment_plan import TreatmentPlan, TreatmentPlanStatus
 from app.models.billing import Billing
@@ -963,6 +964,788 @@ async def delete_whatsapp_template(
     await db.delete(t)
     await db.commit()
     return {"success": True}
+
+
+# --- Comprehensive CRM Dashboard (All KPIs + Analytics) ---
+
+@router.get("/dashboard2")
+async def get_comprehensive_crm_dashboard(
+    period: str = Query("this_month", description="today, this_week, this_month, this_quarter, this_year, custom"),
+    start_date: Optional[str] = Query(None, description="Custom start date (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(None, description="Custom end date (YYYY-MM-DD)"),
+    doctor: Optional[str] = Query(None, description="Filter by doctor ID"),
+    source: Optional[str] = Query(None, description="Filter by lead source"),
+    campaign: Optional[str] = Query(None, description="Filter by campaign"),
+    staff: Optional[str] = Query(None, description="Filter by staff ID"),
+    lead_status: Optional[str] = Query(None, description="Filter by lead status"),
+    treatment: Optional[str] = Query(None, description="Filter by treatment name"),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    hospital_id = current_user.get("hospital_id")
+    today = date.today()
+    now = datetime.now(timezone.utc)
+
+    # Date range helpers
+    if period == "today":
+        date_start = today
+        date_end = today
+    elif period == "this_week":
+        date_start = today - timedelta(days=today.weekday())
+        date_end = date_start + timedelta(days=6)
+    elif period == "this_month":
+        date_start = today.replace(day=1)
+        date_end = today
+    elif period == "this_quarter":
+        q = (today.month - 1) // 3
+        date_start = today.replace(month=q*3+1, day=1)
+        date_end = today
+    elif period == "this_year":
+        date_start = today.replace(month=1, day=1)
+        date_end = today
+    elif period == "custom" and start_date and end_date:
+        date_start = date.fromisoformat(start_date)
+        date_end = date.fromisoformat(end_date)
+    else:
+        date_start = today.replace(day=1)
+        date_end = today
+
+    # Apply filters
+    def apply_hospital(q):
+        if hospital_id:
+            return q.where(FollowUp.hospital_id == hospital_id)
+        return q
+
+    # =========================================================================
+    # TOP KPI CARDS
+    # =========================================================================
+    # Leads
+    lead_base = select(Lead)
+    if hospital_id:
+        lead_base = lead_base.where(Lead.hospital_id == hospital_id)
+    if source:
+        lead_base = lead_base.where(Lead.source.ilike(f"%{source}%"))
+    if doctor:
+        lead_base = lead_base.where(Lead.assigned_doctor_id == doctor)
+    if campaign:
+        lead_base = lead_base.where(Lead.source.ilike(f"%{campaign}%"))
+    if staff:
+        lead_base = lead_base.where(Lead.assigned_staff_id == staff)
+    if lead_status:
+        lead_base = lead_base.where(Lead.status == lead_status)
+    if treatment:
+        lead_base = lead_base.where(Lead.interested_treatment.ilike(f"%{treatment}%"))
+
+    total_leads = (await db.execute(select(func.count()).select_from(lead_base.subquery()))).scalar() or 0
+    new_leads_q = lead_base.where(Lead.created_at >= datetime.combine(date_start, datetime.min.time()))
+    new_leads = (await db.execute(select(func.count()).select_from(new_leads_q.subquery()))).scalar() or 0
+    converted_leads_q = lead_base.where(Lead.status == LeadStatus.CONVERTED.value)
+    converted_leads = (await db.execute(select(func.count()).select_from(converted_leads_q.subquery()))).scalar() or 0
+    conversion_rate = round((converted_leads / total_leads * 100), 1) if total_leads > 0 else 0
+
+    # Revenue from CRM (leads that converted + their cases billing)
+    crm_revenue = 0.0
+    if hospital_id:
+        conv_patient_ids_q = select(Lead.converted_patient_id).where(
+            Lead.hospital_id == hospital_id,
+            Lead.converted_patient_id.isnot(None),
+            Lead.status == LeadStatus.CONVERTED.value,
+        )
+    else:
+        conv_patient_ids_q = select(Lead.converted_patient_id).where(
+            Lead.converted_patient_id.isnot(None),
+            Lead.status == LeadStatus.CONVERTED.value,
+        )
+    conv_patient_ids = [row[0] for row in (await db.execute(conv_patient_ids_q)).all()]
+    if conv_patient_ids:
+        crm_case_ids_q = select(Case.id).where(Case.patient_id.in_(conv_patient_ids))
+        crm_case_ids = [row[0] for row in (await db.execute(crm_case_ids_q)).all()]
+        if crm_case_ids:
+            crm_rev_q = select(func.coalesce(func.sum(Billing.paid_amount), 0)).where(Billing.case_id.in_(crm_case_ids))
+            crm_rev_q = crm_rev_q.where(Billing.updated_at >= datetime.combine(date_start, datetime.min.time()))
+            if period != "custom" and period not in ["today", "this_week", "this_month", "this_quarter", "this_year"]:
+                crm_rev_q = crm_rev_q.where(Billing.updated_at <= datetime.combine(date_end, datetime.max.time()))
+            crm_revenue = float((await db.execute(crm_rev_q)).scalar() or 0)
+
+    cost_per_lead = round(crm_revenue / total_leads, 2) if total_leads > 0 else 0
+
+    # Pending follow-ups today & pending enquiries
+    fu_base = select(FollowUp)
+    if hospital_id:
+        fu_base = fu_base.where(FollowUp.hospital_id == hospital_id)
+    if doctor:
+        fu_base = fu_base.where(FollowUp.doctor_id == doctor)
+    if treatment:
+        fu_base = fu_base.join(Patient, Patient.id == FollowUp.patient_id).where(FollowUp.treatment_name.ilike(f"%{treatment}%"))
+    pending_follow_ups_today_q = fu_base.where(
+        FollowUp.follow_up_date == today,
+        FollowUp.status.in_(["SCHEDULED", "PENDING"]),
+    )
+    pending_follow_ups_today = (await db.execute(select(func.count()).select_from(pending_follow_ups_today_q.subquery()))).scalar() or 0
+    pending_enquiries_q = fu_base.where(
+        FollowUp.status.in_(["SCHEDULED", "PENDING", "CONTACTED", "NO_RESPONSE"]),
+    )
+    pending_enquiries = (await db.execute(select(func.count()).select_from(pending_enquiries_q.subquery()))).scalar() or 0
+
+    # =========================================================================
+    # LEAD GROWTH TREND
+    # =========================================================================
+    lead_growth_trend = []
+    for i in range(5, -1, -1):
+        ym = today - timedelta(days=30 * i)
+        m_start = ym.replace(day=1)
+        m_q = lead_base.where(
+            Lead.created_at >= datetime.combine(m_start, datetime.min.time()),
+            Lead.created_at < datetime.combine((m_start + timedelta(days=32)).replace(day=1), datetime.min.time()),
+        )
+        m_count = (await db.execute(select(func.count()).select_from(m_q.subquery()))).scalar() or 0
+        lead_growth_trend.append({"month": m_start.strftime("%b %Y"), "count": m_count})
+
+    # Leads by source with conversion stats
+    leads_by_source = []
+    lead_sources_raw = select(Lead.source, func.count(Lead.id).label("count")).where(Lead.source.isnot(None))
+    if hospital_id:
+        lead_sources_raw = lead_sources_raw.where(Lead.hospital_id == hospital_id)
+    lead_sources_raw = lead_sources_raw.group_by(Lead.source).order_by(func.count(Lead.id).desc())
+    lead_sources_rows = (await db.execute(lead_sources_raw)).all()
+    for src, cnt in lead_sources_rows:
+        conv_q = select(func.count(Lead.id)).where(Lead.source == src, Lead.converted_patient_id.isnot(None))
+        if hospital_id:
+            conv_q = conv_q.where(Lead.hospital_id == hospital_id)
+        conv_count = (await db.execute(conv_q)).scalar() or 0
+        pat_ids_q = select(Lead.converted_patient_id).where(Lead.source == src, Lead.converted_patient_id.isnot(None))
+        if hospital_id:
+            pat_ids_q = pat_ids_q.where(Lead.hospital_id == hospital_id)
+        pat_ids = [r[0] for r in (await db.execute(pat_ids_q)).all()]
+        revenue = 0.0
+        if pat_ids:
+            case_ids = [r[0] for r in (await db.execute(select(Case.id).where(Case.patient_id.in_(pat_ids)))).all()]
+            if case_ids:
+                revenue = float((await db.execute(select(func.coalesce(func.sum(Billing.paid_amount), 0)).where(Billing.case_id.in_(case_ids)))).scalar() or 0)
+        leads_by_source.append({
+            "source": src, "count": cnt, "converted": conv_count,
+            "conversion_rate": round((conv_count / cnt) * 100, 1) if cnt > 0 else 0,
+            "revenue": revenue,
+            "avg_revenue_per_lead": round(revenue / cnt, 2) if cnt > 0 else 0,
+        })
+
+    # Leads by staff
+    leads_by_staff_raw = select(Lead.assigned_staff_id, func.count(Lead.id).label("count"))
+    if hospital_id:
+        leads_by_staff_raw = leads_by_staff_raw.where(Lead.hospital_id == hospital_id)
+    leads_by_staff_raw = leads_by_staff_raw.where(Lead.assigned_staff_id.isnot(None)).group_by(Lead.assigned_staff_id).order_by(func.count(Lead.id).desc())
+    leads_by_staff_rows = (await db.execute(leads_by_staff_raw)).all()
+    leads_by_staff = []
+    for staff_id, cnt in leads_by_staff_rows:
+        staff_user = await db.get(User, staff_id)
+        leads_by_staff.append({"staff_id": staff_id, "staff_name": staff_user.full_name if staff_user else "Unknown", "count": cnt})
+
+    # Leads by doctor
+    leads_by_doctor_raw = select(Lead.assigned_doctor_id, func.count(Lead.id).label("count"))
+    if hospital_id:
+        leads_by_doctor_raw = leads_by_doctor_raw.where(Lead.hospital_id == hospital_id)
+    leads_by_doctor_raw = leads_by_doctor_raw.where(Lead.assigned_doctor_id.isnot(None)).group_by(Lead.assigned_doctor_id).order_by(func.count(Lead.id).desc())
+    leads_by_doctor_rows = (await db.execute(leads_by_doctor_raw)).all()
+    leads_by_doctor = []
+    for doc_id, cnt in leads_by_doctor_rows:
+        doc = await db.get(User, doc_id) if doc_id else None
+        leads_by_doctor.append({"doctor_id": doc_id, "doctor_name": doc.full_name if doc else "Unknown", "count": cnt})
+
+    # Leads by status
+    leads_by_status_raw = select(Lead.status, func.count(Lead.id).label("count"))
+    if hospital_id:
+        leads_by_status_raw = leads_by_status_raw.where(Lead.hospital_id == hospital_id)
+    leads_by_status_raw = leads_by_status_raw.group_by(Lead.status).order_by(func.count(Lead.id).desc())
+    leads_by_status = [{"status": r[0], "count": r[1]} for r in (await db.execute(leads_by_status_raw)).all()]
+
+    # Lead timeline (recent)
+    lead_timeline = (await db.execute(
+        select(Lead).order_by(Lead.created_at.desc()).limit(20)
+    )).scalars().all()
+    lead_timeline_data = [{
+        "id": str(l.id), "lead_name": l.lead_name, "status": l.status,
+        "created_at": l.created_at.isoformat() if l.created_at else None,
+        "source": l.source,
+    } for l in lead_timeline]
+
+    # =========================================================================
+    # LEAD CONVERSION FUNNEL
+    # =========================================================================
+    funnel_stages = ["Lead", "Contacted", "Interested", "Appointment Booked", "Visited", "Converted"]
+    funnel_data = []
+    lead_status_map = {
+        "Lead": "NEW",
+        "Contacted": "CONTACTED",
+        "Interested": "INTERESTED",
+        "Appointment Booked": "APPOINTMENT_BOOKED",
+        "Visited": "VISITED",
+        "Converted": "CONVERTED",
+    }
+    prev_count = total_leads
+    for stage in funnel_stages:
+        status_val = lead_status_map.get(stage)
+        if status_val == "NEW":
+            stage_count = total_leads
+        else:
+            stage_q = lead_base.where(Lead.status == status_val)
+            stage_count = (await db.execute(select(func.count()).select_from(stage_q.subquery()))).scalar() or 0
+        pct = round((stage_count / total_leads * 100), 1) if total_leads > 0 else 0
+        drop_off = prev_count - stage_count
+        drop_rate = round((drop_off / prev_count * 100), 1) if prev_count > 0 else 0
+        funnel_data.append({
+            "stage": stage, "count": stage_count, "percentage": pct,
+            "drop_off": drop_off, "drop_rate": drop_rate,
+        })
+        prev_count = stage_count
+
+    # =========================================================================
+    # LEAD DASHBOARD (recent leads)
+    # =========================================================================
+    recent_leads_q = lead_base.order_by(Lead.created_at.desc()).limit(50)
+    recent_leads_rows = (await db.execute(recent_leads_q)).scalars().all()
+    recent_leads_data = []
+    for l in recent_leads_rows:
+        staff_name = None
+        if l.assigned_staff_id:
+            u = await db.get(User, l.assigned_staff_id)
+            staff_name = u.full_name if u else None
+        doc_name = None
+        if l.assigned_doctor_id:
+            d = await db.get(User, l.assigned_doctor_id)
+            doc_name = d.full_name if d else None
+        recent_leads_data.append({
+            "id": str(l.id), "lead_name": l.lead_name, "mobile": l.mobile,
+            "email": l.email, "source": l.source,
+            "assigned_staff": staff_name, "assigned_doctor": doc_name,
+            "status": l.status, "lead_score": l.lead_score,
+            "interested_treatment": l.interested_treatment,
+            "budget": float(l.budget) if l.budget else 0,
+            "last_contacted_at": l.last_contacted_at.isoformat() if l.last_contacted_at else None,
+            "next_follow_up_date": l.next_follow_up_date.isoformat() if l.next_follow_up_date else None,
+            "created_at": l.created_at.isoformat() if l.created_at else None,
+        })
+
+    # =========================================================================
+    # ENQUIRY DASHBOARD
+    # =========================================================================
+    tomorrow = today + timedelta(days=1)
+    week_end = today + timedelta(days=6 - today.weekday())
+
+    todays_enquiries_q = fu_base.where(FollowUp.follow_up_date == today)
+    todays_enquiries_count = (await db.execute(select(func.count()).select_from(todays_enquiries_q.subquery()))).scalar() or 0
+    tomorrows_enquiries_q = fu_base.where(FollowUp.follow_up_date == tomorrow)
+    tomorrows_enquiries_count = (await db.execute(select(func.count()).select_from(tomorrows_enquiries_q.subquery()))).scalar() or 0
+    this_week_enquiries_q = fu_base.where(FollowUp.follow_up_date.between(today, week_end))
+    this_week_enquiries_count = (await db.execute(select(func.count()).select_from(this_week_enquiries_q.subquery()))).scalar() or 0
+    overdue_enquiries_q = fu_base.where(
+        FollowUp.follow_up_date < today,
+        FollowUp.status.notin_(["COMPLETED", "CANCELLED", "MISSED"]),
+    )
+    overdue_enquiries_count = (await db.execute(select(func.count()).select_from(overdue_enquiries_q.subquery()))).scalar() or 0
+    six_month_recall_q = fu_base.where(
+        FollowUp.follow_up_type == "6_MONTH_RECALL",
+        FollowUp.follow_up_date <= today,
+    )
+    six_month_recall_count = (await db.execute(select(func.count()).select_from(six_month_recall_q.subquery()))).scalar() or 0
+
+    # Today's enquiries detail
+    todays_enquiries_detail_q = fu_base.where(FollowUp.follow_up_date == today).order_by(FollowUp.follow_up_time).limit(50)
+    todays_enquiries_rows = (await db.execute(todays_enquiries_detail_q)).scalars().all()
+    todays_enquiries_detail = []
+    for fu in todays_enquiries_rows:
+        patient = await db.get(Patient, fu.patient_id) if fu.patient_id else None
+        doctor = await db.get(User, fu.doctor_id) if fu.doctor_id else None
+        priority = "High" if fu.follow_up_type == "1_DAY_POST_TREATMENT" else "Medium" if fu.follow_up_type == "MANUAL" else "Low"
+        billing_date = None
+        if fu.billing_id:
+            billing = await db.get(Billing, fu.billing_id)
+            billing_date = billing.created_at.isoformat() if billing else None
+        todays_enquiries_detail.append({
+            "id": str(fu.id), "patient_id": str(fu.patient_id) if fu.patient_id else None,
+            "patient_name": patient.full_name if patient else "Unknown",
+            "phone": patient.phone if patient else None,
+            "treatment": fu.treatment_name,
+            "doctor_name": doctor.full_name if doctor else None,
+            "follow_up_date": fu.follow_up_date.isoformat(),
+            "enquiry_due_date": fu.follow_up_date.isoformat(),
+            "follow_up_type": fu.follow_up_type,
+            "status": fu.status, "notes": fu.notes,
+            "enquiry_source": patient.patient_source if patient else None,
+            "priority": priority,
+            "assigned_staff": doctor.full_name if doctor else None,
+            "billing_date": billing_date,
+        })
+
+    # =========================================================================
+    # FOLLOW-UP DASHBOARD
+    # =========================================================================
+    active_follow_ups_q = fu_base.where(FollowUp.status.in_(["SCHEDULED", "PENDING", "OPEN"]))
+    active_follow_ups = (await db.execute(select(func.count()).select_from(active_follow_ups_q.subquery()))).scalar() or 0
+    upcoming_follow_ups_q = fu_base.where(
+        FollowUp.follow_up_date >= today,
+        FollowUp.status.in_(["SCHEDULED", "PENDING"]),
+    )
+    upcoming_follow_ups = (await db.execute(select(func.count()).select_from(upcoming_follow_ups_q.subquery()))).scalar() or 0
+    completed_follow_ups_q = fu_base.where(FollowUp.status == "COMPLETED")
+    completed_follow_ups = (await db.execute(select(func.count()).select_from(completed_follow_ups_q.subquery()))).scalar() or 0
+    overdue_follow_ups_q = fu_base.where(
+        FollowUp.follow_up_date < today,
+        FollowUp.status.in_(["SCHEDULED", "PENDING", "OPEN"]),
+    )
+    overdue_follow_ups = (await db.execute(select(func.count()).select_from(overdue_follow_ups_q.subquery()))).scalar() or 0
+
+    # Recent follow-ups detail
+    recent_follow_ups_q = fu_base.order_by(FollowUp.follow_up_date.desc()).limit(50)
+    recent_follow_ups_rows = (await db.execute(recent_follow_ups_q)).scalars().all()
+    recent_follow_ups_data = []
+    for fu in recent_follow_ups_rows:
+        patient = await db.get(Patient, fu.patient_id) if fu.patient_id else None
+        doctor = await db.get(User, fu.doctor_id) if fu.doctor_id else None
+        recent_follow_ups_data.append({
+            "id": str(fu.id), "patient_id": str(fu.patient_id) if fu.patient_id else None,
+            "patient_name": patient.full_name if patient else "Unknown",
+            "patient_phone": patient.phone if patient else None,
+            "doctor_name": doctor.full_name if doctor else None,
+            "status": fu.status, "follow_up_type": fu.follow_up_type,
+            "follow_up_date": fu.follow_up_date.isoformat(),
+            "follow_up_time": str(fu.follow_up_time) if fu.follow_up_time else None,
+            "notes": fu.notes,
+            "created_at": fu.created_at.isoformat() if fu.created_at else None,
+            "treatment_name": fu.treatment_name,
+        })
+
+    # Follow-up analytics
+    successful_follow_ups_q = fu_base.where(FollowUp.status == "COMPLETED")
+    successful_follow_ups = (await db.execute(select(func.count()).select_from(successful_follow_ups_q.subquery()))).scalar() or 0
+    failed_follow_ups_q = fu_base.where(FollowUp.status.in_(["CANCELLED", "MISSED"]))
+    failed_follow_ups = (await db.execute(select(func.count()).select_from(failed_follow_ups_q.subquery()))).scalar() or 0
+
+    # Follow-ups by staff
+    fu_by_staff_raw = select(FollowUp.doctor_id, func.count(FollowUp.id).label("count"))
+    if hospital_id:
+        fu_by_staff_raw = fu_by_staff_raw.where(FollowUp.hospital_id == hospital_id)
+    fu_by_staff_raw = fu_by_staff_raw.where(FollowUp.doctor_id.isnot(None)).group_by(FollowUp.doctor_id).order_by(func.count(FollowUp.id).desc())
+    fu_by_staff_rows = (await db.execute(fu_by_staff_raw)).all()
+    follow_ups_by_staff = []
+    for doc_id, cnt in fu_by_staff_rows:
+        d = await db.get(User, doc_id)
+        follow_ups_by_staff.append({"doctor_id": doc_id, "doctor_name": d.full_name if d else "Unknown", "count": cnt})
+
+    # Follow-ups by outcome
+    fu_by_outcome_raw = select(FollowUp.status, func.count(FollowUp.id).label("count"))
+    if hospital_id:
+        fu_by_outcome_raw = fu_by_outcome_raw.where(FollowUp.hospital_id == hospital_id)
+    fu_by_outcome_raw = fu_by_outcome_raw.group_by(FollowUp.status).order_by(func.count(FollowUp.id).desc())
+    follow_ups_by_outcome = [{"status": r[0], "count": r[1]} for r in (await db.execute(fu_by_outcome_raw)).all()]
+
+    # Follow-up completion rate
+    total_fu = (await db.execute(select(func.count()).select_from(fu_base.subquery()))).scalar() or 0
+    fu_completion_rate = round((completed_follow_ups / total_fu * 100), 1) if total_fu > 0 else 0
+
+    # Follow-ups by source (via patient)
+    fu_by_source_raw = select(Patient.patient_source, func.count(FollowUp.id).label("count")).select_from(FollowUp).join(Patient, Patient.id == FollowUp.patient_id).where(Patient.patient_source.isnot(None))
+    if hospital_id:
+        fu_by_source_raw = fu_by_source_raw.where(FollowUp.hospital_id == hospital_id)
+    fu_by_source_raw = fu_by_source_raw.group_by(Patient.patient_source).order_by(func.count(FollowUp.id).desc()).limit(10)
+    follow_ups_by_source = [{"source": r[0], "count": r[1]} for r in (await db.execute(fu_by_source_raw)).all()]
+
+    # Avg response time (hours between created_at and follow_up_date)
+    avg_response_raw = select(func.coalesce(func.avg(
+        func.extract("epoch", FollowUp.completed_date - FollowUp.created_at) / 3600
+    ), 0)).where(FollowUp.completed_date.isnot(None), FollowUp.created_at.isnot(None))
+    if hospital_id:
+        avg_response_raw = avg_response_raw.where(FollowUp.hospital_id == hospital_id)
+    avg_response_hours = float((await db.execute(avg_response_raw)).scalar() or 0)
+
+    # Lead conversion from follow-ups
+    fu_conversion_raw = select(func.count(Lead.id)).select_from(FollowUp).join(Patient, Patient.id == FollowUp.patient_id, isouter=True).join(Lead, Lead.converted_patient_id == Patient.id, isouter=True).where(Lead.id.isnot(None))
+    if hospital_id:
+        fu_conversion_raw = fu_conversion_raw.where(FollowUp.hospital_id == hospital_id)
+    lead_conversion_from_fu = (await db.execute(fu_conversion_raw)).scalar() or 0
+
+    # =========================================================================
+    # CALL ANALYTICS
+    # =========================================================================
+    # We track calls through LeadCommunication / CommunicationLog
+    call_base = select(CommunicationLog).where(CommunicationLog.channel == "CALL")
+    if hospital_id:
+        call_base = call_base.where(CommunicationLog.hospital_id == hospital_id)
+
+    total_calls = (await db.execute(select(func.count()).select_from(call_base.subquery()))).scalar() or 0
+    # Also check LeadCall records
+    lead_call_base = select(LeadCall)
+    if hospital_id:
+        lead_call_base = lead_call_base.where(LeadCall.hospital_id == hospital_id)
+    total_lead_calls = (await db.execute(select(func.count()).select_from(lead_call_base.subquery()))).scalar() or 0
+    total_calls += total_lead_calls
+
+    answered_calls_q = call_base.where(CommunicationLog.status == "SENT")
+    answered_calls = (await db.execute(select(func.count()).select_from(answered_calls_q.subquery()))).scalar() or 0
+    missed_calls = total_calls - answered_calls
+
+    outgoing_calls = total_lead_calls
+    incoming_calls = total_calls - outgoing_calls
+
+    # Avg duration from LeadCall
+    avg_duration_q = select(func.coalesce(func.avg(LeadCall.duration_seconds), 0))
+    if hospital_id:
+        avg_duration_q = avg_duration_q.where(LeadCall.hospital_id == hospital_id)
+    avg_duration = float((await db.execute(avg_duration_q)).scalar() or 0)
+
+    # Calls per day
+    calls_per_day_raw = select(
+        func.date(CommunicationLog.created_at).label("day"),
+        func.count(CommunicationLog.id).label("count"),
+    ).where(CommunicationLog.channel == "CALL")
+    if hospital_id:
+        calls_per_day_raw = calls_per_day_raw.where(CommunicationLog.hospital_id == hospital_id)
+    calls_per_day_raw = calls_per_day_raw.group_by(func.date(CommunicationLog.created_at)).order_by(func.date(CommunicationLog.created_at).desc()).limit(30)
+    calls_per_day = [{"day": str(r[0]), "count": r[1]} for r in (await db.execute(calls_per_day_raw)).all()]
+
+    # =========================================================================
+    # WHATSAPP ANALYTICS
+    # =========================================================================
+    wa_base = select(CommunicationLog).where(CommunicationLog.channel == "WHATSAPP")
+    if hospital_id:
+        wa_base = wa_base.where(CommunicationLog.hospital_id == hospital_id)
+
+    messages_sent = (await db.execute(select(func.count()).select_from(wa_base.subquery()))).scalar() or 0
+    broadcast_messages_q = wa_base.where(CommunicationLog.message_type == "CAMPAIGN")
+    broadcast_messages = (await db.execute(select(func.count()).select_from(broadcast_messages_q.subquery()))).scalar() or 0
+    campaign_messages = broadcast_messages
+    appointment_reminders_q = wa_base.where(CommunicationLog.message_type == "APPOINTMENT_REMINDER")
+    appointment_reminders = (await db.execute(select(func.count()).select_from(appointment_reminders_q.subquery()))).scalar() or 0
+    recall_messages_q = wa_base.where(CommunicationLog.message_type == "RECALL")
+    recall_messages = (await db.execute(select(func.count()).select_from(recall_messages_q.subquery()))).scalar() or 0
+
+    # Messages by day
+    wa_by_day_raw = select(
+        func.date(CommunicationLog.created_at).label("day"),
+        func.count(CommunicationLog.id).label("count"),
+    ).where(CommunicationLog.channel == "WHATSAPP")
+    if hospital_id:
+        wa_by_day_raw = wa_by_day_raw.where(CommunicationLog.hospital_id == hospital_id)
+    wa_by_day_raw = wa_by_day_raw.group_by(func.date(CommunicationLog.created_at)).order_by(func.date(CommunicationLog.created_at).desc()).limit(30)
+    messages_by_day = [{"day": str(r[0]), "count": r[1]} for r in (await db.execute(wa_by_day_raw)).all()]
+
+    # Messages by campaign
+    messages_by_campaign = []
+
+    # Messages by template
+    wa_by_template_raw = select(
+        CommunicationLog.message_type,
+        func.count(CommunicationLog.id).label("count"),
+    ).where(CommunicationLog.channel == "WHATSAPP")
+    if hospital_id:
+        wa_by_template_raw = wa_by_template_raw.where(CommunicationLog.hospital_id == hospital_id)
+    wa_by_template_raw = wa_by_template_raw.group_by(CommunicationLog.message_type).order_by(func.count(CommunicationLog.id).desc())
+    messages_by_template = [{"template": r[0] or "General", "count": r[1]} for r in (await db.execute(wa_by_template_raw)).all()]
+
+    # Messages by staff
+    wa_by_staff_raw = select(CommunicationLog.doctor_id, func.count(CommunicationLog.id).label("count")).where(CommunicationLog.channel == "WHATSAPP", CommunicationLog.doctor_id.isnot(None))
+    if hospital_id:
+        wa_by_staff_raw = wa_by_staff_raw.where(CommunicationLog.hospital_id == hospital_id)
+    wa_by_staff_raw = wa_by_staff_raw.group_by(CommunicationLog.doctor_id).order_by(func.count(CommunicationLog.id).desc()).limit(10)
+    wa_by_staff_rows = (await db.execute(wa_by_staff_raw)).all()
+    messages_by_staff = []
+    for sid, cnt in wa_by_staff_rows:
+        u = await db.get(User, sid) if sid else None
+        messages_by_staff.append({"staff_id": sid, "staff_name": u.full_name if u else "Unknown", "count": cnt})
+
+    # =========================================================================
+    # CAMPAIGN DASHBOARD
+    # =========================================================================
+    camp_base = select(Campaign)
+    if hospital_id:
+        camp_base = camp_base.where(Campaign.hospital_id == hospital_id)
+
+    active_campaigns_q = camp_base.where(Campaign.status == "ACTIVE")
+    active_campaigns = (await db.execute(select(func.count()).select_from(active_campaigns_q.subquery()))).scalar() or 0
+    completed_campaigns_q = camp_base.where(Campaign.status == "COMPLETED")
+    completed_campaigns = (await db.execute(select(func.count()).select_from(completed_campaigns_q.subquery()))).scalar() or 0
+
+    camp_total_messages = (await db.execute(
+        select(func.coalesce(func.sum(Campaign.messages_sent), 0)).select_from(camp_base.subquery())
+    )).scalar() or 0
+    camp_patients_reached = (await db.execute(
+        select(func.count(CampaignRecipient.id)).select_from(camp_base.subquery())
+    )).scalar() or 0
+
+    camp_leads_generated = 0
+    camp_appointments_generated = 0
+    camp_revenue_generated = 0.0
+    campaign_analytics = []
+    campaigns_list = (await db.execute(camp_base.order_by(Campaign.created_at.desc()).limit(20))).scalars().all()
+    for c in campaigns_list:
+        c_leads_q = lead_base.where(Lead.source.ilike(f"%{c.name}%"))
+        c_leads = (await db.execute(select(func.count()).select_from(c_leads_q.subquery()))).scalar() or 0
+        c_conversions_q = lead_base.where(Lead.source.ilike(f"%{c.name}%"), Lead.status == LeadStatus.CONVERTED.value)
+        c_conversions = (await db.execute(select(func.count()).select_from(c_conversions_q.subquery()))).scalar() or 0
+        c_rev = float(c.revenue_generated or 0)
+        c_cost = float(c.messages_sent or 0) * 0.5
+        c_roi = round(((c_rev - c_cost) / c_cost * 100), 1) if c_cost > 0 else 0
+        c_cpl = round(c_cost / c_leads, 2) if c_leads > 0 else 0
+        c_cpc = round(c_cost / c_conversions, 2) if c_conversions > 0 else 0
+        c_cr = round((c_conversions / c_leads * 100), 1) if c_leads > 0 else 0
+        campaign_analytics.append({
+            "id": str(c.id), "name": c.name,
+            "messages": c.messages_sent or 0,
+            "leads": c_leads, "conversions": c_conversions,
+            "revenue": c_rev, "roi": c_roi,
+            "cost": c_cost, "cost_per_lead": c_cpl,
+            "cost_per_conversion": c_cpc, "conversion_rate": c_cr,
+        })
+        camp_leads_generated += c_leads
+        camp_appointments_generated += c_conversions
+        camp_revenue_generated += c_rev
+
+    # =========================================================================
+    # PATIENT ACQUISITION ANALYTICS
+    # =========================================================================
+    patient_base = select(Patient)
+    if hospital_id:
+        patient_base = patient_base.where(Patient.hospital_id == hospital_id)
+
+    acquisition_sources = ["Google", "Instagram", "Facebook", "Referral", "WhatsApp", "Website", "Walk-In", "Campaign", "Doctor Referral", "Other"]
+    acquisition_data = []
+    for src in acquisition_sources:
+        p_q = patient_base.where(Patient.patient_source.ilike(f"%{src}%"))
+        p_count = (await db.execute(select(func.count()).select_from(p_q.subquery()))).scalar() or 0
+        src_leads = 0
+        src_revenue = 0.0
+        if p_count > 0:
+            pids = [row[0] for row in (await db.execute(select(Patient.id).where(Patient.patient_source.ilike(f"%{src}%")))).all()]
+            if hospital_id:
+                pids = [row[0] for row in (await db.execute(
+                    select(Patient.id).where(Patient.hospital_id == hospital_id, Patient.patient_source.ilike(f"%{src}%"))
+                )).all()]
+            src_lead_q = lead_base.where(Lead.source.ilike(f"%{src}%"))
+            src_leads = (await db.execute(select(func.count()).select_from(src_lead_q.subquery()))).scalar() or 0
+            if pids:
+                case_ids_q = select(Case.id).where(Case.patient_id.in_(pids))
+                cids = [row[0] for row in (await db.execute(case_ids_q)).all()]
+                if cids:
+                    src_revenue = float((await db.execute(
+                        select(func.coalesce(func.sum(Billing.paid_amount), 0)).where(Billing.case_id.in_(cids))
+                    )).scalar() or 0)
+        acquisition_data.append({
+            "source": src, "patients": p_count, "leads": src_leads,
+            "conversion_rate": round((p_count / (src_leads or 1) * 100), 1) if src_leads > 0 else 0,
+            "revenue": src_revenue,
+        })
+
+    # =========================================================================
+    # REVENUE ATTRIBUTION
+    # =========================================================================
+    revenue_by_source_data = []
+    source_list = ["Google", "Instagram", "Facebook", "Referral", "WhatsApp", "Website", "Walk-In", "Campaign", "Doctor Referral", "Other"]
+    for src in source_list:
+        p_q = patient_base.where(Patient.patient_source.ilike(f"%{src}%"))
+        pids = [row[0] for row in (await db.execute(select(Patient.id).where(Patient.patient_source.ilike(f"%{src}%")))).all()]
+        if hospital_id:
+            pids = [row[0] for row in (await db.execute(
+                select(Patient.id).where(Patient.hospital_id == hospital_id, Patient.patient_source.ilike(f"%{src}%"))
+            )).all()]
+        rev = 0.0
+        if pids:
+            cids = [row[0] for row in (await db.execute(select(Case.id).where(Case.patient_id.in_(pids)))).all()]
+            if cids:
+                rev = float((await db.execute(
+                    select(func.coalesce(func.sum(Billing.paid_amount), 0)).where(Billing.case_id.in_(cids))
+                )).scalar() or 0)
+        revenue_by_source_data.append({"source": src, "revenue": rev})
+
+    # Revenue by campaign (already in campaign_analytics)
+    # Revenue by doctor
+    revenue_by_doctor_data = []
+    doc_cases_raw = select(Case.doctor_id, func.coalesce(func.sum(Billing.paid_amount), 0).label("revenue")).select_from(Case).join(Billing, Billing.case_id == Case.id).where(Case.doctor_id.isnot(None))
+    if hospital_id:
+        doc_pids = [row[0] for row in (await db.execute(select(Patient.id).where(Patient.hospital_id == hospital_id))).all()]
+        if doc_pids:
+            doc_cases_raw = doc_cases_raw.where(Case.patient_id.in_(doc_pids))
+    doc_cases_raw = doc_cases_raw.group_by(Case.doctor_id).order_by(func.sum(Billing.paid_amount).desc())
+    for doc_id, rev in (await db.execute(doc_cases_raw)).all():
+        d = await db.get(User, doc_id)
+        revenue_by_doctor_data.append({"doctor_id": doc_id, "doctor_name": d.full_name if d else "Unknown", "revenue": float(rev)})
+
+    # Revenue by treatment
+    revenue_by_treatment_data = []
+    tp_rev_raw = select(TreatmentPlan.treatment_name, func.coalesce(func.sum(Billing.paid_amount), 0).label("revenue")).select_from(TreatmentPlan).join(Case, Case.id == TreatmentPlan.case_id, isouter=True).join(Billing, Billing.case_id == Case.id, isouter=True).where(TreatmentPlan.treatment_name.isnot(None))
+    if hospital_id:
+        tp_pids = [row[0] for row in (await db.execute(select(Patient.id).where(Patient.hospital_id == hospital_id))).all()]
+        if tp_pids:
+            tp_rev_raw = tp_rev_raw.where(Case.patient_id.in_(tp_pids))
+    tp_rev_raw = tp_rev_raw.group_by(TreatmentPlan.treatment_name).order_by(func.sum(Billing.paid_amount).desc()).limit(10)
+    revenue_by_treatment_data = [{"treatment": r[0], "revenue": float(r[1])} for r in (await db.execute(tp_rev_raw)).all()]
+
+    # Revenue trend (monthly)
+    revenue_trend_data = []
+    for i in range(5, -1, -1):
+        ym = today - timedelta(days=30 * i)
+        m_start = ym.replace(day=1)
+        m_end = (m_start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+        m_rev = 0.0
+        m_cases_q = select(Case.id)
+        if hospital_id:
+            m_pids = [row[0] for row in (await db.execute(select(Patient.id).where(Patient.hospital_id == hospital_id))).all()]
+            if m_pids:
+                m_cases_q = m_cases_q.where(Case.patient_id.in_(m_pids))
+        m_cids = [row[0] for row in (await db.execute(m_cases_q)).all()]
+        if m_cids:
+            m_rev = float((await db.execute(
+                select(func.coalesce(func.sum(Billing.paid_amount), 0)).where(
+                    Billing.case_id.in_(m_cids),
+                    Billing.updated_at >= datetime.combine(m_start, datetime.min.time()),
+                    Billing.updated_at <= datetime.combine(m_end, datetime.max.time()),
+                )
+            )).scalar() or 0)
+        revenue_trend_data.append({"month": m_start.strftime("%b %Y"), "revenue": m_rev})
+
+    # =========================================================================
+    # CALENDAR WIDGET DATA
+    # =========================================================================
+    calendar_enquiries = (await db.execute(
+        select(func.count()).select_from(fu_base.where(FollowUp.follow_up_date == today).subquery())
+    )).scalar() or 0
+    calendar_appointments = (await db.execute(
+        select(func.count(Appointment.id)).where(Appointment.appointment_date == today)
+    )).scalar() or 0
+
+    # =========================================================================
+    # ALERTS & REMINDERS
+    # =========================================================================
+    high_priority_leads_q = lead_base.where(Lead.priority == "HIGH", Lead.status != LeadStatus.CONVERTED.value)
+    high_priority_leads = (await db.execute(select(func.count()).select_from(high_priority_leads_q.subquery()))).scalar() or 0
+    missed_calls_action_q = lead_call_base.where(LeadCall.outcome.is_(None))
+    missed_calls_action = (await db.execute(select(func.count()).select_from(missed_calls_action_q.subquery()))).scalar() or 0
+    upcoming_appts_q = select(func.count(Appointment.id)).where(Appointment.appointment_date == today, Appointment.status == "SCHEDULED")
+    upcoming_appointments = (await db.execute(upcoming_appts_q)).scalar() or 0
+
+    # Low conversion alert
+    low_conversion_alert = conversion_rate < 20
+
+    kpis = {
+        "total_leads": total_leads,
+        "new_leads": new_leads,
+        "converted_leads": converted_leads,
+        "conversion_rate": conversion_rate,
+        "revenue_from_crm": crm_revenue,
+        "cost_per_lead": cost_per_lead,
+        "pending_follow_ups_today": pending_follow_ups_today,
+        "pending_enquiries_today": pending_enquiries,
+    }
+
+    return {
+        "kpis": kpis,
+        "lead_analytics": {
+            "growth_trend": lead_growth_trend,
+            "by_source": leads_by_source,
+            "by_staff": leads_by_staff,
+            "by_doctor": leads_by_doctor,
+            "by_status": leads_by_status,
+            "timeline": lead_timeline_data,
+            "funnel": funnel_data,
+        },
+        "conversion_analytics": {
+            "funnel": funnel_data,
+            "revenue_generated": crm_revenue,
+            "conversion_trend": lead_growth_trend,
+            "top_sources": leads_by_source[:5],
+            "top_staff": leads_by_staff[:5],
+        },
+        "revenue_analytics": {
+            "revenue_trend": revenue_trend_data,
+            "by_source": revenue_by_source_data,
+            "by_campaign": [{"name": c["name"], "revenue": c["revenue"]} for c in campaign_analytics],
+            "by_doctor": revenue_by_doctor_data,
+            "by_treatment": revenue_by_treatment_data,
+            "monthly_comparison": revenue_trend_data,
+        },
+        "lead_dashboard": recent_leads_data,
+        "enquiry_dashboard": {
+            "today": todays_enquiries_count,
+            "tomorrow": tomorrows_enquiries_count,
+            "this_week": this_week_enquiries_count,
+            "overdue": overdue_enquiries_count,
+            "six_month_recall": six_month_recall_count,
+            "todays_detail": todays_enquiries_detail,
+        },
+        "follow_up_dashboard": {
+            "active": active_follow_ups,
+            "upcoming": upcoming_follow_ups,
+            "completed": completed_follow_ups,
+            "overdue": overdue_follow_ups,
+            "recent": recent_follow_ups_data,
+        },
+        "follow_up_analytics": {
+            "total_follow_ups": total_fu,
+            "completed_follow_ups": completed_follow_ups,
+            "pending_follow_ups": active_follow_ups,
+            "overdue_follow_ups": overdue_follow_ups,
+            "successful_follow_ups": successful_follow_ups,
+            "failed_follow_ups": failed_follow_ups,
+            "by_staff": follow_ups_by_staff,
+            "by_doctor": follow_ups_by_staff,
+            "by_source": follow_ups_by_source,
+            "by_outcome": follow_ups_by_outcome,
+            "completion_rate": fu_completion_rate,
+            "avg_response_time": round(avg_response_hours, 1),
+            "lead_conversion_from_fu": lead_conversion_from_fu,
+        },
+        "call_analytics": {
+            "total_calls": total_calls,
+            "answered_calls": answered_calls,
+            "missed_calls": missed_calls,
+            "outgoing_calls": outgoing_calls,
+            "incoming_calls": incoming_calls,
+            "avg_duration": round(avg_duration, 0),
+            "calls_per_day": calls_per_day,
+        },
+        "whatsapp_analytics": {
+            "messages_sent": messages_sent,
+            "broadcast_messages": broadcast_messages,
+            "campaign_messages": campaign_messages,
+            "appointment_reminders": appointment_reminders,
+            "recall_messages": recall_messages,
+            "messages_by_day": messages_by_day,
+            "messages_by_campaign": messages_by_campaign,
+            "messages_by_template": messages_by_template,
+            "messages_by_staff": messages_by_staff,
+        },
+        "campaign_dashboard": {
+            "active_campaigns": active_campaigns,
+            "completed_campaigns": completed_campaigns,
+            "messages_sent": camp_total_messages,
+            "patients_reached": camp_patients_reached,
+            "leads_generated": camp_leads_generated,
+            "appointments_generated": camp_appointments_generated,
+            "revenue_generated": camp_revenue_generated,
+            "campaigns": campaign_analytics,
+        },
+        "patient_acquisition": acquisition_data,
+        "revenue_attribution": {
+            "by_source": revenue_by_source_data,
+            "by_campaign": [{"name": c["name"], "revenue": c["revenue"]} for c in campaign_analytics],
+            "by_doctor": revenue_by_doctor_data,
+            "by_treatment": revenue_by_treatment_data,
+            "revenue_trend": revenue_trend_data,
+        },
+        "calendar_widget": {
+            "enquiries": calendar_enquiries,
+            "follow_ups": pending_follow_ups_today,
+            "appointments": calendar_appointments,
+            "campaign_schedules": active_campaigns,
+        },
+        "alerts": {
+            "overdue_follow_ups": overdue_follow_ups,
+            "high_priority_leads": high_priority_leads,
+            "missed_calls_action": missed_calls_action,
+            "pending_enquiries": pending_enquiries,
+            "upcoming_appointments": upcoming_appointments,
+            "recall_patients_due": six_month_recall_count,
+            "low_conversion_alert": low_conversion_alert,
+        },
+    }
 
 
 # --- CRM Dashboard (Follow-Up Reminders + Metrics) ---

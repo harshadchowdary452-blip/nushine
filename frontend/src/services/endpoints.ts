@@ -323,6 +323,8 @@ export const crmApi = {
   getEnquiryDashboard: () => api.get("/crm/enquiry/dashboard").then((r) => r.data),
   sourceAnalytics: () => api.get("/crm/source-analytics").then((r) => r.data),
   getTodaysEnquiries: (tab?: string, calendarDate?: string) => api.get("/crm/enquiry/today", { params: { tab, calendar_date: calendarDate } }).then((r) => r.data),
+  dashboard2: (params?: { period?: string; start_date?: string; end_date?: string; doctor?: string; source?: string; campaign?: string; staff?: string; lead_status?: string; follow_up_status?: string; priority?: string; enquiry_type?: string; treatment?: string }) =>
+    api.get("/crm/dashboard2", { params }).then((r) => r.data),
 };
 
 

@@ -26,7 +26,12 @@ const roleNav: Record<string, NavSection[]> = {
       { label: "Admin Groups", icon: Shield, path: "/admin/groups" },
       { label: "Hospitals", icon: Building2, path: "/admin/hospitals" },
       { label: "Doctors", icon: Stethoscope, path: "/admin/doctors" },
+    ]},
+    { label: "CRM", items: [
+      { label: "CRM Dashboard", icon: LayoutDashboard, path: "/crm/dashboard2" },
       { label: "Leads", icon: UserPlus, path: "/leads" },
+      { label: "Campaigns", icon: Megaphone, path: "/crm/campaigns" },
+      { label: "Follow-Ups", icon: Clock, path: "/crm/follow-ups" },
     ]},
     { label: "Finance", items: [
       { label: "Expenses", icon: IndianRupee, path: "/admin/expenses" },
@@ -43,7 +48,12 @@ const roleNav: Record<string, NavSection[]> = {
     { label: "Management", items: [
       { label: "Hospitals", icon: Building2, path: "/admin/hospitals" },
       { label: "Doctors", icon: Stethoscope, path: "/admin/doctors" },
+    ]},
+    { label: "CRM", items: [
+      { label: "CRM Dashboard", icon: LayoutDashboard, path: "/crm/dashboard2" },
       { label: "Leads", icon: UserPlus, path: "/leads" },
+      { label: "Campaigns", icon: Megaphone, path: "/crm/campaigns" },
+      { label: "Follow-Ups", icon: Clock, path: "/crm/follow-ups" },
     ]},
     { label: "Finance", items: [
       { label: "Expenses", icon: IndianRupee, path: "/admin/expenses" },
@@ -64,17 +74,14 @@ const roleNav: Record<string, NavSection[]> = {
       { label: "Treatments", icon: Activity, path: "/treatments" },
       { label: "Billing", icon: Receipt, path: "/billing" },
     ]},
-    { label: "CRM & Sales", items: [
-      { label: "Dashboard", icon: BarChart3, path: "/crm" },
+    { label: "CRM", items: [
+      { label: "CRM Dashboard", icon: LayoutDashboard, path: "/crm/dashboard2" },
       { label: "Leads", icon: UserPlus, path: "/leads" },
-      { label: "Lead Analytics", icon: TrendingUp, path: "/crm/lead-analytics" },
-      { label: "Revenue Attribution", icon: IndianRupee, path: "/crm/revenue-attribution" },
       { label: "Campaigns", icon: Megaphone, path: "/crm/campaigns" },
-      { label: "Follow-Up", icon: Clock, path: "/crm/follow-ups" },
+      { label: "Enquiry Calendar", icon: CalendarDays, path: "/crm/enquiry-calendar" },
+      { label: "Follow-Ups", icon: Clock, path: "/crm/follow-ups" },
       { label: "WhatsApp", icon: MessageSquare, path: "/whatsapp" },
-      { label: "WA Templates", icon: FileText, path: "/whatsapp/templates" },
-      { label: "WA Broadcast", icon: Send, path: "/whatsapp/broadcast" },
-      { label: "Communication", icon: Mail, path: "/crm/communication" },
+      { label: "Communications", icon: Mail, path: "/crm/communications" },
     ]},
     { label: "Management", items: [
       { label: "Doctors", icon: Stethoscope, path: "/admin/doctors" },

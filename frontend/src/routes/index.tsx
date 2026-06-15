@@ -30,8 +30,6 @@ import EmailTemplates from "@/pages/crm/email-templates";
 import FollowUps from "@/pages/crm/follow-ups";
 import Campaigns from "@/pages/crm/campaigns";
 import EnquiryCalendar from "@/pages/crm/enquiry-calendar";
-import CrmDashboard from "@/pages/dashboard/crm-dashboard";
-import CrmPage from "@/pages/crm";
 import LeadAnalytics from "@/pages/crm/lead-analytics";
 import RevenueAttribution from "@/pages/crm/revenue-attribution";
 import LeadList from "@/pages/leads/list";
@@ -40,6 +38,7 @@ import Settings from "@/pages/settings/profile";
 import WhatsAppConfigPage from "@/pages/settings/whatsapp-config";
 import WhatsAppTemplates from "@/pages/whatsapp/templates";
 import WhatsAppBroadcast from "@/pages/whatsapp/broadcast";
+import CrmDashboard from "@/pages/dashboard/crm-dashboard";
 
 const dashboardByRole: Record<Role, string> = {
   SUPER_ADMIN: "/super-admin",
@@ -123,9 +122,9 @@ export const router = createBrowserRouter([
       { path: "/crm/communications", element: withRoles(<CommunicationHistory />, ["HOSPITAL_ADMIN"]) },
       { path: "/crm/templates", element: withRoles(<EmailTemplates />, ["HOSPITAL_ADMIN"]) },
       { path: "/crm/dashboard", element: withRoles(<CrmDashboard />, ADMIN_ROLES) },
+      { path: "/crm/dashboard2", element: withRoles(<CrmDashboard />, ADMIN_ROLES) },
       { path: "/crm/follow-ups", element: withRoles(<FollowUps />, ["HOSPITAL_ADMIN"]) },
       { path: "/crm/campaigns", element: withRoles(<Campaigns />, ["HOSPITAL_ADMIN"]) },
-      { path: "/crm", element: withRoles(<CrmPage />, ADMIN_ROLES) },
       { path: "/crm/enquiry-calendar", element: withRoles(<EnquiryCalendar />, ["HOSPITAL_ADMIN"]) },
       { path: "/crm/lead-analytics", element: withRoles(<LeadAnalytics />, ADMIN_ROLES) },
       { path: "/crm/revenue-attribution", element: withRoles(<RevenueAttribution />, ADMIN_ROLES) },

@@ -135,3 +135,261 @@ WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f1
 WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
 WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['VIEW_LEADS', 'MANAGE_LEADS']
 WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNING:  WatchFiles detected changes in 'app\routers\crm.py'. Reloading...
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['VIEW_LEADS', 'MANAGE_LEADS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_CASES', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['VIEW_ALL_DOCTORS', 'MANAGE_STAFF']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_BILLING']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_CASES', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_BILLING']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNING:  WatchFiles detected changes in 'app\routers\crm.py'. Reloading...
+C:\Users\harsh\AppData\Local\Programs\Python\Python314\Lib\site-packages\uvicorn\_subprocess.py:84: RuntimeWarning: coroutine 'Server.serve' was never awaited
+  pass
+RuntimeWarning: Enable tracemalloc to get the object allocation traceback
+INFO:     Started server process [22952]
+INFO:     Waiting for application startup.
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['VIEW_ALL_DOCTORS', 'MANAGE_STAFF']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_CASES', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['CREATE_TREATMENT_PLAN', 'MANAGE_CASES']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_CASES', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['CREATE_TREATMENT_PLAN', 'MANAGE_CASES']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['CREATE_TREATMENT_PLAN', 'MANAGE_CASES']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_CASES']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_CASES']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_BILLING']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_CASES']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_CASES', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_CASES']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_BILLING']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['CREATE_TREATMENT_PLAN', 'MANAGE_CASES']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['ADD_POST_OP']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_CASES']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['ADD_PRE_OP']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_CASES']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['ADD_PRE_OP']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['ADD_PRE_OP']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_CASES']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['ADD_PRE_OP']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_CASES']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['CREATE_TREATMENT_PLAN', 'MANAGE_CASES']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_CASES', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNING:  WatchFiles detected changes in 'app\routers\crm.py'. Reloading...
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['VIEW_LEADS', 'MANAGE_LEADS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['VIEW_ALL_DOCTORS', 'MANAGE_STAFF']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_APPOINTMENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_CASES', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['CREATE_TREATMENT_PLAN', 'MANAGE_CASES']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_CASES', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_BILLING']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['VIEW_LEADS', 'MANAGE_LEADS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['VIEW_ALL_DOCTORS', 'MANAGE_STAFF']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['VIEW_LEADS', 'MANAGE_LEADS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['VIEW_ALL_DOCTORS', 'MANAGE_STAFF']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['VIEW_LEADS', 'MANAGE_LEADS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['CREATE_PATIENT']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_CASES', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_APPOINTMENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_BILLING']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNING:  WatchFiles detected changes in 'app\routers\crm.py'. Reloading...
+C:\Users\harsh\AppData\Local\Programs\Python\Python314\Lib\site-packages\uvicorn\_subprocess.py:84: RuntimeWarning: coroutine 'Server.serve' was never awaited
+  pass
+RuntimeWarning: Enable tracemalloc to get the object allocation traceback
+INFO:     Started server process [21216]
+INFO:     Waiting for application startup.
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['CREATE_TREATMENT_PLAN', 'MANAGE_CASES']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNING:  WatchFiles detected changes in 'scripts\seed_crm_test_data.py'. Reloading...
+WARNING:  WatchFiles detected changes in 'scripts\seed_crm_test_data.py', 'app\routers\crm.py'. Reloading...
+C:\Users\harsh\AppData\Local\Programs\Python\Python314\Lib\site-packages\uvicorn\_subprocess.py:84: RuntimeWarning: coroutine 'Server.serve' was never awaited
+  pass
+RuntimeWarning: Enable tracemalloc to get the object allocation traceback
+INFO:     Started server process [21616]
+INFO:     Waiting for application startup.
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+WARNING:  WatchFiles detected changes in 'scripts\seed_crm_test_data.py'. Reloading...
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_BILLING']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_CASES', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNING:  WatchFiles detected changes in 'scripts\seed_crm_test_data.py', 'app\routers\crm.py'. Reloading...
+Exception ignored while calling deallocator <function BaseEventLoop.__del__ at 0x0000023D502FC720>:
+Traceback (most recent call last):
+  File "C:\Users\harsh\AppData\Local\Programs\Python\Python314\Lib\asyncio\base_events.py", line 760, in __del__
+    self.close()
+  File "C:\Users\harsh\AppData\Local\Programs\Python\Python314\Lib\asyncio\selector_events.py", line 104, in close
+    self._close_self_pipe()
+  File "C:\Users\harsh\AppData\Local\Programs\Python\Python314\Lib\asyncio\selector_events.py", line 111, in _close_self_pipe
+    self._remove_reader(self._ssock.fileno())
+AttributeError: '_WindowsSelectorEventLoop' object has no attribute '_ssock'
+C:\Users\harsh\AppData\Local\Programs\Python\Python314\Lib\site-packages\uvicorn\_subprocess.py:84: RuntimeWarning: coroutine 'Server.serve' was never awaited
+  pass
+RuntimeWarning: Enable tracemalloc to get the object allocation traceback
+INFO:     Started server process [13768]
+INFO:     Waiting for application startup.
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_BILLING']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_CASES', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_BILLING']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN checking=['MANAGE_BILLING']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=a9170e3f-bfcf-4282-bcc2-3e8f153356d8 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=778b6936-0f6d-469a-a72f-a9a764b95170 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=778b6936-0f6d-469a-a72f-a9a764b95170 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=778b6936-0f6d-469a-a72f-a9a764b95170 role=HOSPITAL_ADMIN checking=['VIEW_ALL_DOCTORS', 'MANAGE_STAFF']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=778b6936-0f6d-469a-a72f-a9a764b95170 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=778b6936-0f6d-469a-a72f-a9a764b95170 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=778b6936-0f6d-469a-a72f-a9a764b95170 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=778b6936-0f6d-469a-a72f-a9a764b95170 role=HOSPITAL_ADMIN checking=['MANAGE_APPOINTMENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=778b6936-0f6d-469a-a72f-a9a764b95170 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=778b6936-0f6d-469a-a72f-a9a764b95170 role=HOSPITAL_ADMIN checking=['MANAGE_CASES', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=778b6936-0f6d-469a-a72f-a9a764b95170 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=778b6936-0f6d-469a-a72f-a9a764b95170 role=HOSPITAL_ADMIN checking=['MANAGE_CASES', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=778b6936-0f6d-469a-a72f-a9a764b95170 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=778b6936-0f6d-469a-a72f-a9a764b95170 role=HOSPITAL_ADMIN checking=['CREATE_TREATMENT_PLAN', 'MANAGE_CASES']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=778b6936-0f6d-469a-a72f-a9a764b95170 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=778b6936-0f6d-469a-a72f-a9a764b95170 role=HOSPITAL_ADMIN checking=['VIEW_LEADS', 'MANAGE_LEADS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=778b6936-0f6d-469a-a72f-a9a764b95170 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=778b6936-0f6d-469a-a72f-a9a764b95170 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=778b6936-0f6d-469a-a72f-a9a764b95170 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=778b6936-0f6d-469a-a72f-a9a764b95170 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=778b6936-0f6d-469a-a72f-a9a764b95170 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=778b6936-0f6d-469a-a72f-a9a764b95170 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=778b6936-0f6d-469a-a72f-a9a764b95170 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=778b6936-0f6d-469a-a72f-a9a764b95170 role=HOSPITAL_ADMIN checking=['MANAGE_PATIENTS', 'VIEW_ALL_PATIENTS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=778b6936-0f6d-469a-a72f-a9a764b95170 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=778b6936-0f6d-469a-a72f-a9a764b95170 role=HOSPITAL_ADMIN checking=['VIEW_ALL_DOCTORS', 'MANAGE_STAFF']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=778b6936-0f6d-469a-a72f-a9a764b95170 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=778b6936-0f6d-469a-a72f-a9a764b95170 role=HOSPITAL_ADMIN checking=['VIEW_LEADS', 'MANAGE_LEADS']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=778b6936-0f6d-469a-a72f-a9a764b95170 role=HOSPITAL_ADMIN
+WARNI [app.core.permissions] VERIFY_PERMISSION sub=778b6936-0f6d-469a-a72f-a9a764b95170 role=HOSPITAL_ADMIN checking=['VIEW_ALL_DOCTORS', 'MANAGE_STAFF']
+WARNI [app.core.permissions] VERIFY_PERMISSION OK: sub=778b6936-0f6d-469a-a72f-a9a764b95170 role=HOSPITAL_ADMIN
+WARNING:  WatchFiles detected changes in 'app\routers\crm.py'. Reloading...
