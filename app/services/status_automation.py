@@ -72,7 +72,7 @@ class StatusAutomationService:
         )
         self.db.add(case)
         await self.db.flush()
-        await self._log_audit("case", case.id, "OPEN", "OPEN", "system", "System", "system", "Auto-created from completed appointment")
+        await self._log_audit("case", case.id, "OPEN", "OPEN", None, "System", "system", "Auto-created from completed appointment")
         await self._create_notification(doctor_id=appt.doctor_id, title="New Case Auto-Created", description=f"Case created from completed appointment for patient")
         await self.update_patient_status(appt.patient_id)
         return case

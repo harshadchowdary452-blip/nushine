@@ -107,12 +107,11 @@ export default function PatientDetail() {
     patient_source: "",
     source_campaign_name: "",
     source_campaign_id: "",
-    source_campaign_date: "",
-    address: "",
-    medical_history: "",
-    diagnosis: "",
-    date_of_birth: "",
-    age: "",
+        source_campaign_date: "",
+        address: "",
+        medical_history: "",
+        diagnosis: "",
+        age: "",
     status: "",
   });
 
@@ -243,7 +242,6 @@ export default function PatientDetail() {
         address: patient.address || "",
         medical_history: patient.medical_history || "",
         diagnosis: patient.diagnosis || "",
-        date_of_birth: patient.date_of_birth || "",
         age: patient.age?.toString() || "",
         status: patient.status || "",
       });
@@ -528,7 +526,9 @@ export default function PatientDetail() {
                     Call
                   </Button>
                 </a>
-                <a href={`https://wa.me/${patient.phone.replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer">
+                <a href={`https://wa.me/${patient.phone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(
+                  `Hello ${patient.patient_name},\n\nThank you for visiting ${patient.hospital_name || "our clinic"}.\nPlease let us know if you need any assistance.\n\nRegards,\n${patient.hospital_name || "Our Clinic"}`
+                )}`} target="_blank" rel="noopener noreferrer">
                   <Button size="sm" variant="outline" className="border-gray-300 dark:border-[#475569]">
                     <MessageSquare className="h-4 w-4 mr-1.5" />
                     WhatsApp
@@ -585,14 +585,6 @@ export default function PatientDetail() {
                             onChange={(e) => setEditForm((f) => ({ ...f, age: e.target.value }))}
                           />
                         </div>
-                      </div>
-                      <div className="grid gap-2">
-                        <Label>Date of Birth</Label>
-                        <Input
-                          type="date"
-                          value={editForm.date_of_birth}
-                          onChange={(e) => setEditForm((f) => ({ ...f, date_of_birth: e.target.value }))}
-                        />
                       </div>
                     </div>
                   </div>
@@ -755,7 +747,7 @@ export default function PatientDetail() {
 
       {/* Tabs */}
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="bg-white border border-border rounded-xl p-1">
+        <TabsList className="bg-white border border-border rounded-xl p-1 overflow-x-auto flex-nowrap scroll-smooth">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="cases">Cases ({casesList.length})</TabsTrigger>
           <TabsTrigger value="appointments">Appointments ({appointmentsList.length})</TabsTrigger>
@@ -766,7 +758,7 @@ export default function PatientDetail() {
           <TabsTrigger value="timeline">Timeline</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="mt-6">
+        <TabsContent value="overview" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card className="p-6 border-border shadow-card">
               <h3 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
@@ -784,11 +776,7 @@ export default function PatientDetail() {
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-text-secondary">Age</dt>
-                  <dd className="font-medium">{patient.age || "—"}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-text-secondary">Date of Birth</dt>
-                  <dd className="font-medium">{patient.date_of_birth || "—"}</dd>
+                  <dd className="font-medium">{patient.age ? `${patient.age} yrs` : "—"}</dd>
                 </div>
               </dl>
             </Card>
@@ -862,7 +850,7 @@ export default function PatientDetail() {
           </div>
         </TabsContent>
 
-        <TabsContent value="cases" className="mt-6">
+        <TabsContent value="cases" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
           {casesList.length === 0 ? (
             <Card className="p-12 text-center border-border shadow-card">
               <FileText className="h-12 w-12 text-text-muted mx-auto mb-3" />
@@ -894,7 +882,7 @@ export default function PatientDetail() {
           )}
         </TabsContent>
 
-        <TabsContent value="appointments" className="mt-6">
+        <TabsContent value="appointments" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
           {appointmentsList.length === 0 ? (
             <Card className="p-12 text-center border-border shadow-card">
               <Clock className="h-12 w-12 text-text-muted mx-auto mb-3" />
@@ -919,7 +907,7 @@ export default function PatientDetail() {
           )}
         </TabsContent>
 
-        <TabsContent value="treatments" className="mt-6">
+        <TabsContent value="treatments" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
           {treatmentPlansList.length === 0 ? (
             <Card className="p-12 text-center border-border shadow-card">
               <FileText className="h-12 w-12 text-text-muted mx-auto mb-3" />
@@ -927,27 +915,42 @@ export default function PatientDetail() {
             </Card>
           ) : (
             <div className="space-y-3">
-              {treatmentPlansList.map((t: TreatmentPlan) => (
-                <Card key={t.id} className="p-4 border-border shadow-card">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-text-primary truncate">{t.treatment_name}</p>
-                      <p className="text-sm text-text-muted mt-1">
-                        Cost: {formatIndianRupees(t.cost)}
-                        {t.duration_minutes && ` | Duration: ${t.duration_minutes} min`}
-                      </p>
-                    </div>
-                    <div className="ml-4">
+              {treatmentPlansList.map((t: TreatmentPlan) => {
+                const pending = t.pending_amount ?? (t.cost - (t.paid_amount || 0))
+                return (
+                  <Card
+                    key={t.id}
+                    className="p-4 border-border shadow-card card-hover cursor-pointer"
+                    onClick={() => navigate(`/treatments/${t.id}`)}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-text-primary truncate">{t.treatment_name}</p>
+                      </div>
                       <StatusBadge status={t.status} />
                     </div>
-                  </div>
-                </Card>
-              ))}
+                    <div className="flex flex-wrap gap-3 text-xs text-text-muted">
+                      <span>Cost: {formatIndianRupees(t.cost)}</span>
+                      <span>Paid: <span className="text-success">{formatIndianRupees(t.paid_amount || 0)}</span></span>
+                      <span>Pending: <span className="text-danger">{formatIndianRupees(pending)}</span></span>
+                      {t.duration_minutes && <span>Duration: {t.duration_minutes} min</span>}
+                    </div>
+                    {t.total_sittings > 0 && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <div className="flex-1 bg-gray-200 rounded-full h-1.5">
+                          <div className="bg-primary h-1.5 rounded-full" style={{ width: `${t.progress}%` }} />
+                        </div>
+                        <span className="text-xs text-text-muted">{t.progress}%</span>
+                      </div>
+                    )}
+                  </Card>
+                )
+              })}
             </div>
           )}
         </TabsContent>
 
-        <TabsContent value="billing" className="mt-6">
+        <TabsContent value="billing" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
           {billingsList.length === 0 ? (
             <Card className="p-12 text-center border-border shadow-card">
               <FileText className="h-12 w-12 text-text-muted mx-auto mb-3" />
@@ -975,7 +978,7 @@ export default function PatientDetail() {
           )}
         </TabsContent>
 
-        <TabsContent value="responses" className="mt-6">
+        <TabsContent value="responses" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
           <Card className="p-6 border-border shadow-card">
             <h3 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
               <MessageSquare className="h-5 w-5 text-primary" />
@@ -1066,7 +1069,7 @@ export default function PatientDetail() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="follow-ups" className="mt-6">
+        <TabsContent value="follow-ups" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
           {followUpHistory && followUpHistory.length > 0 ? (
             <FollowUpHistory patientId={id!} />
           ) : (
@@ -1077,7 +1080,7 @@ export default function PatientDetail() {
           )}
         </TabsContent>
 
-        <TabsContent value="timeline" className="mt-6">
+        <TabsContent value="timeline" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
           {renderTimeline()}
         </TabsContent>
 

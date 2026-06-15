@@ -103,6 +103,7 @@ export default function BillingDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["billing", id] });
       queryClient.invalidateQueries({ queryKey: ["billings"] });
+      queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" });
       addToast({ title: "Success", description: "Discount applied successfully", variant: "success" });
       setDiscountOpen(false);
       setDiscountPercent("");

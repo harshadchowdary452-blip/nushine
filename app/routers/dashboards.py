@@ -16,6 +16,9 @@ from app.models.appointment import Appointment, AppointmentStatus, AppointmentTy
 from app.models.follow_up import FollowUp, FollowUpStatus
 from app.models.billing import Billing, PaymentStatus
 from app.models.treatment_plan import TreatmentPlan
+from app.models.pre_op import PreOp
+from app.models.post_op import PostOp
+from app.models.treatment_sitting import TreatmentSitting
 from app.utils.dashboard_helpers import (
     get_date_range, get_previous_date_range, calculate_revenue, calculate_expenses_for_date_range,
     calculate_profit, calculate_profit_margin, revenue_trend_with_expenses
@@ -1262,6 +1265,33 @@ async def quick_view_patient(patient_id: str, db: AsyncSession = Depends(get_db)
             }
             break
 
+    # Pre-Ops
+    pre_ops_list = []
+    if case_ids:
+        pre_ops_r = await db.execute(
+            select(PreOp).where(PreOp.case_id.in_(case_ids)).order_by(PreOp.created_at.desc())
+        )
+        pre_ops_list = pre_ops_r.scalars().all()
+
+    # Post-Ops
+    post_ops_list = []
+    if case_ids:
+        post_ops_r = await db.execute(
+            select(PostOp).where(PostOp.case_id.in_(case_ids)).order_by(PostOp.created_at.desc())
+        )
+        post_ops_list = post_ops_r.scalars().all()
+
+    # Treatment Sittings progress
+    treatment_ids = [t.id for t in treatments]
+    sittings_progress = {"total": 0, "completed": 0}
+    if treatment_ids:
+        sittings_r = await db.execute(
+            select(TreatmentSitting).where(TreatmentSitting.treatment_plan_id.in_(treatment_ids))
+        )
+        all_sittings = sittings_r.scalars().all()
+        sittings_progress["total"] = len(all_sittings)
+        sittings_progress["completed"] = sum(1 for s in all_sittings if s.status == "COMPLETED")
+
     # Status history timeline
     timeline = []
     for c in cases:
@@ -1356,4 +1386,27 @@ async def quick_view_patient(patient_id: str, db: AsyncSession = Depends(get_db)
             for b in billings
         ],
         "timeline": timeline[:20],
+        "pre_ops": [
+            {
+                "id": str(p.id),
+                "case_id": str(p.case_id),
+                "notes": p.notes,
+                "photo_urls": p.photo_urls,
+                "xray_urls": p.xray_urls,
+                "created_at": p.created_at.isoformat(),
+            }
+            for p in pre_ops_list
+        ],
+        "post_ops": [
+            {
+                "id": str(p.id),
+                "case_id": str(p.case_id),
+                "notes": p.notes,
+                "report": p.report,
+                "photo_urls": p.photo_urls,
+                "created_at": p.created_at.isoformat(),
+            }
+            for p in post_ops_list
+        ],
+        "treatment_progress": sittings_progress,
     }

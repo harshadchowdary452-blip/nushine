@@ -67,7 +67,7 @@ interface PatientForm {
   email: string
   phone: string
   gender: string
-  date_of_birth: string
+  age: string
   patient_source: string
   source_campaign_name: string
   source_campaign_id: string
@@ -78,7 +78,7 @@ interface PatientForm {
 
 function getEmptyForm(): PatientForm {
   return {
-    full_name: "", email: "", phone: "", gender: "", date_of_birth: "",
+    full_name: "", email: "", phone: "", gender: "", age: "",
     patient_source: "", source_campaign_name: "", source_campaign_id: "",
     source_campaign_date: "", address: "", diagnosis: "",
   }
@@ -479,12 +479,12 @@ export default function PatientList() {
                   </Select>
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="dob">Date of Birth</Label>
+                  <Label htmlFor="age">Age</Label>
                   <Input
-                    id="dob"
-                    type="date"
-                    value={form.date_of_birth}
-                    onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })}
+                    id="age"
+                    type="number"
+                    value={form.age}
+                    onChange={(e) => setForm({ ...form, age: e.target.value })}
                   />
                 </div>
               </div>

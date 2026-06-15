@@ -13,7 +13,7 @@ class TemplateEngine:
     @staticmethod
     def validate_variables(template: str) -> dict[str, list[str]]:
         known = {
-            "patient_name", "doctor_name", "hospital_name",
+            "patient_name", "lead_name", "doctor_name", "hospital_name",
             "appointment_date", "appointment_time",
             "invoice_number", "pending_amount", "due_date",
         }
@@ -34,6 +34,7 @@ class TemplateEngine:
     @staticmethod
     def build_variables(
         patient_name: Optional[str] = None,
+        lead_name: Optional[str] = None,
         doctor_name: Optional[str] = None,
         hospital_name: Optional[str] = None,
         appointment_date: Optional[str] = None,
@@ -44,6 +45,7 @@ class TemplateEngine:
     ) -> Dict[str, str]:
         variables: Dict[str, str] = {}
         if patient_name: variables["patient_name"] = patient_name
+        if lead_name: variables["lead_name"] = lead_name
         if doctor_name: variables["doctor_name"] = doctor_name
         if hospital_name: variables["hospital_name"] = hospital_name
         if appointment_date: variables["appointment_date"] = appointment_date

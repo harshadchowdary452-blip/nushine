@@ -44,6 +44,8 @@ class Permission(str, Enum):
     COMPLETE_TREATMENT = "COMPLETE_TREATMENT"
     MANAGE_EXPENSES = "MANAGE_EXPENSES"
     VIEW_EXPENSES = "VIEW_EXPENSES"
+    MANAGE_LEADS = "MANAGE_LEADS"
+    VIEW_LEADS = "VIEW_LEADS"
 
 
 ROLE_PERMISSIONS = {
@@ -62,6 +64,7 @@ ROLE_PERMISSIONS = {
         Permission.ADD_POST_OP, Permission.ASSIGN_CONSULTANT,
         Permission.UPDATE_BILLING, Permission.COMPLETE_TREATMENT,
         Permission.MANAGE_EXPENSES, Permission.VIEW_EXPENSES,
+        Permission.MANAGE_LEADS, Permission.VIEW_LEADS,
     ],
     Role.GROUP_ADMIN: [
         Permission.CREATE_HOSPITAL, Permission.CREATE_HOSPITAL_ADMIN,
@@ -75,6 +78,7 @@ ROLE_PERMISSIONS = {
         Permission.CREATE_CONSULTANT,
         Permission.UPDATE_BILLING,
         Permission.VIEW_EXPENSES,
+        Permission.MANAGE_LEADS, Permission.VIEW_LEADS,
     ],
     Role.HOSPITAL_ADMIN: [
         Permission.CREATE_DOCTOR, Permission.CREATE_CONSULTANT,
@@ -85,6 +89,7 @@ ROLE_PERMISSIONS = {
         Permission.ADD_PRE_OP, Permission.ADD_POST_OP,
         Permission.UPDATE_BILLING,
         Permission.MANAGE_EXPENSES,
+        Permission.MANAGE_LEADS, Permission.VIEW_LEADS,
     ],
     Role.DOCTOR: [
         Permission.MANAGE_PATIENTS,
@@ -96,6 +101,7 @@ ROLE_PERMISSIONS = {
         Permission.UPDATE_BILLING, Permission.MANAGE_BILLING,
         Permission.COMPLETE_TREATMENT,
         Permission.VIEW_ALL_DOCTORS, Permission.VIEW_OWN_HOSPITALS,
+        Permission.MANAGE_LEADS, Permission.VIEW_LEADS,
     ],
 }
 

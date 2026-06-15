@@ -18,6 +18,7 @@ from app.models.email_template import EmailTemplate
 from app.models.patient import Patient
 from app.models.user import User
 from app.models.hospital import Hospital
+from app.models.lead import Lead, LeadCommunication
 from app.models.case import Case
 from app.models.treatment_plan import TreatmentPlan, TreatmentPlanStatus
 from app.models.billing import Billing
@@ -31,7 +32,8 @@ router = APIRouter(prefix="/crm", tags=["CRM"])
 # --- Schemas ---
 
 class SendWhatsAppRequest(BaseModel):
-    patient_id: str
+    patient_id: Optional[str] = None
+    lead_id: Optional[str] = None
     message: str = Field(..., min_length=1, max_length=1000)
     message_type: str = "GENERAL"
 
@@ -47,6 +49,7 @@ class BroadcastRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=1000)
     message_type: str = "CAMPAIGN"
     patient_ids: Optional[List[str]] = None
+    lead_ids: Optional[List[str]] = None
     appointment_date: Optional[str] = None
     doctor_id: Optional[str] = None
     status: Optional[str] = None
@@ -176,12 +179,46 @@ async def send_whatsapp(
     current_user: dict = Depends(get_current_user),
 ):
     verify_permission(current_user, Permission.MANAGE_PATIENTS)
+    phone = None
+    recipient_name = ""
+    hospital_id = current_user.get("hospital_id")
+
+    if req.lead_id:
+        lead = await db.get(Lead, req.lead_id)
+        if not lead:
+            raise HTTPException(status_code=404, detail="Lead not found")
+        phone = lead.mobile
+        recipient_name = lead.lead_name
+        hospital_id = hospital_id or lead.hospital_id
+        hospital_obj = await db.get(Hospital, hospital_id)
+        hospital_name = hospital_obj.name if hospital_obj else None
+        variables = TemplateEngine.build_variables(
+            lead_name=lead.lead_name,
+            hospital_name=hospital_name,
+        )
+        rendered = TemplateEngine.render_template(req.message, variables)
+        provider = WhatsAppProvider()
+        success = await provider.send_message(phone, rendered)
+        comm = LeadCommunication(
+            lead_id=lead.id, hospital_id=hospital_id, sent_by=current_user.get("sub"),
+            channel="WHATSAPP", message_type=req.message_type, message=rendered,
+            status="SENT" if success else "FAILED",
+            sent_at=datetime.now(timezone.utc) if success else None,
+        )
+        db.add(comm)
+        await db.commit()
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to send WhatsApp message")
+        return {"success": True, "lead_comm_id": comm.id, "rendered_message": rendered}
+
     patient = await db.get(Patient, req.patient_id)
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
     if not patient.phone:
         raise HTTPException(status_code=400, detail="Patient has no phone number")
-    hospital_id = current_user.get("hospital_id") or patient.hospital_id
+    phone = patient.phone
+    recipient_name = patient.full_name
+    hospital_id = hospital_id or patient.hospital_id
     doctor_name = None
     if patient.doctor_id:
         doc = await db.get(User, patient.doctor_id)
@@ -195,7 +232,7 @@ async def send_whatsapp(
     )
     rendered = TemplateEngine.render_template(req.message, variables)
     provider = WhatsAppProvider()
-    success = await provider.send_message(patient.phone, rendered)
+    success = await provider.send_message(phone, rendered)
     status_val = CommunicationStatus.SENT.value if success else CommunicationStatus.FAILED.value
     log = await _log_communication(
         db, req.patient_id, hospital_id, current_user.get("sub"),
@@ -217,11 +254,19 @@ async def preview_broadcast(
     hospital_id = current_user.get("hospital_id")
     patients, errors = await _get_patients_for_broadcast(db, hospital_id, req)
     recipients = [{"id": p.id, "name": p.full_name, "phone": p.phone} for p in patients]
+
+    leads = []
+    if req.lead_ids:
+        from sqlalchemy import select
+        result = await db.execute(select(Lead).where(Lead.id.in_(req.lead_ids)))
+        leads = list(result.scalars().all())
+        recipients.extend([{"id": l.id, "name": l.lead_name, "phone": l.mobile, "type": "lead"} for l in leads])
+
     return {
-        "total_recipients": len(patients),
+        "total_recipients": len(patients) + len(leads),
         "recipients": recipients,
         "errors": errors,
-        "estimated_delivery": f"~{len(patients) * 2} seconds",
+        "estimated_delivery": f"~{(len(patients) + len(leads)) * 2} seconds",
     }
 
 
@@ -258,12 +303,40 @@ async def broadcast_whatsapp(
             sent += 1
         else:
             failed += 1
+
+    if req.lead_ids:
+        from sqlalchemy import select
+        result = await db.execute(select(Lead).where(Lead.id.in_(req.lead_ids)))
+        leads = list(result.scalars().all())
+        for lead in leads:
+            if not lead.mobile:
+                failed += 1
+                continue
+            variables = TemplateEngine.build_variables(
+                lead_name=lead.lead_name,
+                hospital_name=hospital_name or "",
+            )
+            rendered = TemplateEngine.render_template(req.message, variables)
+            success = await provider.send_message(lead.mobile, rendered)
+            comm = LeadCommunication(
+                lead_id=lead.id, hospital_id=hospital_id, sent_by=current_user.get("sub"),
+                channel="WHATSAPP", message_type=req.message_type, message=rendered,
+                status="SENT" if success else "FAILED",
+                sent_at=datetime.now(timezone.utc) if success else None,
+            )
+            db.add(comm)
+            if success:
+                sent += 1
+            else:
+                failed += 1
+
     await db.commit()
+    total = len(patients) + (len(req.lead_ids) if req.lead_ids else 0)
     return {
         "success": True,
         "sent": sent,
         "failed": failed,
-        "total": len(patients),
+        "total": total,
         "errors": errors,
     }
 
@@ -938,9 +1011,12 @@ async def get_crm_dashboard(
     patient_base = select(Patient)
     if hospital_id:
         patient_base = patient_base.where(Patient.hospital_id == hospital_id)
-    source_counts_q = patient_base.where(Patient.patient_source.isnot(None)).with_entities(
+    source_counts_q = select(
         Patient.patient_source, func.count(Patient.id).label("count")
-    ).group_by(Patient.patient_source).order_by(func.count(Patient.id).desc())
+    ).where(Patient.patient_source.isnot(None))
+    if hospital_id:
+        source_counts_q = source_counts_q.where(Patient.hospital_id == hospital_id)
+    source_counts_q = source_counts_q.group_by(Patient.patient_source).order_by(func.count(Patient.id).desc())
     source_counts = (await db.execute(source_counts_q)).all()
     patients_by_source = [{"source": row[0], "count": row[1]} for row in source_counts]
     total_patients_with_source = sum(row[1] for row in source_counts) or 1
@@ -951,6 +1027,7 @@ async def get_crm_dashboard(
         Patient.patient_source,
         func.coalesce(func.sum(Billing.paid_amount), 0).label("revenue"),
         func.count(Patient.id.distinct()).label("patients")
+    ).select_from(Patient
     ).outerjoin(Case, Case.patient_id == Patient.id
     ).outerjoin(Billing, Billing.case_id == Case.id
     ).where(Patient.patient_source.isnot(None))
@@ -981,13 +1058,16 @@ async def get_crm_dashboard(
             m_end = (ym.replace(day=1) + timedelta(days=32)).replace(day=1) - timedelta(days=1)
         else:
             m_end = today
-        m_sources_q = patient_base.where(
+        m_sources_q = select(
+            Patient.patient_source, func.count(Patient.id).label("count")
+        ).where(
             Patient.patient_source.isnot(None),
             Patient.created_at >= m_start,
             Patient.created_at <= m_end,
-        ).with_entities(
-            Patient.patient_source, func.count(Patient.id).label("count")
-        ).group_by(Patient.patient_source)
+        )
+        if hospital_id:
+            m_sources_q = m_sources_q.where(Patient.hospital_id == hospital_id)
+        m_sources_q = m_sources_q.group_by(Patient.patient_source)
         m_rows = (await db.execute(m_sources_q)).all()
         month_label = m_start.strftime("%b %Y")
         monthly_acquisition.append({
@@ -1000,6 +1080,7 @@ async def get_crm_dashboard(
     campaign_patients = (await db.execute(select(func.count()).select_from(campaign_base.subquery()))).scalar() or 0
     campaign_revenue_q = select(
         func.coalesce(func.sum(Billing.paid_amount), 0)
+    ).select_from(Patient
     ).outerjoin(Case, Case.patient_id == Patient.id
     ).outerjoin(Billing, Billing.case_id == Case.id
     ).where(Patient.patient_source == "Campaign")
@@ -1007,7 +1088,7 @@ async def get_crm_dashboard(
         campaign_revenue_q = campaign_revenue_q.where(Patient.hospital_id == hospital_id)
     campaign_revenue = float((await db.execute(campaign_revenue_q)).scalar() or 0)
     total_revenue_all = float((await db.execute(
-        select(func.coalesce(func.sum(Billing.paid_amount), 0))
+        select(func.coalesce(func.sum(Billing.paid_amount), 0)).select_from(Billing)
     )).scalar() or 1)
     campaign_roi = round((campaign_revenue / total_revenue_all) * 100, 1) if total_revenue_all else 0
 
@@ -1102,7 +1183,7 @@ async def get_source_analytics(
     if hospital_id:
         patient_base = patient_base.where(Patient.hospital_id == hospital_id)
 
-    source_counts_q = patient_base.where(Patient.patient_source.isnot(None)).with_entities(
+    source_counts_q = patient_base.where(Patient.patient_source.isnot(None)).add_columns(
         Patient.patient_source, func.count(Patient.id).label("count")
     ).group_by(Patient.patient_source).order_by(func.count(Patient.id).desc())
     source_counts = (await db.execute(source_counts_q)).all()
@@ -1131,7 +1212,7 @@ async def get_source_analytics(
             Patient.patient_source.isnot(None),
             Patient.created_at >= m_start,
             Patient.created_at <= (m_start + timedelta(days=32)).replace(day=1) - timedelta(days=1),
-        ).with_entities(
+        ).add_columns(
             Patient.patient_source, func.count(Patient.id).label("count")
         ).group_by(Patient.patient_source)
         m_rows = (await db.execute(m_sources_q)).all()

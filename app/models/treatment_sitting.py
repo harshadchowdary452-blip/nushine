@@ -1,6 +1,6 @@
 import uuid
-from datetime import datetime, date, timezone
-from sqlalchemy import String, DateTime, Date, Text, Integer, ForeignKey, Enum as SAEnum
+from datetime import datetime, date, time, timezone
+from sqlalchemy import String, DateTime, Date, Time, Text, Integer, ForeignKey, Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 from enum import Enum
@@ -24,6 +24,7 @@ class TreatmentSitting(Base):
     status: Mapped[TreatmentSittingStatus] = mapped_column(SAEnum(TreatmentSittingStatus, create_constraint=False), default=TreatmentSittingStatus.PLANNED, nullable=False)
     doctor_notes: Mapped[str] = mapped_column(Text, nullable=True)
     next_appointment_date: Mapped[date] = mapped_column(Date, nullable=True)
+    next_appointment_time: Mapped[time] = mapped_column(Time, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     treatment_plan = relationship("TreatmentPlan", back_populates="sittings")

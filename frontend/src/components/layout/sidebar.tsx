@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import {
   LayoutDashboard, Users, FolderOpen,   CalendarDays, Stethoscope, Receipt, UserCog, Settings,
   ChevronLeft, X, Building2, Shield, MessageSquare, Activity, Menu, IndianRupee, TrendingUp,
-  Bell, Mail, BarChart3, FileText, Phone, ClipboardList, Calendar, Megaphone, Clock,
+  Bell, Mail, BarChart3, FileText, Phone, ClipboardList, Calendar, Megaphone, Clock, UserPlus, Send,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useSidebarStore } from "@/store/sidebarStore"
@@ -26,12 +26,14 @@ const roleNav: Record<string, NavSection[]> = {
       { label: "Admin Groups", icon: Shield, path: "/admin/groups" },
       { label: "Hospitals", icon: Building2, path: "/admin/hospitals" },
       { label: "Doctors", icon: Stethoscope, path: "/admin/doctors" },
+      { label: "Leads", icon: UserPlus, path: "/leads" },
     ]},
     { label: "Finance", items: [
       { label: "Expenses", icon: IndianRupee, path: "/admin/expenses" },
     ]},
     { label: "Settings", items: [
       { label: "Settings", icon: Settings, path: "/settings" },
+      { label: "WhatsApp Config", icon: MessageSquare, path: "/settings/whatsapp" },
     ]},
   ],
   GROUP_ADMIN: [
@@ -41,12 +43,14 @@ const roleNav: Record<string, NavSection[]> = {
     { label: "Management", items: [
       { label: "Hospitals", icon: Building2, path: "/admin/hospitals" },
       { label: "Doctors", icon: Stethoscope, path: "/admin/doctors" },
+      { label: "Leads", icon: UserPlus, path: "/leads" },
     ]},
     { label: "Finance", items: [
       { label: "Expenses", icon: IndianRupee, path: "/admin/expenses" },
     ]},
     { label: "Settings", items: [
       { label: "Settings", icon: Settings, path: "/settings" },
+      { label: "WhatsApp Config", icon: MessageSquare, path: "/settings/whatsapp" },
     ]},
   ],
   HOSPITAL_ADMIN: [
@@ -60,13 +64,17 @@ const roleNav: Record<string, NavSection[]> = {
       { label: "Treatments", icon: Activity, path: "/treatments" },
       { label: "Billing", icon: Receipt, path: "/billing" },
     ]},
-    { label: "CRM", items: [
+    { label: "CRM & Sales", items: [
       { label: "Dashboard", icon: BarChart3, path: "/crm" },
+      { label: "Leads", icon: UserPlus, path: "/leads" },
+      { label: "Lead Analytics", icon: TrendingUp, path: "/crm/lead-analytics" },
+      { label: "Revenue Attribution", icon: IndianRupee, path: "/crm/revenue-attribution" },
       { label: "Campaigns", icon: Megaphone, path: "/crm/campaigns" },
       { label: "Follow-Up", icon: Clock, path: "/crm/follow-ups" },
       { label: "WhatsApp", icon: MessageSquare, path: "/whatsapp" },
-      { label: "Communication", icon: MessageSquare, path: "/crm/communication" },
-      { label: "Analytics", icon: BarChart3, path: "/crm/analytics" },
+      { label: "WA Templates", icon: FileText, path: "/whatsapp/templates" },
+      { label: "WA Broadcast", icon: Send, path: "/whatsapp/broadcast" },
+      { label: "Communication", icon: Mail, path: "/crm/communication" },
     ]},
     { label: "Management", items: [
       { label: "Doctors", icon: Stethoscope, path: "/admin/doctors" },
@@ -76,6 +84,7 @@ const roleNav: Record<string, NavSection[]> = {
     ]},
     { label: "Settings", items: [
       { label: "Settings", icon: Settings, path: "/settings" },
+      { label: "WhatsApp Config", icon: MessageSquare, path: "/settings/whatsapp" },
     ]},
   ],
   DOCTOR: [

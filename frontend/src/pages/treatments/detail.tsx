@@ -1,7 +1,8 @@
-import { useState } from "react"
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState, useMemo } from "react"
 import { useParams, useNavigate, Link } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { ArrowLeft, Calendar, CalendarDays, Clock, User, Activity, FileText, Edit3, Plus, MessageSquare, History, DollarSign } from "lucide-react"
+import { ArrowLeft, Calendar, CalendarDays, Clock, User, Activity, FileText, Edit3, Plus, MessageSquare, History, DollarSign, Camera, ZoomIn, ZoomOut, RotateCcw, Download, ExternalLink, Maximize, Minimize } from "lucide-react"
 import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -31,11 +32,12 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { treatmentApi, treatmentSittingsApi, patientsApi, crmApi } from "@/services/endpoints"
+import { treatmentApi, treatmentSittingsApi, patientsApi, crmApi, billingApi } from "@/services/endpoints"
+import api from "@/services/api"
 import { useToast } from "@/components/ui/toast"
 import { formatIndianRupees } from "@/lib/currency"
 import { cn } from "@/lib/utils"
-import type { TreatmentPlan, TreatmentSitting, Patient } from "@/types"
+import type { TreatmentPlan, TreatmentSitting, Patient, Billing, PreOp, PostOp } from "@/types"
 
 function S() {
   return <div className="space-y-4 p-6">
@@ -67,7 +69,9 @@ export default function TreatmentDetail() {
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [editForm, setEditForm] = useState<any>({})
   const [sittingDialogOpen, setSittingDialogOpen] = useState(false)
-  const [sittingForm, setSittingForm] = useState({ sitting_number: 1, work_done: "", doctor_notes: "", next_appointment_date: "" })
+  const [sittingForm, setSittingForm] = useState({ sitting_number: 1, work_done: "", doctor_notes: "", next_appointment_date: "", next_appointment_time: "" })
+  const [editingSitting, setEditingSitting] = useState<TreatmentSitting | null>(null)
+  const [editSittingForm, setEditSittingForm] = useState({ work_done: "", doctor_notes: "", status: "", next_appointment_date: "", next_appointment_time: "" })
 
   const { data: plan, isLoading } = useQuery({
     queryKey: ["treatment-plan", id],
@@ -91,10 +95,52 @@ export default function TreatmentDetail() {
 
   const patient: Patient | null = patientData || null
 
+  const { data: billings } = useQuery({
+    queryKey: ["case-billings", plan?.case_id],
+    queryFn: () => billingApi.list({ case_id: plan!.case_id }),
+    enabled: !!plan?.case_id,
+  })
+  const billingList: Billing[] = useMemo(() => {
+    const raw = Array.isArray(billings) ? billings : (billings?.items || [])
+    return raw as Billing[]
+  }, [billings])
+
+  const { data: preOpsRaw } = useQuery({
+    queryKey: ["case-preops", plan?.case_id],
+    queryFn: async () => {
+      const r = await api.get(`/pre-ops/${plan!.case_id}`)
+      return r.data
+    },
+    enabled: !!plan?.case_id,
+  })
+
+  const { data: postOpsRaw } = useQuery({
+    queryKey: ["case-postops", plan?.case_id],
+    queryFn: async () => {
+      const r = await api.get(`/post-ops/${plan!.case_id}`)
+      return r.data
+    },
+    enabled: !!plan?.case_id,
+  })
+
+  const preOpPhotos: string[] = useMemo(() => {
+    if (!preOpsRaw?.photo_urls) return []
+    return preOpsRaw.photo_urls.split(",").filter(Boolean)
+  }, [preOpsRaw])
+  const preOpXrays: string[] = useMemo(() => {
+    if (!preOpsRaw?.xray_urls) return []
+    return preOpsRaw.xray_urls.split(",").filter(Boolean)
+  }, [preOpsRaw])
+  const postOpPhotos: string[] = useMemo(() => {
+    if (!postOpsRaw?.photo_urls) return []
+    return postOpsRaw.photo_urls.split(",").filter(Boolean)
+  }, [postOpsRaw])
+
   const statusMutation = useMutation({
     mutationFn: ({ sid, status }: { sid: string; status: string }) => treatmentApi.updateStatus(sid, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["treatment-plan", id] })
+      queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" })
       addToast({ title: "Success", description: "Status updated", variant: "success" })
     },
     onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed", variant: "destructive" }),
@@ -104,6 +150,7 @@ export default function TreatmentDetail() {
     mutationFn: ({ sid, data }: { sid: string; data: any }) => treatmentApi.update(sid, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["treatment-plan", id] })
+      queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" })
       addToast({ title: "Success", description: "Treatment plan updated", variant: "success" })
       setEditDialogOpen(false)
     },
@@ -115,9 +162,22 @@ export default function TreatmentDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["treatment-sittings", id] })
       queryClient.invalidateQueries({ queryKey: ["treatment-plan", id] })
+      queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" })
       addToast({ title: "Success", description: "Sitting added", variant: "success" })
       setSittingDialogOpen(false)
-      setSittingForm({ sitting_number: (sittingList.length || 0) + 1, work_done: "", doctor_notes: "", next_appointment_date: "" })
+      setSittingForm({ sitting_number: (sittingList.length || 0) + 1, work_done: "", doctor_notes: "", next_appointment_date: "", next_appointment_time: "" })
+    },
+    onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed", variant: "destructive" }),
+  })
+
+  const updateSittingMutation = useMutation({
+    mutationFn: ({ sid, data }: { sid: string; data: any }) => treatmentSittingsApi.update(sid, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["treatment-sittings", id] })
+      queryClient.invalidateQueries({ queryKey: ["treatment-plan", id] })
+      queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" })
+      addToast({ title: "Success", description: "Sitting updated", variant: "success" })
+      setEditingSitting(null)
     },
     onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed", variant: "destructive" }),
   })
@@ -133,6 +193,7 @@ export default function TreatmentDetail() {
       start_date: plan.start_date || "",
       expected_completion_date: plan.expected_completion_date || "",
       next_appointment_date: plan.next_appointment_date || "",
+      next_appointment_time: "",
       notes: plan.notes || "",
     })
     setEditDialogOpen(true)
@@ -172,15 +233,16 @@ export default function TreatmentDetail() {
       </div>
 
       <Tabs defaultValue="details" className="w-full">
-        <TabsList className="bg-white border border-border rounded-xl p-1">
+        <TabsList className="bg-white border border-border rounded-xl p-1 overflow-x-auto flex-nowrap scroll-smooth">
           <TabsTrigger value="details">Details</TabsTrigger>
           <TabsTrigger value="sittings">Sittings ({sittingList.length})</TabsTrigger>
-          <TabsTrigger value="billing">Billing</TabsTrigger>
+          <TabsTrigger value="billing">Billing ({billingList.length})</TabsTrigger>
+          <TabsTrigger value="photos">Photos ({preOpPhotos.length + preOpXrays.length + postOpPhotos.length})</TabsTrigger>
           <TabsTrigger value="enquiries">Enquiries</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="details" className="mt-6">
+        <TabsContent value="details" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
           <div className="grid gap-6 lg:grid-cols-3">
             <div className="lg:col-span-2 space-y-6">
               {/* Treatment info card */}
@@ -220,7 +282,12 @@ export default function TreatmentDetail() {
                     </div>
                     <div>
                       <span className="text-muted-foreground">Next Appointment</span>
-                      <p className="font-medium flex items-center gap-1 mt-0.5"><CalendarDays className="h-3.5 w-3.5 text-muted-foreground" /> {plan.next_appointment_date ? format(new Date(plan.next_appointment_date), "dd MMM yyyy") : "—"}</p>
+                      <p className="font-medium flex items-center gap-1 mt-0.5"><CalendarDays className="h-3.5 w-3.5 text-muted-foreground" /> {plan.next_appointment_date ? `${format(new Date(plan.next_appointment_date), "dd MMM yyyy")}` : "—"}</p>
+                      {plan.next_appointment_date && sittingList.some(s => s.next_appointment_time && s.next_appointment_date === plan.next_appointment_date) && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Time: {sittingList.find(s => s.next_appointment_date === plan.next_appointment_date)?.next_appointment_time}
+                        </p>
+                      )}
                     </div>
                     <div>
                       <span className="text-muted-foreground">Description</span>
@@ -307,6 +374,29 @@ export default function TreatmentDetail() {
               </Card>
 
               <Card>
+                <CardHeader><CardTitle className="text-base">Treatment Progress</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Progress</span>
+                    <span className="text-sm font-bold">{plan.progress}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2.5">
+                    <div className={cn("h-2.5 rounded-full transition-all duration-500", plan.progress >= 100 ? "bg-success" : plan.progress >= 50 ? "bg-primary" : "bg-warning")} style={{ width: `${Math.min(100, plan.progress)}%` }} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-center text-xs">
+                    <div className="rounded-lg bg-success-soft p-2">
+                      <p className="text-success font-bold">{plan.completed_sittings || 0}</p>
+                      <p className="text-muted-foreground">Completed</p>
+                    </div>
+                    <div className="rounded-lg bg-warning-soft p-2">
+                      <p className="text-warning font-bold">{plan.remaining_sittings}</p>
+                      <p className="text-muted-foreground">Remaining</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-center text-muted-foreground">{plan.completed_sittings || 0} / {plan.total_sittings} Sittings</p>
+                </CardContent>
+              </Card>
+              <Card>
                 <CardHeader><CardTitle className="text-base">Quick Stats</CardTitle></CardHeader>
                 <CardContent className="space-y-3 text-sm">
                   <div className="flex justify-between"><span className="text-muted-foreground">Created</span><span className="font-medium">{format(new Date(plan.created_at), "dd MMM yy")}</span></div>
@@ -317,7 +407,7 @@ export default function TreatmentDetail() {
           </div>
         </TabsContent>
 
-        <TabsContent value="sittings" className="mt-6">
+        <TabsContent value="sittings" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-base">Sittings & Progress</CardTitle>
@@ -334,7 +424,7 @@ export default function TreatmentDetail() {
                 </div>
                 <div className="rounded-lg bg-success-soft p-3 text-center">
                   <p className="text-xs text-muted-foreground">Completed</p>
-                  <p className="text-xl font-bold text-success">{plan.completed_sittings}</p>
+                  <p className="text-xl font-bold text-success">{plan.completed_sittings || 0}</p>
                 </div>
                 <div className="rounded-lg bg-warning-soft p-3 text-center">
                   <p className="text-xs text-muted-foreground">Remaining</p>
@@ -345,6 +435,10 @@ export default function TreatmentDetail() {
                   <p className="text-xl font-bold text-primary">{plan.progress}%</p>
                 </div>
               </div>
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{plan.completed_sittings || 0} / {plan.total_sittings} Sittings Completed</span>
+                <span>Remaining: {plan.remaining_sittings}</span>
+              </div>
 
               <ProgressBar value={plan.progress} />
 
@@ -352,17 +446,37 @@ export default function TreatmentDetail() {
                 <div className="space-y-2">
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Sitting History</p>
                   {sittingList.map((s) => (
-                    <div key={s.id} className="flex items-start justify-between rounded-lg border border-border p-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-mono font-semibold">Sitting #{s.sitting_number}</span>
-                          <StatusBadge status={s.status} />
+                    <div key={s.id} className="rounded-lg border border-border p-3">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-mono font-semibold">Sitting #{s.sitting_number}</span>
+                            <StatusBadge status={s.status} />
+                          </div>
+                          {s.work_done && <p className="text-xs text-muted-foreground mt-1">{s.work_done}</p>}
+                          {s.doctor_notes && <p className="text-xs text-muted-foreground mt-0.5 italic">Notes: {s.doctor_notes}</p>}
                         </div>
-                        {s.work_done && <p className="text-xs text-muted-foreground mt-1">{s.work_done}</p>}
-                        {s.doctor_notes && <p className="text-xs text-muted-foreground mt-0.5 italic">Notes: {s.doctor_notes}</p>}
-                      </div>
-                      <div className="text-right text-xs text-muted-foreground">
-                        {s.next_appointment_date && <p>Next: {format(new Date(s.next_appointment_date), "dd MMM yy")}</p>}
+                        <div className="flex items-center gap-2">
+                          <div className="text-right text-xs text-muted-foreground">
+                            {s.next_appointment_date && (
+                              <p>Next: {format(new Date(s.next_appointment_date), "dd MMM yy")}{s.next_appointment_time ? ` ${s.next_appointment_time}` : ""}</p>
+                            )}
+                          </div>
+                          {s.status !== "COMPLETED" && s.status !== "CANCELLED" && (
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
+                              setEditingSitting(s)
+                              setEditSittingForm({
+                                work_done: s.work_done || "",
+                                doctor_notes: s.doctor_notes || "",
+                                status: "COMPLETED",
+                                next_appointment_date: "",
+                                next_appointment_time: "",
+                              })
+                            }}>
+                              <Edit3 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -375,7 +489,7 @@ export default function TreatmentDetail() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="billing" className="mt-6">
+        <TabsContent value="billing" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
           <div className="grid gap-6 md:grid-cols-2">
             <Card>
               <CardHeader><CardTitle className="text-base">Financial Summary</CardTitle></CardHeader>
@@ -394,16 +508,72 @@ export default function TreatmentDetail() {
                     <p className={cn("text-lg font-bold", pendingAmount > 0 ? "text-amber-700" : "text-green-700")}>{formatIndianRupees(pendingAmount)}</p>
                   </div>
                 </div>
+                {plan.paid_amount > 0 && (
+                  <div className="mt-3 pt-3 border-t border-border">
+                    <p className="text-xs text-muted-foreground mb-2">Payment Status</p>
+                    <Badge variant={pendingAmount <= 0 ? "success" : pendingAmount < plan.cost ? "warning" : "danger"}>
+                      {pendingAmount <= 0 ? "PAID" : pendingAmount < plan.cost ? "PARTIALLY PAID" : "UNPAID"}
+                    </Badge>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            {billingList.length > 0 && (
+              <Card>
+                <CardHeader><CardTitle className="text-base">Invoices & Payments</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  {billingList.map((b: Billing) => (
+                    <div key={b.id} className="rounded-lg border border-border p-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-semibold">{b.invoice_number ? `#${b.invoice_number}` : `Bill ${b.id.slice(0, 8)}`}</span>
+                        <Badge variant={b.payment_status === "PAID" ? "success" : b.payment_status === "PARTIAL" ? "warning" : "danger"}>{b.payment_status}</Badge>
+                      </div>
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        <div className="flex justify-between"><span>Total</span><span className="font-medium">{formatIndianRupees(b.total_amount)}</span></div>
+                        <div className="flex justify-between"><span>Paid</span><span className="font-medium text-success">{formatIndianRupees(b.paid_amount)}</span></div>
+                        <div className="flex justify-between"><span>Pending</span><span className="font-medium text-danger">{formatIndianRupees(b.pending_amount)}</span></div>
+                        {b.created_at && <div className="flex justify-between"><span>Date</span><span>{format(new Date(b.created_at), "dd MMM yyyy")}</span></div>}
+                        {b.payment_method && <div className="flex justify-between"><span>Method</span><span>{b.payment_method}</span></div>}
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="photos" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader><CardTitle className="text-base">Pre-Op Images ({preOpPhotos.length + preOpXrays.length})</CardTitle></CardHeader>
+              <CardContent>
+                {preOpPhotos.length === 0 && preOpXrays.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">No Pre-Op images</p>
+                ) : (
+                  <div className="space-y-4">
+                    {preOpPhotos.length > 0 && <ImageGrid photos={preOpPhotos} label="Photos" />}
+                    {preOpXrays.length > 0 && <ImageGrid photos={preOpXrays} label="X-Rays" />}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-base">Post-Op Images ({postOpPhotos.length})</CardTitle></CardHeader>
+              <CardContent>
+                {postOpPhotos.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">No Post-Op images</p>
+                ) : (
+                  <ImageGrid photos={postOpPhotos} label="Photos" />
+                )}
               </CardContent>
             </Card>
           </div>
         </TabsContent>
-
-        <TabsContent value="enquiries" className="mt-6">
+<TabsContent value="enquiries" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
           <EnquiryList patientId={plan.patient_id} treatmentPlanId={id!} />
         </TabsContent>
-
-        <TabsContent value="history" className="mt-6">
+        <TabsContent value="history" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
           <TreatmentHistory plan={plan} />
         </TabsContent>
       </Tabs>
@@ -490,9 +660,15 @@ export default function TreatmentDetail() {
               <Label>Doctor Notes</Label>
               <Textarea value={sittingForm.doctor_notes} onChange={(e) => setSittingForm({ ...sittingForm, doctor_notes: e.target.value })} />
             </div>
-            <div className="grid gap-2">
-              <Label>Next Appointment Date</Label>
-              <Input type="date" value={sittingForm.next_appointment_date} onChange={(e) => setSittingForm({ ...sittingForm, next_appointment_date: e.target.value })} />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Next Appointment Date</Label>
+                <Input type="date" value={sittingForm.next_appointment_date} onChange={(e) => setSittingForm({ ...sittingForm, next_appointment_date: e.target.value })} />
+              </div>
+              <div className="grid gap-2">
+                <Label>Next Appointment Time</Label>
+                <Input type="time" value={sittingForm.next_appointment_time} onChange={(e) => setSittingForm({ ...sittingForm, next_appointment_time: e.target.value })} />
+              </div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setSittingDialogOpen(false)}>Cancel</Button>
@@ -501,6 +677,136 @@ export default function TreatmentDetail() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Mark sitting complete dialog */}
+      <Dialog open={!!editingSitting} onOpenChange={(o) => { if (!o) setEditingSitting(null) }}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader><DialogTitle>Mark Sitting Complete</DialogTitle><DialogDescription>Update sitting #{editingSitting?.sitting_number} status.</DialogDescription></DialogHeader>
+          <form onSubmit={(e) => {
+            e.preventDefault()
+            if (!editingSitting) return
+            const data: Record<string, any> = {}
+            if (editSittingForm.status) data.status = editSittingForm.status
+            if (editSittingForm.work_done) data.work_done = editSittingForm.work_done
+            if (editSittingForm.doctor_notes) data.doctor_notes = editSittingForm.doctor_notes
+            if (editSittingForm.next_appointment_date) data.next_appointment_date = editSittingForm.next_appointment_date
+            if (editSittingForm.next_appointment_time) data.next_appointment_time = editSittingForm.next_appointment_time
+            updateSittingMutation.mutate({ sid: editingSitting.id, data })
+          }} className="space-y-4">
+            <div className="grid gap-2">
+              <Label>Status</Label>
+              <Select value={editSittingForm.status} onValueChange={(v) => setEditSittingForm({ ...editSittingForm, status: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="COMPLETED">Completed</SelectItem>
+                  <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                  <SelectItem value="CANCELLED">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label>Work Done</Label>
+              <Textarea value={editSittingForm.work_done} onChange={(e) => setEditSittingForm({ ...editSittingForm, work_done: e.target.value })} />
+            </div>
+            <div className="grid gap-2">
+              <Label>Doctor Notes</Label>
+              <Textarea value={editSittingForm.doctor_notes} onChange={(e) => setEditSittingForm({ ...editSittingForm, doctor_notes: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Next Appointment Date</Label>
+                <Input type="date" value={editSittingForm.next_appointment_date} onChange={(e) => setEditSittingForm({ ...editSittingForm, next_appointment_date: e.target.value })} />
+              </div>
+              <div className="grid gap-2">
+                <Label>Next Appointment Time</Label>
+                <Input type="time" value={editSittingForm.next_appointment_time} onChange={(e) => setEditSittingForm({ ...editSittingForm, next_appointment_time: e.target.value })} />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditingSitting(null)}>Cancel</Button>
+              <Button type="submit" disabled={updateSittingMutation.isPending}>Save</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+function ImagePreviewDialog({ url, onClose }: { url: string | null; onClose: () => void }) {
+  const [zoom, setZoom] = useState(1)
+  const [fullscreen, setFullscreen] = useState(false)
+
+  if (!url) return null
+
+  const content = (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between p-3 border-b shrink-0">
+        <DialogTitle className="text-sm">Image Preview</DialogTitle>
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-muted-foreground mr-2">{Math.round(zoom * 100)}%</span>
+          <button onClick={() => setZoom(z => Math.min(z + 0.25, 5))} className="p-1.5 rounded-md hover:bg-gray-100"><ZoomIn className="h-4 w-4" /></button>
+          <button onClick={() => setZoom(z => Math.max(z - 0.25, 0.25))} className="p-1.5 rounded-md hover:bg-gray-100"><ZoomOut className="h-4 w-4" /></button>
+          <button onClick={() => setZoom(1)} className="p-1.5 rounded-md hover:bg-gray-100"><RotateCcw className="h-4 w-4" /></button>
+          <button onClick={() => setFullscreen(!fullscreen)} className="p-1.5 rounded-md hover:bg-gray-100 ml-1">
+            {fullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+          </button>
+        </div>
+      </div>
+      <div
+        className="flex-1 flex items-center justify-center overflow-auto bg-gray-100 dark:bg-gray-900 cursor-grab active:cursor-grabbing select-none p-4"
+        onWheel={(e) => { e.preventDefault(); setZoom(z => Math.max(0.25, Math.min(5, z + (e.deltaY > 0 ? -0.1 : 0.1)))) }}
+        onDoubleClick={() => setZoom(z => z === 1 ? 2 : 1)}
+      >
+        <img src={url} alt="Preview" className="transition-transform duration-200 max-w-full max-h-full object-contain" style={{ transform: `scale(${zoom})` }} draggable={false} loading="lazy" />
+      </div>
+      <div className="flex justify-center gap-2 p-3 border-t shrink-0">
+        <a href={url} download className="flex items-center gap-1 text-xs font-medium text-primary hover:underline px-3 py-1.5 rounded-md hover:bg-primary-soft">
+          <Download className="h-3.5 w-3.5" /> Download
+        </a>
+        <button onClick={() => { window.open(url, "_blank") }} className="flex items-center gap-1 text-xs font-medium text-primary hover:underline px-3 py-1.5 rounded-md hover:bg-primary-soft">
+          <ExternalLink className="h-3.5 w-3.5" /> Open
+        </button>
+      </div>
+    </div>
+  )
+
+  if (fullscreen) {
+    return (
+      <Dialog open={true} onOpenChange={() => { onClose(); setZoom(1); setFullscreen(false) }}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] w-[95vw] h-[95vh] p-0">
+          {content}
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
+  return (
+    <Dialog open={true} onOpenChange={() => { onClose(); setZoom(1) }}>
+      <DialogContent className="sm:max-w-[90vw] max-h-[90vh] h-[80vh] p-0">
+        {content}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function ImageGrid({ photos, label }: { photos: string[]; label: string }) {
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  if (photos.length === 0) return null
+  return (
+    <div>
+      <p className="text-xs font-medium text-muted-foreground mb-2">{label} ({photos.length})</p>
+      <div className="grid grid-cols-3 gap-2">
+        {photos.map((url, i) => (
+          <div key={i} className="relative group aspect-square rounded-lg overflow-hidden border border-border">
+            <img src={url} alt={`${label} ${i + 1}`} className="w-full h-full object-cover cursor-pointer" onClick={() => setPreviewUrl(url)} loading="lazy" />
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+              <button onClick={(e) => { e.stopPropagation(); window.open(url, "_blank") }} className="p-1.5 bg-white/90 rounded-full"><ExternalLink className="h-3.5 w-3.5" /></button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <ImagePreviewDialog url={previewUrl} onClose={() => setPreviewUrl(null)} />
     </div>
   )
 }

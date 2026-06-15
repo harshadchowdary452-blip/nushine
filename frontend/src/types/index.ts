@@ -194,6 +194,7 @@ export interface TreatmentSitting {
   status: TreatmentSittingStatus;
   doctor_notes: string | null;
   next_appointment_date: string | null;
+  next_appointment_time: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -485,6 +486,88 @@ export interface QuickViewPatientFollowUp {
   notes?: string | null;
 }
 
+export interface QuickViewPatientPreOp {
+  id: string;
+  case_id: string;
+  notes: string | null;
+  photo_urls: string | null;
+  xray_urls: string | null;
+  created_at: string;
+}
+
+export interface QuickViewPatientPostOp {
+  id: string;
+  case_id: string;
+  notes: string | null;
+  report: string | null;
+  photo_urls: string | null;
+  created_at: string;
+}
+
+export type LeadSource =
+  | "GOOGLE_SEARCH" | "GOOGLE_MAPS" | "INSTAGRAM" | "FACEBOOK"
+  | "WHATSAPP" | "WEBSITE" | "WALK_IN" | "REFERRAL"
+  | "DOCTOR_REFERRAL" | "CLINIC_REFERRAL" | "CAMPAIGN"
+  | "ADVERTISEMENT" | "BANNER" | "NEWSPAPER" | "YOUTUBE"
+  | "EVENT" | "OTHER";
+
+export type LeadStatus =
+  | "NEW" | "CONTACTED" | "INTERESTED" | "FOLLOW_UP_REQUIRED"
+  | "APPOINTMENT_BOOKED" | "VISITED" | "CONVERTED"
+  | "LOST" | "NOT_INTERESTED" | "NO_RESPONSE";
+
+export type LeadCallOutcome =
+  | "INTERESTED" | "NOT_INTERESTED" | "NO_ANSWER" | "BUSY"
+  | "CALL_BACK_LATER" | "APPOINTMENT_REQUESTED" | "CONVERTED";
+
+export interface Lead {
+  id: string;
+  hospital_id: string;
+  assigned_staff_id: string | null;
+  assigned_doctor_id: string | null;
+  converted_patient_id: string | null;
+  lead_name: string;
+  mobile: string;
+  alternate_mobile: string | null;
+  email: string | null;
+  age: number | null;
+  gender: string | null;
+  city: string | null;
+  source: LeadSource;
+  interested_treatment: string | null;
+  budget: number | null;
+  preferred_visit_date: string | null;
+  notes: string | null;
+  status: LeadStatus;
+  lead_score: number | null;
+  last_contacted_at: string | null;
+  next_follow_up_date: string | null;
+  priority: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LeadCall {
+  id: string;
+  lead_id: string;
+  called_by: string | null;
+  outcome: string | null;
+  notes: string | null;
+  follow_up_date: string | null;
+  duration_seconds: number | null;
+  created_at: string;
+}
+
+export interface LeadCommunication {
+  id: string;
+  lead_id: string;
+  channel: string;
+  message: string;
+  status: string;
+  sent_at: string | null;
+  created_at: string;
+}
+
 export interface QuickViewPatient {
   id: string;
   name: string;
@@ -502,4 +585,7 @@ export interface QuickViewPatient {
   appointments: QuickViewPatientAppointment[];
   billings: QuickViewPatientBilling[];
   timeline: QuickViewPatientTimeline[];
+  pre_ops: QuickViewPatientPreOp[];
+  post_ops: QuickViewPatientPostOp[];
+  treatment_progress: { total: number; completed: number };
 }

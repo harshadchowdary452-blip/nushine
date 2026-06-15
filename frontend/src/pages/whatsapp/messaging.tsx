@@ -2,7 +2,7 @@ import { useState } from "react"
 import { motion } from "framer-motion"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Send, MessageSquare, Users as UsersIcon, Search, Loader2, CheckCircle, XCircle, Eye, Filter, CalendarDays, BarChart3, Clock, Heart, Gift, FileText } from "lucide-react"
-import { patientsApi, doctorsApi, crmApi } from "@/services/endpoints"
+import { patientsApi, doctorsApi, crmApi, leadsApi } from "@/services/endpoints"
 import PageHeader from "@/components/layout/page-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -13,12 +13,13 @@ import { useToast } from "@/components/ui/toast"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import type { Patient } from "@/types"
+import type { Patient, Lead } from "@/types"
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } }
 
 const TEMPLATE_VARIABLES = [
   { label: "Patient Name", variable: "{{patient_name}}" },
+  { label: "Lead Name", variable: "{{lead_name}}" },
   { label: "Doctor Name", variable: "{{doctor_name}}" },
   { label: "Hospital Name", variable: "{{hospital_name}}" },
   { label: "Appointment Date", variable: "{{appointment_date}}" },
@@ -34,6 +35,8 @@ const PRESETS = [
   { id: "payment_reminder", label: "Payment Reminder", icon: FileText, message: "Dear {{patient_name}}, this is a gentle reminder about your pending payment of {{pending_amount}}. Please clear it by {{due_date}}. - {{hospital_name}}" },
   { id: "recall", label: "6-Month Recall", icon: Heart, message: "Dear {{patient_name}}, it is time for your 6-month dental check-up. Please schedule an appointment at {{hospital_name}}." },
   { id: "festival_wishes", label: "Festival Wishes", icon: Gift, message: "Warm wishes from {{hospital_name}}! May this festive season bring happiness and good health to you and your family. - {{hospital_name}}" },
+  { id: "lead_followup", label: "Lead Follow-Up", icon: Clock, message: "Dear {{lead_name}}, thank you for your interest in our dental services. We would love to schedule a consultation at {{hospital_name}}. Please reply to confirm a convenient time." },
+  { id: "lead_offer", label: "Lead Offer", icon: Gift, message: "Hi {{lead_name}}, {{hospital_name}} has a special offer for new patients! Get a free consultation this week. Call us to book your appointment." },
   { id: "custom", label: "Custom", icon: MessageSquare, message: "" },
 ]
 
@@ -47,6 +50,9 @@ export default function WhatsAppMessaging() {
   const [message, setMessage] = useState("")
   const [selectedPatient, setSelectedPatient] = useState("")
   const [selectedPatients, setSelectedPatients] = useState<string[]>([])
+  const [selectedLead, setSelectedLead] = useState("")
+  const [selectedLeads, setSelectedLeads] = useState<string[]>([])
+  const [recipientType, setRecipientType] = useState<"patient" | "lead">("patient")
   const [template, setTemplate] = useState("")
   const [filterType, setFilterType] = useState("all")
   const [filterDoctor, setFilterDoctor] = useState("")
@@ -63,15 +69,25 @@ export default function WhatsAppMessaging() {
     queryKey: ["doctors", "whatsapp"],
     queryFn: () => doctorsApi.list({ page_size: 100 }),
   })
+  const { data: leads } = useQuery({
+    queryKey: ["leads", "whatsapp"],
+    queryFn: () => leadsApi.list({ page_size: 200 }),
+  })
 
   const patientList: Patient[] = patients?.items || patients || []
   const doctorList: any[] = doctors?.items || doctors || []
+  const leadList: Lead[] = Array.isArray(leads) ? leads : []
 
   const sendMutation = useMutation({
-    mutationFn: () => crmApi.sendWhatsApp({ patient_id: selectedPatient, message }),
+    mutationFn: () => {
+      if (recipientType === "lead") {
+        return crmApi.sendWhatsApp({ lead_id: selectedLead, message })
+      }
+      return crmApi.sendWhatsApp({ patient_id: selectedPatient, message })
+    },
     onSuccess: () => {
       addToast({ title: "Sent!", description: "WhatsApp message sent successfully", variant: "success" })
-      setPhone(""); setMessage(""); setSelectedPatient("")
+      setPhone(""); setMessage(""); setSelectedPatient(""); setSelectedLead("")
     },
     onError: () => addToast({ title: "Error", description: "Failed to send message", variant: "destructive" }),
   })
@@ -84,13 +100,13 @@ export default function WhatsAppMessaging() {
       ...(filterType === "doctor" && filterDoctor ? { doctor_id: filterDoctor } : {}),
       ...(filterType === "status" && filterStatus ? { status: filterStatus } : {}),
       ...(filterType === "ids" ? { patient_ids: selectedPatients } : {}),
+      ...(filterType === "leads" ? { lead_ids: selectedLeads } : {}),
     }),
-    onSuccess: (res) => {
-      addToast({ title: "Broadcast complete", description: `${res.sent} sent, ${res.failed} failed`, variant: "success" })
-      setSelectedPatients([]); setMessage(""); setShowPreview(false); setPreviewData(null)
-      queryClient.invalidateQueries({ queryKey: ["crm", "analytics"] })
+    onSuccess: (data) => {
+      setPreviewData(data)
+      setShowPreview(true)
     },
-    onError: () => addToast({ title: "Error", description: "Broadcast failed", variant: "destructive" }),
+    onError: () => addToast({ title: "Error", description: "Failed to load preview", variant: "destructive" }),
   })
 
   const previewMutation = useMutation({
@@ -130,17 +146,33 @@ export default function WhatsAppMessaging() {
     )
   }
 
+  function toggleLead(id: string) {
+    setSelectedLeads((prev) =>
+      prev.includes(id) ? prev.filter((l) => l !== id) : [...prev, id]
+    )
+  }
+
   function toggleAll() {
-    if (selectedPatients.length === patientList.length) {
-      setSelectedPatients([])
+    if (filterType === "leads") {
+      if (selectedLeads.length === leadList.length) {
+        setSelectedLeads([])
+      } else {
+        setSelectedLeads(leadList.map((l: any) => l.id))
+      }
     } else {
-      setSelectedPatients(patientList.map((p: any) => p.id))
+      if (selectedPatients.length === patientList.length) {
+        setSelectedPatients([])
+      } else {
+        setSelectedPatients(patientList.map((p: any) => p.id))
+      }
     }
   }
 
   async function handlePreview() {
     if (filterType === "all") {
       setSelectedPatients(patientList.map((p: any) => p.id))
+    } else if (filterType === "leads") {
+      setSelectedLeads(leadList.map((l: any) => l.id))
     }
     previewMutation.mutate()
   }
@@ -148,6 +180,8 @@ export default function WhatsAppMessaging() {
   async function handleSend() {
     if (filterType === "all") {
       setSelectedPatients(patientList.map((p: any) => p.id))
+    } else if (filterType === "leads") {
+      setSelectedLeads(leadList.map((l: any) => l.id))
     }
     broadcastMutation.mutate()
   }
@@ -157,7 +191,8 @@ export default function WhatsAppMessaging() {
     (filterType === "appointment_date" && filterApptDate) ||
     (filterType === "doctor" && filterDoctor) ||
     (filterType === "status" && filterStatus) ||
-    (filterType === "ids" && selectedPatients.length > 0)
+    (filterType === "ids" && selectedPatients.length > 0) ||
+    (filterType === "leads" && selectedLeads.length > 0)
   )
 
   return (
@@ -213,27 +248,58 @@ export default function WhatsAppMessaging() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Patient</Label>
-                    <Select value={selectedPatient} onValueChange={(v) => {
-                      setSelectedPatient(v)
-                      const p = patientList.find((x: any) => x.id === v)
-                      if (p) setPhone(p.phone || "")
-                    }}>
-                      <SelectTrigger><SelectValue placeholder="Search patient..." /></SelectTrigger>
-                      <SelectContent>
-                        {patientList.map((p: any) => (
-                          <SelectItem key={p.id} value={p.id}>{p.full_name} - {p.phone}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label>Recipient Type</Label>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => setRecipientType("patient")}
+                        className={`flex-1 rounded-lg border p-2 text-sm font-medium transition-colors ${recipientType === "patient" ? "border-green-400 bg-green-50 text-green-700" : "border-border text-gray-500 hover:bg-gray-50"}`}>
+                        Patient
+                      </button>
+                      <button type="button" onClick={() => setRecipientType("lead")}
+                        className={`flex-1 rounded-lg border p-2 text-sm font-medium transition-colors ${recipientType === "lead" ? "border-blue-400 bg-blue-50 text-blue-700" : "border-border text-gray-500 hover:bg-gray-50"}`}>
+                        Lead
+                      </button>
+                    </div>
                   </div>
+                  {recipientType === "patient" ? (
+                    <div className="space-y-2">
+                      <Label>Patient</Label>
+                      <Select value={selectedPatient} onValueChange={(v) => {
+                        setSelectedPatient(v); setSelectedLead("")
+                        const p = patientList.find((x: any) => x.id === v)
+                        if (p) setPhone(p.phone || "")
+                      }}>
+                        <SelectTrigger><SelectValue placeholder="Search patient..." /></SelectTrigger>
+                        <SelectContent>
+                          {patientList.map((p: any) => (
+                            <SelectItem key={p.id} value={p.id}>{p.full_name} - {p.phone}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label>Lead</Label>
+                      <Select value={selectedLead} onValueChange={(v) => {
+                        setSelectedLead(v); setSelectedPatient("")
+                        const l = leadList.find((x: any) => x.id === v)
+                        if (l) setPhone(l.mobile || "")
+                      }}>
+                        <SelectTrigger><SelectValue placeholder="Search lead..." /></SelectTrigger>
+                        <SelectContent>
+                          {leadList.map((l: any) => (
+                            <SelectItem key={l.id} value={l.id}>{l.lead_name} - {l.mobile}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <Label>Phone Number</Label>
                     <Input placeholder="+911234567890" value={phone} onChange={(e) => setPhone(e.target.value)} />
                   </div>
                   <Button className="w-full gap-2 bg-green-600 hover:bg-green-700"
                     onClick={() => sendMutation.mutate()}
-                    disabled={!selectedPatient || !message || sendMutation.isPending}>
+                    disabled={(recipientType === "patient" ? !selectedPatient : !selectedLead) || !message || sendMutation.isPending}>
                     {sendMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                     Send Message
                   </Button>
@@ -330,6 +396,7 @@ export default function WhatsAppMessaging() {
                       <SelectTrigger><SelectValue placeholder="Select filter..." /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Patients</SelectItem>
+                        <SelectItem value="leads">Leads</SelectItem>
                         <SelectItem value="doctor">By Doctor</SelectItem>
                         <SelectItem value="status">By Status</SelectItem>
                         <SelectItem value="appointment_date">By Appointment Date</SelectItem>
@@ -486,6 +553,45 @@ export default function WhatsAppMessaging() {
                           <div className="min-w-0 flex-1">
                             <p className="truncate font-medium">{p.full_name}</p>
                             <p className="truncate text-xs text-gray-500">{p.phone || "No phone"}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              {filterType === "leads" && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <UsersIcon className="h-5 w-5 text-blue-500" />
+                      Select Leads ({selectedLeads.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="relative mb-4">
+                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                      <Input placeholder="Search leads..." className="pl-10" />
+                    </div>
+                    <div className="mb-2">
+                      <button onClick={toggleAll} className="flex items-center gap-2 rounded-md px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50">
+                        {selectedLeads.length === leadList.length ? "Deselect All" : "Select All"}
+                      </button>
+                    </div>
+                    <div className="max-h-80 space-y-1 overflow-y-auto">
+                      {leadList.map((l: any) => (
+                        <button key={l.id} onClick={() => toggleLead(l.id)}
+                          className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
+                            selectedLeads.includes(l.id) ? "bg-blue-50 text-blue-700" : "hover:bg-gray-50"
+                          }`}>
+                          {selectedLeads.includes(l.id) ? (
+                            <CheckCircle className="h-4 w-4 shrink-0 text-blue-600" />
+                          ) : (
+                            <div className="h-4 w-4 shrink-0 rounded-full border-2 border-gray-300" />
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-medium">{l.lead_name}</p>
+                            <p className="truncate text-xs text-gray-500">{l.mobile || "No phone"}</p>
                           </div>
                         </button>
                       ))}

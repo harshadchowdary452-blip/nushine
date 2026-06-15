@@ -217,7 +217,9 @@ export default function AppointmentList() {
       resetForm()
     },
     onError: (err: any) => {
-      addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to create appointment", variant: "destructive" })
+      const detail = err?.response?.data?.detail
+      const msg = Array.isArray(detail) ? detail.map((d: any) => d.msg).join("; ") : detail || "Failed to create appointment"
+      addToast({ title: "Error", description: msg, variant: "destructive" })
     },
   })
 
@@ -329,6 +331,10 @@ export default function AppointmentList() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    if (!form.patient_id) {
+      addToast({ title: "Validation Error", description: "Please select a patient", variant: "destructive" })
+      return
+    }
     if (!form.appointment_date || !form.appointment_time) {
       addToast({ title: "Validation Error", description: "Please select both date and time", variant: "destructive" })
       return

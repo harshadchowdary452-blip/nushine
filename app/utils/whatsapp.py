@@ -1,10 +1,27 @@
 from typing import Optional
+from urllib.parse import quote
 from app.config import settings
+
+
+class DeepLinkProvider:
+    def generate_link(self, phone: str, message: str = "") -> str:
+        clean = phone.replace("+", "").replace(" ", "").replace("-", "")
+        if not clean.startswith("1") and not clean.startswith("91"):
+            if not clean.startswith("1") and len(clean) == 10:
+                clean = "91" + clean
+        encoded = quote(message)
+        wa_link = f"https://wa.me/{clean}?text={encoded}" if message else f"https://wa.me/{clean}"
+        web_link = f"https://web.whatsapp.com/send?phone={clean}&text={encoded}" if message else f"https://web.whatsapp.com/send?phone={clean}"
+        return {"wa_link": wa_link, "web_link": web_link, "phone": clean}
+
+    async def send_message(self, to: str, message: str) -> bool:
+        return True
 
 
 class WhatsAppProvider:
     def __init__(self):
         self.provider = settings.WHATSAPP_PROVIDER
+        self.deeplink = DeepLinkProvider()
 
     async def send_message(self, to: str, message: str) -> bool:
         if self.provider == "twilio":
@@ -13,6 +30,9 @@ class WhatsAppProvider:
             return await self._send_meta(to, message)
         else:
             return await self._send_mock(to, message)
+
+    def generate_deep_link(self, phone: str, message: str = "") -> dict:
+        return self.deeplink.generate_link(phone, message)
 
     async def _send_twilio(self, to: str, message: str) -> bool:
         try:

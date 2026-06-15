@@ -7,7 +7,7 @@ from fastapi import HTTPException, status
 from app.repositories.treatment_sitting_repository import TreatmentSittingRepository
 from app.repositories.audit_log_repository import AuditLogRepository
 from app.models.treatment_sitting import TreatmentSitting, TreatmentSittingStatus
-from app.models.treatment_plan import TreatmentPlan
+from app.models.treatment_plan import TreatmentPlan, TreatmentPlanStatus
 from app.models.case import Case
 from app.models.patient import Patient
 from app.models.appointment import Appointment, AppointmentStatus, AppointmentType
@@ -32,22 +32,25 @@ class TreatmentSittingService:
         case = await self.db.get(Case, plan.case_id)
         if not case:
             return None
+        appt_date = sitting.next_appointment_date
+        appt_time = sitting.next_appointment_time or time(9, 0)
         existing = await self.db.execute(
             select(Appointment).where(
                 Appointment.patient_id == case.patient_id,
-                Appointment.appointment_date == sitting.next_appointment_date,
+                Appointment.appointment_date == appt_date,
+                Appointment.appointment_time == appt_time,
                 Appointment.status.in_([AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED]),
                 Appointment.is_active == True,
             ).limit(1)
         )
         if existing.scalar_one_or_none():
-            logger.info("Appointment already exists for patient %s on %s, skipping", case.patient_id, sitting.next_appointment_date)
+            logger.info("Appointment already exists for patient %s on %s at %s, skipping", case.patient_id, appt_date, appt_time)
             return None
         appt = Appointment(
             patient_id=case.patient_id,
             doctor_id=case.doctor_id or "",
-            appointment_date=sitting.next_appointment_date,
-            appointment_time=time(9, 0),
+            appointment_date=appt_date,
+            appointment_time=appt_time,
             status=AppointmentStatus.SCHEDULED,
             appointment_type=AppointmentType.TREATMENT,
             notes=f"Auto-created from treatment sitting #{sitting.sitting_number}",
@@ -87,6 +90,14 @@ class TreatmentSittingService:
                 data["status"] = "PLANNED"
             sitting = await self.repo.create(**data)
             await self._auto_create_appointment_from_sitting(sitting)
+            await self._recalculate_plan_sitting_counts(treatment_plan_id)
+            if sitting.status == TreatmentSittingStatus.COMPLETED.value:
+                from app.services.treatment_enquiry_service import TreatmentEnquiryService
+                enquiry_svc = TreatmentEnquiryService(self.db)
+                await enquiry_svc.on_sitting_completed(treatment_plan_id)
+                plan = await self.db.get(TreatmentPlan, treatment_plan_id)
+                if plan and plan.remaining_sittings <= 0:
+                    await enquiry_svc.on_treatment_plan_completed(treatment_plan_id)
             logger.info("CREATE_TREATMENT_SITTING - Success: %s", sitting.id)
             await self.audit_log_repo.create(user_id=user_id, action="CREATE_TREATMENT_SITTING", entity_type="TREATMENT_SITTING", entity_id=str(sitting.id), details=f"Sitting #{sitting.sitting_number} created")
             return sitting
@@ -95,6 +106,24 @@ class TreatmentSittingService:
         except Exception as e:
             logger.exception("CREATE_TREATMENT_SITTING - Unexpected error: %s", str(e))
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create treatment sitting: {str(e)}")
+
+    async def _recalculate_plan_sitting_counts(self, plan_id: str):
+        completed = await self.db.execute(
+            select(func.count(TreatmentSitting.id)).where(
+                TreatmentSitting.treatment_plan_id == plan_id,
+                TreatmentSitting.status == TreatmentSittingStatus.COMPLETED.value,
+            )
+        )
+        actual_completed = completed.scalar() or 0
+        plan = await self.db.get(TreatmentPlan, plan_id)
+        if plan:
+            plan.completed_sittings = actual_completed
+            plan.remaining_sittings = max(0, plan.total_sittings - actual_completed)
+            if plan.remaining_sittings <= 0 and plan.total_sittings > 0:
+                plan.status = TreatmentPlanStatus.COMPLETED
+            elif plan.status == TreatmentPlanStatus.COMPLETED and plan.remaining_sittings > 0:
+                plan.status = TreatmentPlanStatus.IN_PROGRESS
+            await self.db.flush()
 
     async def get(self, sitting_id: str) -> Optional[TreatmentSitting]:
         return await self.repo.get(sitting_id)
@@ -105,29 +134,38 @@ class TreatmentSittingService:
     async def update(self, sitting_id: str, data: dict, user_id: str = None) -> Optional[TreatmentSitting]:
         try:
             old = await self.repo.get(sitting_id)
-            was_completed = old is not None and old.status != TreatmentSittingStatus.COMPLETED.value and data.get("status") == TreatmentSittingStatus.COMPLETED.value
-            has_next_date = data.get("next_appointment_date") is not None
+            was_completed = old and old.status == TreatmentSittingStatus.COMPLETED.value
             sitting = await self.repo.update(sitting_id, **data)
             if sitting:
-                if has_next_date:
+                if data.get("next_appointment_date") is not None:
                     await self._auto_create_appointment_from_sitting(sitting)
                 await self.audit_log_repo.create(user_id=user_id, action="UPDATE_TREATMENT_SITTING", entity_type="TREATMENT_SITTING", entity_id=sitting_id, details="Treatment sitting updated")
-
-                if was_completed and sitting.treatment_plan_id:
-                    plan_result = await self.db.execute(select(TreatmentPlan).where(TreatmentPlan.id == sitting.treatment_plan_id))
-                    plan = plan_result.scalar_one_or_none()
-                    if plan:
-                        plan.completed_sittings = (plan.completed_sittings or 0) + 1
-                        plan.remaining_sittings = max(0, (plan.total_sittings or 1) - plan.completed_sittings)
-                        if plan.remaining_sittings <= 0:
-                            plan.status = "COMPLETED"
-                            await self.db.flush()
-                            await self.audit_log_repo.create(
-                                user_id=user_id, action="COMPLETE_TREATMENT_PLAN",
-                                entity_type="TREATMENT_PLAN", entity_id=str(plan.id),
-                                details=f"Treatment plan auto-completed: all {plan.total_sittings} sittings done"
-                            )
+                await self._recalculate_plan_sitting_counts(sitting.treatment_plan_id)
+                now_completed = sitting.status == TreatmentSittingStatus.COMPLETED.value
+                if now_completed and not was_completed:
+                    from app.services.treatment_enquiry_service import TreatmentEnquiryService
+                    enquiry_svc = TreatmentEnquiryService(self.db)
+                    await enquiry_svc.on_sitting_completed(sitting.treatment_plan_id)
+                plan = await self.db.get(TreatmentPlan, sitting.treatment_plan_id)
+                if plan and plan.remaining_sittings <= 0:
+                    from app.services.treatment_enquiry_service import TreatmentEnquiryService
+                    enquiry_svc = TreatmentEnquiryService(self.db)
+                    await enquiry_svc.on_treatment_plan_completed(sitting.treatment_plan_id)
             return sitting
         except Exception as e:
             logger.exception("UPDATE_TREATMENT_SITTING - Error: %s", str(e))
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update treatment sitting: {str(e)}")
+
+    async def delete(self, sitting_id: str, user_id: str = None) -> bool:
+        try:
+            sitting = await self.repo.get(sitting_id)
+            plan_id = sitting.treatment_plan_id if sitting else None
+            result = await self.repo.delete(sitting_id)
+            if result:
+                await self.audit_log_repo.create(user_id=user_id, action="DELETE_TREATMENT_SITTING", entity_type="TREATMENT_SITTING", entity_id=sitting_id, details="Treatment sitting deleted")
+                if plan_id:
+                    await self._recalculate_plan_sitting_counts(plan_id)
+            return result
+        except Exception as e:
+            logger.exception("DELETE_TREATMENT_SITTING - Error: %s", str(e))
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to delete treatment sitting: {str(e)}")

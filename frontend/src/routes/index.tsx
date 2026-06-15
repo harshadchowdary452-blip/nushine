@@ -32,7 +32,14 @@ import Campaigns from "@/pages/crm/campaigns";
 import EnquiryCalendar from "@/pages/crm/enquiry-calendar";
 import CrmDashboard from "@/pages/dashboard/crm-dashboard";
 import CrmPage from "@/pages/crm";
+import LeadAnalytics from "@/pages/crm/lead-analytics";
+import RevenueAttribution from "@/pages/crm/revenue-attribution";
+import LeadList from "@/pages/leads/list";
+import LeadDetail from "@/pages/leads/detail";
 import Settings from "@/pages/settings/profile";
+import WhatsAppConfigPage from "@/pages/settings/whatsapp-config";
+import WhatsAppTemplates from "@/pages/whatsapp/templates";
+import WhatsAppBroadcast from "@/pages/whatsapp/broadcast";
 
 const dashboardByRole: Record<Role, string> = {
   SUPER_ADMIN: "/super-admin",
@@ -120,11 +127,18 @@ export const router = createBrowserRouter([
       { path: "/crm/campaigns", element: withRoles(<Campaigns />, ["HOSPITAL_ADMIN"]) },
       { path: "/crm", element: withRoles(<CrmPage />, ADMIN_ROLES) },
       { path: "/crm/enquiry-calendar", element: withRoles(<EnquiryCalendar />, ["HOSPITAL_ADMIN"]) },
+      { path: "/crm/lead-analytics", element: withRoles(<LeadAnalytics />, ADMIN_ROLES) },
+      { path: "/crm/revenue-attribution", element: withRoles(<RevenueAttribution />, ADMIN_ROLES) },
+      { path: "/leads", element: withRoles(<LeadList />, ADMIN_ROLES) },
+      { path: "/leads/:id", element: withRoles(<LeadDetail />, ADMIN_ROLES) },
       { path: "/cases", element: withRoles(<CaseList />, CARE_ROLES) },
       { path: "/cases/:id", element: withRoles(<CaseDetail />, CARE_ROLES) },
       { path: "/treatments", element: withRoles(<TreatmentList />, CARE_ROLES) },
       { path: "/treatments/:id", element: withRoles(<TreatmentDetail />, CARE_ROLES) },
       { path: "/settings", element: withRoles(<Settings />, [...ADMIN_ROLES, "DOCTOR"]) },
+      { path: "/settings/whatsapp", element: withRoles(<WhatsAppConfigPage />, ADMIN_ROLES) },
+      { path: "/whatsapp/templates", element: withRoles(<WhatsAppTemplates />, ADMIN_ROLES) },
+      { path: "/whatsapp/broadcast", element: withRoles(<WhatsAppBroadcast />, ADMIN_ROLES) },
       { path: "*", element: <Navigate to="/" replace /> },
     ],
   },

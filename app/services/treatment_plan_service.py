@@ -25,7 +25,7 @@ def _enrich_plan(plan: TreatmentPlan):
         "total_sittings": total,
         "completed_sittings": completed,
         "remaining_sittings": remaining,
-        "progress": round(((total - remaining) / total * 100) if total > 0 else 0, 1),
+        "progress": round((completed / total * 100) if total > 0 else 0, 1),
         "pending_amount": max(0, (plan.cost or 0) - (plan.paid_amount or 0)),
     }
     for k, v in sittings_data.items():

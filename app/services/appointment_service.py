@@ -238,6 +238,16 @@ class AppointmentService:
 
     async def delete(self, appointment_id: str, user_id: str = None) -> bool:
         try:
+            from app.models.follow_up import FollowUp
+            from app.models.case import Case
+            from app.models.follow_up_response import FollowUpResponse
+            for fup in (await self.db.execute(select(FollowUp).where(FollowUp.appointment_id == appointment_id))).scalars():
+                fup.appointment_id = None
+            for c in (await self.db.execute(select(Case).where(Case.appointment_id == appointment_id))).scalars():
+                c.appointment_id = None
+            for fur in (await self.db.execute(select(FollowUpResponse).where(FollowUpResponse.appointment_id == appointment_id))).scalars():
+                fur.appointment_id = None
+            await self.db.flush()
             result = await self.repo.delete(appointment_id)
             if result:
                 await self.audit_log_repo.create(user_id=user_id, action="DELETE_APPOINTMENT", entity_type="APPOINTMENT", entity_id=appointment_id, details="Appointment deleted")

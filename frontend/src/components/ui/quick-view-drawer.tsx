@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "react-router-dom"
-import { Building2, Stethoscope, Users, DollarSign, Activity, Calendar, Award, FolderOpen, TrendingUp, Loader2, ExternalLink, IndianRupee, PieChart, RotateCcw } from "lucide-react"
+import { Building2, Stethoscope, Users, DollarSign, Activity, Calendar, Award, FolderOpen, TrendingUp, Loader2, ExternalLink, IndianRupee, PieChart, RotateCcw, ZoomIn, ZoomOut, Download, Maximize, Minimize } from "lucide-react"
 import { dashboardApi } from "@/services/endpoints"
 import { formatIndianRupees, formatIndianNumber } from "@/lib/currency"
 import DateFilterBar from "@/components/ui/date-filter-bar"
@@ -10,7 +10,10 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from "@/components/ui/sheet"
-import type { QuickViewAdminGroup, QuickViewHospital, QuickViewDoctor, QuickViewPatient } from "@/types"
+import {
+  Dialog, DialogContent, DialogTitle,
+} from "@/components/ui/dialog"
+import type { QuickViewAdminGroup, QuickViewHospital, QuickViewDoctor, QuickViewPatient, QuickViewPatientPreOp, QuickViewPatientPostOp } from "@/types"
 
 interface QuickViewDrawerProps {
   open: boolean
@@ -161,8 +164,87 @@ function DoctorContent({ id, onClose, period, startDate, endDate }: { id: string
   )
 }
 
+function ImagePreviewDialog({ url, onClose }: { url: string | null; onClose: () => void }) {
+  const [zoom, setZoom] = useState(1)
+  const [fullscreen, setFullscreen] = useState(false)
+
+  if (!url) return null
+
+  const content = (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between p-3 border-b shrink-0">
+        <DialogTitle className="text-sm">Image Preview</DialogTitle>
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-muted-foreground mr-2">{Math.round(zoom * 100)}%</span>
+          <button onClick={() => setZoom(z => Math.min(z + 0.25, 5))} className="p-1.5 rounded-md hover:bg-gray-100"><ZoomIn className="h-4 w-4" /></button>
+          <button onClick={() => setZoom(z => Math.max(z - 0.25, 0.25))} className="p-1.5 rounded-md hover:bg-gray-100"><ZoomOut className="h-4 w-4" /></button>
+          <button onClick={() => setZoom(1)} className="p-1.5 rounded-md hover:bg-gray-100"><RotateCcw className="h-4 w-4" /></button>
+          <button onClick={() => setFullscreen(!fullscreen)} className="p-1.5 rounded-md hover:bg-gray-100 ml-1">
+            {fullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+          </button>
+        </div>
+      </div>
+      <div
+        className="flex-1 flex items-center justify-center overflow-auto bg-gray-100 dark:bg-gray-900 cursor-grab active:cursor-grabbing select-none p-4"
+        onWheel={(e) => { e.preventDefault(); setZoom(z => Math.max(0.25, Math.min(5, z + (e.deltaY > 0 ? -0.1 : 0.1)))) }}
+        onDoubleClick={() => setZoom(z => z === 1 ? 2 : 1)}
+      >
+        <img src={url} alt="Preview" className="transition-transform duration-200 max-w-full max-h-full object-contain" style={{ transform: `scale(${zoom})` }} draggable={false} loading="lazy" />
+      </div>
+      <div className="flex justify-center gap-2 p-3 border-t shrink-0">
+        <a href={url} download className="flex items-center gap-1 text-xs font-medium text-primary hover:underline px-3 py-1.5 rounded-md hover:bg-primary-soft">
+          <Download className="h-3.5 w-3.5" /> Download
+        </a>
+        <button onClick={() => { window.open(url, "_blank") }} className="flex items-center gap-1 text-xs font-medium text-primary hover:underline px-3 py-1.5 rounded-md hover:bg-primary-soft">
+          <ExternalLink className="h-3.5 w-3.5" /> Open
+        </button>
+      </div>
+    </div>
+  )
+
+  if (fullscreen) {
+    return (
+      <Dialog open={true} onOpenChange={() => { onClose(); setZoom(1); setFullscreen(false) }}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] w-[95vw] h-[95vh] p-0">
+          {content}
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
+  return (
+    <Dialog open={true} onOpenChange={() => { onClose(); setZoom(1) }}>
+      <DialogContent className="sm:max-w-[90vw] max-h-[90vh] h-[80vh] p-0">
+        {content}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function PhotoGrid({ photos, label }: { photos: string[]; label: string }) {
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  if (photos.length === 0) return null
+  return (
+    <div>
+      <p className="text-xs font-medium text-gray-500 mb-2">{label} ({photos.length})</p>
+      <div className="grid grid-cols-3 gap-2">
+        {photos.map((url, i) => (
+          <div key={i} className="relative group aspect-square rounded-lg overflow-hidden border border-gray-200">
+            <img src={url} alt={`${label} ${i + 1}`} className="w-full h-full object-cover cursor-pointer" onClick={() => setPreviewUrl(url)} loading="lazy" />
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+              <button onClick={(e) => { e.stopPropagation(); window.open(url, "_blank") }} className="p-1.5 bg-white/90 rounded-full"><ExternalLink className="h-3.5 w-3.5" /></button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <ImagePreviewDialog url={previewUrl} onClose={() => setPreviewUrl(null)} />
+    </div>
+  )
+}
+
 function PatientContent({ id, onClose }: QuickViewContentProps) {
   const navigate = useNavigate()
+  const [activeTab, setActiveTab] = useState("overview")
   const { data, isLoading } = useQuery<QuickViewPatient>({
     queryKey: ["quick-view", "patient", id],
     queryFn: () => dashboardApi.quickViewPatient(id),
@@ -172,72 +254,228 @@ function PatientContent({ id, onClose }: QuickViewContentProps) {
   if (isLoading) return <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
   if (!data) return <div className="text-center py-12 text-gray-500">No data available</div>
 
+  const preOpPhotos = data.pre_ops.flatMap(p => (p.photo_urls || "").split(",").filter(Boolean))
+  const preOpXrays = data.pre_ops.flatMap(p => (p.xray_urls || "").split(",").filter(Boolean))
+  const postOpPhotos = data.post_ops.flatMap(p => (p.photo_urls || "").split(",").filter(Boolean))
+  const progress = data.treatment_progress
+  const progressPct = progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0
+
+  const tabs = [
+    { key: "overview", label: "Overview" },
+    { key: "cases", label: `Cases (${data.total_cases})` },
+    { key: "treatments", label: `Treatments (${data.total_treatments})` },
+    { key: "billing", label: "Billing" },
+    { key: "followups", label: "Follow-Ups" },
+    { key: "preop", label: `Pre-Op (${preOpPhotos.length + preOpXrays.length})` },
+    { key: "postop", label: `Post-Op (${postOpPhotos.length})` },
+    { key: "timeline", label: "Timeline" },
+  ]
+
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3">
-        <MetricCard icon={FolderOpen} label="Cases" value={formatIndianNumber(data.total_cases)} color="info" />
-        <MetricCard icon={Activity} label="Treatments" value={formatIndianNumber(data.total_treatments)} color="primary" />
-        <MetricCard icon={Calendar} label="Appointments" value={formatIndianNumber(data.total_appointments)} color="warning" />
-        <MetricCard icon={RotateCcw} label="Follow-Ups" value={formatIndianNumber(data.total_follow_ups)} color="warning" />
+    <div className="flex flex-col h-full">
+      <div className="flex gap-1 flex-wrap border-b pb-2 mb-4 shrink-0 overflow-x-auto">
+        {tabs.map(t => (
+          <button
+            key={t.key}
+            onClick={() => setActiveTab(t.key)}
+            className={`text-xs font-medium px-2.5 py-1.5 rounded-md whitespace-nowrap transition-colors ${
+              activeTab === t.key ? "bg-primary text-white" : "text-gray-500 hover:bg-gray-100"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
-      {data.next_follow_up && (
-        <div className="rounded-xl border border-warning bg-warning-soft p-3">
-          <p className="text-xs font-medium text-warning mb-1">Next Follow-Up</p>
-          <p className="text-sm font-bold text-gray-900">{new Date(data.next_follow_up.date).toLocaleDateString("en-IN")}</p>
-          {data.next_follow_up.time && <p className="text-xs text-gray-500">Time: {data.next_follow_up.time}</p>}
-          <Badge variant="warning">{data.next_follow_up.status}</Badge>
-        </div>
-      )}
-      <div className="grid grid-cols-3 gap-2 rounded-xl bg-gray-50 p-3">
-        <div className="text-center">
-          <p className="text-xs text-gray-500">Total Billed</p>
-          <p className="text-sm font-bold text-gray-900">{formatIndianRupees(data.total_billed)}</p>
-        </div>
-        <div className="text-center">
-          <p className="text-xs text-gray-500">Paid</p>
-          <p className="text-sm font-bold text-success">{formatIndianRupees(data.total_paid)}</p>
-        </div>
-        <div className="text-center">
-          <p className="text-xs text-gray-500">Pending</p>
-          <p className="text-sm font-bold text-danger">{formatIndianRupees(data.total_pending)}</p>
-        </div>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <button onClick={() => { onClose(); navigate(`/patients/${id}`) }} className="flex items-center gap-1 text-xs font-medium text-primary hover:underline px-3 py-2">
-          <ExternalLink className="h-3 w-3" /> View Full Profile
-        </button>
-      </div>
-      {data.timeline.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Timeline</h3>
-          <div className="space-y-2">
-            {data.timeline.map((t, i) => (
-              <div key={i} className="flex items-start gap-3 rounded-xl bg-gray-50 px-3 py-2">
-                <div className="mt-0.5 h-2 w-2 rounded-full bg-primary shrink-0" />
-                <div>
-                  <p className="text-xs text-gray-400">{new Date(t.date).toLocaleDateString("en-IN")}</p>
-                  <p className="text-sm text-gray-700">{t.event}</p>
-                </div>
+
+      <div className="flex-1 overflow-y-auto space-y-4 pr-1 scroll-smooth">
+        {activeTab === "overview" && (
+          <>
+            <div className="grid grid-cols-2 gap-2">
+              <MetricCard icon={FolderOpen} label="Cases" value={formatIndianNumber(data.total_cases)} color="info" />
+              <MetricCard icon={Activity} label="Treatments" value={formatIndianNumber(data.total_treatments)} color="primary" />
+              <MetricCard icon={Calendar} label="Appointments" value={formatIndianNumber(data.total_appointments)} color="warning" />
+              <MetricCard icon={RotateCcw} label="Follow-Ups" value={formatIndianNumber(data.total_follow_ups)} color="warning" />
+            </div>
+
+            {data.next_follow_up && (
+              <div className="rounded-xl border border-warning bg-warning-soft p-3">
+                <p className="text-xs font-medium text-warning mb-1">Next Follow-Up</p>
+                <p className="text-sm font-bold text-gray-900">{new Date(data.next_follow_up.date).toLocaleDateString("en-IN")}</p>
+                {data.next_follow_up.time && <p className="text-xs text-gray-500">Time: {data.next_follow_up.time}</p>}
+                <Badge variant="warning" className="mt-1">{data.next_follow_up.status}</Badge>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-      {data.cases.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Cases</h3>
-          <div className="space-y-2">
-            {data.cases.map((c) => (
-              <div key={c.id} className="rounded-xl bg-gray-50 px-3 py-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-gray-700 truncate">{c.chief_complaint}</p>
-                  <Badge variant={c.status === "COMPLETED" ? "success" : c.status === "CANCELLED" ? "danger" : "warning"}>{c.status}</Badge>
-                </div>
+            )}
+
+            <div className="grid grid-cols-3 gap-2 rounded-xl bg-gray-50 p-3">
+              <div className="text-center">
+                <p className="text-xs text-gray-500">Total Billed</p>
+                <p className="text-sm font-bold text-gray-900">{formatIndianRupees(data.total_billed)}</p>
               </div>
-            ))}
+              <div className="text-center">
+                <p className="text-xs text-gray-500">Paid</p>
+                <p className="text-sm font-bold text-success">{formatIndianRupees(data.total_paid)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-gray-500">Pending</p>
+                <p className="text-sm font-bold text-danger">{formatIndianRupees(data.total_pending)}</p>
+              </div>
+            </div>
+
+            {progress.total > 0 && (
+              <div className="rounded-xl border border-gray-200 p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-medium text-gray-500">Treatment Progress</p>
+                  <span className="text-sm font-bold text-primary">{progressPct}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2.5 mb-2">
+                  <div className="bg-primary h-2.5 rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }} />
+                </div>
+                <p className="text-xs text-gray-500">{progress.completed} / {progress.total} Sittings Completed</p>
+                {progress.total - progress.completed > 0 && (
+                  <p className="text-xs text-gray-400">Remaining: {progress.total - progress.completed}</p>
+                )}
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => { onClose(); navigate(`/patients/${id}`) }} className="flex items-center gap-1 text-xs font-medium text-primary hover:underline px-3 py-2">
+                <ExternalLink className="h-3 w-3" /> View Full Profile
+              </button>
+            </div>
+          </>
+        )}
+
+        {activeTab === "cases" && (
+          <div className="space-y-2">
+            {data.cases.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-8">No cases</p>
+            ) : (
+              data.cases.map((c) => (
+                <div key={c.id} className="rounded-xl bg-gray-50 px-3 py-2.5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-gray-700 truncate">{c.chief_complaint}</p>
+                    <Badge variant={c.status === "COMPLETED" ? "success" : c.status === "CANCELLED" ? "danger" : "warning"} className="shrink-0 ml-2">{c.status}</Badge>
+                  </div>
+                  {c.diagnosis && <p className="text-xs text-gray-400 mt-1 truncate">{c.diagnosis}</p>}
+                </div>
+              ))
+            )}
           </div>
-        </div>
-      )}
+        )}
+
+        {activeTab === "treatments" && (
+          <div className="space-y-2">
+            {data.treatments.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-8">No treatments</p>
+            ) : (
+              data.treatments.map((t) => (
+                <div key={t.id} className="rounded-xl bg-gray-50 px-3 py-2.5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-gray-700 truncate">{t.treatment_name}</p>
+                    <Badge variant={t.status === "COMPLETED" ? "success" : "warning"} className="shrink-0 ml-2">{t.status}</Badge>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">{formatIndianRupees(t.cost)}</p>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {activeTab === "billing" && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-3 gap-2 rounded-xl bg-gray-50 p-3">
+              <div className="text-center">
+                <p className="text-xs text-gray-500">Total Billed</p>
+                <p className="text-sm font-bold text-gray-900">{formatIndianRupees(data.total_billed)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-gray-500">Paid</p>
+                <p className="text-sm font-bold text-success">{formatIndianRupees(data.total_paid)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-gray-500">Pending</p>
+                <p className="text-sm font-bold text-danger">{formatIndianRupees(data.total_pending)}</p>
+              </div>
+            </div>
+            {data.billings.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-4">No billing records</p>
+            ) : (
+              data.billings.map((b) => (
+                <div key={b.id} className="rounded-xl bg-gray-50 px-3 py-2.5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-gray-700">{formatIndianRupees(b.total_amount)}</p>
+                    <Badge variant={b.payment_status === "PAID" ? "success" : b.payment_status === "PARTIAL" ? "warning" : "danger"} className="shrink-0">{b.payment_status}</Badge>
+                  </div>
+                  <div className="flex gap-3 mt-1 text-xs text-gray-400">
+                    <span>Paid: {formatIndianRupees(b.paid_amount)}</span>
+                    <span>Pending: {formatIndianRupees(b.pending_amount)}</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {activeTab === "followups" && (
+          <div className="space-y-2">
+            {data.follow_up_history.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-8">No follow-ups</p>
+            ) : (
+              data.follow_up_history.map((f) => (
+                <div key={f.id} className="rounded-xl bg-gray-50 px-3 py-2.5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-gray-700">{new Date(f.date).toLocaleDateString("en-IN")}</p>
+                    <Badge variant={f.status === "COMPLETED" ? "success" : f.status === "SCHEDULED" ? "warning" : "default"} className="shrink-0">{f.status}</Badge>
+                  </div>
+                  {f.time && <p className="text-xs text-gray-400 mt-1">Time: {f.time}</p>}
+                  {f.notes && <p className="text-xs text-gray-400 mt-1">{f.notes}</p>}
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {activeTab === "preop" && (
+          <div className="space-y-4">
+            {preOpPhotos.length === 0 && preOpXrays.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-8">No Pre-Op images</p>
+            ) : (
+              <>
+                {preOpPhotos.length > 0 && <PhotoGrid photos={preOpPhotos} label="Pre-Op Photos" />}
+                {preOpXrays.length > 0 && <PhotoGrid photos={preOpXrays} label="X-Rays" />}
+              </>
+            )}
+          </div>
+        )}
+
+        {activeTab === "postop" && (
+          <div className="space-y-4">
+            {postOpPhotos.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-8">No Post-Op images</p>
+            ) : (
+              <PhotoGrid photos={postOpPhotos} label="Post-Op Photos" />
+            )}
+          </div>
+        )}
+
+        {activeTab === "timeline" && (
+          <div className="space-y-2">
+            {data.timeline.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-8">No timeline events</p>
+            ) : (
+              data.timeline.map((t, i) => (
+                <div key={i} className="flex items-start gap-3 rounded-xl bg-gray-50 px-3 py-2">
+                  <div className="mt-0.5 h-2 w-2 rounded-full bg-primary shrink-0" />
+                  <div>
+                    <p className="text-xs text-gray-400">{new Date(t.date).toLocaleDateString("en-IN")}</p>
+                    <p className="text-sm text-gray-700">{t.event}</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

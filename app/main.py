@@ -11,7 +11,7 @@ from app.database import engine
 from app.core.security import hash_password
 from app.core.permissions import Role
 from app.utils.scheduler import check_appointment_reminders, check_same_day_appointments, check_missed_appointments
-from app.routers import auth, admin_groups, hospitals, doctors, consultants, patients, cases, consultant_notes, treatment_plans, treatment_sittings, appointments, billings, pre_ops, post_ops, dashboards, whatsapp_messaging, notifications, hospital_monthly_expenses, reports, crm, calendar, status_audit, campaigns
+from app.routers import auth, admin_groups, hospitals, doctors, consultants, patients, cases, consultant_notes, treatment_plans, treatment_sittings, appointments, billings, pre_ops, post_ops, dashboards, whatsapp_messaging, whatsapp_config, notifications, hospital_monthly_expenses, reports, crm, calendar, status_audit, campaigns, leads
 
 
 def run_migrations():
@@ -107,6 +107,8 @@ app.include_router(reports.router, prefix="/api/v1")
 app.include_router(crm.router, prefix="/api/v1")
 app.include_router(campaigns.router, prefix="/api/v1")
 app.include_router(calendar.router, prefix="/api/v1")
+app.include_router(leads.router, prefix="/api/v1")
+app.include_router(whatsapp_config.router, prefix="/api/v1")
 app.include_router(status_audit.router, prefix="/api/v1")
 
 

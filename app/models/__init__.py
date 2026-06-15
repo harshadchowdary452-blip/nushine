@@ -25,6 +25,7 @@ from app.models.hospital_settings import HospitalSettings
 from app.models.campaign import Campaign, CampaignRecipient, CampaignStatus, CampaignType, CampaignChannel, CampaignTarget, CampaignRecipientStatus
 from app.models.follow_up_response import FollowUpResponse, FollowUpResponseStatus, FeedbackType, EnquiryOutcome
 from app.models.whatsapp_template import WhatsAppTemplate
+from app.models.lead import Lead, LeadCommunication, LeadCall, LeadSource, LeadStatus, LeadCallOutcome
 
 __all__ = [
     "AdminGroup", "Hospital", "User", "Patient", "Consultant",
@@ -38,4 +39,5 @@ __all__ = [
     "Campaign", "CampaignRecipient", "CampaignStatus", "CampaignType", "CampaignChannel", "CampaignTarget", "CampaignRecipientStatus",
     "FollowUpResponse", "FollowUpResponseStatus", "FeedbackType", "EnquiryOutcome",
     "WhatsAppTemplate",
+    "Lead", "LeadCommunication", "LeadCall", "LeadSource", "LeadStatus", "LeadCallOutcome",
 ]

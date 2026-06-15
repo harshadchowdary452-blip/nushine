@@ -102,26 +102,22 @@ class TreatmentEnquiryService:
             extra_vars={"treatment_name": treatment_name},
         )
 
-    async def on_treatment_plan_completed(self, plan_id: str) -> None:
+    async def on_sitting_completed(self, plan_id: str) -> None:
         ctx = await self._get_plan_context(plan_id)
         if not ctx:
             return
         existing = await self.db.execute(
             select(FollowUp).where(
                 FollowUp.treatment_id == plan_id,
-                FollowUp.follow_up_type.in_([
-                    FollowUpType.ONE_DAY_POST_TREATMENT.value,
-                    FollowUpType.SIX_MONTH_RECALL.value,
-                ]),
+                FollowUp.follow_up_type == FollowUpType.ONE_DAY_POST_TREATMENT.value,
             )
         )
         if existing.scalar_one_or_none():
-            logger.info("Follow-ups already exist for plan %s, skipping", plan_id)
+            logger.info("1-day follow-up already exists for plan %s, skipping", plan_id)
             return
         today = date.today()
         tomorrow = today + timedelta(days=1)
-        six_months = today + timedelta(days=180)
-        fu1 = FollowUp(
+        fu = FollowUp(
             patient_id=ctx["patient_id"],
             hospital_id=ctx["hospital_id"],
             doctor_id=ctx["doctor_id"],
@@ -135,8 +131,30 @@ class TreatmentEnquiryService:
             treatment_completed_date=today,
             notes=f"Auto-generated: 1-day post treatment check for '{ctx['plan'].treatment_name}'",
         )
-        self.db.add(fu1)
-        fu2 = FollowUp(
+        self.db.add(fu)
+        await self.db.flush()
+        try:
+            await self._send_whatsapp_for(fu, ctx["plan"].treatment_name)
+        except Exception as e:
+            logger.warning("WhatsApp send failed for 1-day follow-up: %s", e)
+        logger.info("1-day post-treatment follow-up created for plan %s", plan_id)
+
+    async def on_treatment_plan_completed(self, plan_id: str) -> None:
+        ctx = await self._get_plan_context(plan_id)
+        if not ctx:
+            return
+        existing = await self.db.execute(
+            select(FollowUp).where(
+                FollowUp.treatment_id == plan_id,
+                FollowUp.follow_up_type == FollowUpType.SIX_MONTH_RECALL.value,
+            )
+        )
+        if existing.scalar_one_or_none():
+            logger.info("6-month follow-up already exists for plan %s, skipping", plan_id)
+            return
+        today = date.today()
+        six_months = today + timedelta(days=180)
+        fu = FollowUp(
             patient_id=ctx["patient_id"],
             hospital_id=ctx["hospital_id"],
             doctor_id=ctx["doctor_id"],
@@ -150,17 +168,10 @@ class TreatmentEnquiryService:
             treatment_completed_date=today,
             notes=f"Auto-generated: 6-month recall for treatment '{ctx['plan'].treatment_name}'",
         )
-        self.db.add(fu2)
+        self.db.add(fu)
         await self.db.flush()
         try:
-            await self._send_whatsapp_for(fu1, ctx["plan"].treatment_name)
-        except Exception as e:
-            logger.warning("WhatsApp send failed for 1-day follow-up: %s", e)
-        try:
-            await self._send_whatsapp_for(fu2, ctx["plan"].treatment_name)
+            await self._send_whatsapp_for(fu, ctx["plan"].treatment_name)
         except Exception as e:
             logger.warning("WhatsApp send failed for 6-month follow-up: %s", e)
-        logger.info(
-            "TREATMENT_COMPLETION + 6_MONTH_RECALL enquiries created for plan %s",
-            plan_id,
-        )
+        logger.info("6-month recall follow-up created for plan %s", plan_id)

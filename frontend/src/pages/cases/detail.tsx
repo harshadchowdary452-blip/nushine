@@ -193,7 +193,7 @@ export default function CaseDetail() {
       </Card>
 
       <Tabs defaultValue="overview">
-        <TabsList className="bg-white border border-border rounded-xl p-1">
+        <TabsList className="bg-white border border-border rounded-xl p-1 overflow-x-auto flex-nowrap scroll-smooth">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="preop">Pre-Op Images</TabsTrigger>
           <TabsTrigger value="postop">Post-Op Images</TabsTrigger>
@@ -201,7 +201,7 @@ export default function CaseDetail() {
           <TabsTrigger value="billing">Billing</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="mt-6">
+        <TabsContent value="overview" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card className="p-6 border-border shadow-card">
               <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -256,7 +256,7 @@ export default function CaseDetail() {
           </div>
         </TabsContent>
 
-        <TabsContent value="preop" className="mt-6">
+        <TabsContent value="preop" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
           <Card className="p-6 border-border shadow-card">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -396,7 +396,7 @@ export default function CaseDetail() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="postop" className="mt-6">
+        <TabsContent value="postop" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
           <Card className="p-6 border-border shadow-card">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -500,7 +500,7 @@ export default function CaseDetail() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="treatments" className="mt-6">
+        <TabsContent value="treatments" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
           {treatmentsList.length === 0 ? (
             <Card className="p-12 text-center border-border shadow-card">
               <FileText className="h-12 w-12 text-text-muted mx-auto mb-3" />
@@ -531,32 +531,48 @@ export default function CaseDetail() {
           )}
         </TabsContent>
 
-        <TabsContent value="billing" className="mt-6">
+        <TabsContent value="billing" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
           {billingsList.length === 0 ? (
             <Card className="p-12 text-center border-border shadow-card">
               <FileText className="h-12 w-12 text-text-muted mx-auto mb-3" />
               <p className="text-text-secondary">No billing records for this case</p>
             </Card>
           ) : (
-            <div className="space-y-3">
-              {billingsList.map((b: Record<string, unknown>) => (
-                <Card
-                  key={b.id as string}
-                  className="p-4 border-border shadow-card card-hover cursor-pointer"
-                  onClick={() => navigate(`/billing/${b.id}`)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-text-primary">{formatIndianRupees(b.total_amount as number)}</p>
-                      <div className="flex gap-4 mt-1 text-sm text-text-muted">
-                        <span>Paid: {formatIndianRupees(b.paid_amount as number)}</span>
-                        <span>Pending: {formatIndianRupees(b.pending_amount as number)}</span>
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="rounded-xl bg-blue-50 p-4 text-center">
+                  <p className="text-xs text-muted-foreground mb-1">Total Billed</p>
+                  <p className="text-lg font-bold text-blue-700">{formatIndianRupees(billingsList.reduce((s: number, b: any) => s + (b.total_amount || 0), 0))}</p>
+                </div>
+                <div className="rounded-xl bg-green-50 p-4 text-center">
+                  <p className="text-xs text-muted-foreground mb-1">Total Paid</p>
+                  <p className="text-lg font-bold text-green-700">{formatIndianRupees(billingsList.reduce((s: number, b: any) => s + (b.paid_amount || 0), 0))}</p>
+                </div>
+                <div className="rounded-xl bg-amber-50 p-4 text-center">
+                  <p className="text-xs text-muted-foreground mb-1">Total Pending</p>
+                  <p className="text-lg font-bold text-amber-700">{formatIndianRupees(billingsList.reduce((s: number, b: any) => s + (b.pending_amount || 0), 0))}</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                {billingsList.map((b: Record<string, unknown>) => (
+                  <Card
+                    key={b.id as string}
+                    className="p-4 border-border shadow-card card-hover cursor-pointer"
+                    onClick={() => navigate(`/billing/${b.id}`)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-text-primary">{formatIndianRupees(b.total_amount as number)}</p>
+                        <div className="flex gap-4 mt-1 text-sm text-text-muted">
+                          <span>Paid: {formatIndianRupees(b.paid_amount as number)}</span>
+                          <span>Pending: {formatIndianRupees(b.pending_amount as number)}</span>
+                        </div>
                       </div>
+                      <StatusBadge status={b.payment_status as string} />
                     </div>
-                    <StatusBadge status={b.payment_status as string} />
-                  </div>
-                </Card>
-              ))}
+                  </Card>
+                ))}
+              </div>
             </div>
           )}
         </TabsContent>

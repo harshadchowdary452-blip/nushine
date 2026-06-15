@@ -1,5 +1,5 @@
 import api from "./api";
-import type { LoginRequest, LoginResponse, PaginationParams, User } from "@/types";
+import type { LoginRequest, LoginResponse, PaginationParams, User, Lead, LeadCall, LeadCommunication } from "@/types";
 
 function withPagination(params?: PaginationParams) {
   if (!params) return undefined;
@@ -206,6 +206,42 @@ export const campaignsApi = {
   },
 };
 
+export const whatsappConfigApi = {
+  get: (hospitalId: string) => api.get(`/whatsapp-config/${hospitalId}`).then((r) => r.data),
+  update: (hospitalId: string, data: Record<string, any>) => api.put(`/whatsapp-config/${hospitalId}`, data).then((r) => r.data),
+};
+
+export const whatsappTemplatesApi = {
+  list: (params?: Record<string, any>) => api.get("/crm/whatsapp-templates", { params }).then((r) => r.data),
+  create: (data: { name: string; message: string }) => api.post("/crm/whatsapp-templates", data).then((r) => r.data),
+  update: (id: string, data: { name?: string; message?: string; is_active?: boolean }) =>
+    api.put(`/crm/whatsapp-templates/${id}`, data).then((r) => r.data),
+  delete: (id: string) => api.delete(`/crm/whatsapp-templates/${id}`),
+};
+
+export const leadsApi = {
+  list: (params?: PaginationParams) => api.get("/leads", { params: withPagination(params) }).then((r) => r.data),
+  get: (id: string) => api.get<Lead>(`/leads/${id}`).then((r) => r.data),
+  create: (data: Partial<Lead>) => api.post<Lead>("/leads", data).then((r) => r.data),
+  update: (id: string, data: Partial<Lead>) => api.put<Lead>(`/leads/${id}`, data).then((r) => r.data),
+  updateStatus: (id: string, status: string) => api.put<Lead>(`/leads/${id}/status`, { status }).then((r) => r.data),
+  delete: (id: string) => api.delete(`/leads/${id}`),
+  getCommunications: (id: string) => api.get<LeadCommunication[]>(`/leads/${id}/communications`).then((r) => r.data),
+  addCommunication: (id: string, data: { channel: string; message: string }) =>
+    api.post<LeadCommunication>(`/leads/${id}/communications`, data).then((r) => r.data),
+  getCalls: (id: string) => api.get<LeadCall[]>(`/leads/${id}/calls`).then((r) => r.data),
+  addCall: (id: string, data: { outcome?: string; notes?: string; follow_up_date?: string; duration_seconds?: number }) =>
+    api.post<LeadCall>(`/leads/${id}/calls`, data).then((r) => r.data),
+  convert: (id: string, data?: Record<string, any>) =>
+    api.post(`/leads/${id}/convert`, data || {}).then((r) => r.data),
+  createFollowUp: (id: string, data: { follow_up_date: string; follow_up_time?: string; priority?: string; reason?: string; notes?: string }) =>
+    api.post(`/leads/${id}/follow-ups`, data).then((r) => r.data),
+  getFollowUps: (id: string) => api.get(`/leads/${id}/follow-ups`).then((r) => r.data),
+  bookAppointment: (id: string, data: { appointment_date: string; appointment_time?: string; doctor_id?: string; notes?: string }) =>
+    api.post(`/leads/${id}/appointments`, data).then((r) => r.data),
+  analytics: () => api.get("/leads/analytics/summary").then((r) => r.data),
+};
+
 export const crmApi = {
   communications: {
     list: (params?: { patient_id?: string; channel?: string; limit?: number; offset?: number }) =>
@@ -266,7 +302,7 @@ export const crmApi = {
     patient_ids?: string[]; appointment_date?: string;
     doctor_id?: string; status?: string;
   }) => api.post("/crm/whatsapp/preview", data).then((r) => r.data),
-  sendWhatsApp: (data: { patient_id: string; message: string; message_type?: string }) =>
+  sendWhatsApp: (data: { patient_id?: string; lead_id?: string; message: string; message_type?: string }) =>
     api.post("/crm/whatsapp/send", data).then((r) => r.data),
   followUpResponses: {
     record: (followUpId: string, data: { patient_id: string; response_message?: string; response_status: string }) =>
@@ -276,7 +312,7 @@ export const crmApi = {
   },
   broadcastWhatsApp: (data: {
     message: string; message_type?: string; filter_type: string;
-    patient_ids?: string[]; appointment_date?: string;
+    patient_ids?: string[]; lead_ids?: string[]; appointment_date?: string;
     doctor_id?: string; status?: string;
   }) => api.post("/crm/whatsapp/broadcast", data).then((r) => r.data),
   createFollowUpFromEnquiry: (data: {

@@ -5,6 +5,7 @@ from datetime import datetime
 
 class BillingCreate(BaseModel):
     case_id: str
+    treatment_plan_id: Optional[str] = None
     total_amount: float = Field(default=0.0, ge=0)
     paid_amount: float = Field(default=0.0, ge=0)
     payment_method: Optional[str] = None

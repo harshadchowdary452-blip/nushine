@@ -58,6 +58,7 @@ export default function AppointmentDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["appointment", id] })
       queryClient.invalidateQueries({ queryKey: ["appointments"] })
+      queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" })
       addToast({ title: "Success", description: "Appointment updated", variant: "success" })
       setEditOpen(false)
     },
@@ -72,6 +73,7 @@ export default function AppointmentDetail() {
     onSuccess: (resp: any) => {
       queryClient.invalidateQueries({ queryKey: ["appointment", id] })
       queryClient.invalidateQueries({ queryKey: ["appointments"] })
+      queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" })
       addToast({
         title: "Doctor Reassigned",
         description: `Changed to ${resp.new_doctor_name}`,
