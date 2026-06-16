@@ -617,7 +617,7 @@ export default function PatientDetail() {
                         <SearchableSelect
                           value={editForm.patient_source}
                           onValueChange={(v) => setEditForm((f) => ({ ...f, patient_source: v }))}
-                          options={["Walk-In", "Google Search", "Google Maps", "Instagram", "Facebook", "WhatsApp", "Website", "Referral - Existing Patient", "Referral - Doctor", "Referral - Clinic", "Advertisement", "Banner", "Newspaper", "YouTube", "Campaign", "Event", "Other"]}
+                          options={["Walk-In", "Google Search", "Google Maps", "Instagram", "Facebook", "WhatsApp", "Website", "Referral - Existing Patient", "Referral - Doctor", "Referral - Clinic", "Advertisement", "Banner", "Newspaper", "YouTube", "Campaign", "Event", "Lead", "Other"]}
                           placeholder="Search or select source..."
                         />
                       </div>
@@ -756,6 +756,7 @@ export default function PatientDetail() {
           <TabsTrigger value="responses">Responses ({followUpResponsesList.length})</TabsTrigger>
           <TabsTrigger value="follow-ups">Follow-Ups ({followUpHistory?.length || 0})</TabsTrigger>
           <TabsTrigger value="timeline">Timeline</TabsTrigger>
+          <TabsTrigger value="images">Images</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
@@ -1082,6 +1083,21 @@ export default function PatientDetail() {
 
         <TabsContent value="timeline" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
           {renderTimeline()}
+        </TabsContent>
+
+        <TabsContent value="images" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
+          <div className="space-y-6">
+            {casesList.length === 0 ? (
+              <Card className="p-12 text-center border-border shadow-card">
+                <Camera className="h-12 w-12 text-text-muted mx-auto mb-3" />
+                <p className="text-text-secondary">No cases found for this patient</p>
+              </Card>
+            ) : (
+              casesList.map((caseItem: Case) => (
+                <CaseImages key={caseItem.id} caseId={caseItem.id} caseName={`Case #${caseItem.id.slice(0, 8)}`} />
+              ))
+            )}
+          </div>
         </TabsContent>
 
       </Tabs>

@@ -131,8 +131,9 @@ export default function AdminHospitals() {
       setDeleteDialogOpen(false)
       setDeletingHospital(null)
     },
-    onError: () => {
-      addToast({ title: "Error", description: "Failed to delete hospital", variant: "destructive" })
+    onError: (err: any) => {
+      const msg = err?.response?.data?.detail || "Failed to delete hospital"
+      addToast({ title: "Error", description: msg, variant: "destructive" })
     },
   })
 

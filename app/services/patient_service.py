@@ -1,15 +1,28 @@
 import logging
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, delete as sa_delete
 from fastapi import HTTPException, status
+from app.repositories.base import BaseRepository
 from app.repositories.patient_repository import PatientRepository
 from app.repositories.case_repository import CaseRepository
 from app.repositories.billing_repository import BillingRepository
 from app.repositories.treatment_plan_repository import TreatmentPlanRepository
+from app.repositories.appointment_repository import AppointmentRepository
 from app.repositories.audit_log_repository import AuditLogRepository
 from app.models.patient import Patient, PatientStatus
-from app.models.case import CaseStatus
-from app.models.billing import PaymentStatus
+from app.models.case import Case, CaseStatus
+from app.models.billing import Billing, PaymentStatus
+from app.models.appointment import Appointment
+from app.models.treatment_plan import TreatmentPlan
+from app.models.treatment_sitting import TreatmentSitting
+from app.models.follow_up import FollowUp
+from app.models.communication_log import CommunicationLog
+from app.models.patient_feedback import PatientFeedback
+from app.models.lead import Lead
+from app.models.pre_op import PreOp
+from app.models.post_op import PostOp
+from app.models.consultant_note import ConsultantNote
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +34,7 @@ class PatientService:
         self.case_repo = CaseRepository(db)
         self.billing_repo = BillingRepository(db)
         self.treatment_plan_repo = TreatmentPlanRepository(db)
+        self.appointment_repo = AppointmentRepository(db)
         self.db = db
 
     async def create(self, data: dict, user_id: str = None) -> Patient:
@@ -108,10 +122,26 @@ class PatientService:
 
     async def delete(self, patient_id: str, user_id: str = None) -> bool:
         try:
+            await self.db.execute(sa_delete(Appointment).where(Appointment.patient_id == patient_id))
+            await self.db.execute(sa_delete(FollowUp).where(FollowUp.patient_id == patient_id))
+            await self.db.execute(sa_delete(CommunicationLog).where(CommunicationLog.patient_id == patient_id))
+            await self.db.execute(sa_delete(PatientFeedback).where(PatientFeedback.patient_id == patient_id))
+            await self.db.execute(sa_delete(Lead).where(Lead.converted_patient_id == patient_id))
+            cases = (await self.db.execute(select(Case).where(Case.patient_id == patient_id))).scalars().all()
+            for c in cases:
+                await self.db.execute(sa_delete(PreOp).where(PreOp.case_id == c.id))
+                await self.db.execute(sa_delete(PostOp).where(PostOp.case_id == c.id))
+                await self.db.execute(sa_delete(ConsultantNote).where(ConsultantNote.case_id == c.id))
+                tps = (await self.db.execute(select(TreatmentPlan).where(TreatmentPlan.case_id == c.id))).scalars().all()
+                for tp in tps:
+                    await self.db.execute(sa_delete(TreatmentSitting).where(TreatmentSitting.treatment_plan_id == tp.id))
+                await self.db.execute(sa_delete(TreatmentPlan).where(TreatmentPlan.case_id == c.id))
+                await self.db.execute(sa_delete(Billing).where(Billing.case_id == c.id))
+            await self.db.execute(sa_delete(Case).where(Case.patient_id == patient_id))
             result = await self.repo.delete(patient_id)
             if result:
                 await self.audit_log_repo.create(user_id=user_id, action="DELETE_PATIENT", entity_type="PATIENT", entity_id=patient_id, details="Patient deleted")
             return result
         except Exception as e:
-            logger.exception("DELETE_PATIENT - Error: %s", str(e))
+            logger.exception("DELETE_PATIENT - Unexpected error: %s", str(e))
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to delete patient: {str(e)}")

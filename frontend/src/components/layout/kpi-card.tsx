@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react"
 import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
-import { TrendingUp, TrendingDown } from "lucide-react"
+import { TrendingUp, TrendingDown, ChevronRight } from "lucide-react"
 
 interface KpiCardProps {
   title: string
@@ -17,11 +17,11 @@ interface KpiCardProps {
 }
 
 const colorMap = {
-  primary: { bg: "bg-primary-soft", text: "text-primary", icon: "text-primary" },
-  success: { bg: "bg-success-soft", text: "text-success", icon: "text-success" },
-  warning: { bg: "bg-warning-soft", text: "text-warning", icon: "text-warning" },
-  info: { bg: "bg-info-soft", text: "text-info", icon: "text-info" },
-  danger: { bg: "bg-danger-soft", text: "text-danger", icon: "text-danger" },
+  primary: { bg: "bg-indigo-50", text: "text-indigo-600", icon: "text-indigo-600" },
+  success: { bg: "bg-emerald-50", text: "text-emerald-600", icon: "text-emerald-600" },
+  warning: { bg: "bg-amber-50", text: "text-amber-600", icon: "text-amber-600" },
+  info: { bg: "bg-cyan-50", text: "text-cyan-600", icon: "text-cyan-600" },
+  danger: { bg: "bg-red-50", text: "text-red-600", icon: "text-red-600" },
 }
 
 export default function KpiCard({ title, value, icon: Icon, trend, description, className, loading = false, color = "primary", delay = 0, onClick }: KpiCardProps) {
@@ -29,11 +29,13 @@ export default function KpiCard({ title, value, icon: Icon, trend, description, 
 
   if (loading) {
     return (
-      <div className={cn("rounded-2xl border border-gray-100 bg-white p-4 shadow-kpi", className)}>
-        <div className="space-y-2">
-          <div className="skeleton h-3 w-20" />
-          <div className="skeleton h-6 w-28" />
-          {description && <div className="skeleton h-3 w-16" />}
+      <div className={cn("rounded-xl border border-gray-200 bg-white p-3.5 shadow-card", className)}>
+        <div className="flex items-center gap-3">
+          <div className="skeleton h-9 w-9 rounded-lg" />
+          <div className="flex-1 space-y-1.5">
+            <div className="skeleton h-3 w-20" />
+            <div className="skeleton h-5 w-24" />
+          </div>
         </div>
       </div>
     )
@@ -41,40 +43,49 @@ export default function KpiCard({ title, value, icon: Icon, trend, description, 
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay, ease: "easeOut" }}
-      whileHover={{ y: -2 }}
+      transition={{ duration: 0.3, delay, ease: "easeOut" }}
+      whileHover={{ y: -1 }}
       onClick={onClick}
-      className={cn("group rounded-2xl border border-gray-100 bg-white p-4 shadow-kpi transition-all duration-300 hover:shadow-kpi-hover", onClick && "cursor-pointer", className)}
+      className={cn(
+        "group rounded-xl border border-gray-200 bg-white p-3.5 shadow-card transition-all duration-200 hover:shadow-card-hover",
+        onClick && "cursor-pointer",
+        className
+      )}
     >
-      <div className="flex items-start justify-between">
-        <div className="space-y-1 flex-1 min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">{title}</p>
-          <motion.p
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: delay + 0.1 }}
-            className="text-xl font-bold tracking-tight text-gray-900"
-          >
-            {value}
-          </motion.p>
+      <div className="flex items-start gap-3">
+        <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-105", c.bg, c.text)}>
+          <Icon className="h-[18px] w-[18px]" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-medium text-text-secondary uppercase tracking-wider">{title}</p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3, delay: delay + 0.05 }}
+              className="text-card-title text-text-primary"
+            >
+              {value}
+            </motion.p>
+            {onClick && (
+              <ChevronRight className="h-3.5 w-3.5 text-text-muted opacity-0 -ml-1 group-hover:opacity-100 transition-opacity" />
+            )}
+          </div>
           {trend && (
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 mt-0.5">
               <span className={cn(
-                "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-semibold",
-                trend.positive ? "bg-success-soft text-success" : "bg-danger-soft text-danger"
+                "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+                trend.positive ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"
               )}>
                 {trend.positive ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
                 {trend.value}
               </span>
-              {description && <span className="text-[11px] text-gray-400">{description}</span>}
+              {description && <span className="text-[10px] text-text-muted">{description}</span>}
             </div>
           )}
-          {!trend && description && <p className="text-[11px] text-gray-400">{description}</p>}
-        </div>
-        <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-transform duration-300 group-hover:scale-110", c.bg, c.text)}>
-          <Icon className={cn("h-4 w-4", c.icon)} />
+          {!trend && description && <p className="text-[10px] text-text-muted mt-0.5">{description}</p>}
         </div>
       </div>
     </motion.div>

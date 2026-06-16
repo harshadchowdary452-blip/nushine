@@ -274,13 +274,13 @@ export default function CaseDetail() {
                   if (files.length === 0) return
                   setUploadingPreOp(true)
                   try {
+                    const formData = new FormData()
                     for (const file of files) {
-                      const formData = new FormData()
                       formData.append("photos", file)
-                      await api.post(`/pre-ops/${id}`, formData, {
-                        headers: { "Content-Type": "multipart/form-data" },
-                      })
                     }
+                    await api.post(`/pre-ops/${id}`, formData, {
+                      headers: { "Content-Type": "multipart/form-data" },
+                    })
                     queryClient.invalidateQueries({ queryKey: ["case-preops", id] })
                     addToast({ title: "Success", description: `${files.length} image(s) uploaded` })
                   } catch (err: unknown) {
@@ -342,13 +342,13 @@ export default function CaseDetail() {
                     if (files.length === 0) return
                     setUploadingPreOpXray(true)
                     try {
+                      const formData = new FormData()
                       for (const file of files) {
-                        const formData = new FormData()
                         formData.append("xrays", file)
-                        await api.post(`/pre-ops/${id}`, formData, {
-                          headers: { "Content-Type": "multipart/form-data" },
-                        })
                       }
+                      await api.post(`/pre-ops/${id}`, formData, {
+                        headers: { "Content-Type": "multipart/form-data" },
+                      })
                       queryClient.invalidateQueries({ queryKey: ["case-preops", id] })
                       addToast({ title: "Success", description: `${files.length} X-Ray(s) uploaded` })
                     } catch (err: unknown) {
@@ -414,13 +414,13 @@ export default function CaseDetail() {
                   if (files.length === 0) return
                   setUploadingPostOp(true)
                   try {
+                    const formData = new FormData()
                     for (const file of files) {
-                      const formData = new FormData()
                       formData.append("photos", file)
-                      await api.post(`/post-ops/${id}`, formData, {
-                        headers: { "Content-Type": "multipart/form-data" },
-                      })
                     }
+                    await api.post(`/post-ops/${id}`, formData, {
+                      headers: { "Content-Type": "multipart/form-data" },
+                    })
                     queryClient.invalidateQueries({ queryKey: ["case-postops", id] })
                     addToast({ title: "Success", description: `${files.length} image(s) uploaded` })
                   } catch (err: unknown) {

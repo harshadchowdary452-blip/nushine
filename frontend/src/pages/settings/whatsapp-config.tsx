@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
-import { MessageSquare, Save, Smartphone, Globe, ToggleLeft, ToggleRight, Info } from "lucide-react"
+import { MessageSquare, Save, Smartphone, Globe, ToggleLeft, ToggleRight, Info, Wifi } from "lucide-react"
 import PageHeader from "@/components/layout/page-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -20,6 +20,7 @@ export default function WhatsAppConfigPage() {
   const hospitalId = user?.hospital_id || ""
 
   const [enabled, setEnabled] = useState(false)
+  const [whatsappMode, setWhatsappMode] = useState("LIVE")
   const [clinicNumber, setClinicNumber] = useState("")
   const [countryCode, setCountryCode] = useState("+91")
   const [defaultTemplates, setDefaultTemplates] = useState(true)
@@ -35,6 +36,7 @@ export default function WhatsAppConfigPage() {
   useEffect(() => {
     if (config) {
       setEnabled(config.enabled)
+      setWhatsappMode(config.whatsapp_mode || "LIVE")
       setClinicNumber(config.clinic_whatsapp_number || "")
       setCountryCode(config.country_code)
       setDefaultTemplates(config.default_message_templates_enabled)
@@ -54,7 +56,8 @@ export default function WhatsAppConfigPage() {
 
   function handleSave() {
     updateMutation.mutate({
-      enabled, clinic_whatsapp_number: clinicNumber || null,
+      enabled, whatsapp_mode: whatsappMode,
+      clinic_whatsapp_number: clinicNumber || null,
       country_code: countryCode, default_message_templates_enabled: defaultTemplates,
       broadcast_enabled: broadcastEnabled, campaign_enabled: campaignEnabled,
     })
@@ -80,6 +83,17 @@ export default function WhatsAppConfigPage() {
               <p className="text-sm text-gray-500">Turn on WhatsApp messaging for this clinic</p>
             </div>
             <Switch checked={enabled} onCheckedChange={setEnabled} />
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
+            <div>
+              <p className="font-medium text-gray-900">WhatsApp Mode</p>
+              <p className="text-sm text-gray-500">LIVE for production, SANDBOX for testing</p>
+            </div>
+            <select value={whatsappMode} onChange={(e) => setWhatsappMode(e.target.value)} className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none focus:border-primary">
+              <option value="LIVE">Live</option>
+              <option value="SANDBOX">Sandbox</option>
+            </select>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

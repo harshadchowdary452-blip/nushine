@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 
@@ -49,5 +49,18 @@ class BillingResponse(BaseModel):
     notes: Optional[str]
     created_at: datetime
     updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class BillingHistoryResponse(BaseModel):
+    id: str
+    billing_id: str
+    action: str
+    previous_data: Optional[str] = None
+    new_data: Optional[str] = None
+    changes_summary: Optional[str] = None
+    performed_by: Optional[str] = None
+    created_at: datetime
 
     model_config = {"from_attributes": True}

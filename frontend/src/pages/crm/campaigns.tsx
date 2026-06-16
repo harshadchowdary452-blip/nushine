@@ -3,7 +3,7 @@ import { motion } from "framer-motion"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   Megaphone, Plus, Loader2, Rocket, Trash2, BarChart3, Target, Send, Eye, MessageSquare,
-  MessageCircle, FileText, Edit3
+  MessageCircle, FileText, Edit3, X
 } from "lucide-react"
 import { campaignsApi, crmApi } from "@/services/endpoints"
 import PageHeader from "@/components/layout/page-header"
@@ -92,6 +92,7 @@ export default function Campaigns() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => campaignsApi.delete(id),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["campaigns"] }); addToast({ title: "Deleted", variant: "success" }) },
+    onError: (err: any) => { const msg = err?.response?.data?.detail || "Failed to delete campaign"; addToast({ title: "Error", description: msg, variant: "destructive" }) },
   })
 
   const launchMutation = useMutation({
@@ -143,7 +144,7 @@ export default function Campaigns() {
             </DialogTrigger>
             <DialogContent className="sm:max-w-lg">
               <DialogHeader><DialogTitle>Create Campaign</DialogTitle></DialogHeader>
-              <div className="space-y-4">
+              <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
                 <div className="space-y-2">
                   <Label>Campaign Name</Label>
                   <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Summer Checkup Drive" />
@@ -196,7 +197,7 @@ export default function Campaigns() {
                     </Select>
                     {selectedTemplate && (
                       <Button variant="ghost" size="icon-sm" onClick={() => { setSelectedTemplate(""); setMessage("") }}>
-                        <XIcon className="h-4 w-4" />
+                        <X className="h-4 w-4" />
                       </Button>
                     )}
                   </div>

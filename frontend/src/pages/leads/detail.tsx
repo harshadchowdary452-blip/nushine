@@ -23,8 +23,9 @@ import {
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { leadsApi } from "@/services/endpoints"
+import { leadsApi, doctorsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
+import { useAuthStore } from "@/store/authStore"
 import type { Lead, LeadCall, LeadCommunication, LeadCallOutcome } from "@/types"
 
 const statusStyles: Record<string, string> = {
@@ -136,6 +137,14 @@ export default function LeadDetail() {
     enabled: !!id,
   })
 
+  const currentUser = useAuthStore((s) => s.user)
+  const { data: doctorsData } = useQuery({
+    queryKey: ["doctors", "dropdown", currentUser?.hospital_id],
+    queryFn: () => doctorsApi.list({ page_size: 200, hospital_id: currentUser?.hospital_id || undefined }),
+    enabled: !!currentUser,
+  })
+  const doctors: any[] = Array.isArray(doctorsData) ? doctorsData : doctorsData?.items || []
+
   const statusMutation = useMutation({
     mutationFn: (status: string) => leadsApi.updateStatus(id!, status),
     onSuccess: () => {
@@ -161,7 +170,7 @@ export default function LeadDetail() {
       addToast({ title: "Lead deleted", variant: "success" })
       navigate("/leads?" + searchParams.toString())
     },
-    onError: () => addToast({ title: "Error deleting lead", variant: "destructive" }),
+    onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to delete lead", variant: "destructive" }),
   })
 
   const callMutation = useMutation({
@@ -322,11 +331,11 @@ export default function LeadDetail() {
               <Button size="sm" variant="outline" onClick={() => { setApptOpen(true); setActiveTab("appointments") }}>
                 <Calendar className="h-3.5 w-3.5 mr-1" /> Appointment
               </Button>
-              {(lead.status !== "CONVERTED" && lead.status !== "LOST") && (
-                <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => openConvert(lead)}>
-                  <Target className="h-3.5 w-3.5 mr-1" /> Convert
-                </Button>
-              )}
+                {lead.status !== "CONVERTED" && lead.status !== "LOST" && lead.status !== "NOT_INTERESTED" && lead.status !== "NO_RESPONSE" && (
+                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => openConvert(lead)}>
+                    <Target className="h-3.5 w-3.5 mr-1" /> Convert
+                  </Button>
+                )}
               <Button size="sm" variant="outline" onClick={() => openEdit(lead)}>
                 <Edit3 className="h-3.5 w-3.5 mr-1" /> Edit
               </Button>
@@ -858,7 +867,16 @@ export default function LeadDetail() {
           <div className="space-y-3 py-2">
             <div><Label>Date *</Label><Input type="date" value={apptDate} onChange={(e) => setApptDate(e.target.value)} /></div>
             <div><Label>Time</Label><Input type="time" value={apptTime} onChange={(e) => setApptTime(e.target.value)} /></div>
-            <div><Label>Doctor ID</Label><Input value={apptDoctor} onChange={(e) => setApptDoctor(e.target.value)} placeholder="Doctor ID (optional)" /></div>
+            <div><Label>Doctor</Label>
+              <Select value={apptDoctor} onValueChange={setApptDoctor}>
+                <SelectTrigger><SelectValue placeholder="Select doctor (optional)" /></SelectTrigger>
+                <SelectContent>
+                  {doctors.length > 0 ? doctors.map((doc: any) => (
+                    <SelectItem key={doc.id} value={doc.id}>{doc.full_name}</SelectItem>
+                  )) : <SelectItem value="" disabled>No doctors available</SelectItem>}
+                </SelectContent>
+              </Select>
+            </div>
             <div><Label>Notes</Label><Textarea value={apptNotes} onChange={(e) => setApptNotes(e.target.value)} rows={3} placeholder="Appointment notes..." /></div>
           </div>
           <DialogFooter>
@@ -869,7 +887,7 @@ export default function LeadDetail() {
       </Dialog>
 
       <Dialog open={convertOpen} onOpenChange={setConvertOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Convert Lead to Patient</DialogTitle>
             <DialogDescription>A new patient record and case will be created. The lead history will be preserved.</DialogDescription>
           </DialogHeader>
@@ -893,11 +911,17 @@ export default function LeadDetail() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConvertOpen(false)}>Cancel</Button>
-            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => convertMutation.mutate({
-              patient_name: convertPatientName || undefined, age: convertAge ? parseInt(convertAge) : undefined,
-              gender: convertGender || undefined, phone: convertPhone || undefined,
-              email: convertEmail || undefined, city: convertCity || undefined, notes: convertNotes || undefined,
-            })} disabled={convertMutation.isPending}>
+            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => {
+              const data: Record<string, any> = {}
+              if (convertPatientName) data.patient_name = convertPatientName
+              if (convertAge) data.age = parseInt(convertAge)
+              if (convertGender) data.gender = convertGender
+              if (convertPhone) data.phone = convertPhone
+              if (convertEmail) data.email = convertEmail
+              if (convertCity) data.city = convertCity
+              if (convertNotes) data.notes = convertNotes
+              convertMutation.mutate(data)
+            }} disabled={convertMutation.isPending}>
               {convertMutation.isPending ? "Converting..." : "Convert to Patient"}
             </Button>
           </DialogFooter>

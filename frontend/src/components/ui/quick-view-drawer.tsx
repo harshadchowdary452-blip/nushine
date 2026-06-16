@@ -13,6 +13,7 @@ import {
 import {
   Dialog, DialogContent, DialogTitle,
 } from "@/components/ui/dialog"
+import { cn } from "@/lib/utils"
 import type { QuickViewAdminGroup, QuickViewHospital, QuickViewDoctor, QuickViewPatient, QuickViewPatientPreOp, QuickViewPatientPostOp } from "@/types"
 
 interface QuickViewDrawerProps {
@@ -523,7 +524,7 @@ function useMediaQuery(query: string) {
 
 export default function QuickViewDrawer({ open, onClose, type, entityId, entityName }: QuickViewDrawerProps) {
   const Content = contentMap[type]
-  const isDesktop = useMediaQuery("(min-width: 640px)")
+  const isDesktop = useMediaQuery("(min-width: 768px)")
   const [period, setPeriod] = useState("this_month")
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
@@ -551,12 +552,20 @@ export default function QuickViewDrawer({ open, onClose, type, entityId, entityN
 
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose() }}>
-      <SheetContent side={isDesktop ? "right" : "bottom"} className={isDesktop ? "sm:max-w-[560px] w-full" : ""}>
-        <SheetHeader className="mb-4">
-          <SheetTitle className="flex items-center gap-2 text-xl">
-            {entityName || "Quick View"}
-          </SheetTitle>
-          <SheetDescription>
+      <SheetContent
+        side={isDesktop ? "right" : "bottom"}
+        className={cn(
+          "border-l border-gray-200 shadow-xl",
+          isDesktop ? "sm:max-w-[560px] w-full" : ""
+        )}
+      >
+        <SheetHeader className="border-b border-gray-100 pb-3 mb-4">
+          <div className="flex items-center justify-between">
+            <SheetTitle className="flex items-center gap-2 text-lg font-semibold text-gray-900">
+              {entityName || "Quick View"}
+            </SheetTitle>
+          </div>
+          <SheetDescription className="text-xs text-text-secondary">
             {type === "admin-group" && "Admin Group performance details"}
             {type === "hospital" && "Hospital performance details"}
             {type === "doctor" && "Doctor performance details"}
@@ -564,9 +573,9 @@ export default function QuickViewDrawer({ open, onClose, type, entityId, entityN
           </SheetDescription>
         </SheetHeader>
         {type !== "patient" && filterBar}
-        <ScrollArea className="h-[calc(100vh-220px)] sm:h-[calc(100vh-160px)] pr-4">
+        <div className="overflow-y-auto pr-1 scroll-smooth" style={{ maxHeight: "calc(100vh - 220px)" }}>
           {Content ? <Content id={entityId} onClose={onClose} period={period} startDate={startDate} endDate={endDate} /> : null}
-        </ScrollArea>
+        </div>
       </SheetContent>
     </Sheet>
   )

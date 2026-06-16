@@ -100,8 +100,9 @@ export default function TreatmentList() {
       setDeleteDialogOpen(false)
       setDeletingPlan(null)
     },
-    onError: () => {
-      addToast({ title: "Error", description: "Failed to delete treatment plan", variant: "destructive" })
+    onError: (err: any) => {
+      const msg = err?.response?.data?.detail || "Failed to delete treatment plan"
+      addToast({ title: "Error", description: msg, variant: "destructive" })
     },
   })
 

@@ -1,98 +1,234 @@
-import { useState, useMemo, useCallback } from "react"
-import { motion } from "framer-motion"
+import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { useQuery } from "@tanstack/react-query"
+import { useNavigate } from "react-router-dom"
 import {
-  Users, UserPlus, CheckCircle2, TrendingUp, IndianRupee, DollarSign, Clock, MessageSquare,
-  Phone, Mail, Calendar, BarChart3, PieChart, Activity, Target, Award, Send,
-  ChevronDown, Filter, ArrowUpRight, ArrowDownRight,
+  Users, UserPlus, CheckCircle2, TrendingUp, Clock, MessageSquare,
+  BarChart3, Activity, Send, Award, DollarSign,
+  Plus, Megaphone, Phone, CalendarDays, List, Eye, Target, 
 } from "lucide-react"
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LineChart, Line,
-  PieChart as RePieChart, Pie, Cell,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line,
+  PieChart, Pie, Cell, Legend,
 } from "recharts"
 import { cn } from "@/lib/utils"
 import { formatIndianRupees, formatIndianNumber } from "@/lib/currency"
-import { crmApi } from "@/services/endpoints"
+import { crmApi, doctorsApi } from "@/services/endpoints"
 import DashboardDateFilter, { type DateRangePreset } from "@/components/ui/dashboard-date-filter"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import KpiCard from "@/components/layout/kpi-card"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import DentalEmptyState from "@/components/ui/dental-empty-state"
+import { useAuthStore } from "@/store/authStore"
 
-interface CrmDashboardData {
-  total_leads: number; new_leads: number; converted_leads: number; conversion_rate: number;
-  crm_revenue: number; cost_per_lead: number; pending_follow_ups_today: number; pending_enquiries: number;
-  lead_growth_trend: { month: string; leads: number; converted: number }[];
-  leads_by_source: { source: string; leads: number; converted: number }[];
-  crm_funnel: { stage: string; count: number }[];
-  todays_enquiries: number; todays_enquiries_detail: any[]; enquiry_by_type: { type: string; count: number }[]; follow_up_compliance_rate: number;
-  follow_up_summary: { total_due: number; overdue: number; completed_this_month: number; completion_rate: number };
-  follow_up_by_type: { follow_up_type: string; count: number }[];
-  follow_up_trend: { month: string; completed: number; pending: number }[];
-  follow_up_by_doctor: { doctor_name: string; count: number }[];
-  active_campaigns: number; completed_campaigns: number; campaign_performance: any[];
-  messages_sent: number; broadcast_messages: number; campaign_messages: number; appointment_reminders: number; recall_messages: number;
-  messages_by_day: { day: string; count: number }[];
-  messages_by_campaign: { campaign_name: string; count: number }[];
-  messages_by_template: { template: string; count: number }[];
-  messages_by_staff: { staff_name: string; count: number }[];
-  revenue_by_source: { source: string; revenue: number; count: number }[];
-  revenue_by_doctor: { doctor_name: string; revenue: number; count: number }[];
-  patient_acquisition: { total_patients: number; from_crm: number; conversion_rate: number };
-  lead_status_breakdown: { status: string; count: number }[];
-  recent_communications: any[];
-}
-
+const COLORS = ["#4F46E5", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899", "#06B6D4", "#F97316"]
 const sections = [
   { id: "overview", label: "Overview" },
-  { id: "funnel", label: "Funnel" },
+  { id: "leads", label: "Leads" },
   { id: "sources", label: "Sources" },
   { id: "enquiries", label: "Enquiries" },
   { id: "followups", label: "Follow-Ups" },
   { id: "campaigns", label: "Campaigns" },
   { id: "whatsapp", label: "WhatsApp" },
-  { id: "revenue", label: "Revenue" },
   { id: "acquisition", label: "Acquisition" },
+  { id: "lead-revenue", label: "Lead Revenue" },
 ]
 
-const COLORS = ["#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316"]
-
 function ChartTooltip({ active, payload, label, financial }: any) {
-  if (active && payload && payload.length) {
-    return (
-      <div className="rounded-xl border border-gray-100 bg-white p-3 shadow-lg">
-        <p className="text-sm font-semibold text-gray-900 mb-1">{label}</p>
-        {payload.map((p: any, i: number) => (
-          <p key={i} className="text-xs" style={{ color: p.color }}>
-            {p.name}: {financial ? formatIndianRupees(p.value ?? 0) : formatIndianNumber(p.value ?? 0)}
-          </p>
-        ))}
-      </div>
-    )
-  }
-  return null
+  if (!active || !payload?.length) return null
+  return (
+    <div className="rounded-xl border border-gray-100 bg-white p-3 shadow-lg">
+      <p className="text-sm font-semibold text-gray-900 mb-1">{label}</p>
+      {payload.map((p: any, i: number) => (
+        <p key={i} className="text-xs" style={{ color: p.color }}>
+          {p.name}: {financial ? formatIndianRupees(p.value ?? 0) : formatIndianNumber(p.value ?? 0)}
+        </p>
+      ))}
+    </div>
+  )
 }
 
 const kpiConfig = [
   { key: "total_leads", label: "Total Leads", icon: Users, color: "primary", format: (v: number) => formatIndianNumber(v) },
   { key: "new_leads", label: "New Leads", icon: UserPlus, color: "info", format: (v: number) => formatIndianNumber(v) },
-  { key: "converted_leads", label: "Converted Leads", icon: CheckCircle2, color: "success", format: (v: number) => formatIndianNumber(v) },
+  { key: "converted_leads", label: "Converted", icon: CheckCircle2, color: "success", format: (v: number) => formatIndianNumber(v) },
   { key: "conversion_rate", label: "Conversion Rate", icon: TrendingUp, color: "success", format: (v: number) => `${v ?? 0}%` },
-  { key: "crm_revenue", label: "CRM Revenue", icon: IndianRupee, color: "warning", format: (v: number) => formatIndianRupees(v ?? 0) },
-  { key: "cost_per_lead", label: "Cost Per Lead", icon: DollarSign, color: "info", format: (v: number) => formatIndianRupees(v ?? 0) },
-  { key: "pending_follow_ups_today", label: "Pending Follow-ups Today", icon: Clock, color: "danger", format: (v: number) => formatIndianNumber(v) },
-  { key: "pending_enquiries", label: "Pending Enquiries", icon: MessageSquare, color: "warning", format: (v: number) => formatIndianNumber(v) },
+  { key: "pending_follow_ups_today", label: "Pending Follow-ups", icon: Clock, color: "warning", format: (v: number) => formatIndianNumber(v) },
+  { key: "active_campaigns", label: "Active Campaigns", icon: Megaphone, color: "info", format: (v: number) => formatIndianNumber(v) },
+  { key: "patient_acquisition", label: "Patient Acquisition", icon: Users, color: "success", format: (v: number) => formatIndianNumber(v) },
+  { key: "lead_sources", label: "Lead Sources", icon: Target, color: "primary", format: (v: number) => formatIndianNumber(v) },
 ]
 
-function KpiDrawer({ open, onClose, data, kpi }: { open: boolean; onClose: () => void; data: CrmDashboardData | undefined; kpi: typeof kpiConfig[number] | null }) {
-  if (!kpi || !data) return null
-  const val = (data as any)[kpi.key]
+const chartSections = [
+  { id: "leads", label: "Recent Leads & Score Distribution" },
+  { id: "sources", label: "Leads by Source & Growth Trend" },
+  { id: "enquiries", label: "Enquiries Overview" },
+  { id: "followups", label: "Follow-Up Summary" },
+  { id: "campaigns", label: "Campaign Summary & Performance" },
+  { id: "whatsapp", label: "WhatsApp Analytics" },
+  { id: "acquisition", label: "Patient Acquisition" },
+  { id: "lead-revenue", label: "Revenue Generated by Lead" },
+]
+
+function ChartQuickView({ open, onClose, section, data }: any) {
+  if (!section || !data) return null
+  const allData = data
+  const renderContent = () => {
+    switch (section) {
+      case "leads":
+        return (
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Recent Leads</p>
+            {(allData.lead_dashboard || []).slice(0, 20).map((l: any) => (
+              <div key={l.id} className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2">
+                <span className="text-sm font-medium">{l.lead_name}</span>
+                <Badge variant="outline" className="text-[10px]">{l.status}</Badge>
+              </div>
+            ))}
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mt-4">Score Distribution</p>
+            {(allData.lead_analytics?.score_distribution || []).map((s: any) => (
+              <div key={s.category} className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2">
+                <span className="text-sm">{s.category}</span>
+                <span className="text-sm font-semibold">{formatIndianNumber(s.count)}</span>
+              </div>
+            ))}
+          </div>
+        )
+      case "sources":
+        return (
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Leads by Source</p>
+            {(allData.lead_analytics?.by_source || []).map((s: any) => (
+              <div key={s.source} className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2">
+                <span className="text-sm">{s.source}</span>
+                <span className="text-sm font-semibold">{formatIndianNumber(s.count)}</span>
+              </div>
+            ))}
+          </div>
+        )
+      case "enquiries":
+        return (
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Enquiries Detail</p>
+            {["today","tomorrow","this_week","overdue","completed"].map((k) => (
+              <div key={k} className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2">
+                <span className="text-sm capitalize">{k.replace(/_/g, " ")}</span>
+                <span className="text-sm font-semibold">{formatIndianNumber(allData.enquiry_dashboard?.[k] ?? 0)}</span>
+              </div>
+            ))}
+          </div>
+        )
+      case "followups":
+        return (
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Follow-Up Detail</p>
+            {["pending","completed","response","feedback"].map((k) => (
+              <div key={k} className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2">
+                <span className="text-sm capitalize">{k}</span>
+                <span className="text-sm font-semibold">{formatIndianNumber(allData.follow_up_dashboard?.[k] ?? 0)}</span>
+              </div>
+            ))}
+            {(allData.follow_up_dashboard?.recent || []).slice(0, 10).map((fu: any) => (
+              <div key={fu.id} className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2">
+                <span className="text-sm">{fu.patient_name}</span>
+                <Badge variant="outline">{fu.status}</Badge>
+              </div>
+            ))}
+          </div>
+        )
+      case "campaigns":
+        return (
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Campaigns</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-xl bg-gray-50 p-3 text-center"><p className="text-[11px] text-gray-500">Active</p><p className="text-lg font-bold">{allData.campaign_dashboard?.active_campaigns ?? 0}</p></div>
+              <div className="rounded-xl bg-gray-50 p-3 text-center"><p className="text-[11px] text-gray-500">Completed</p><p className="text-lg font-bold">{allData.campaign_dashboard?.completed_campaigns ?? 0}</p></div>
+            </div>
+            {(allData.campaign_dashboard?.campaigns || []).map((c: any) => (
+              <div key={c.id} className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2">
+                <span className="text-sm">{c.name}</span>
+                <span className="text-sm font-semibold text-green-600">{formatIndianRupees(c.revenue)}</span>
+              </div>
+            ))}
+          </div>
+        )
+      case "whatsapp":
+        return (
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">WhatsApp Messages by Type</p>
+            {["messages_sent","broadcast_messages","appointment_reminders","recall_messages","enquiry_messages","lead_messages"].map((k) => (
+              <div key={k} className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2">
+                <span className="text-sm capitalize">{k.replace(/_/g, " ")}</span>
+                <span className="text-sm font-semibold">{formatIndianNumber(allData.whatsapp_analytics?.[k] ?? 0)}</span>
+              </div>
+            ))}
+          </div>
+        )
+      case "acquisition":
+        return (
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Patient Acquisition</p>
+            {(allData.patient_acquisition || []).map((a: any) => (
+              <div key={a.source} className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2">
+                <span className="text-sm">{a.source}</span>
+                <span className="text-sm font-semibold">{formatIndianNumber(a.patients)} patients · {formatIndianRupees(a.revenue)}</span>
+              </div>
+            ))}
+          </div>
+        )
+      case "lead-revenue":
+        const allSources = new Map<string, number>()
+        ;(allData.revenue_from_leads_trend || []).forEach((m: any) => {
+          ;(m.by_source || []).forEach((s: any) => {
+            allSources.set(s.source, (allSources.get(s.source) || 0) + s.revenue)
+          })
+        })
+        const sortedSources = [...allSources.entries()].sort((a, b) => b[1] - a[1])
+        const totalRevenue = sortedSources.reduce((sum, [,v]) => sum + v, 0)
+        return (
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Total Revenue from Leads</p>
+            <div className="rounded-2xl bg-gradient-to-br from-emerald-50 to-emerald-100 p-4 text-center border border-emerald-200">
+              <p className="text-3xl font-bold text-emerald-900">{formatIndianRupees(totalRevenue)}</p>
+            </div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mt-4">Revenue by Source</p>
+            {sortedSources.map(([source, rev]) => (
+              <div key={source} className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2">
+                <span className="text-sm">{source === "ADVERTISEMENT" ? "Ad" : source.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}</span>
+                <span className="text-sm font-semibold text-emerald-600">{formatIndianRupees(rev)}</span>
+              </div>
+            ))}
+          </div>
+        )
+      default:
+        return <p className="text-sm text-gray-400">No details available</p>
+    }
+  }
   return (
     <Sheet open={open} onOpenChange={onClose}>
-      <SheetContent side="right" className="w-full sm:max-w-md">
+      <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+        <SheetHeader className="pb-4 border-b border-gray-100">
+          <SheetTitle className="flex items-center gap-2 text-base">
+            <Eye className="h-4 w-4 text-primary" />
+            {chartSections.find(s => s.id === section)?.label || "Chart Details"}
+          </SheetTitle>
+        </SheetHeader>
+        <div className="mt-6">{renderContent()}</div>
+      </SheetContent>
+    </Sheet>
+  )
+}
+
+function KpiDrawer({ open, onClose, kpis, leadAnalytics, followUpDashboard, kpi }: any) {
+  if (!kpi || !kpis) return null
+  const val = kpis[kpi.key]
+  return (
+    <Sheet open={open} onOpenChange={onClose}>
+      <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
         <SheetHeader className="pb-4 border-b border-gray-100">
           <SheetTitle className="flex items-center gap-2 text-base">
             <kpi.icon className="h-4 w-4 text-primary" />
@@ -104,10 +240,10 @@ function KpiDrawer({ open, onClose, data, kpi }: { open: boolean; onClose: () =>
             <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">Current Value</p>
             <p className="text-2xl font-bold text-gray-900 mt-1">{kpi.format(val)}</p>
           </div>
-          {kpi.key === "total_leads" && data.lead_status_breakdown && (
+          {kpi.key === "total_leads" && leadAnalytics?.by_status && (
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Status Breakdown</p>
-              {data.lead_status_breakdown.map((s: any) => (
+              {leadAnalytics.by_status.map((s: any) => (
                 <div key={s.status} className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2">
                   <Badge variant="outline">{s.status}</Badge>
                   <span className="text-sm font-semibold">{formatIndianNumber(s.count)}</span>
@@ -115,36 +251,62 @@ function KpiDrawer({ open, onClose, data, kpi }: { open: boolean; onClose: () =>
               ))}
             </div>
           )}
-          {kpi.key === "crm_revenue" && data.revenue_by_source && (
+          {kpi.key === "new_leads" && leadAnalytics?.growth_trend && (
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">By Source</p>
-              {data.revenue_by_source.map((s: any) => (
-                <div key={s.source} className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2">
-                  <span className="text-sm text-gray-700">{s.source}</span>
-                  <span className="text-sm font-semibold">{formatIndianRupees(s.revenue)}</span>
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Growth Trend</p>
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={leadAnalytics.growth_trend}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="count" stroke="#0ea5e9" strokeWidth={2} dot={{ r: 2 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+          {kpi.key === "converted_leads" && leadAnalytics?.by_doctor && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">By Doctor</p>
+              {leadAnalytics.by_doctor.slice(0, 8).map((d: any) => (
+                <div key={d.doctor_id} className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2">
+                  <span className="text-sm font-medium">{d.doctor_name}</span>
+                  <span className="text-sm font-semibold">{formatIndianNumber(d.count)}</span>
                 </div>
               ))}
             </div>
           )}
-          {kpi.key === "pending_follow_ups_today" && data.follow_up_summary && (
-            <div className="grid grid-cols-2 gap-3">
-              {Object.entries(data.follow_up_summary).map(([key, val]) => (
-                <div key={key} className="rounded-xl bg-gray-50 px-3 py-2.5 text-center">
-                  <p className="text-[11px] text-gray-500 capitalize">{key.replace(/_/g, " ")}</p>
-                  <p className="text-lg font-bold text-gray-900">{key === "completion_rate" ? `${val}%` : val}</p>
+          {kpi.key === "conversion_rate" && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Conversion Funnel</p>
+              {leadAnalytics?.funnel?.map((f: any) => (
+                <div key={f.stage} className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2">
+                  <span className="text-sm">{f.stage}</span>
+                  <div className="text-right">
+                    <span className="text-sm font-semibold">{formatIndianNumber(f.count)}</span>
+                    <span className="text-xs text-gray-400 ml-2">{f.percentage}%</span>
+                  </div>
                 </div>
               ))}
             </div>
           )}
-          {kpi.key === "pending_enquiries" && data.todays_enquiries_detail && data.todays_enquiries_detail.length > 0 && (
+          {kpi.key === "total_follow_ups" && followUpDashboard && (
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Recent Enquiries</p>
-              {data.todays_enquiries_detail.slice(0, 5).map((e: any, i: number) => (
-                <div key={i} className="rounded-xl bg-gray-50 px-3 py-2">
-                  <p className="text-sm font-medium text-gray-900">{e.patient_name || e.patient || "N/A"}</p>
-                  <p className="text-xs text-gray-500">{e.type || e.enquiry_type} - {e.status}</p>
-                </div>
-              ))}
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Status Breakdown</p>
+              <div className="grid grid-cols-2 gap-2">
+                {["pending","completed","response","feedback"].map((s) => (
+                  <div key={s} className="rounded-xl bg-gray-50 p-3 text-center">
+                    <p className="text-[11px] text-gray-500 capitalize">{s}</p>
+                    <p className="text-lg font-bold">{formatIndianNumber(followUpDashboard[s] ?? 0)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {kpi.key === "active_campaigns" && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Active Campaigns</p>
+              <p className="text-2xl font-bold text-primary text-center py-4">{formatIndianNumber(kpis.active_campaigns ?? 0)}</p>
             </div>
           )}
         </div>
@@ -154,6 +316,8 @@ function KpiDrawer({ open, onClose, data, kpi }: { open: boolean; onClose: () =>
 }
 
 export function CrmDashboardPage() {
+  const navigate = useNavigate()
+  const { user } = useAuthStore()
   const [period, setPeriod] = useState<DateRangePreset>("month")
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
@@ -164,6 +328,33 @@ export function CrmDashboardPage() {
   const [activeSection, setActiveSection] = useState("overview")
   const [selectedKpi, setSelectedKpi] = useState<typeof kpiConfig[number] | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [chartQuickView, setChartQuickView] = useState<string | null>(null)
+  const sectionRefs = useRef<Record<string, HTMLElement | null>>({})
+
+  // Dynamic filter options
+  const { data: doctorsList } = useQuery({
+    queryKey: ["dashboard-doctors"],
+    queryFn: () => doctorsApi.list(),
+    staleTime: 60000,
+  })
+  const doctorOptions = Array.isArray(doctorsList) ? doctorsList : doctorsList?.items || []
+
+  // Scroll spy
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          const id = entry.target.getAttribute("data-section")
+          if (id) setActiveSection(id)
+        }
+      })
+    }, { rootMargin: "-80px 0px -60% 0px", threshold: 0 })
+    sections.forEach((s) => {
+      const el = document.querySelector(`[data-section="${s.id}"]`)
+      if (el) observer.observe(el)
+    })
+    return () => observer.disconnect()
+  }, [])
 
   const params = useMemo(() => {
     const periodMap: Record<string, string> = {
@@ -187,6 +378,15 @@ export function CrmDashboardPage() {
     gcTime: 60000,
   })
 
+  const kpis = data?.kpis ?? {}
+  const leadAnalytics = data?.lead_analytics ?? {}
+  const enquiryDashboard = data?.enquiry_dashboard ?? {}
+  const followUpDashboard = data?.follow_up_dashboard ?? {}
+  const whatsappAnalytics = data?.whatsapp_analytics ?? {}
+  const campaignDashboard = data?.campaign_dashboard ?? {}
+  const patientAcquisition = data?.patient_acquisition ?? []
+  const revenueFromLeadsTrend = data?.revenue_from_leads_trend ?? []
+
   const scrollTo = useCallback((id: string) => {
     setActiveSection(id)
     document.getElementById(`section-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" })
@@ -197,34 +397,40 @@ export function CrmDashboardPage() {
     setDrawerOpen(true)
   }, [])
 
+  const quickActions = [
+    { label: "Add Lead", icon: Plus, onClick: () => navigate("/leads?action=create") },
+    { label: "Create Campaign", icon: Megaphone, onClick: () => navigate("/crm/campaigns?action=create") },
+    { label: "Send WhatsApp", icon: Send, onClick: () => navigate("/whatsapp") },
+    { label: "Enquiry Calendar", icon: CalendarDays, onClick: () => navigate("/crm/enquiry-calendar") },
+    { label: "Follow-Ups", icon: Clock, onClick: () => navigate("/crm/follow-ups") },
+  ]
+
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-8 w-60 rounded-xl" />
-        <Skeleton className="h-4 w-80 rounded-xl" />
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-60 rounded-lg" />
+        <Skeleton className="h-4 w-80 rounded-lg" />
         <div className="flex gap-2">
           {sections.map((s) => <Skeleton key={s.id} className="h-8 w-24 rounded-lg" />)}
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-[110px] rounded-2xl" />)}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-[90px] rounded-xl" />)}
         </div>
       </div>
     )
   }
 
-  if (error || !data) {
+  if (error) {
     return (
       <DentalEmptyState
         icon={Activity}
-        title="No Data Available"
+        title="Error Loading Dashboard"
         description="Could not load CRM dashboard data. Try adjusting your filters or check back later."
       />
     )
   }
 
-  const hasData = data.total_leads > 0 || data.crm_revenue > 0 || data.pending_follow_ups_today > 0
-
-  if (!hasData) {
+  if (!data) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -234,588 +440,400 @@ export function CrmDashboardPage() {
           </div>
           <DashboardDateFilter value={period} onChange={setPeriod} />
         </div>
-        <DentalEmptyState
-          icon={MessageSquare}
-          title="No CRM Data Yet"
-          description="Start capturing leads and enquiries to see your CRM analytics here."
-        />
+        <DentalEmptyState icon={MessageSquare} title="No Data" description="No CRM data available for this period." />
       </div>
     )
   }
 
-  const funnelData = data.crm_funnel.map((f: { stage: string; count: number }, i: number, arr: { stage: string; count: number }[]) => {
-    const total = arr[0]?.count || 1
-    const prev = arr[i - 1]?.count || 0
-    return {
-      ...f,
-      percentage: ((f.count / total) * 100).toFixed(1),
-      dropOff: i === 0 ? 0 : prev - f.count,
-      dropOffRate: i === 0 ? 0 : ((prev - f.count) / prev) * 100,
-    }
-  })
-
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="space-y-6"
-    >
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">CRM Dashboard</h1>
-          <p className="text-sm text-gray-500">Real-time CRM performance metrics</p>
+          <h1 className="text-section-title text-gray-900">CRM Dashboard</h1>
+          <p className="text-sm text-text-secondary">Real-time CRM performance metrics</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <DashboardDateFilter value={period} onChange={setPeriod} />
-          <select
-            value={doctor}
-            onChange={(e) => setDoctor(e.target.value)}
-            className="h-9 rounded-xl border border-gray-200 bg-white px-3 text-xs text-gray-600 outline-none focus:border-primary"
-          >
+          {period === "custom" && (
+            <>
+              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-9 w-[140px] rounded-xl text-xs" aria-label="Start date" />
+              <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-9 w-[140px] rounded-xl text-xs" aria-label="End date" />
+            </>
+          )}
+          <select value={doctor} onChange={(e) => setDoctor(e.target.value)} aria-label="Doctor filter" className="h-9 rounded-xl border border-gray-200 bg-white px-3 text-xs text-gray-600 outline-none focus:border-primary">
             <option value="">All Doctors</option>
+            {doctorOptions.map((d: any) => <option key={d.id} value={d.id}>{d.full_name || d.name}</option>)}
           </select>
-          <select
-            value={source}
-            onChange={(e) => setSource(e.target.value)}
-            className="h-9 rounded-xl border border-gray-200 bg-white px-3 text-xs text-gray-600 outline-none focus:border-primary"
-          >
+          <select value={source} onChange={(e) => setSource(e.target.value)} aria-label="Source filter" className="h-9 rounded-xl border border-gray-200 bg-white px-3 text-xs text-gray-600 outline-none focus:border-primary">
             <option value="">All Sources</option>
+            {["GOOGLE_SEARCH","GOOGLE_MAPS","INSTAGRAM","FACEBOOK","WHATSAPP","WEBSITE","REFERRAL","WALK_IN","CAMPAIGN","DOCTOR_REFERRAL","OTHER"].map(s => <option key={s} value={s}>{s.replace(/_/g," ").toLowerCase().replace(/\b\w/g,c=>c.toUpperCase())}</option>)}
           </select>
-          <select
-            value={campaign}
-            onChange={(e) => setCampaign(e.target.value)}
-            className="h-9 rounded-xl border border-gray-200 bg-white px-3 text-xs text-gray-600 outline-none focus:border-primary"
-          >
+          <select value={campaign} onChange={(e) => setCampaign(e.target.value)} className="h-9 rounded-xl border border-gray-200 bg-white px-3 text-xs text-gray-600 outline-none focus:border-primary">
             <option value="">All Campaigns</option>
+            {(data?.campaign_dashboard?.campaigns || []).map((c: any) => <option key={c.id} value={c.name}>{c.name}</option>)}
           </select>
-          <select
-            value={treatment}
-            onChange={(e) => setTreatment(e.target.value)}
-            className="h-9 rounded-xl border border-gray-200 bg-white px-3 text-xs text-gray-600 outline-none focus:border-primary"
-          >
+          <select value={treatment} onChange={(e) => setTreatment(e.target.value)} className="h-9 rounded-xl border border-gray-200 bg-white px-3 text-xs text-gray-600 outline-none focus:border-primary">
             <option value="">All Treatments</option>
+            <option value="ROOT_CANAL">Root Canal</option>
+            <option value="DENTAL_IMPLANT">Dental Implant</option>
+            <option value="TEETH_WHITENING">Teeth Whitening</option>
+            <option value="CROWN">Crown</option>
+            <option value="BRIDGE">Bridge</option>
+            <option value="RCT">RCT</option>
+            <option value="SCALING">Scaling</option>
+            <option value="EXTRACTION">Extraction</option>
           </select>
         </div>
+      </div>
+
+      {/* Quick Action Bar */}
+      <div className="flex flex-wrap items-center gap-2 p-3 bg-white rounded-xl border border-gray-100 shadow-sm">
+        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider mr-1">Quick Actions</span>
+        {quickActions.map((a) => (
+          <Button key={a.label} variant="outline" size="sm" onClick={a.onClick} className="h-8 text-xs gap-1.5">
+            <a.icon className="h-3.5 w-3.5" />{a.label}
+          </Button>
+        ))}
       </div>
 
       <div className="sticky top-0 z-20 -mx-6 px-6 py-2 bg-gray-50/90 backdrop-blur-sm border-b border-gray-100">
         <div className="flex gap-1 overflow-x-auto scrollbar-none">
           {sections.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => scrollTo(s.id)}
-              className={cn(
-                "whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
-                activeSection === s.id
-                  ? "bg-primary text-white shadow-sm"
-                  : "text-gray-500 hover:bg-gray-100"
-              )}
-            >
-              {s.label}
-            </button>
+            <button key={s.id} onClick={() => scrollTo(s.id)} className={cn("whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-colors", activeSection === s.id ? "bg-primary text-white shadow-sm" : "text-gray-500 hover:bg-gray-100")}>{s.label}</button>
           ))}
         </div>
       </div>
 
-      <div id="section-overview" className="scroll-mt-16">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div id="section-overview" data-section="overview" className="scroll-mt-16">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {kpiConfig.map((kpi, i) => (
-            <KpiCard
-              key={kpi.key}
-              title={kpi.label}
-              value={kpi.format((data as any)[kpi.key])}
-              icon={kpi.icon}
-              color={kpi.color as any}
-              delay={i * 0.03}
-              onClick={() => openKpi(kpi)}
-            />
+            <KpiCard key={kpi.key} title={kpi.label} value={kpi.format(kpis[kpi.key])} icon={kpi.icon} color={kpi.color as any} delay={i * 0.02} onClick={() => openKpi(kpi)} />
           ))}
         </div>
       </div>
 
-      <div id="section-funnel" className="scroll-mt-16">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-              <Target className="h-4 w-4 text-primary" />
-              CRM Funnel
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={funnelData.length * 50 + 60}>
-              <BarChart data={funnelData} layout="vertical" margin={{ left: 100, right: 60, top: 10, bottom: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 11 }} />
-                <YAxis dataKey="stage" type="category" tick={{ fontSize: 11 }} width={100} />
-                <Tooltip
-                  content={({ active, payload, label }) => {
-                    if (active && payload?.length) {
-                      const d = payload[0].payload
-                      return (
-                        <div className="rounded-xl border border-gray-100 bg-white p-3 shadow-lg text-xs">
-                          <p className="font-semibold text-gray-900 mb-1">{d.stage}</p>
-                          <p>Count: {formatIndianNumber(d.count)}</p>
-                          <p>% of Total: {d.percentage}%</p>
-                          {d.dropOff > 0 && <p className="text-danger">Drop-off: {formatIndianNumber(d.dropOff)} ({d.dropOffRate.toFixed(1)}%)</p>}
-                        </div>
-                      )
-                    }
-                    return null
-                  }}
-                />
-                <Bar dataKey="count" fill="#0ea5e9" radius={[0, 4, 4, 0]} barSize={24}>
-                  {funnelData.map((_: { stage: string; count: number; percentage: string; dropOff: number; dropOffRate: number }, i: number) => (
-                    <Cell key={i} fill={`hsl(200, 70%, ${55 - i * 5}%)`} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mt-4">
-              {funnelData.map((f: { stage: string; count: number; percentage: string; dropOff: number; dropOffRate: number }, i: number) => (
-                <div key={f.stage} className="rounded-xl bg-gray-50 p-2.5 text-center">
-                  <p className="text-[11px] text-gray-500 truncate">{f.stage}</p>
-                  <p className="text-sm font-bold text-gray-900">{formatIndianNumber(f.count)}</p>
-                  <p className="text-[10px] text-gray-400">{f.percentage}%</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div id="section-sources" className="scroll-mt-16">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-              <BarChart3 className="h-4 w-4 text-primary" />
-              Lead Source Analytics
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={Math.max(200, (data.leads_by_source?.length || 1) * 50)}>
-              <BarChart data={data.leads_by_source || []} layout="vertical" margin={{ left: 100, right: 40, top: 10, bottom: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 11 }} />
-                <YAxis dataKey="source" type="category" tick={{ fontSize: 11 }} width={100} />
-                <Tooltip content={<ChartTooltip />} />
-                <Legend />
-                <Bar dataKey="leads" name="Leads" fill="#0ea5e9" radius={[0, 4, 4, 0]} barSize={20} />
-                <Bar dataKey="converted" name="Converted" fill="#10b981" radius={[0, 4, 4, 0]} barSize={20} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div id="section-enquiries" className="scroll-mt-16">
-        <div className="grid gap-6 lg:grid-cols-2">
+      <div id="section-leads" data-section="leads" className="scroll-mt-16">
+        <div className="grid gap-4 md:grid-cols-2">
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                <MessageSquare className="h-4 w-4 text-primary" />
-                Enquiry Overview
-              </CardTitle>
+            <CardHeader className="cursor-pointer" onClick={() => setChartQuickView("leads")}>
+              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700"><List className="h-4 w-4 text-primary" /> Recent Leads</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                <div className="rounded-xl bg-gray-50 p-3 text-center">
-                  <p className="text-[11px] text-gray-500">Today's Enquiries</p>
-                  <p className="text-xl font-bold text-gray-900">{formatIndianNumber(data.todays_enquiries)}</p>
-                </div>
-                <div className="rounded-xl bg-gray-50 p-3 text-center">
-                  <p className="text-[11px] text-gray-500">Compliance Rate</p>
-                  <p className="text-xl font-bold text-gray-900">{data.follow_up_compliance_rate ?? 0}%</p>
-                </div>
-              </div>
-              <div className="h-52">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RePieChart>
-                    <Pie
-                      data={data.enquiry_by_type || []}
-                      dataKey="count"
-                      nameKey="type"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={50}
-                      outerRadius={80}
-                      paddingAngle={3}
-                    >
-                      {(data.enquiry_by_type || []).map((_: any, i: number) => (
-                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
+              {data?.lead_dashboard?.length > 0 ? (
+                <div className="max-h-72 overflow-y-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead><TableHead>Source</TableHead><TableHead>Status</TableHead><TableHead>Doctor</TableHead><TableHead>Score</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {data.lead_dashboard.slice(0, 15).map((l: any) => (
+                        <TableRow key={l.id} className="cursor-pointer" onClick={() => navigate(`/leads/${l.id}`)}>
+                          <TableCell className="font-medium text-xs">{l.lead_name}</TableCell>
+                          <TableCell><Badge variant="outline" className="text-[10px]">{l.source}</Badge></TableCell>
+                          <TableCell><Badge className="text-[10px]">{l.status}</Badge></TableCell>
+                          <TableCell className="text-xs">{l.assigned_doctor || "-"}</TableCell>
+                          <TableCell className="text-xs font-semibold">{l.lead_score ?? "-"}</TableCell>
+                        </TableRow>
                       ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : <p className="text-sm text-gray-400 text-center py-10">No leads data</p>}
+            </CardContent>
+          </Card>
+          <Card className="cursor-pointer" onClick={() => setChartQuickView("leads")}>
+            <CardHeader><CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700"><Award className="h-4 w-4 text-primary" /> Lead Score Distribution</CardTitle></CardHeader>
+            <CardContent>
+              {leadAnalytics.score_distribution?.length > 0 ? (
+                <ResponsiveContainer width="100%" height={260}>
+                  <PieChart>
+                    <Pie data={leadAnalytics.score_distribution} dataKey="count" nameKey="category" cx="50%" cy="50%" outerRadius={80} label={({ category, percent }: any) => `${category} ${(percent * 100).toFixed(0)}%`}>
+                      {leadAnalytics.score_distribution.map((_: any, i: number) => <Cell key={i} fill={["#22c55e","#0ea5e9","#f59e0b","#ef4444"][i % 4]} />)}
                     </Pie>
                     <Tooltip />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                  </RePieChart>
+                    <Legend />
+                  </PieChart>
                 </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                <Mail className="h-4 w-4 text-primary" />
-                Today's Enquiry Details
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-xs">Patient</TableHead>
-                    <TableHead className="text-xs">Type</TableHead>
-                    <TableHead className="text-xs">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(data.todays_enquiries_detail || []).length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={3} className="text-center text-xs text-gray-400 py-6">No enquiries today</TableCell>
-                    </TableRow>
-                  ) : (
-                    (data.todays_enquiries_detail || []).map((e: any, i: number) => (
-                      <TableRow key={i}>
-                        <TableCell className="text-xs font-medium">{e.patient_name || e.patient || "N/A"}</TableCell>
-                        <TableCell className="text-xs">{e.type || e.enquiry_type || "-"}</TableCell>
-                        <TableCell>
-                          <Badge variant={e.status === "open" || e.status === "pending" ? "warning" : "success"} className="text-[10px]">
-                            {e.status || "N/A"}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+              ) : <p className="text-sm text-gray-400 text-center py-10">No score data</p>}
             </CardContent>
           </Card>
         </div>
       </div>
 
-      <div id="section-followups" className="scroll-mt-16">
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                <Activity className="h-4 w-4 text-primary" />
-                Follow-Up Summary
-              </CardTitle>
-            </CardHeader>
+
+
+      <div id="section-sources" data-section="sources" className="scroll-mt-16">
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card className="cursor-pointer" onClick={() => setChartQuickView("sources")}>
+            <CardHeader><CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700"><BarChart3 className="h-4 w-4 text-primary" /> Leads by Source</CardTitle></CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                {data.follow_up_summary && Object.entries(data.follow_up_summary).map(([key, val]) => (
-                  <div key={key} className="rounded-xl bg-gray-50 p-3 text-center">
-                    <p className="text-[11px] text-gray-500 capitalize">{key.replace(/_/g, " ")}</p>
-                    <p className="text-lg font-bold text-gray-900">{key === "completion_rate" ? `${val}%` : formatIndianNumber(val as number)}</p>
+              {leadAnalytics.by_source?.length > 0 ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <ResponsiveContainer width="100%" height={280}>
+                    <PieChart>
+                      <Pie data={leadAnalytics.by_source.filter((s: any) => s.count > 0)} dataKey="count" nameKey="source" cx="50%" cy="50%" outerRadius={90}>
+                        {leadAnalytics.by_source.filter((s: any) => s.count > 0).map((_: any, i: number) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                      </Pie>
+                      <Tooltip formatter={(v: any) => formatIndianNumber(v)} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="space-y-1.5 max-h-[280px] overflow-y-auto">
+                    {leadAnalytics.by_source.filter((s: any) => s.count > 0).map((s: any, i: number) => (
+                      <div key={s.source} className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-1.5">
+                        <div className="flex items-center gap-2">
+                          <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                          <span className="text-xs">{s.source}</span>
+                        </div>
+                        <span className="text-xs font-semibold">{formatIndianNumber(s.count)}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-              <div className="h-52">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.follow_up_by_type || []} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="follow_up_type" tick={{ fontSize: 10 }} />
-                    <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Bar dataKey="count" name="Count" fill="#8b5cf6" radius={[4, 4, 0, 0]} barSize={28} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+                </div>
+              ) : <p className="text-sm text-gray-400 text-center py-10">No source data</p>}
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                <TrendingUp className="h-4 w-4 text-primary" />
-                Follow-Up Trend
-              </CardTitle>
-            </CardHeader>
+          <Card className="cursor-pointer" onClick={() => setChartQuickView("sources")}>
+            <CardHeader><CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700"><BarChart3 className="h-4 w-4 text-primary" /> Lead Growth Trend</CardTitle></CardHeader>
             <CardContent>
-              <div className="h-52">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={data.follow_up_trend || []} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+              {leadAnalytics.growth_trend?.length > 0 ? (
+                <ResponsiveContainer width="100%" height={280}>
+                  <LineChart data={leadAnalytics.growth_trend}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Legend />
-                    <Line type="monotone" dataKey="completed" name="Completed" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
-                    <Line type="monotone" dataKey="pending" name="Pending" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
+                    <Tooltip content={<ChartTooltip financial={false} />} />
+                    <Line type="monotone" dataKey="count" stroke="#0ea5e9" strokeWidth={2} dot={{ r: 3 }} name="Leads" />
                   </LineChart>
                 </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-        <div className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                <Award className="h-4 w-4 text-primary" />
-                Follow-Ups by Doctor
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={Math.max(200, (data.follow_up_by_doctor?.length || 1) * 45)}>
-                <BarChart data={data.follow_up_by_doctor || []} layout="vertical" margin={{ left: 120, right: 40, top: 10, bottom: 10 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 11 }} />
-                  <YAxis dataKey="doctor_name" type="category" tick={{ fontSize: 11 }} width={120} />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="count" name="Follow-Ups" fill="#ec4899" radius={[0, 4, 4, 0]} barSize={20} />
-                </BarChart>
-              </ResponsiveContainer>
+              ) : <p className="text-sm text-gray-400 text-center py-10">No trend data</p>}
             </CardContent>
           </Card>
         </div>
       </div>
 
-      <div id="section-campaigns" className="scroll-mt-16">
-        <div className="grid gap-4 sm:grid-cols-2 mb-6">
-          <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-card">
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Active Campaigns</p>
-            <p className="text-xl font-bold text-gray-900 mt-1">{data.active_campaigns ?? 0}</p>
-          </div>
-          <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-card">
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Completed Campaigns</p>
-            <p className="text-xl font-bold text-gray-900 mt-1">{data.completed_campaigns ?? 0}</p>
-          </div>
-        </div>
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-              <BarChart3 className="h-4 w-4 text-primary" />
-              Campaign Performance
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-xs">Campaign</TableHead>
-                  <TableHead className="text-xs">Sent</TableHead>
-                  <TableHead className="text-xs">Responses</TableHead>
-                  <TableHead className="text-xs">Conversion</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(data.campaign_performance || []).length === 0 ? (
+      <div id="section-enquiries" data-section="enquiries" className="scroll-mt-16">
+        <Card className="cursor-pointer" onClick={() => setChartQuickView("enquiries")}>
+          <CardHeader><CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700"><MessageSquare className="h-4 w-4 text-primary" /> Enquiries Overview</CardTitle></CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
+              <div className="rounded-xl bg-gray-50 p-3 text-center"><p className="text-[11px] text-gray-500">Today</p><p className="text-lg font-bold text-primary">{formatIndianNumber(enquiryDashboard.today ?? 0)}</p></div>
+              <div className="rounded-xl bg-gray-50 p-3 text-center"><p className="text-[11px] text-gray-500">Tomorrow</p><p className="text-lg font-bold text-gray-700">{formatIndianNumber(enquiryDashboard.tomorrow ?? 0)}</p></div>
+              <div className="rounded-xl bg-gray-50 p-3 text-center"><p className="text-[11px] text-gray-500">This Week</p><p className="text-lg font-bold text-gray-700">{formatIndianNumber(enquiryDashboard.this_week ?? 0)}</p></div>
+              <div className="rounded-xl bg-gray-50 p-3 text-center"><p className="text-[11px] text-gray-500">Overdue</p><p className="text-lg font-bold text-red-500">{formatIndianNumber(enquiryDashboard.overdue ?? 0)}</p></div>
+              <div className="rounded-xl bg-gray-50 p-3 text-center"><p className="text-[11px] text-gray-500">Completed</p><p className="text-lg font-bold text-green-600">{formatIndianNumber(enquiryDashboard.completed ?? 0)}</p></div>
+            </div>
+            {enquiryDashboard.todays_detail?.length > 0 && (
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-xs text-gray-400 py-6">No campaign data</TableCell>
+                    <TableHead>Patient</TableHead><TableHead>Doctor</TableHead><TableHead>Type</TableHead><TableHead>Status</TableHead><TableHead>Date</TableHead>
                   </TableRow>
-                ) : (
-                  (data.campaign_performance || []).map((c: any, i: number) => (
-                    <TableRow key={i}>
-                      <TableCell className="text-xs font-medium">{c.campaign || c.campaign_name || c.name || "N/A"}</TableCell>
-                      <TableCell className="text-xs">{formatIndianNumber(c.sent ?? c.messages_sent ?? 0)}</TableCell>
-                      <TableCell className="text-xs">{formatIndianNumber(c.responses ?? c.response_count ?? 0)}</TableCell>
-                      <TableCell className="text-xs">{c.conversion_rate != null ? `${c.conversion_rate}%` : "-"}</TableCell>
+                </TableHeader>
+                <TableBody>
+                  {enquiryDashboard.todays_detail.slice(0, 10).map((e: any) => (
+                    <TableRow key={e.id}>
+                      <TableCell className="font-medium">{e.patient_name}</TableCell>
+                      <TableCell>{e.doctor_name}</TableCell>
+                      <TableCell><Badge variant="outline">{e.follow_up_type}</Badge></TableCell>
+                      <TableCell><Badge>{e.status}</Badge></TableCell>
+                      <TableCell className="text-xs">{e.follow_up_date}</TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      <div id="section-whatsapp" className="scroll-mt-16">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
-          <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-card">
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Messages Sent</p>
-            <p className="text-xl font-bold text-gray-900 mt-1">{formatIndianNumber(data.messages_sent ?? 0)}</p>
-          </div>
-          <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-card">
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Broadcast</p>
-            <p className="text-xl font-bold text-gray-900 mt-1">{formatIndianNumber(data.broadcast_messages ?? 0)}</p>
-          </div>
-          <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-card">
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Reminders</p>
-            <p className="text-xl font-bold text-gray-900 mt-1">{formatIndianNumber(data.appointment_reminders ?? 0)}</p>
-          </div>
-          <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-card">
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Recall</p>
-            <p className="text-xl font-bold text-gray-900 mt-1">{formatIndianNumber(data.recall_messages ?? 0)}</p>
-          </div>
-        </div>
-        <div className="grid gap-6 lg:grid-cols-2">
+      <div id="section-followups" data-section="followups" className="scroll-mt-16">
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card className="cursor-pointer" onClick={() => setChartQuickView("followups")}>
+            <CardHeader><CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700"><Activity className="h-4 w-4 text-primary" /> Follow-Up Summary</CardTitle></CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl bg-gray-50 p-3 text-center"><p className="text-[11px] text-gray-500">Pending</p><p className="text-lg font-bold text-amber-500">{formatIndianNumber(followUpDashboard.pending ?? 0)}</p></div>
+                <div className="rounded-xl bg-gray-50 p-3 text-center"><p className="text-[11px] text-gray-500">Completed</p><p className="text-lg font-bold text-success">{formatIndianNumber(followUpDashboard.completed ?? 0)}</p></div>
+                <div className="rounded-xl bg-gray-50 p-3 text-center"><p className="text-[11px] text-gray-500">Response</p><p className="text-lg font-bold text-blue-500">{formatIndianNumber(followUpDashboard.response ?? 0)}</p></div>
+                <div className="rounded-xl bg-gray-50 p-3 text-center"><p className="text-[11px] text-gray-500">Feedback</p><p className="text-lg font-bold text-purple-500">{formatIndianNumber(followUpDashboard.feedback ?? 0)}</p></div>
+              </div>
+            </CardContent>
+          </Card>
+          {/* Follow-Up Widget */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Messages by Day</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700"><Clock className="h-4 w-4 text-primary" /> Follow-Up Widget</CardTitle>
+              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => navigate("/crm/follow-ups")}>View All</Button>
             </CardHeader>
             <CardContent>
-              <div className="h-52">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.messages_by_day || []} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+              {followUpDashboard.recent?.length > 0 ? (
+                <div className="space-y-2 max-h-[320px] overflow-y-auto">
+                  {followUpDashboard.recent.slice(0, 6).map((fu: any) => {
+                    const priority = fu.follow_up_type === "1_DAY_POST_TREATMENT" ? "High" : fu.follow_up_type === "MANUAL" ? "Medium" : "Low"
+                    const priColor = priority === "High" ? "text-red-500" : priority === "Medium" ? "text-amber-500" : "text-green-500"
+                    return (
+                      <div key={fu.id} className="rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
+                        <div className="flex items-center justify-between mb-2">
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">{fu.patient_name}</p>
+                            <p className="text-[11px] text-gray-500">{fu.doctor_name || "N/A"} · <span className={priColor}>{priority}</span></p>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Badge variant={fu.status === "COMPLETED" ? "default" : "outline"} className="text-[10px]">{fu.status}</Badge>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] text-gray-400">Due: {fu.follow_up_date}</span>
+                          <div className="flex gap-1">
+                            {fu.patient_phone && (
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => window.open(`tel:${fu.patient_phone}`)} title="Call"><Phone className="h-3.5 w-3.5" /></Button>
+                            )}
+                            {fu.patient_phone && (
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => window.open(`https://wa.me/${fu.patient_phone}`)} title="WhatsApp"><Send className="h-3.5 w-3.5" /></Button>
+                            )}
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => navigate(`/crm/follow-ups?id=${fu.id}`)} title="Open"><Eye className="h-3.5 w-3.5" /></Button>
+                          </div>
+                        </div>
+                        {fu.notes && <p className="text-[10px] text-gray-400 mt-1 truncate">{fu.notes}</p>}
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : <p className="text-sm text-gray-400 text-center py-10">No follow-ups</p>}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      <div id="section-campaigns" data-section="campaigns" className="scroll-mt-16">
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card className="cursor-pointer" onClick={() => setChartQuickView("campaigns")}>
+            <CardHeader><CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700"><Award className="h-4 w-4 text-primary" /> Campaign Summary</CardTitle></CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl bg-gray-50 p-3 text-center"><p className="text-[11px] text-gray-500">Active</p><p className="text-lg font-bold text-success">{campaignDashboard.active_campaigns ?? 0}</p></div>
+                <div className="rounded-xl bg-gray-50 p-3 text-center"><p className="text-[11px] text-gray-500">Completed</p><p className="text-lg font-bold text-gray-900">{campaignDashboard.completed_campaigns ?? 0}</p></div>
+                <div className="rounded-xl bg-gray-50 p-3 text-center"><p className="text-[11px] text-gray-500">Leads Generated</p><p className="text-lg font-bold text-primary">{formatIndianNumber(campaignDashboard.leads_generated ?? 0)}</p></div>
+                <div className="rounded-xl bg-gray-50 p-3 text-center"><p className="text-[11px] text-gray-500">Revenue</p><p className="text-lg font-bold text-success">{formatIndianRupees(campaignDashboard.revenue_generated ?? 0)}</p></div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700"><BarChart3 className="h-4 w-4 text-primary" /> Campaign Performance</CardTitle></CardHeader>
+            <CardContent>
+              {campaignDashboard.campaigns?.length > 0 ? (
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={campaignDashboard.campaigns}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                    <YAxis tick={{ fontSize: 11 }} />
+                    <Tooltip />
+                    <Bar dataKey="leads" fill="#0ea5e9" radius={[4, 4, 0, 0]} name="Leads" />
+                    <Bar dataKey="appts" fill="#10b981" radius={[4, 4, 0, 0]} name="Appts" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : <p className="text-sm text-gray-400 text-center py-10">No campaign data</p>}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      <div id="section-whatsapp" data-section="whatsapp" className="scroll-mt-16">
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card className="cursor-pointer" onClick={() => setChartQuickView("whatsapp")}>
+            <CardHeader><CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700"><Send className="h-4 w-4 text-primary" /> WhatsApp Summary</CardTitle></CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl bg-gray-50 p-3 text-center"><p className="text-[11px] text-gray-500">Messages Sent</p><p className="text-lg font-bold text-primary">{formatIndianNumber(whatsappAnalytics.messages_sent ?? 0)}</p></div>
+                <div className="rounded-xl bg-gray-50 p-3 text-center"><p className="text-[11px] text-gray-500">Broadcasts</p><p className="text-lg font-bold text-info">{formatIndianNumber(whatsappAnalytics.broadcast_messages ?? 0)}</p></div>
+                <div className="rounded-xl bg-gray-50 p-3 text-center"><p className="text-[11px] text-gray-500">Appt Reminders</p><p className="text-lg font-bold text-success">{formatIndianNumber(whatsappAnalytics.appointment_reminders ?? 0)}</p></div>
+                <div className="rounded-xl bg-gray-50 p-3 text-center"><p className="text-[11px] text-gray-500">Recall</p><p className="text-lg font-bold text-warning">{formatIndianNumber(whatsappAnalytics.recall_messages ?? 0)}</p></div>
+                <div className="rounded-xl bg-gray-50 p-3 text-center"><p className="text-[11px] text-gray-500">Enquiry</p><p className="text-lg font-bold text-violet-600">{formatIndianNumber(whatsappAnalytics.enquiry_messages ?? 0)}</p></div>
+                <div className="rounded-xl bg-gray-50 p-3 text-center"><p className="text-[11px] text-gray-500">Lead Messages</p><p className="text-lg font-bold text-amber-600">{formatIndianNumber(whatsappAnalytics.lead_messages ?? 0)}</p></div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700"><BarChart3 className="h-4 w-4 text-primary" /> Messages by Day</CardTitle></CardHeader>
+            <CardContent>
+              {whatsappAnalytics.messages_by_day?.length > 0 ? (
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={whatsappAnalytics.messages_by_day}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="day" tick={{ fontSize: 10 }} />
                     <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Bar dataKey="count" name="Messages" fill="#14b8a6" radius={[4, 4, 0, 0]} barSize={20} />
+                    <Tooltip content={<ChartTooltip financial={false} />} />
+                    <Bar dataKey="count" fill="#25D366" radius={[4, 4, 0, 0]} name="Messages" />
                   </BarChart>
                 </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Messages by Campaign</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-52">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.messages_by_campaign || []} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="campaign_name" tick={{ fontSize: 10 }} />
-                    <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Bar dataKey="count" name="Messages" fill="#f97316" radius={[4, 4, 0, 0]} barSize={20} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-        <div className="grid gap-6 lg:grid-cols-2 mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Messages by Template</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-52">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.messages_by_template || []} layout="vertical" margin={{ left: 100, right: 20, top: 10, bottom: 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-                    <XAxis type="number" tick={{ fontSize: 11 }} />
-                    <YAxis dataKey="template" type="category" tick={{ fontSize: 10 }} width={100} />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Bar dataKey="count" name="Messages" fill="#8b5cf6" radius={[0, 4, 4, 0]} barSize={16} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Messages by Staff</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-52">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.messages_by_staff || []} layout="vertical" margin={{ left: 100, right: 20, top: 10, bottom: 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-                    <XAxis type="number" tick={{ fontSize: 11 }} />
-                    <YAxis dataKey="staff_name" type="category" tick={{ fontSize: 10 }} width={100} />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Bar dataKey="count" name="Messages" fill="#0ea5e9" radius={[0, 4, 4, 0]} barSize={16} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              ) : <p className="text-sm text-gray-400 text-center py-10">No message data</p>}
             </CardContent>
           </Card>
         </div>
       </div>
 
-      <div id="section-revenue" className="scroll-mt-16">
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                <IndianRupee className="h-4 w-4 text-primary" />
-                Revenue by Source
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-60">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.revenue_by_source || []} layout="vertical" margin={{ left: 100, right: 40, top: 10, bottom: 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-                    <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                    <YAxis dataKey="source" type="category" tick={{ fontSize: 11 }} width={100} />
-                    <Tooltip content={<ChartTooltip financial />} />
-                    <Bar dataKey="revenue" name="Revenue" fill="#f59e0b" radius={[0, 4, 4, 0]} barSize={20} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                <Award className="h-4 w-4 text-primary" />
-                Revenue by Doctor
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-60">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.revenue_by_doctor || []} layout="vertical" margin={{ left: 100, right: 40, top: 10, bottom: 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-                    <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                    <YAxis dataKey="doctor_name" type="category" tick={{ fontSize: 11 }} width={100} />
-                    <Tooltip content={<ChartTooltip financial />} />
-                    <Bar dataKey="revenue" name="Revenue" fill="#10b981" radius={[0, 4, 4, 0]} barSize={20} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
 
-      <div id="section-acquisition" className="scroll-mt-16">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-              <Users className="h-4 w-4 text-primary" />
-              Patient Acquisition
-            </CardTitle>
-          </CardHeader>
+
+      <div id="section-acquisition" data-section="acquisition" className="scroll-mt-16">
+        <Card className="cursor-pointer" onClick={() => setChartQuickView("acquisition")}>
+          <CardHeader><CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700"><TrendingUp className="h-4 w-4 text-primary" /> Patient Acquisition by Source</CardTitle></CardHeader>
           <CardContent>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
-                <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Total Patients</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{formatIndianNumber(data.patient_acquisition?.total_patients ?? 0)}</p>
+            {patientAcquisition.length > 0 ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie data={patientAcquisition.filter((a: any) => a.patients > 0)} dataKey="patients" nameKey="source" cx="50%" cy="50%" outerRadius={100}>
+                      {patientAcquisition.filter((a: any) => a.patients > 0).map((_: any, i: number) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip formatter={(v: any) => formatIndianNumber(v)} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                  {patientAcquisition.filter((a: any) => a.patients > 0).map((a: any, i: number) => (
+                    <div key={a.source} className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <div className="h-3 w-3 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                        <span className="text-sm">{a.source}</span>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-semibold">{formatIndianNumber(a.patients)} patients</p>
+                        {a.revenue > 0 && <p className="text-[11px] text-gray-500">{formatIndianRupees(a.revenue)}</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
-                <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">From CRM</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{formatIndianNumber(data.patient_acquisition?.from_crm ?? 0)}</p>
-              </div>
-              <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
-                <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Conversion Rate</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{data.patient_acquisition?.conversion_rate ?? 0}%</p>
-              </div>
-            </div>
-            <div className="mt-4 h-48">
-              <ResponsiveContainer width="100%" height="100%">
-                <RePieChart>
-                  <Pie
-                    data={[
-                      { name: "From CRM", value: data.patient_acquisition?.from_crm ?? 0 },
-                      { name: "Other", value: Math.max(0, (data.patient_acquisition?.total_patients ?? 0) - (data.patient_acquisition?.from_crm ?? 0)) },
-                    ]}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={55}
-                    outerRadius={85}
-                    paddingAngle={3}
-                  >
-                    <Cell fill="#0ea5e9" />
-                    <Cell fill="#e5e7eb" />
-                  </Pie>
-                  <Tooltip />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                </RePieChart>
-              </ResponsiveContainer>
-            </div>
+            ) : <p className="text-sm text-gray-400 text-center py-10">No acquisition data</p>}
           </CardContent>
         </Card>
       </div>
 
-      <KpiDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} data={data} kpi={selectedKpi} />
-    </motion.div>
+      <div id="section-lead-revenue" data-section="lead-revenue" className="scroll-mt-16">
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card className="md:col-span-2 cursor-pointer" onClick={() => setChartQuickView("lead-revenue")}>
+            <CardHeader><CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700"><DollarSign className="h-4 w-4 text-emerald-500" /> Revenue Generated by Lead</CardTitle></CardHeader>
+            <CardContent>
+              {revenueFromLeadsTrend.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={revenueFromLeadsTrend}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                    <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `₹${(v/1000).toFixed(0)}K`} />
+                    <Tooltip formatter={(v: any) => formatIndianRupees(v)} />
+                    <Bar dataKey="total_revenue" fill="#10b981" radius={[4, 4, 0, 0]} barSize={36} name="Revenue" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : <p className="text-sm text-gray-400 text-center py-10">No revenue data from leads</p>}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      <KpiDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} kpis={kpis} leadAnalytics={leadAnalytics} followUpDashboard={followUpDashboard} kpi={selectedKpi} />
+      <ChartQuickView open={chartQuickView !== null} onClose={() => setChartQuickView(null)} section={chartQuickView} data={data} />
+    </div>
   )
 }
 

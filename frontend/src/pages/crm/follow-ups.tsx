@@ -144,6 +144,7 @@ export default function FollowUps() {
       queryClient.invalidateQueries({ queryKey: ["crm"] })
       addToast({ title: "Deleted", description: "Follow-up deleted", variant: "success" })
     },
+    onError: (err: any) => { const msg = err?.response?.data?.detail || "Failed to delete follow-up"; addToast({ title: "Error", description: msg, variant: "destructive" }) },
   })
 
   const markDoneMutation = useMutation({

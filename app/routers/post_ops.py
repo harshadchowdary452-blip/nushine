@@ -26,8 +26,24 @@ async def get_post_op(case_id: str, db: AsyncSession = Depends(get_db), current_
     post_ops = await repo.get_all(filters={"case_id": case_id})
     if not post_ops:
         return {"id": None, "notes": None, "report": None, "photo_urls": None}
-    latest = post_ops[-1]
-    return {"id": str(latest.id), "notes": latest.notes, "report": latest.report, "photo_urls": latest.photo_urls}
+    all_photos = []
+    notes = None
+    report = None
+    latest_id = None
+    for po in post_ops:
+        if po.photo_urls:
+            all_photos.extend(po.photo_urls.split(","))
+        if po.notes:
+            notes = po.notes
+        if po.report:
+            report = po.report
+        latest_id = str(po.id)
+    return {
+        "id": latest_id,
+        "notes": notes,
+        "report": report,
+        "photo_urls": ",".join(all_photos) if all_photos else None,
+    }
 
 
 @router.post("/{case_id}")
@@ -51,6 +67,19 @@ async def add_post_op(case_id: str, notes: Optional[str] = Form(None), report: O
                 with open(os.path.join(upload_path, filename), "wb") as f:
                     shutil.copyfileobj(photo.file, f)
                 photo_urls.append(f"/uploads/post_op/{filename}")
+    existing = await repo.get_all(filters={"case_id": case_id})
+    if existing:
+        target = existing[-1]
+        existing_photos = target.photo_urls.split(",") if target.photo_urls else []
+        all_photos = existing_photos + photo_urls
+        updated = await repo.update(
+            target.id,
+            notes=notes or target.notes,
+            report=report or target.report,
+            photo_urls=",".join(all_photos) if all_photos else None,
+        )
+        await audit.create(user_id=current_user.get("sub"), action="UPDATE_POST_OP", entity_type="POST_OP", entity_id=str(updated.id), details="Post-op photos appended")
+        return {"id": str(updated.id), "notes": updated.notes, "report": updated.report, "photo_urls": photo_urls}
     post_op = await repo.create(case_id=case_id, notes=notes, report=report, photo_urls=",".join(photo_urls) if photo_urls else None)
     await audit.create(user_id=current_user.get("sub"), action="ADD_POST_OP", entity_type="POST_OP", entity_id=str(post_op.id), details="Post-op added")
     return {"id": str(post_op.id), "notes": post_op.notes, "report": post_op.report, "photo_urls": photo_urls}

@@ -192,8 +192,9 @@ export default function AppointmentList() {
       setDeleteDialogOpen(false)
       setDeletingAppointment(null)
     },
-    onError: () => {
-      addToast({ title: "Error", description: "Failed to delete appointment", variant: "destructive" })
+    onError: (err: any) => {
+      const msg = err?.response?.data?.detail || "Failed to delete appointment"
+      addToast({ title: "Error", description: msg, variant: "destructive" })
     },
   })
 

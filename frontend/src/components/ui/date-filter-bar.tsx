@@ -29,9 +29,9 @@ export default function DateFilterBar({
   return (
     <div className="flex flex-wrap items-end gap-3">
       <div className="space-y-1">
-        <Label className="text-xs text-muted-foreground">Period</Label>
+        <Label htmlFor="period-select" className="text-xs text-muted-foreground">Period</Label>
         <Select value={period} onValueChange={onPeriodChange}>
-          <SelectTrigger className="w-[150px] h-9 text-sm">
+          <SelectTrigger id="period-select" aria-label="Period" title={period} className="w-[150px] h-9 text-sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -44,21 +44,25 @@ export default function DateFilterBar({
       {period === "custom" && (
         <>
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">From</Label>
+            <Label htmlFor="filter-start-date" className="text-xs text-muted-foreground">From</Label>
             <Input
+              id="filter-start-date"
               type="date"
               value={startDate || ""}
               onChange={(e) => onStartDateChange?.(e.target.value)}
               className="h-9 text-sm w-[150px]"
+              aria-label="Start date"
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">To</Label>
+            <Label htmlFor="filter-end-date" className="text-xs text-muted-foreground">To</Label>
             <Input
+              id="filter-end-date"
               type="date"
               value={endDate || ""}
               onChange={(e) => onEndDateChange?.(e.target.value)}
               className="h-9 text-sm w-[150px]"
+              aria-label="End date"
             />
           </div>
         </>

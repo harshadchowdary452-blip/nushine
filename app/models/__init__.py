@@ -26,6 +26,8 @@ from app.models.campaign import Campaign, CampaignRecipient, CampaignStatus, Cam
 from app.models.follow_up_response import FollowUpResponse, FollowUpResponseStatus, FeedbackType, EnquiryOutcome
 from app.models.whatsapp_template import WhatsAppTemplate
 from app.models.lead import Lead, LeadCommunication, LeadCall, LeadSource, LeadStatus, LeadCallOutcome
+from app.models.billing_history import BillingHistory
+from app.models.whatsapp_config import WhatsAppConfig
 
 __all__ = [
     "AdminGroup", "Hospital", "User", "Patient", "Consultant",
@@ -39,5 +41,7 @@ __all__ = [
     "Campaign", "CampaignRecipient", "CampaignStatus", "CampaignType", "CampaignChannel", "CampaignTarget", "CampaignRecipientStatus",
     "FollowUpResponse", "FollowUpResponseStatus", "FeedbackType", "EnquiryOutcome",
     "WhatsAppTemplate",
+    "WhatsAppConfig",
     "Lead", "LeadCommunication", "LeadCall", "LeadSource", "LeadStatus", "LeadCallOutcome",
+    "BillingHistory",
 ]

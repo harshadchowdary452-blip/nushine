@@ -51,10 +51,16 @@ class HospitalService:
         return hospital
 
     async def delete(self, hospital_id: str, user_id: str = None) -> bool:
-        result = await self.repo.delete(hospital_id)
-        if result:
-            await self.audit_log_repo.create(user_id=user_id, action="DELETE_HOSPITAL", entity_type="HOSPITAL", entity_id=hospital_id, details="Hospital deleted")
-        return result
+        import logging
+        logger = logging.getLogger(__name__)
+        try:
+            result = await self.repo.delete(hospital_id)
+            if result:
+                await self.audit_log_repo.create(user_id=user_id, action="DELETE_HOSPITAL", entity_type="HOSPITAL", entity_id=hospital_id, details="Hospital deleted")
+            return result
+        except Exception as e:
+            logger.exception("DELETE_HOSPITAL - Unexpected error: %s", str(e))
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to delete hospital: {str(e)}")
 
     async def get_analytics(self, hospital_id: str = None) -> Dict[str, Any]:
         return {"total_hospitals": 1 if hospital_id else await self.repo.count(), "total_doctors": await self.user_repo.count({"hospital_id": hospital_id, "role": Role.DOCTOR.value}) if hospital_id else 0, "total_patients": await self.patient_repo.count({"hospital_id": hospital_id}) if hospital_id else 0}

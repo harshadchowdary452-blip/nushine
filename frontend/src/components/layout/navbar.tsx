@@ -1,46 +1,39 @@
 import { useState, useEffect, useCallback } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
-import { PanelLeftOpen, Bell, ChevronDown, LogOut, User, Calendar, AlertCircle, MessageSquare, Clock, CheckCheck, Trash2, X } from "lucide-react"
+import {
+  PanelLeftOpen, Bell, ChevronDown, LogOut, User, Calendar, AlertCircle,
+  MessageSquare, Clock, Trash2, X,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useSidebarStore } from "@/store/sidebarStore"
 import { useAuthStore } from "@/store/authStore"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { notificationsApi } from "@/services/endpoints"
+import { queryClient } from "@/lib/queryClient"
 import { format } from "date-fns"
 
 interface NotificationItem {
-  id: string
-  title: string
-  description: string
-  type: string
-  is_read: boolean
-  created_at: string
+  id: string; title: string; description: string; type: string; is_read: boolean; created_at: string
 }
 
 const iconMap: Record<string, { icon: React.ElementType; color: string }> = {
-  appointment: { icon: Calendar, color: "text-primary" },
-  alert: { icon: AlertCircle, color: "text-danger" },
-  message: { icon: MessageSquare, color: "text-success" },
-  reminder: { icon: Clock, color: "text-warning" },
-  billing: { icon: AlertCircle, color: "text-warning" },
-  crm: { icon: MessageSquare, color: "text-primary" },
-  followup: { icon: Clock, color: "text-info" },
-  system: { icon: AlertCircle, color: "text-gray-500" },
+  appointment: { icon: Calendar, color: "text-indigo-600" },
+  alert: { icon: AlertCircle, color: "text-red-500" },
+  message: { icon: MessageSquare, color: "text-emerald-500" },
+  reminder: { icon: Clock, color: "text-amber-500" },
+  billing: { icon: AlertCircle, color: "text-amber-500" },
+  crm: { icon: MessageSquare, color: "text-indigo-600" },
+  followup: { icon: Clock, color: "text-cyan-500" },
+  system: { icon: AlertCircle, color: "text-gray-400" },
 }
 
 const filters = [
-  { key: "all", label: "All" },
-  { key: "unread", label: "Unread" },
-  { key: "read", label: "Read" },
-  { key: "appointment", label: "Appointments" },
-  { key: "billing", label: "Billing" },
-  { key: "crm", label: "CRM" },
-  { key: "followup", label: "Follow‑Ups" },
-  { key: "system", label: "System" },
+  { key: "all", label: "All" }, { key: "unread", label: "Unread" }, { key: "read", label: "Read" },
+  { key: "appointment", label: "Appointments" }, { key: "billing", label: "Billing" },
+  { key: "crm", label: "CRM" }, { key: "followup", label: "Follow‑Ups" }, { key: "system", label: "System" },
 ] as const
-
 type FilterKey = (typeof filters)[number]["key"]
 
 export default function Navbar() {
@@ -56,21 +49,16 @@ export default function Navbar() {
   const fetchNotifications = useCallback(async () => {
     try {
       const data = await notificationsApi.list()
-      const items = data?.items ?? []
       setNotifCount(data?.unread ?? 0)
-      setNotifications(items)
-    } catch {
-      setNotifCount(0)
-    }
+      setNotifications(data?.items ?? [])
+    } catch { setNotifCount(0) }
   }, [])
 
   const fetchUnreadCount = useCallback(async () => {
     try {
       const data = await notificationsApi.unreadCount()
       setNotifCount(data?.unread ?? 0)
-    } catch {
-      setNotifCount(0)
-    }
+    } catch { setNotifCount(0) }
   }, [])
 
   const handleOpen = async () => {
@@ -90,9 +78,7 @@ export default function Navbar() {
     try {
       await notificationsApi.delete(id)
       setNotifications((prev) => prev.filter((n) => n.id !== id))
-    } catch {
-      console.warn("Failed to delete notification", id)
-    }
+    } catch {}
     await fetchUnreadCount()
   }
 
@@ -112,107 +98,123 @@ export default function Navbar() {
   const initials = user?.full_name?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "U"
 
   return (
-    <header className="sticky top-0 z-20 flex h-16 items-center border-b border-gray-200 bg-white px-4 transition-all duration-300">
+    <header role="banner" className="sticky top-0 z-20 flex h-14 items-center border-b border-gray-200 bg-white/95 backdrop-blur-sm px-4 transition-all">
       <div className="flex w-full items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon-sm" onClick={toggle}
-            className="hidden lg:flex text-gray-400 hover:text-gray-600">
-            <PanelLeftOpen className={cn("h-5 w-5 transition-transform", collapsed && "rotate-180")} />
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className="hidden lg:flex text-gray-400 hover:text-gray-600 h-8 w-8">
+            <PanelLeftOpen className={cn("h-[18px] w-[18px] transition-transform", collapsed && "rotate-180")} />
           </Button>
           <Button variant="ghost" size="icon-sm" onClick={() => setMobileOpen(true)}
-            className="flex md:hidden text-gray-400">
-            <PanelLeftOpen className="h-5 w-5" />
+            aria-label="Open mobile menu"
+            title="Open mobile menu"
+            className="flex md:hidden text-gray-400 h-8 w-8">
+            <PanelLeftOpen className="h-[18px] w-[18px]" />
           </Button>
-
-          <div className="hidden sm:flex items-center gap-3">
-            <div className="h-5 w-px bg-gray-200" />
-            <div className="flex flex-col">
-              <span className="text-xs font-semibold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                NUSHINE Dental
-              </span>
-              <span className="text-[10px] text-gray-400 leading-tight hidden md:block">
-                Transforming Smiles Through Intelligent Care
-              </span>
+          <Link to="/" className="hidden sm:flex items-center gap-2.5">
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-indigo-600">
+              <svg width="14" height="14" viewBox="0 0 48 48" fill="none">
+                <path d="M24 10c-3 0-5.5 2-6.5 5.5C16.5 18 16 22 16 26s.5 7 1.5 8.5c.8 1.2 2 2 3.5 2.5.8.2 1.5.6 2 1.2l1 1.3c.5.7 1.5.7 2 0l1-1.3c.5-.6 1.2-1 2-1.2 1.5-.5 2.7-1.3 3.5-2.5 1-1.5 1.5-4.5 1.5-8.5s-.5-8-1.5-10.5C29.5 12 27 10 24 10z" fill="white" />
+              </svg>
             </div>
-          </div>
+            <div>
+              <p className="text-sm font-bold text-gray-900 leading-tight">NUSHINE</p>
+              <p className="text-[10px] text-gray-400 leading-tight tracking-wider">Dental</p>
+            </div>
+          </Link>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+
+          {/* Notifications */}
           <div className="relative">
-            <Button variant="ghost" size="icon-sm" className="relative text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-              onClick={() => notifOpen ? setNotifOpen(false) : handleOpen()}>
-              <Bell className="h-5 w-5" />
+            <button onClick={() => notifOpen ? setNotifOpen(false) : handleOpen()}
+              aria-label={`Notifications${notifCount > 0 ? `, ${notifCount} unread` : ""}`}
+              title={`Notifications${notifCount > 0 ? ` (${notifCount} unread)` : ""}`}
+              className="relative flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all">
+              <Bell className="h-[18px] w-[18px]" />
               {notifCount > 0 && (
                 <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }}
-                  className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-white">
+                  className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-indigo-600 px-1 text-[8px] font-bold text-white">
                   {notifCount > 9 ? "9+" : notifCount}
                 </motion.span>
               )}
-            </Button>
+            </button>
             <AnimatePresence>
               {notifOpen && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setNotifOpen(false)} />
-                  <motion.div initial={{ opacity: 0, y: -4, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+                  <motion.div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="Notifications"
+                    initial={{ opacity: 0, y: -4, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -4, scale: 0.96 }} transition={{ duration: 0.15 }}
-                    className="absolute right-0 top-full z-20 mt-1.5 w-96 rounded-2xl border border-gray-100 bg-white shadow-dropdown overflow-hidden">
-                    <div className="border-b border-gray-100 px-4 py-3 flex items-center justify-between">
-                      <p className="text-sm font-semibold text-gray-900">Notifications</p>
+                    className="absolute right-0 top-full z-20 mt-1.5 w-[380px] rounded-xl border border-gray-100 bg-white shadow-dropdown overflow-hidden">
+                    <div className="border-b border-gray-100 px-4 py-2.5 flex items-center justify-between">
+                      <h2 className="text-sm font-semibold text-gray-900">Notifications</h2>
                       <div className="flex items-center gap-1">
                         {notifications.length > 0 && (
                           <button onClick={handleDeleteAll}
-                            className="flex h-7 w-7 items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 hover:text-danger transition-colors">
+                            aria-label="Delete all notifications"
+                            title="Delete all"
+                            className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-red-500 transition-colors">
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         )}
                         <button onClick={() => setNotifOpen(false)}
-                          className="flex h-7 w-7 items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
+                          aria-label="Close notifications"
+                          title="Close"
+                          className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
                           <X className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     </div>
-
-                    <div className="flex gap-1.5 overflow-x-auto px-4 py-2.5 border-b border-gray-50">
+                    <div className="flex gap-1 overflow-x-auto px-4 py-2 border-b border-gray-50" role="tablist" aria-label="Filter notifications">
                       {filters.map((f) => (
                         <button key={f.key} onClick={() => setActiveFilter(f.key)}
+                          role="tab"
+                          aria-selected={activeFilter === f.key}
                           className={cn(
                             "shrink-0 rounded-lg px-2.5 py-1 text-xs font-medium transition-all whitespace-nowrap",
-                            activeFilter === f.key ? "bg-primary text-white shadow-sm" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                            activeFilter === f.key ? "bg-indigo-600 text-white shadow-sm" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
                           )}>
                           {f.label}
                         </button>
                       ))}
                     </div>
-
-                    <div className="max-h-[360px] overflow-y-auto">
+                    <div className="max-h-[320px] overflow-y-auto" role="list" aria-label="Notification list">
                       {filtered.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-10 text-center">
-                          <Bell className="mb-2 h-8 w-8 text-gray-300" />
+                          <Bell className="mb-2 h-7 w-7 text-gray-300" />
                           <p className="text-sm text-gray-400">No notifications</p>
                         </div>
                       ) : (
                         <div className="py-1">
                           {filtered.map((n) => {
-                            const mapped = iconMap[n.type] || { icon: Bell, color: "text-gray-500" }
+                            const mapped = iconMap[n.type] || { icon: Bell, color: "text-gray-400" }
                             const Icon = mapped.icon
                             return (
                               <div key={n.id}
+                                role="listitem"
                                 className={cn(
-                                  "flex gap-3 rounded-xl px-4 py-2.5 transition-colors group",
-                                  !n.is_read ? "bg-primary/5" : "hover:bg-gray-50"
+                                  "flex gap-2.5 rounded-lg px-4 py-2.5 transition-colors group",
+                                  !n.is_read ? "bg-indigo-50/30" : "hover:bg-gray-50"
                                 )}>
-                                <div className={cn("mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gray-50", mapped.color)}>
-                                  <Icon className="h-4 w-4" />
+                                <div className={cn("mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gray-50", mapped.color)}>
+                                  <Icon className="h-3.5 w-3.5" />
                                 </div>
                                 <div className="min-w-0 flex-1">
                                   <p className="text-sm font-medium text-gray-900 truncate">{n.title}</p>
                                   <p className="text-xs text-gray-400 truncate">{n.description}</p>
-                                  <p className="mt-0.5 text-[11px] text-gray-300">
-                                    {format(new Date(n.created_at), "MMM d, h:mm a")}
-                                  </p>
+                                  <p className="mt-0.5 text-[11px] text-gray-300">{format(new Date(n.created_at), "MMM d, h:mm a")}</p>
                                 </div>
                                 <button onClick={() => handleDelete(n.id)}
-                                  className="shrink-0 flex h-7 w-7 items-center justify-center rounded-xl text-gray-300 opacity-0 group-hover:opacity-100 hover:bg-danger-soft hover:text-danger transition-all">
+                                  aria-label={`Delete notification: ${n.title}`}
+                                  title="Delete"
+                                  className="shrink-0 flex h-7 w-7 items-center justify-center rounded-lg text-gray-300 opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 transition-all">
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </button>
                               </div>
@@ -227,38 +229,48 @@ export default function Navbar() {
             </AnimatePresence>
           </div>
 
+
+          {/* Profile */}
           <div className="relative">
             <button onClick={() => setProfileOpen(!profileOpen)}
-              className="flex items-center gap-2.5 rounded-xl pl-2 pr-3 py-1.5 transition-colors hover:bg-gray-50">
+              aria-label={`User menu${profileOpen ? " (open)" : ""}`}
+              aria-expanded={profileOpen}
+              title={user?.full_name ?? "User"}
+              className="flex items-center gap-2 rounded-lg pl-1.5 pr-2.5 py-1 transition-colors hover:bg-gray-100">
               <Avatar className="h-7 w-7 ring-2 ring-gray-100">
-                <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-xs font-medium text-white">{initials}</AvatarFallback>
+                <AvatarFallback className="bg-indigo-600 text-xs font-medium text-white">{initials}</AvatarFallback>
               </Avatar>
               <div className="hidden lg:block text-left">
                 <p className="text-sm font-medium text-gray-900 leading-tight">{user?.full_name ?? "User"}</p>
-                <p className="text-xs text-gray-400 leading-tight">{user?.role?.replace("_", " ") ?? ""}</p>
+                <p className="text-[11px] text-gray-400 leading-tight capitalize">{user?.role?.replace("_", " ").toLowerCase() ?? ""}</p>
               </div>
-              <ChevronDown className="hidden lg:block h-3.5 w-3.5 text-gray-400" />
+              <ChevronDown className="hidden lg:block h-3 w-3 text-gray-400" />
             </button>
             <AnimatePresence>
               {profileOpen && (
                 <>
-                  <div className="fixed inset-0 z-10" onClick={() => setProfileOpen(false)} />
-                  <motion.div initial={{ opacity: 0, y: -4, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+                  <div className="fixed inset-0 z-10" onClick={() => setProfileOpen(false)} aria-hidden="true" />
+                  <motion.div
+                    role="menu"
+                    aria-label="User menu"
+                    initial={{ opacity: 0, y: -4, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -4, scale: 0.96 }} transition={{ duration: 0.15 }}
-                    className="absolute right-0 top-full z-20 mt-1.5 w-56 rounded-2xl border border-gray-100 bg-white p-1.5 shadow-dropdown">
-                    <div className="border-b border-gray-100 px-3 py-3">
+                    className="absolute right-0 top-full z-20 mt-1.5 w-52 rounded-xl border border-gray-100 bg-white p-1 shadow-dropdown">
+                    <div className="border-b border-gray-100 px-3 py-2.5">
                       <p className="text-sm font-medium text-gray-900">{user?.full_name ?? "User"}</p>
-                      <p className="text-xs text-gray-400">{user?.email ?? ""}</p>
+                      <p className="text-xs text-gray-400 truncate">{user?.email ?? ""}</p>
                     </div>
                     <div className="pt-1">
                       <Link to="/settings" onClick={() => setProfileOpen(false)}
-                        className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900">
+                        role="menuitem"
+                        className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900">
                         <User className="h-4 w-4" /> Profile
                       </Link>
-                      <button onClick={() => { setProfileOpen(false); logout(); navigate("/login") }}
-                        className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-danger transition-colors hover:bg-danger-soft">
-                        <LogOut className="h-4 w-4" /> Logout
-                      </button>
+                      <button onClick={() => { setProfileOpen(false); queryClient.clear(); logout(); navigate("/login") }}
+                          role="menuitem"
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-600 transition-colors hover:bg-red-50">
+                          <LogOut className="h-4 w-4" /> Logout
+                        </button>
                     </div>
                   </motion.div>
                 </>

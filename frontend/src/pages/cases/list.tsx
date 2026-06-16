@@ -138,8 +138,9 @@ export default function CaseList() {
       setDeleteDialogOpen(false)
       setDeletingCase(null)
     },
-    onError: () => {
-      addToast({ title: "Error", description: "Failed to delete case", variant: "destructive" })
+    onError: (err: any) => {
+      const msg = err?.response?.data?.detail || "Failed to delete case"
+      addToast({ title: "Error", description: msg, variant: "destructive" })
     },
   })
 

@@ -163,16 +163,16 @@ async def super_admin_dashboard(
     total_groups = (await db.execute(select(func.count(AdminGroup.id)))).scalar() or 0
     total_hospitals = (await db.execute(select(func.count(Hospital.id)))).scalar() or 0
     total_doctors = (await db.execute(select(func.count(User.id)).where(User.role == Role.DOCTOR.value))).scalar() or 0
-    total_patients = (await db.execute(select(func.count(Patient.id)))).scalar() or 0
+    total_patients = (await db.execute(select(func.count(Patient.id)).where())).scalar() or 0
 
     active_case_statuses = [s.value for s in CaseStatus if s not in (CaseStatus.COMPLETED, CaseStatus.CANCELLED)]
     total_active_cases = (await db.execute(
         select(func.count(Case.id)).where(Case.status.in_(active_case_statuses))
     )).scalar() or 0
 
-    total_appointments = (await db.execute(select(func.count(Appointment.id)))).scalar() or 0
+    total_appointments = (await db.execute(select(func.count(Appointment.id)).where())).scalar() or 0
 
-    total_revenue_result = await db.execute(select(func.sum(Billing.paid_amount)))
+    total_revenue_result = await db.execute(select(func.sum(Billing.paid_amount)).where())
     total_revenue = float(total_revenue_result.scalar() or 0)
 
     monthly_revenue_result = await db.execute(
@@ -198,7 +198,7 @@ async def super_admin_dashboard(
     patient_growth_trend = await _monthly_patient_trend(db)
 
     # Get all case IDs for performance queries
-    all_case_ids_r = await db.execute(select(Case.id))
+    all_case_ids_r = await db.execute(select(Case.id).where())
     all_case_ids = [row[0] for row in all_case_ids_r.all()]
 
     # Admin group performance by revenue
@@ -302,6 +302,7 @@ async def group_admin_dashboard(
     period: str = Query("this_month", description="today, this_week, this_month, this_quarter, this_year, custom"),
     start_date: Optional[str] = Query(None, description="Custom range start (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="Custom range end (YYYY-MM-DD)"),
+    hospital_id: Optional[str] = Query(None, description="Filter to a specific hospital in the group"),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
@@ -317,14 +318,15 @@ async def group_admin_dashboard(
             "revenue_trend": [], "patient_growth_trend": [],
             "monthly_growth_trend": [], "hospital_performance": [], "doctor_performance": [],
             "revenue_expense_trend": [], "expense_trend": [], "profit_trend": [],
+            "selected_hospital_id": None,
         }
 
     now = datetime.now(timezone.utc)
     current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     current_year_start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
 
-    hospital_ids = await _get_hospital_ids_for_group(db, admin_group_id)
-    if not hospital_ids:
+    group_hospital_ids = await _get_hospital_ids_for_group(db, admin_group_id)
+    if not group_hospital_ids:
         return {
             "total_hospitals": 0, "total_doctors": 0, "total_patients": 0,
             "total_active_cases": 0, "total_appointments": 0,
@@ -333,7 +335,16 @@ async def group_admin_dashboard(
             "revenue_trend": [], "patient_growth_trend": [],
             "monthly_growth_trend": [], "hospital_performance": [], "doctor_performance": [],
             "revenue_expense_trend": [], "expense_trend": [], "profit_trend": [],
+            "selected_hospital_id": None,
         }
+
+    # If hospital_id is provided, validate it belongs to the group and use it
+    if hospital_id:
+        if hospital_id not in group_hospital_ids:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Hospital not in your admin group")
+        hospital_ids = [hospital_id]
+    else:
+        hospital_ids = group_hospital_ids
 
     total_hospitals = len(hospital_ids)
     total_doctors = (await db.execute(
@@ -413,12 +424,14 @@ async def group_admin_dashboard(
         })
     hospital_performance.sort(key=lambda x: x["revenue"], reverse=True)
 
-    # Doctor performance
+    # Doctor performance (filtered by hospital_ids if a specific hospital is selected)
     doctor_performance = []
-    doctors_r = await db.execute(
-        select(User.id, User.full_name).where(User.role == Role.DOCTOR.value, User.admin_group_id == admin_group_id)
-    )
-    for did, dname in doctors_r.all():
+    doctor_query = select(User.id, User.full_name).where(User.role == Role.DOCTOR.value, User.admin_group_id == admin_group_id)
+    if hospital_id:
+        doctor_query = doctor_query.where(User.hospital_id == hospital_id)
+    doctor_rows = (await db.execute(doctor_query)).all()
+    filtered_doctor_count = len(doctor_rows)
+    for did, dname in doctor_rows:
         d_cases_r = await db.execute(select(Case.id).where(Case.doctor_id == did))
         d_cids = [row[0] for row in d_cases_r.all()]
         if d_cids:
@@ -433,8 +446,9 @@ async def group_admin_dashboard(
     combined_trend = await revenue_trend_with_expenses(db, case_ids if case_ids else [], hospital_ids, period=period, start_date=start_date, end_date=end_date)
 
     return {
-        "total_hospitals": total_hospitals,
-        "total_doctors": total_doctors,
+        "selected_hospital_id": hospital_id,
+        "total_hospitals": len(group_hospital_ids),
+        "total_doctors": filtered_doctor_count,
         "total_patients": total_patients,
         "total_active_cases": total_active_cases,
         "total_appointments": total_appointments,

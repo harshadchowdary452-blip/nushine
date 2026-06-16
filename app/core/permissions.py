@@ -46,6 +46,7 @@ class Permission(str, Enum):
     VIEW_EXPENSES = "VIEW_EXPENSES"
     MANAGE_LEADS = "MANAGE_LEADS"
     VIEW_LEADS = "VIEW_LEADS"
+    VIEW_CRM_DASHBOARD = "VIEW_CRM_DASHBOARD"
 
 
 ROLE_PERMISSIONS = {
@@ -65,6 +66,7 @@ ROLE_PERMISSIONS = {
         Permission.UPDATE_BILLING, Permission.COMPLETE_TREATMENT,
         Permission.MANAGE_EXPENSES, Permission.VIEW_EXPENSES,
         Permission.MANAGE_LEADS, Permission.VIEW_LEADS,
+        Permission.VIEW_CRM_DASHBOARD,
     ],
     Role.GROUP_ADMIN: [
         Permission.CREATE_HOSPITAL, Permission.CREATE_HOSPITAL_ADMIN,
@@ -90,6 +92,7 @@ ROLE_PERMISSIONS = {
         Permission.UPDATE_BILLING,
         Permission.MANAGE_EXPENSES,
         Permission.MANAGE_LEADS, Permission.VIEW_LEADS,
+        Permission.VIEW_CRM_DASHBOARD,
     ],
     Role.DOCTOR: [
         Permission.MANAGE_PATIENTS,

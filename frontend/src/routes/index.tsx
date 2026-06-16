@@ -1,44 +1,46 @@
 import { createBrowserRouter, Navigate, Outlet, useLocation } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
+import { lazy, Suspense } from "react";
 import type { ReactElement } from "react";
 import { useAuthStore } from "@/store/authStore";
 import type { Role } from "@/types";
 import AppLayout from "@/components/layout/app-layout";
-import Login from "@/pages/auth/login";
-import SuperAdminDashboard from "@/pages/dashboard/super-admin";
-import GroupAdminDashboard from "@/pages/dashboard/group-admin";
-import HospitalAdminDashboard from "@/pages/dashboard/hospital-admin";
-import DoctorDashboard from "@/pages/dashboard/doctor";
-import AdminGroups from "@/pages/admin/groups";
-import AdminHospitals from "@/pages/admin/hospitals";
-import AdminDoctors from "@/pages/admin/doctors";
-import AdminExpenses from "@/pages/admin/expenses";
-import PatientList from "@/pages/patients/list";
-import PatientDetail from "@/pages/patients/detail";
-import CaseList from "@/pages/cases/list";
-import CaseDetail from "@/pages/cases/detail";
-import AppointmentList from "@/pages/appointments/list";
-import AppointmentDetail from "@/pages/appointments/detail";
-import ConsultantList from "@/pages/consultants/list";
-import TreatmentList from "@/pages/treatments/list";
-import TreatmentDetail from "@/pages/treatments/detail";
-import BillingList from "@/pages/billing/list";
-import BillingDetail from "@/pages/billing/detail";
-import WhatsAppMessaging from "@/pages/whatsapp/messaging";
-import CommunicationHistory from "@/pages/crm/communications";
-import EmailTemplates from "@/pages/crm/email-templates";
-import FollowUps from "@/pages/crm/follow-ups";
-import Campaigns from "@/pages/crm/campaigns";
-import EnquiryCalendar from "@/pages/crm/enquiry-calendar";
-import LeadAnalytics from "@/pages/crm/lead-analytics";
-import RevenueAttribution from "@/pages/crm/revenue-attribution";
-import LeadList from "@/pages/leads/list";
-import LeadDetail from "@/pages/leads/detail";
-import Settings from "@/pages/settings/profile";
-import WhatsAppConfigPage from "@/pages/settings/whatsapp-config";
-import WhatsAppTemplates from "@/pages/whatsapp/templates";
-import WhatsAppBroadcast from "@/pages/whatsapp/broadcast";
-import CrmDashboard from "@/pages/dashboard/crm-dashboard";
+
+const Login = lazy(() => import("@/pages/auth/login"));
+const SuperAdminDashboard = lazy(() => import("@/pages/dashboard/super-admin"));
+const GroupAdminDashboard = lazy(() => import("@/pages/dashboard/group-admin"));
+const HospitalAdminDashboard = lazy(() => import("@/pages/dashboard/hospital-admin"));
+const DoctorDashboard = lazy(() => import("@/pages/dashboard/doctor"));
+const AdminGroups = lazy(() => import("@/pages/admin/groups"));
+const AdminHospitals = lazy(() => import("@/pages/admin/hospitals"));
+const AdminDoctors = lazy(() => import("@/pages/admin/doctors"));
+const AdminExpenses = lazy(() => import("@/pages/admin/expenses"));
+const PatientList = lazy(() => import("@/pages/patients/list"));
+const PatientDetail = lazy(() => import("@/pages/patients/detail"));
+const CaseList = lazy(() => import("@/pages/cases/list"));
+const CaseDetail = lazy(() => import("@/pages/cases/detail"));
+const AppointmentList = lazy(() => import("@/pages/appointments/list"));
+const AppointmentDetail = lazy(() => import("@/pages/appointments/detail"));
+const ConsultantList = lazy(() => import("@/pages/consultants/list"));
+const TreatmentList = lazy(() => import("@/pages/treatments/list"));
+const TreatmentDetail = lazy(() => import("@/pages/treatments/detail"));
+const BillingList = lazy(() => import("@/pages/billing/list"));
+const BillingDetail = lazy(() => import("@/pages/billing/detail"));
+const WhatsAppMessaging = lazy(() => import("@/pages/whatsapp/messaging"));
+const CommunicationHistory = lazy(() => import("@/pages/crm/communications"));
+const EmailTemplates = lazy(() => import("@/pages/crm/email-templates"));
+const FollowUps = lazy(() => import("@/pages/crm/follow-ups"));
+const Campaigns = lazy(() => import("@/pages/crm/campaigns"));
+const EnquiryCalendar = lazy(() => import("@/pages/crm/enquiry-calendar"));
+const LeadAnalytics = lazy(() => import("@/pages/crm/lead-analytics"));
+const RevenueAttribution = lazy(() => import("@/pages/crm/revenue-attribution"));
+const LeadList = lazy(() => import("@/pages/leads/list"));
+const LeadDetail = lazy(() => import("@/pages/leads/detail"));
+const Settings = lazy(() => import("@/pages/settings/profile"));
+const WhatsAppConfigPage = lazy(() => import("@/pages/settings/whatsapp-config"));
+const WhatsAppTemplates = lazy(() => import("@/pages/whatsapp/templates"));
+const WhatsAppBroadcast = lazy(() => import("@/pages/whatsapp/broadcast"));
+const CrmDashboard = lazy(() => import("@/pages/dashboard/crm-dashboard"));
 
 const dashboardByRole: Record<Role, string> = {
   SUPER_ADMIN: "/super-admin",
@@ -57,6 +59,21 @@ function DashboardRedirect() {
   return <Navigate to={getDashboardPath(user.role)} replace />;
 }
 
+function PageLoader() {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        height: "100vh",
+      }}
+    >
+      <div className="spinner" />
+    </div>
+  );
+}
+
 function ProtectedLayout() {
   const location = useLocation();
   const { user, accessToken, refreshToken } = useAuthStore();
@@ -64,9 +81,11 @@ function ProtectedLayout() {
   if (!isAuthenticated) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   return (
     <AppLayout>
-      <AnimatePresence mode="wait">
-        <Outlet key={location.pathname} />
-      </AnimatePresence>
+      <Suspense fallback={<PageLoader />}>
+        <AnimatePresence mode="wait">
+          <Outlet key={location.pathname} />
+        </AnimatePresence>
+      </Suspense>
     </AppLayout>
   );
 }
@@ -75,7 +94,11 @@ function PublicRoute() {
   const { user, accessToken, refreshToken } = useAuthStore();
   const isAuthenticated = !!user && !!accessToken && !!refreshToken;
   if (isAuthenticated) return <Navigate to={getDashboardPath(user?.role)} replace />;
-  return <Outlet />;
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <Outlet />
+    </Suspense>
+  );
 }
 
 function RoleGuard({ allowedRoles, children }: { allowedRoles: Role[]; children: ReactElement }) {

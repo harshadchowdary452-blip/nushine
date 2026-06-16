@@ -74,7 +74,9 @@ def get_date_range(period: str = "this_month", start_date: Optional[str] = None,
 async def calculate_revenue(db: AsyncSession, case_ids: list[str] = None, period: str = "this_month",
                             start_date: Optional[str] = None, end_date: Optional[str] = None) -> float:
     date_start, date_end = get_date_range(period, start_date, end_date)
-    query = select(func.sum(Billing.paid_amount)).where(Billing.updated_at >= date_start, Billing.updated_at < date_end)
+    query = select(func.sum(Billing.paid_amount)).where(
+        Billing.updated_at >= date_start, Billing.updated_at < date_end,
+    )
     if case_ids is not None:
         query = query.where(Billing.case_id.in_(case_ids))
     result = await db.execute(query)

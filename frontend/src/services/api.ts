@@ -1,9 +1,11 @@
 import axios from "axios";
 import { useAuthStore } from "@/store/authStore";
+import { queryClient } from "@/lib/queryClient";
 
 const api = axios.create({
   baseURL: "/api/v1",
   headers: { "Content-Type": "application/json" },
+  timeout: 30000,
 });
 
 api.interceptors.request.use((config) => {
@@ -17,6 +19,7 @@ api.interceptors.request.use((config) => {
 let refreshPromise: Promise<string> | null = null;
 
 const forceLogout = () => {
+  queryClient.clear();
   useAuthStore.getState().logout();
   if (window.location.pathname !== "/login") {
     window.location.assign("/login");

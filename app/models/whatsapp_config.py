@@ -10,6 +10,7 @@ class WhatsAppConfig(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     hospital_id: Mapped[str] = mapped_column(String(36), nullable=False, unique=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    whatsapp_mode: Mapped[str] = mapped_column(String(20), default="LIVE")
     clinic_whatsapp_number: Mapped[str] = mapped_column(String(20), nullable=True)
     country_code: Mapped[str] = mapped_column(String(5), default="+91")
     default_message_templates_enabled: Mapped[bool] = mapped_column(Boolean, default=True)

@@ -13,6 +13,7 @@ class PatientCreate(BaseModel):
     phone: Optional[str] = None
     email: Optional[str] = None
     patient_source: Optional[str] = None
+    original_source: Optional[str] = None
     source_campaign_name: Optional[str] = None
     source_campaign_id: Optional[str] = None
     source_campaign_date: Optional[date] = None
@@ -30,6 +31,7 @@ class PatientUpdate(BaseModel):
     phone: Optional[str] = None
     email: Optional[str] = None
     patient_source: Optional[str] = None
+    original_source: Optional[str] = None
     source_campaign_name: Optional[str] = None
     source_campaign_id: Optional[str] = None
     source_campaign_date: Optional[date] = None
@@ -50,6 +52,7 @@ class PatientResponse(BaseModel):
     phone: Optional[str]
     email: Optional[str]
     patient_source: Optional[str]
+    original_source: Optional[str]
     source_campaign_name: Optional[str]
     source_campaign_id: Optional[str]
     source_campaign_date: Optional[date]

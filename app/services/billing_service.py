@@ -1,4 +1,4 @@
-import logging, os
+import json, logging, os
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,7 +6,9 @@ from sqlalchemy import select
 from fastapi import HTTPException, status
 from app.repositories.billing_repository import BillingRepository
 from app.repositories.audit_log_repository import AuditLogRepository
+from app.repositories.billing_history_repository import BillingHistoryRepository
 from app.models.billing import Billing, PaymentStatus, DiscountType
+from app.models.billing_history import BillingHistory
 from app.models.case import Case
 from app.models.patient import Patient
 from app.models.hospital import Hospital
@@ -22,6 +24,7 @@ class BillingService:
     def __init__(self, db: AsyncSession):
         self.repo = BillingRepository(db)
         self.audit_log_repo = AuditLogRepository(db)
+        self.history_repo = BillingHistoryRepository(db)
         self.db = db
 
     async def _enrich(self, billing: Billing):
@@ -35,6 +38,19 @@ class BillingService:
                 if p:
                     billing.patient_name = p.full_name
         return billing
+
+    async def _record_history(self, billing_id: str, action: str, previous_data: dict = None, new_data: dict = None, changes_summary: str = None, user_id: str = None):
+        try:
+            await self.history_repo.create(
+                billing_id=billing_id,
+                action=action,
+                previous_data=json.dumps(previous_data) if previous_data else None,
+                new_data=json.dumps(new_data) if new_data else None,
+                changes_summary=changes_summary,
+                performed_by=user_id,
+            )
+        except Exception as e:
+            logger.warning("BILLING_HISTORY - Failed to record %s for billing %s: %s", action, billing_id, str(e))
 
     async def _generate_invoice_pdf(self, billing: Billing) -> str:
         from fpdf import FPDF
@@ -68,206 +84,291 @@ class BillingService:
 
         pdf = FPDF(orientation="P", unit="mm", format="A4")
         pdf.add_page()
-        pdf.set_auto_page_break(auto=True, margin=20)
+        pdf.set_auto_page_break(auto=True, margin=25)
 
         ml = 15
         pw = pdf.w - ml * 2
         primary = (41, 65, 132)
-        accent = (0, 120, 180)
+        accent = (20, 100, 180)
         dark = (50, 50, 50)
-        muted = (130, 130, 130)
-        light_bg = (245, 247, 250)
+        muted = (120, 120, 120)
+        white = (255, 255, 255)
+        light_gray = (245, 246, 250)
+        border_gray = (220, 225, 235)
+        green_c = (40, 160, 80)
+        red_c = (200, 60, 60)
+        blue_c = (0, 100, 200)
 
-        def section_header(title):
+        def section_bar(title):
             pdf.set_fill_color(*primary)
-            pdf.set_text_color(255, 255, 255)
+            pdf.set_text_color(*white)
             pdf.set_font("Helvetica", "B", 10)
+            x0 = pdf.get_x()
             pdf.cell(pw, 7, f"  {title}", fill=True, align="L")
-            pdf.ln(8)
-
-        def keyval(label, value, bold_label=True):
-            pdf.set_font("Helvetica", "B" if bold_label else "", 9)
-            pdf.set_text_color(*dark)
-            pdf.cell(30, 5, label)
             pdf.set_font("Helvetica", "", 9)
-            pdf.cell(55, 5, str(value or "-"))
-            pdf.ln(5)
+            pdf.ln(9)
 
-        # ---- HEADER: Logo + Hospital Info (split layout) ----
-        logo_y = pdf.get_y()
-        if hospital and hospital.logo_url:
-            logo_path = hospital.logo_url
-            if os.path.exists(logo_path):
-                try:
-                    pdf.image(logo_path, x=ml, y=logo_y, w=30)
-                except Exception:
-                    pass
-
-        right_x = ml + 90
-        pdf.set_xy(right_x, logo_y)
-        pdf.set_font("Helvetica", "B", 16)
-        pdf.set_text_color(*primary)
-        pdf.cell(pw - 90, 8, hospital.name if hospital else "Hospital", align="R")
-        pdf.set_xy(right_x, pdf.get_y() + 8)
-        pdf.set_font("Helvetica", "", 8)
-        pdf.set_text_color(*muted)
-        if hospital:
-            lines = []
-            if hospital.address:
-                lines.append(hospital.address)
-            contact_parts = []
-            if hospital.phone:
-                contact_parts.append(f"Phone: {hospital.phone}")
-            if hospital.email:
-                contact_parts.append(f"Email: {hospital.email}")
-            if contact_parts:
-                lines.append(" | ".join(contact_parts))
-            if hospital.registration_number:
-                lines.append(f"Reg No: {hospital.registration_number}")
-            if hospital.gst_number:
-                lines.append(f"GST: {hospital.gst_number}")
-            for idx, line in enumerate(lines):
-                pdf.set_xy(right_x, pdf.get_y() - 1)
-                pdf.multi_cell(pw - 90, 4, line, align="R")
-                pdf.set_xy(right_x, pdf.get_y())
-        pdf.ln(6)
-
-        if pdf.get_y() < logo_y + 35:
-            pdf.set_y(logo_y + 35)
-
-        # ---- Thin accent divider ----
-        pdf.set_draw_color(*accent)
-        pdf.set_line_width(0.8)
-        pdf.line(ml, pdf.get_y(), ml + pw, pdf.get_y())
-        pdf.ln(5)
-
-        # ---- INVOICE TITLE + META ----
-        pdf.set_font("Helvetica", "B", 18)
-        pdf.set_text_color(*primary)
-        pdf.cell(pw * 0.5, 9, "TAX INVOICE")
-        pdf.set_font("Helvetica", "", 9)
-        pdf.set_text_color(*dark)
-        inv_number = billing.invoice_number or str(billing.id)[:8].upper()
-        pdf.cell(pw * 0.5, 9, f"Invoice #: {inv_number}", align="R")
-        pdf.ln(6)
-        try:
-            inv_date_str = billing.created_at.strftime('%d-%m-%Y')
-        except Exception:
-            inv_date_str = datetime.now(timezone.utc).strftime('%d-%m-%Y')
-        pdf.set_font("Helvetica", "", 8)
-        pdf.set_text_color(*muted)
-        pdf.cell(pw * 0.5, 5, "")
-        pdf.cell(pw * 0.5, 5, f"Date: {inv_date_str}", align="R")
-        pdf.ln(8)
-
-        # ---- PATIENT DETAILS ----
-        section_header("PATIENT DETAILS")
-        y0 = pdf.get_y()
-        if patient:
-            keyval("Patient ID", patient.id[:8])
-            keyval("Name", patient.full_name)
-            keyval("Phone", patient.phone, bold_label=False)
-            keyval("Email", patient.email, bold_label=False)
-        else:
-            keyval("Patient ID", "-")
-            keyval("Name", "-")
-        y1 = pdf.get_y()
-        pdf.set_xy(ml + 95, y0)
-        if patient:
-            keyval("Gender", patient.gender or "-")
-            keyval("Age", str(patient.age) if patient.age else "-")
-            keyval("Address", (patient.address or "-")[:80], bold_label=False)
-        else:
-            keyval("Gender", "-")
-            keyval("Age", "-")
-        pdf.set_y(max(y1, pdf.get_y()) + 2)
-        if doctor:
-            keyval("Doctor", doctor.full_name)
-        if case:
-            keyval("Case No", str(case.id)[:8])
-        if treatments:
-            keyval("Treatment", (treatments[0].treatment_name or "-")[:60])
-        pdf.ln(3)
-
-        # ---- TREATMENT DETAILS ----
-        if treatments:
-            section_header("TREATMENT DETAILS")
-            y0 = pdf.get_y()
-            tp = treatments[0]
-            keyval("Name", tp.treatment_name)
-            keyval("Total Sittings", str(tp.total_sittings))
-            keyval("Completed", str(tp.completed_sittings))
-            y1 = pdf.get_y()
-            pdf.set_xy(ml + 95, y0)
-            keyval("Remaining", str(tp.remaining_sittings))
-            status_val = str(tp.status.value if hasattr(tp.status, 'value') else (tp.status or "-"))
-            keyval("Status", status_val)
-            keyval("Start Date", tp.start_date.strftime('%d-%m-%Y') if tp.start_date else "-")
-            pdf.set_y(max(y1, pdf.get_y()) + 3)
-
-        # ---- BILLING DETAILS TABLE ----
-        section_header("BILLING DETAILS")
-
-        def table_header():
-            pdf.set_font("Helvetica", "B", 9)
-            pdf.set_fill_color(230, 240, 250)
+        def info_row(label, value, w1=35, w2=55):
+            if value is None or value == "":
+                return
+            pdf.set_font("Helvetica", "", 9)
+            pdf.set_text_color(*muted)
+            pdf.cell(w1, 5.5, label)
+            pdf.set_font("Helvetica", "", 9)
             pdf.set_text_color(*dark)
-            pdf.cell(100, 8, "  Description", border=1, fill=True, align="L")
-            pdf.cell(30, 8, "Amount (Rs.)", border=1, fill=True, align="C")
+            pdf.cell(w2, 5.5, str(value))
+            pdf.ln(5.5)
+
+        def table_header(cols, widths):
+            pdf.set_font("Helvetica", "B", 9)
+            pdf.set_fill_color(235, 240, 250)
+            pdf.set_text_color(*dark)
+            for i, (col, w) in enumerate(zip(cols, widths)):
+                align = "L" if i == 0 else "R"
+                pdf.cell(w, 8, f"  {col}" if i == 0 else f"{col}  ", border=1, fill=True, align=align)
             pdf.ln()
 
-        def table_row(label, amount, color=None, bold=False):
+        def table_row(cols, widths, bold=False, color=None):
             pdf.set_font("Helvetica", "B" if bold else "", 9)
             if color:
                 pdf.set_text_color(*color)
             else:
                 pdf.set_text_color(*dark)
-            pdf.cell(100, 7, f"  {label}", border=1, align="L")
-            pdf.cell(30, 7, f"{amount:>9,.2f}" if amount != 0 else "     0.00", border=1, align="R")
+            for i, (col, w) in enumerate(zip(cols, widths)):
+                align = "L" if i == 0 else "R"
+                txt = f"  {col}" if i == 0 else f"{col}  "
+                pdf.cell(w, 7, txt, border=1, align=align)
             pdf.ln()
 
-        table_header()
+        # =============================================
+        # HEADER: Logo left, Hospital name/address right
+        # =============================================
+        logo_h = 0
+        logo_y_start = pdf.get_y()
+        if hospital and hospital.logo_url:
+            lpath = hospital.logo_url
+            if os.path.exists(lpath):
+                try:
+                    pdf.image(lpath, x=ml, y=logo_y_start, w=28)
+                    logo_h = 18
+                except Exception:
+                    pass
+
+        rh_y = logo_y_start + 2
+        rh_x = ml + 95
+        if hospital:
+            pdf.set_xy(rh_x, rh_y)
+            pdf.set_font("Helvetica", "B", 15)
+            pdf.set_text_color(*primary)
+            pdf.cell(pw - 95, 7, hospital.name or "Hospital", align="R")
+            pdf.set_xy(rh_x, pdf.get_y() + 6)
+            pdf.set_font("Helvetica", "", 8)
+            pdf.set_text_color(*muted)
+            addr = hospital.address or ""
+            pdf.multi_cell(pw - 95, 4, addr, align="R")
+            contact_parts = []
+            if hospital.phone:
+                contact_parts.append(f"Tel: {hospital.phone}")
+            if hospital.email:
+                contact_parts.append(hospital.email)
+            if contact_parts:
+                pdf.set_x(rh_x)
+                pdf.set_font("Helvetica", "", 7.5)
+                pdf.multi_cell(pw - 95, 4, " | ".join(contact_parts), align="R")
+            reg_lines = []
+            if hospital.registration_number:
+                reg_lines.append(f"Reg: {hospital.registration_number}")
+            if hospital.gst_number:
+                reg_lines.append(f"GST: {hospital.gst_number}")
+            if reg_lines:
+                pdf.set_x(rh_x)
+                pdf.set_font("Helvetica", "", 7)
+                pdf.multi_cell(pw - 95, 3.5, " | ".join(reg_lines), align="R")
+        else:
+            pdf.set_xy(rh_x, rh_y)
+            pdf.set_font("Helvetica", "B", 15)
+            pdf.set_text_color(*primary)
+            pdf.cell(pw - 95, 7, "Hospital", align="R")
+
+        header_bottom = max(pdf.get_y(), logo_y_start + max(logo_h, 22)) + 4
+
+        # ---- Accent divider ----
+        pdf.set_y(header_bottom)
+        pdf.set_draw_color(*accent)
+        pdf.set_line_width(0.6)
+        pdf.line(ml, pdf.get_y(), ml + pw, pdf.get_y())
+        pdf.ln(6)
+
+        # =============================================
+        # INVOICE TITLE
+        # =============================================
+        pdf.set_font("Helvetica", "B", 16)
+        pdf.set_text_color(*primary)
+        pdf.cell(pw * 0.5, 8, "TAX INVOICE")
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_text_color(*dark)
+        inv_no = billing.invoice_number or str(billing.id)[:8].upper()
+        pdf.cell(pw * 0.5, 8, f"Invoice #: {inv_no}", align="R")
+        pdf.ln(6)
+        inv_date_str = billing.created_at.strftime('%d-%m-%Y') if billing.created_at else datetime.now(timezone.utc).strftime('%d-%m-%Y')
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(*muted)
+        pdf.cell(pw * 0.5, 5, "")
+        pdf.cell(pw * 0.5, 5, f"Date: {inv_date_str}", align="R")
+        pdf.ln(9)
+
+        # =============================================
+        # PATIENT DETAILS CARD
+        # =============================================
+        section_bar("PATIENT & CASE DETAILS")
+        box_y0 = pdf.get_y()
+        pdf.set_fill_color(*light_gray)
+        pdf.set_draw_color(*border_gray)
+        pdf.rect(ml, box_y0, pw, 32, style="D")
+
+        def card_field(label, value, x, y, w1=22, w2=60):
+            if value is None or value == "":
+                return
+            pdf.set_xy(x, y)
+            pdf.set_font("Helvetica", "", 8.5)
+            pdf.set_text_color(*muted)
+            pdf.cell(w1, 5.5, label)
+            pdf.set_font("Helvetica", "", 8.5)
+            pdf.set_text_color(*dark)
+            pdf.cell(w2, 5.5, str(value))
+
+        row1 = box_y0 + 2.5
+        row2 = row1 + 6.5
+        row3 = row2 + 6.5
+        col1_x = ml + 4
+        col2_x = ml + 95
+        w1 = 22
+        w2 = 65
+
+        if patient:
+            card_field("Name:", patient.full_name, col1_x, row1, w1, w2)
+            card_field("Age:", str(patient.age) if patient.age else "-", col2_x, row1, w1, w2 - 10)
+            card_field("Phone:", patient.phone or "-", col1_x, row2, w1, w2)
+            card_field("Gender:", patient.gender or "-", col2_x, row2, w1, w2 - 10)
+            if doctor:
+                card_field("Doctor:", doctor.full_name, col1_x, row3, w1, w2)
+            if case:
+                card_field("Case No:", str(case.id)[:8], col2_x, row3, w1, w2 - 10)
+        else:
+            card_field("Patient:", "-", col1_x, row1, w1, w2)
+        pdf.set_y(max(pdf.get_y(), box_y0 + 32) + 3)
+
+        # =============================================
+        # TREATMENT DETAILS (if any)
+        # =============================================
+        if treatments:
+            section_bar("TREATMENT DETAILS")
+            tp = treatments[0]
+            box_t0 = pdf.get_y()
+            pdf.set_fill_color(*light_gray)
+            pdf.set_draw_color(*border_gray)
+            pdf.rect(ml, box_t0, pw, 20, style="D")
+            tr1 = box_t0 + 2.5
+            tr2 = tr1 + 6.5
+            card_field("Treatment:", tp.treatment_name or "-", col1_x, tr1, 22, 60)
+            card_field("Status:", str(tp.status.value if hasattr(tp.status, 'value') else (tp.status or "-")), col2_x, tr1, 22, 50)
+            card_field("Sittings:", f"{tp.completed_sittings}/{tp.total_sittings}", col1_x, tr2, 22, 60)
+            card_field("Remaining:", str(tp.remaining_sittings), col2_x, tr2, 22, 50)
+            pdf.set_y(max(pdf.get_y(), box_t0 + 20) + 3)
+
+        # =============================================
+        # BILLING TABLE
+        # =============================================
+        section_bar("BILLING DETAILS")
+
+        col_w = [pw - 55, 55]
+        table_header(["Description", "Amount (Rs.)"], col_w)
 
         orig_amt = float(billing.original_amount or 0)
-        if orig_amt > 0 and orig_amt != float(billing.total_amount or 0):
-            table_row("Original Amount", orig_amt)
-
+        total_amt = float(billing.total_amount or 0)
         discount_amt = float(billing.discount_amount or 0)
+        paid_amt = float(billing.paid_amount or 0)
+        pending_amt = float(billing.pending_amount or 0)
+
+        if orig_amt > 0 and orig_amt != total_amt:
+            table_row(["Original Amount", f"{orig_amt:>10,.2f}"], col_w)
+
         if discount_amt > 0:
             dt_label = "Percentage" if billing.discount_type == "PERCENTAGE" else "Fixed"
             dv = float(billing.discount_percent or 0)
             label = f"Discount ({dt_label}: {dv:.0f}%)" if billing.discount_type == "PERCENTAGE" else f"Discount ({dt_label})"
-            table_row(label, -discount_amt, color=(40, 140, 40))
+            table_row([label, f"- {discount_amt:>8,.2f}"], col_w, color=green_c)
 
-        table_row("Final Amount", float(billing.total_amount or 0), bold=True, color=(0, 100, 180))
-        table_row("Paid Amount", float(billing.paid_amount or 0))
-
-        pending = float(billing.pending_amount or 0)
-        table_row("Balance Amount", pending, color=(200, 50, 50) if pending > 0 else (40, 40, 40))
+        table_row(["Final Amount", f"{total_amt:>10,.2f}"], col_w, bold=True, color=blue_c)
+        table_row(["Paid Amount", f"{paid_amt:>10,.2f}"], col_w)
+        pending_color = red_c if pending_amt > 0 else dark
+        table_row(["Balance Amount", f"{pending_amt:>10,.2f}"], col_w, color=pending_color, bold=(pending_amt > 0))
 
         pdf.ln(3)
 
-        # ---- PAYMENT INFO ----
+        # =============================================
+        # FINANCIAL SUMMARY CARD (right-aligned)
+        # =============================================
+        sum_x = ml + pw - 70
+        sum_w = 70
+        sum_y0 = pdf.get_y()
+        pdf.set_fill_color(240, 245, 255)
+        pdf.set_draw_color(*border_gray)
+        pdf.rect(sum_x, sum_y0, sum_w, 30, style="DF")
+
+        row_h = 5.5
+        cy = sum_y0 + 2
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.set_text_color(*primary)
+        pdf.set_xy(sum_x + 3, cy)
+        pdf.cell(sum_w - 6, 6, "FINANCIAL SUMMARY")
+        cy += 7
+
+        def sum_row(label, value, col, bold=False):
+            nonlocal cy
+            pdf.set_font("Helvetica", "B" if bold else "", 8)
+            pdf.set_text_color(*col)
+            pdf.set_xy(sum_x + 3, cy)
+            pdf.cell(sum_w * 0.45, row_h, label)
+            pdf.cell(sum_w * 0.45, row_h, value, align="R")
+            cy += row_h
+
+        sum_row("Total:", f"Rs. {total_amt:,.2f}", primary, bold=True)
+        sum_row("Paid:", f"Rs. {paid_amt:,.2f}", green_c)
+        if discount_amt > 0:
+            sum_row("Discount:", f"- Rs. {discount_amt:,.2f}", green_c)
+        bal_label = "Balance:" if pending_amt > 0 else "Cleared:"
+        bal_color = red_c if pending_amt > 0 else green_c
+        sum_row(bal_label, f"Rs. {pending_amt:,.2f}", bal_color, bold=True)
+
+        pdf.set_y(max(pdf.get_y(), sum_y0 + 30) + 3)
+
+        # =============================================
+        # PAYMENT INFO
+        # =============================================
+        ps = str(billing.payment_status) if billing.payment_status else "DRAFT"
+        pm = billing.payment_method or "-"
         pdf.set_font("Helvetica", "", 8)
         pdf.set_text_color(*muted)
-        ps = str(billing.payment_status) if billing.payment_status else "DRAFT"
-        pdf.cell(0, 5, f"Payment Status: {ps}   |   Method: {billing.payment_method or '-'}")
-        pdf.ln(6)
+        pdf.cell(0, 5, f"Payment Status: {ps}    |    Method: {pm}")
+        pdf.ln(5)
+        if billing.payment_method:
+            pdf.cell(0, 5, f"Payment Method: {billing.payment_method}")
+            pdf.ln(5)
         if billing.notes:
             pdf.set_font("Helvetica", "I", 8)
             pdf.set_text_color(*muted)
             pdf.multi_cell(pw, 4, f"Notes: {billing.notes}")
-            pdf.ln(2)
+            pdf.ln(1)
+        pdf.ln(3)
 
-        pdf.set_text_color(*dark)
-        pdf.ln(2)
-
-        # ---- FOOTER DIVIDER ----
+        # =============================================
+        # FOOTER
+        # =============================================
         pdf.set_draw_color(*accent)
         pdf.set_line_width(0.4)
         pdf.line(ml, pdf.get_y(), ml + pw, pdf.get_y())
-        pdf.ln(4)
-
+        pdf.ln(5)
         h_name = hospital.name if hospital else "Hospital"
         today_str = datetime.now(timezone.utc).strftime('%d-%m-%Y')
         pdf.set_font("Helvetica", "", 7)
@@ -275,13 +376,13 @@ class BillingService:
         pdf.cell(0, 4, f"Generated on {today_str} by {h_name}", align="C")
         pdf.ln(4)
         if hospital and (hospital.phone or hospital.email):
-            contact = ""
+            cp = ""
             if hospital.phone:
-                contact += f"Phone: {hospital.phone}"
+                cp += f"Tel: {hospital.phone}"
             if hospital.email:
-                contact += f"  |  Email: {hospital.email}" if contact else f"Email: {hospital.email}"
-            pdf.cell(0, 4, contact, align="C")
-        pdf.ln(4)
+                cp += f"  |  Email: {hospital.email}"
+            pdf.cell(0, 4, cp, align="C")
+            pdf.ln(4)
         pdf.cell(0, 4, "This is a computer-generated invoice and does not require a physical signature.", align="C")
 
         pdf.output(pdf_path)
@@ -336,6 +437,8 @@ class BillingService:
 
             billing = await self.repo.create(**data)
             await self.audit_log_repo.create(user_id=user_id, action="CREATE_BILLING", entity_type="BILLING", entity_id=str(billing.id), details="Billing created")
+            new_vals = {k: getattr(billing, k) for k in ("total_amount", "paid_amount", "pending_amount", "discount_amount", "discount_percent", "payment_status") if hasattr(billing, k)}
+            await self._record_history(billing.id, "CREATE_BILLING", new_data=new_vals, changes_summary=f"Billing created for Rs. {total_after_discount:.2f}", user_id=user_id)
             await self._sync_treatment_plan_paid_amounts(billing.case_id)
 
             # Auto-generate PDF
@@ -386,6 +489,9 @@ class BillingService:
             if not billing:
                 return None
             was_paid_before = billing.payment_status == PaymentStatus.PAID
+            prev_paid = billing.paid_amount
+            prev_pending = billing.pending_amount
+            prev_status = billing.payment_status.value if billing.payment_status else None
             billing.paid_amount += paid_amount
             billing.pending_amount = billing.total_amount - billing.paid_amount
             if billing.pending_amount <= 0:
@@ -409,6 +515,13 @@ class BillingService:
             await self.db.flush()
             await self.db.refresh(billing)
             await self.audit_log_repo.create(user_id=user_id, action="UPDATE_BILLING_PAYMENT", entity_type="BILLING", entity_id=billing_id, details=f"Payment of {paid_amount} received")
+            prev_data = {"paid_amount": prev_paid, "pending_amount": prev_pending, "payment_status": prev_status}
+            new_vals = {"paid_amount": billing.paid_amount, "pending_amount": billing.pending_amount, "payment_status": billing.payment_status.value if billing.payment_status else None}
+            status_changed = prev_status != (billing.payment_status.value if billing.payment_status else None)
+            summary = f"Payment of Rs. {paid_amount:.2f} received"
+            if status_changed:
+                summary += f" | Status: {prev_status} → {billing.payment_status.value}"
+            await self._record_history(billing_id, "PAYMENT_UPDATE", previous_data=prev_data, new_data=new_vals, changes_summary=summary, user_id=user_id)
             if billing.payment_status == PaymentStatus.PAID and not was_paid_before:
                 case_result = await self.db.execute(select(Case).where(Case.id == billing.case_id))
                 case = case_result.scalar_one_or_none()
@@ -432,6 +545,7 @@ class BillingService:
         if not billing:
             return None
         original_amount = billing.original_amount or billing.total_amount
+        prev_data = {"discount_type": billing.discount_type, "discount_percent": billing.discount_percent, "discount_amount": billing.discount_amount, "total_amount": billing.total_amount}
         if discount_type == DiscountType.FIXED_AMOUNT.value:
             if discount_amount >= original_amount:
                 raise HTTPException(status_code=400, detail="Discount amount cannot exceed original amount")
@@ -454,6 +568,8 @@ class BillingService:
         await self.db.flush()
         await self.db.refresh(billing)
         await self._attach_names(billing)
+        new_vals = {"discount_type": billing.discount_type, "discount_percent": billing.discount_percent, "discount_amount": billing.discount_amount, "total_amount": billing.total_amount}
+        await self._record_history(billing.id, "DISCOUNT_APPLIED", previous_data=prev_data, new_data=new_vals, changes_summary=f"Discount applied: {calc_discount_percent}% / Rs.{calc_discount_amount:.2f}", user_id=None)
         await self._sync_treatment_plan_paid_amounts(billing.case_id)
         return billing
 
@@ -527,6 +643,7 @@ class BillingService:
             result = await self.repo.delete(billing_id)
             if result:
                 await self.audit_log_repo.create(user_id=user_id, action="DELETE_BILLING", entity_type="BILLING", entity_id=billing_id, details="Billing deleted")
+                await self._record_history(billing_id, "DELETE_BILLING", changes_summary="Billing deleted", user_id=user_id)
             return result
         except Exception as e:
             logger.exception("DELETE_BILLING - Error: %s", str(e))

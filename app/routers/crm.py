@@ -1,3 +1,5 @@
+import traceback
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from pydantic import BaseModel, Field
 from typing import Optional, List
@@ -5,7 +7,20 @@ from datetime import datetime, timezone, date, time, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 from app.database import get_db
+
+logger = logging.getLogger("crm-router")
+logging.basicConfig(level=logging.DEBUG)
 from app.dependencies import get_current_user
+
+
+def _verify_hospital_access(entity, current_user):
+    """Raise 403 if the entity's hospital_id doesn't match the user's hospital_id (HOSPITAL_ADMIN/DOCTOR)."""
+    role = current_user.get("role")
+    if role in ("HOSPITAL_ADMIN", "DOCTOR"):
+        entity_hid = getattr(entity, "hospital_id", None)
+        user_hid = current_user.get("hospital_id")
+        if entity_hid and user_hid and str(entity_hid) != str(user_hid):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: entity belongs to another hospital")
 from app.core.permissions import Role, Permission, verify_permission
 from app.models.communication_log import CommunicationLog, CommunicationChannel, CommunicationStatus, MessageType
 from app.models.notification import Notification
@@ -96,8 +111,7 @@ class DeliveryCallbackRequest(BaseModel):
 async def _get_patients_for_broadcast(
     db: AsyncSession,
     hospital_id: Optional[str],
-    req: BroadcastRequest,
-) -> tuple[list[Patient], list[str]]:
+    req: BroadcastRequest) -> tuple[list[Patient], list[str]]:
     """Resolve patient list based on broadcast filters. Returns (patients, errors)."""
     query = select(Patient).where(Patient.is_active == True)
     if hospital_id:
@@ -127,8 +141,7 @@ async def _build_message_variables(
     db: AsyncSession,
     patient: Patient,
     hospital_name: Optional[str],
-    appointment_date_str: Optional[str] = None,
-) -> dict:
+    appointment_date_str: Optional[str] = None) -> dict:
     """Build template variables for a given patient."""
     doctor_name = None
     if patient.doctor_id:
@@ -139,8 +152,7 @@ async def _build_message_variables(
         patient_name=patient.full_name,
         doctor_name=doctor_name,
         hospital_name=hospital_name,
-        appointment_date=appointment_date_str,
-    )
+        appointment_date=appointment_date_str)
 
 
 async def _log_communication(
@@ -153,8 +165,7 @@ async def _log_communication(
     message: str,
     status: str,
     subject: Optional[str] = None,
-    attachment_url: Optional[str] = None,
-) -> CommunicationLog:
+    attachment_url: Optional[str] = None) -> CommunicationLog:
     log = CommunicationLog(
         patient_id=patient_id,
         hospital_id=hospital_id,
@@ -165,8 +176,7 @@ async def _log_communication(
         message=message,
         status=status,
         sent_at=datetime.now(timezone.utc) if status != CommunicationStatus.FAILED.value else None,
-        attachment_url=attachment_url,
-    )
+        attachment_url=attachment_url)
     db.add(log)
     return log
 
@@ -177,8 +187,7 @@ async def _log_communication(
 async def send_whatsapp(
     req: SendWhatsAppRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_PATIENTS)
     phone = None
     recipient_name = ""
@@ -195,8 +204,7 @@ async def send_whatsapp(
         hospital_name = hospital_obj.name if hospital_obj else None
         variables = TemplateEngine.build_variables(
             lead_name=lead.lead_name,
-            hospital_name=hospital_name,
-        )
+            hospital_name=hospital_name)
         rendered = TemplateEngine.render_template(req.message, variables)
         provider = WhatsAppProvider()
         success = await provider.send_message(phone, rendered)
@@ -204,8 +212,7 @@ async def send_whatsapp(
             lead_id=lead.id, hospital_id=hospital_id, sent_by=current_user.get("sub"),
             channel="WHATSAPP", message_type=req.message_type, message=rendered,
             status="SENT" if success else "FAILED",
-            sent_at=datetime.now(timezone.utc) if success else None,
-        )
+            sent_at=datetime.now(timezone.utc) if success else None)
         db.add(comm)
         await db.commit()
         if not success:
@@ -229,16 +236,14 @@ async def send_whatsapp(
     variables = TemplateEngine.build_variables(
         patient_name=patient.full_name,
         doctor_name=doctor_name,
-        hospital_name=hospital_name,
-    )
+        hospital_name=hospital_name)
     rendered = TemplateEngine.render_template(req.message, variables)
     provider = WhatsAppProvider()
     success = await provider.send_message(phone, rendered)
     status_val = CommunicationStatus.SENT.value if success else CommunicationStatus.FAILED.value
     log = await _log_communication(
         db, req.patient_id, hospital_id, current_user.get("sub"),
-        CommunicationChannel.WHATSAPP.value, req.message_type, rendered, status_val,
-    )
+        CommunicationChannel.WHATSAPP.value, req.message_type, rendered, status_val)
     await db.commit()
     if not success:
         raise HTTPException(status_code=500, detail="Failed to send WhatsApp message")
@@ -249,8 +254,7 @@ async def send_whatsapp(
 async def preview_broadcast(
     req: BroadcastRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_PATIENTS)
     hospital_id = current_user.get("hospital_id")
     patients, errors = await _get_patients_for_broadcast(db, hospital_id, req)
@@ -275,8 +279,7 @@ async def preview_broadcast(
 async def broadcast_whatsapp(
     req: BroadcastRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_PATIENTS)
     hospital_id = current_user.get("hospital_id")
     hospital_name = None
@@ -298,8 +301,7 @@ async def broadcast_whatsapp(
         status_val = CommunicationStatus.SENT.value if success else CommunicationStatus.FAILED.value
         await _log_communication(
             db, patient.id, hospital_id, current_user.get("sub"),
-            CommunicationChannel.WHATSAPP.value, req.message_type, rendered, status_val,
-        )
+            CommunicationChannel.WHATSAPP.value, req.message_type, rendered, status_val)
         if success:
             sent += 1
         else:
@@ -315,16 +317,14 @@ async def broadcast_whatsapp(
                 continue
             variables = TemplateEngine.build_variables(
                 lead_name=lead.lead_name,
-                hospital_name=hospital_name or "",
-            )
+                hospital_name=hospital_name or "")
             rendered = TemplateEngine.render_template(req.message, variables)
             success = await provider.send_message(lead.mobile, rendered)
             comm = LeadCommunication(
                 lead_id=lead.id, hospital_id=hospital_id, sent_by=current_user.get("sub"),
                 channel="WHATSAPP", message_type=req.message_type, message=rendered,
                 status="SENT" if success else "FAILED",
-                sent_at=datetime.now(timezone.utc) if success else None,
-            )
+                sent_at=datetime.now(timezone.utc) if success else None)
             db.add(comm)
             if success:
                 sent += 1
@@ -346,8 +346,7 @@ async def broadcast_whatsapp(
 async def delivery_callback(
     req: DeliveryCallbackRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
     log = await db.get(CommunicationLog, req.log_id)
     if not log:
         raise HTTPException(status_code=404, detail="Communication log not found")
@@ -364,8 +363,7 @@ async def delivery_callback(
 async def send_email(
     req: SendEmailRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_PATIENTS)
     patient = await db.get(Patient, req.patient_id)
     if not patient:
@@ -380,8 +378,7 @@ async def send_email(
     variables = TemplateEngine.build_variables(
         patient_name=patient.full_name,
         doctor_name=doctor_name,
-        hospital_name=hospital_name,
-    )
+        hospital_name=hospital_name)
     rendered_subject = TemplateEngine.render_template(req.subject, variables)
     rendered_body = TemplateEngine.render_template(req.body, variables)
     attachment_url = None
@@ -391,8 +388,7 @@ async def send_email(
         db, req.patient_id, hospital_id, current_user.get("sub"),
         CommunicationChannel.EMAIL.value, req.message_type, rendered_body,
         CommunicationStatus.SENT.value, subject=rendered_subject,
-        attachment_url=attachment_url,
-    )
+        attachment_url=attachment_url)
     await db.commit()
     return {"success": True, "log_id": log.id}
 
@@ -406,8 +402,7 @@ async def list_communications(
     limit: int = Query(50, le=200),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
     query = select(CommunicationLog)
     hospital_id = current_user.get("hospital_id")
     if hospital_id:
@@ -437,8 +432,11 @@ async def list_communications(
 async def get_patient_communications(
     patient_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
+    pat = await db.get(Patient, patient_id)
+    if not pat:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    _verify_hospital_access(pat, current_user)
     query = select(CommunicationLog).where(CommunicationLog.patient_id == patient_id)
     query = query.order_by(desc(CommunicationLog.created_at)).limit(50)
     result = await db.execute(query)
@@ -457,8 +455,7 @@ async def get_patient_communications(
 @router.get("/templates")
 async def list_templates(
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
     result = await db.execute(select(EmailTemplate).where(EmailTemplate.is_active == True))
     templates = result.scalars().all()
     return [{"id": str(t.id), "name": t.name, "subject": t.subject, "body": t.body, "is_active": t.is_active} for t in templates]
@@ -468,8 +465,7 @@ async def list_templates(
 async def create_template(
     req: TemplateCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_PATIENTS)
     t = EmailTemplate(name=req.name, subject=req.subject, body=req.body)
     db.add(t)
@@ -492,8 +488,7 @@ async def delete_template(template_id: str, db: AsyncSession = Depends(get_db), 
 async def update_template(
     template_id: str, req: TemplateUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_PATIENTS)
     t = await db.get(EmailTemplate, template_id)
     if not t: raise HTTPException(status_code=404, detail="Template not found")
@@ -511,16 +506,14 @@ async def update_template(
 async def submit_feedback(
     req: FeedbackCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
     patient = await db.get(Patient, req.patient_id)
     if not patient: raise HTTPException(status_code=404, detail="Patient not found")
     hospital_id = current_user.get("hospital_id") or patient.hospital_id
     fb = PatientFeedback(
         patient_id=req.patient_id, hospital_id=hospital_id,
         doctor_id=req.doctor_id, case_id=req.case_id,
-        rating=req.rating, review=req.review, comments=req.comments,
-    )
+        rating=req.rating, review=req.review, comments=req.comments)
     db.add(fb)
     await db.commit()
     return {"success": True, "id": str(fb.id)}
@@ -531,10 +524,13 @@ async def list_feedback(
     hospital_id: Optional[str] = Query(None),
     doctor_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
     query = select(PatientFeedback)
-    if hospital_id: query = query.where(PatientFeedback.hospital_id == hospital_id)
+    role = current_user.get("role")
+    if role in ("HOSPITAL_ADMIN", "DOCTOR"):
+        query = query.where(PatientFeedback.hospital_id == current_user.get("hospital_id"))
+    elif hospital_id:
+        query = query.where(PatientFeedback.hospital_id == hospital_id)
     if doctor_id: query = query.where(PatientFeedback.doctor_id == doctor_id)
     query = query.order_by(desc(PatientFeedback.created_at)).limit(50)
     result = await db.execute(query)
@@ -553,10 +549,14 @@ async def list_feedback(
 async def create_follow_up(
     req: FollowUpCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_PATIENTS)
     hospital_id = current_user.get("hospital_id")
+    # Verify patient belongs to user's hospital
+    pat_check = await db.get(Patient, req.patient_id)
+    if not pat_check:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    _verify_hospital_access(pat_check, current_user)
     follow_up_date = date.fromisoformat(req.follow_up_date)
     follow_up_time = time.fromisoformat(req.follow_up_time) if req.follow_up_time else time(9, 0)
     doctor_id = req.doctor_id or current_user.get("sub")
@@ -566,8 +566,7 @@ async def create_follow_up(
         patient_id=req.patient_id, hospital_id=hospital_id,
         doctor_id=doctor_id, case_id=req.case_id,
         follow_up_date=follow_up_date, follow_up_time=follow_up_time,
-        notes=req.notes, status=FollowUpStatus.SCHEDULED.value,
-    )
+        notes=req.notes, status=FollowUpStatus.SCHEDULED.value)
     db.add(fu)
     await db.flush()
 
@@ -577,8 +576,7 @@ async def create_follow_up(
         appointment_date=follow_up_date, appointment_time=follow_up_time,
         status=AppointmentStatus.SCHEDULED,
         appointment_type=AppointmentType.FOLLOW_UP,
-        notes=req.notes,
-    )
+        notes=req.notes)
     db.add(appt)
     await db.flush()
 
@@ -594,23 +592,20 @@ async def create_follow_up(
         doctor_name=doc.full_name if doc else "Doctor",
         hospital_name=hospital_obj.name if hospital_obj else "Hospital",
         appointment_date=follow_up_date.isoformat(),
-        appointment_time=str(follow_up_time),
-    )
+        appointment_time=str(follow_up_time))
 
     # 4. Send WhatsApp to patient (if phone available)
     if patient and patient.phone:
         whatsapp_message = TemplateEngine.render_template(
             "Dear {{patient_name}}, your follow-up appointment has been scheduled for {{appointment_date}} at {{appointment_time}} with Dr. {{doctor_name}} at {{hospital_name}}. Please arrive on time.",
-            variables,
-        )
+            variables)
         provider = WhatsAppProvider()
         whatsapp_success = await provider.send_message(patient.phone, whatsapp_message)
         if whatsapp_success:
             await _log_communication(
                 db, req.patient_id, hospital_id, doctor_id,
                 CommunicationChannel.WHATSAPP.value, "FOLLOW_UP_REMINDER",
-                whatsapp_message, CommunicationStatus.SENT.value,
-            )
+                whatsapp_message, CommunicationStatus.SENT.value)
 
     # 5. Send email to patient (if email available)
     if patient and patient.email:
@@ -621,13 +616,11 @@ async def create_follow_up(
             "Date: {{appointment_date}}<br>Time: {{appointment_time}}<br>"
             "Doctor: Dr. {{doctor_name}}<br>Location: {{hospital_name}}<br><br>"
             "Please arrive 15 minutes early.<br><br>Thank you,<br>{{hospital_name}}",
-            variables,
-        )
+            variables)
         await _log_communication(
             db, req.patient_id, hospital_id, doctor_id,
             CommunicationChannel.EMAIL.value, "FOLLOW_UP_REMINDER",
-            body, CommunicationStatus.SENT.value, subject=subject,
-        )
+            body, CommunicationStatus.SENT.value, subject=subject)
 
     # 6. Send in-app notification to the doctor
     notif = Notification(
@@ -636,10 +629,8 @@ async def create_follow_up(
         title="New Follow-Up Assigned",
         description=TemplateEngine.render_template(
             "Follow-up scheduled for {{patient_name}} on {{appointment_date}} at {{appointment_time}}.",
-            variables,
-        ),
-        entity_type="follow_up", entity_id=fu.id,
-    )
+            variables),
+        entity_type="follow_up", entity_id=fu.id)
     db.add(notif)
 
     await db.commit()
@@ -655,8 +646,7 @@ async def list_follow_ups(
     patient_id: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
     query = select(FollowUp)
     hospital_id = current_user.get("hospital_id")
     if hospital_id: query = query.where(FollowUp.hospital_id == hospital_id)
@@ -684,6 +674,7 @@ async def delete_follow_up(follow_up_id: str, db: AsyncSession = Depends(get_db)
     fu = await db.get(FollowUp, follow_up_id)
     if not fu:
         raise HTTPException(status_code=404, detail="Follow-up not found")
+    _verify_hospital_access(fu, current_user)
     await db.delete(fu)
     await db.commit()
     return {"success": True}
@@ -693,10 +684,10 @@ async def delete_follow_up(follow_up_id: str, db: AsyncSession = Depends(get_db)
 async def update_follow_up(
     follow_up_id: str, req: FollowUpUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
     fu = await db.get(FollowUp, follow_up_id)
     if not fu: raise HTTPException(status_code=404, detail="Follow-up not found")
+    _verify_hospital_access(fu, current_user)
     if req.status is not None: fu.status = req.status
     if req.notes is not None: fu.notes = req.notes
     # Sync linked appointment status
@@ -733,19 +724,18 @@ async def record_follow_up_response(
     follow_up_id: str,
     req: FollowUpResponseCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_PATIENTS)
     fu = await db.get(FollowUp, follow_up_id)
     if not fu:
         raise HTTPException(status_code=404, detail="Follow-up not found")
+    _verify_hospital_access(fu, current_user)
     fr = FollowUpResponse(
         follow_up_id=follow_up_id,
         patient_id=req.patient_id,
         hospital_id=fu.hospital_id,
         response_message=req.response_message,
-        response_status=req.response_status,
-    )
+        response_status=req.response_status)
     db.add(fr)
     fu.status = FollowUpStatus.COMPLETED.value
     await db.commit()
@@ -756,8 +746,11 @@ async def record_follow_up_response(
 async def get_patient_follow_up_responses(
     patient_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
+    pat = await db.get(Patient, patient_id)
+    if not pat:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    _verify_hospital_access(pat, current_user)
     q = select(FollowUpResponse).where(FollowUpResponse.patient_id == patient_id).order_by(desc(FollowUpResponse.created_at)).limit(30)
     result = await db.execute(q)
     items = result.scalars().all()
@@ -793,8 +786,7 @@ async def get_patient_follow_up_responses(
 @router.get("/segments")
 async def get_patient_segments(
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.VIEW_ALL_PATIENTS)
     hospital_id = current_user.get("hospital_id")
     base = select(Patient)
@@ -826,8 +818,7 @@ async def _get_top_communication_days(db: AsyncSession, hospital_id: Optional[st
     since = datetime.now(timezone.utc) - timedelta(days=days)
     q = select(
         func.date(CommunicationLog.created_at).label("day"),
-        func.count(CommunicationLog.id).label("count"),
-    ).where(CommunicationLog.created_at >= since)
+        func.count(CommunicationLog.id).label("count")).where(CommunicationLog.created_at >= since)
     if hospital_id: q = q.where(CommunicationLog.hospital_id == hospital_id)
     q = q.group_by(func.date(CommunicationLog.created_at)).order_by(desc("count")).limit(5)
     result = await db.execute(q)
@@ -855,8 +846,8 @@ async def _get_broadcast_success_rate(db: AsyncSession, hospital_id: Optional[st
 @router.get("/analytics")
 async def get_crm_analytics(
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.VIEW_CRM_DASHBOARD)
     hospital_id = current_user.get("hospital_id")
     base = select(CommunicationLog)
     if hospital_id: base = base.where(CommunicationLog.hospital_id == hospital_id)
@@ -909,8 +900,7 @@ class WhatsAppTemplateUpdate(BaseModel):
 @router.get("/whatsapp-templates")
 async def list_whatsapp_templates(
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
     hospital_id = current_user.get("hospital_id")
     q = select(WhatsAppTemplate).where(WhatsAppTemplate.is_active == True)
     if hospital_id:
@@ -924,8 +914,7 @@ async def list_whatsapp_templates(
 async def create_whatsapp_template(
     req: WhatsAppTemplateCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_PATIENTS)
     hospital_id = current_user.get("hospital_id")
     t = WhatsAppTemplate(hospital_id=hospital_id, name=req.name, message=req.message)
@@ -938,12 +927,12 @@ async def create_whatsapp_template(
 async def update_whatsapp_template(
     template_id: str, req: WhatsAppTemplateUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_PATIENTS)
     t = await db.get(WhatsAppTemplate, template_id)
     if not t:
         raise HTTPException(status_code=404, detail="Template not found")
+    _verify_hospital_access(t, current_user)
     if req.name is not None: t.name = req.name
     if req.message is not None: t.message = req.message
     if req.is_active is not None: t.is_active = req.is_active
@@ -955,12 +944,12 @@ async def update_whatsapp_template(
 async def delete_whatsapp_template(
     template_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_PATIENTS)
     t = await db.get(WhatsAppTemplate, template_id)
     if not t:
         raise HTTPException(status_code=404, detail="Template not found")
+    _verify_hospital_access(t, current_user)
     await db.delete(t)
     await db.commit()
     return {"success": True}
@@ -980,8 +969,8 @@ async def get_comprehensive_crm_dashboard(
     lead_status: Optional[str] = Query(None, description="Filter by lead status"),
     treatment: Optional[str] = Query(None, description="Filter by treatment name"),
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.VIEW_CRM_DASHBOARD)
     hospital_id = current_user.get("hospital_id")
     today = date.today()
     now = datetime.now(timezone.utc)
@@ -1049,13 +1038,11 @@ async def get_comprehensive_crm_dashboard(
         conv_patient_ids_q = select(Lead.converted_patient_id).where(
             Lead.hospital_id == hospital_id,
             Lead.converted_patient_id.isnot(None),
-            Lead.status == LeadStatus.CONVERTED.value,
-        )
+            Lead.status == LeadStatus.CONVERTED.value)
     else:
         conv_patient_ids_q = select(Lead.converted_patient_id).where(
             Lead.converted_patient_id.isnot(None),
-            Lead.status == LeadStatus.CONVERTED.value,
-        )
+            Lead.status == LeadStatus.CONVERTED.value)
     conv_patient_ids = [row[0] for row in (await db.execute(conv_patient_ids_q)).all()]
     if conv_patient_ids:
         crm_case_ids_q = select(Case.id).where(Case.patient_id.in_(conv_patient_ids))
@@ -1079,12 +1066,10 @@ async def get_comprehensive_crm_dashboard(
         fu_base = fu_base.join(Patient, Patient.id == FollowUp.patient_id).where(FollowUp.treatment_name.ilike(f"%{treatment}%"))
     pending_follow_ups_today_q = fu_base.where(
         FollowUp.follow_up_date == today,
-        FollowUp.status.in_(["SCHEDULED", "PENDING"]),
-    )
+        FollowUp.status.in_(["SCHEDULED", "PENDING"]))
     pending_follow_ups_today = (await db.execute(select(func.count()).select_from(pending_follow_ups_today_q.subquery()))).scalar() or 0
     pending_enquiries_q = fu_base.where(
-        FollowUp.status.in_(["SCHEDULED", "PENDING", "CONTACTED", "NO_RESPONSE"]),
-    )
+        FollowUp.status.in_(["SCHEDULED", "PENDING", "CONTACTED", "NO_RESPONSE"]))
     pending_enquiries = (await db.execute(select(func.count()).select_from(pending_enquiries_q.subquery()))).scalar() or 0
 
     # =========================================================================
@@ -1096,8 +1081,7 @@ async def get_comprehensive_crm_dashboard(
         m_start = ym.replace(day=1)
         m_q = lead_base.where(
             Lead.created_at >= datetime.combine(m_start, datetime.min.time()),
-            Lead.created_at < datetime.combine((m_start + timedelta(days=32)).replace(day=1), datetime.min.time()),
-        )
+            Lead.created_at < datetime.combine((m_start + timedelta(days=32)).replace(day=1), datetime.min.time()))
         m_count = (await db.execute(select(func.count()).select_from(m_q.subquery()))).scalar() or 0
         lead_growth_trend.append({"month": m_start.strftime("%b %Y"), "count": m_count})
 
@@ -1160,7 +1144,7 @@ async def get_comprehensive_crm_dashboard(
 
     # Lead timeline (recent)
     lead_timeline = (await db.execute(
-        select(Lead).order_by(Lead.created_at.desc()).limit(20)
+        lead_base.order_by(Lead.created_at.desc()).limit(20)
     )).scalars().all()
     lead_timeline_data = [{
         "id": str(l.id), "lead_name": l.lead_name, "status": l.status,
@@ -1168,6 +1152,14 @@ async def get_comprehensive_crm_dashboard(
         "source": l.source,
     } for l in lead_timeline]
 
+    # Lead score distribution (hot/warm/cold/lost)
+    score_categories = [("Hot (81-100)", 81, 100), ("Warm (61-80)", 61, 80), ("Cold (21-60)", 21, 60), ("Lost (0-20)", 0, 20)]
+    all_leads_for_scores = (await db.execute(lead_base.add_columns(Lead.lead_score))).all()
+    score_distribution = []
+    for label, lo, hi in score_categories:
+        cnt = sum(1 for row in all_leads_for_scores if row.lead_score is not None and lo <= row.lead_score <= hi)
+        score_distribution.append({"category": label, "count": cnt})
+ 
     # =========================================================================
     # LEAD CONVERSION FUNNEL
     # =========================================================================
@@ -1239,13 +1231,13 @@ async def get_comprehensive_crm_dashboard(
     this_week_enquiries_count = (await db.execute(select(func.count()).select_from(this_week_enquiries_q.subquery()))).scalar() or 0
     overdue_enquiries_q = fu_base.where(
         FollowUp.follow_up_date < today,
-        FollowUp.status.notin_(["COMPLETED", "CANCELLED", "MISSED"]),
-    )
+        FollowUp.status.notin_(["COMPLETED", "CANCELLED", "MISSED"]))
     overdue_enquiries_count = (await db.execute(select(func.count()).select_from(overdue_enquiries_q.subquery()))).scalar() or 0
+    completed_enquiries_q = fu_base.where(FollowUp.status == "COMPLETED")
+    completed_enquiries_count = (await db.execute(select(func.count()).select_from(completed_enquiries_q.subquery()))).scalar() or 0
     six_month_recall_q = fu_base.where(
         FollowUp.follow_up_type == "6_MONTH_RECALL",
-        FollowUp.follow_up_date <= today,
-    )
+        FollowUp.follow_up_date <= today)
     six_month_recall_count = (await db.execute(select(func.count()).select_from(six_month_recall_q.subquery()))).scalar() or 0
 
     # Today's enquiries detail
@@ -1279,23 +1271,28 @@ async def get_comprehensive_crm_dashboard(
     # =========================================================================
     # FOLLOW-UP DASHBOARD
     # =========================================================================
-    active_follow_ups_q = fu_base.where(FollowUp.status.in_(["SCHEDULED", "PENDING", "OPEN"]))
-    active_follow_ups = (await db.execute(select(func.count()).select_from(active_follow_ups_q.subquery()))).scalar() or 0
-    upcoming_follow_ups_q = fu_base.where(
-        FollowUp.follow_up_date >= today,
-        FollowUp.status.in_(["SCHEDULED", "PENDING"]),
-    )
-    upcoming_follow_ups = (await db.execute(select(func.count()).select_from(upcoming_follow_ups_q.subquery()))).scalar() or 0
-    completed_follow_ups_q = fu_base.where(FollowUp.status == "COMPLETED")
+    pending_fu_q = fu_base.where(FollowUp.status.in_(["SCHEDULED", "PENDING"]), FollowUp.follow_up_date == today)
+    pending_follow_ups = (await db.execute(select(func.count()).select_from(pending_fu_q.subquery()))).scalar() or 0
+    completed_follow_ups_q = fu_base.where(FollowUp.status == "COMPLETED", FollowUp.follow_up_date == today)
     completed_follow_ups = (await db.execute(select(func.count()).select_from(completed_follow_ups_q.subquery()))).scalar() or 0
-    overdue_follow_ups_q = fu_base.where(
-        FollowUp.follow_up_date < today,
-        FollowUp.status.in_(["SCHEDULED", "PENDING", "OPEN"]),
-    )
-    overdue_follow_ups = (await db.execute(select(func.count()).select_from(overdue_follow_ups_q.subquery()))).scalar() or 0
+    response_fu_q = fu_base.where(FollowUp.status == "OPEN", FollowUp.follow_up_date == today)
+    response_follow_ups = (await db.execute(select(func.count()).select_from(response_fu_q.subquery()))).scalar() or 0
+    # Feedback count from FollowUpResponse (today)
+    feedback_base = select(func.count(FollowUpResponse.id)).where(
+        FollowUpResponse.created_at >= datetime.combine(today, datetime.min.time()),
+        FollowUpResponse.created_at < datetime.combine(today + timedelta(days=1), datetime.min.time()))
+    if hospital_id:
+        feedback_base = feedback_base.where(FollowUpResponse.hospital_id == hospital_id)
+    feedback_count = (await db.execute(feedback_base)).scalar() or 0
+    overdue_count = (await db.execute(select(func.count()).select_from(
+        fu_base.where(FollowUp.follow_up_date < today, FollowUp.status.in_(["SCHEDULED", "PENDING", "OPEN"])).subquery()
+    ))).scalar() or 0
 
-    # Recent follow-ups detail
-    recent_follow_ups_q = fu_base.order_by(FollowUp.follow_up_date.desc()).limit(50)
+    # Recent follow-ups detail — only today's active follow-ups
+    today_fu_base = fu_base.where(
+        FollowUp.follow_up_date == today,
+        FollowUp.status.in_(["SCHEDULED", "PENDING", "OPEN"]))
+    recent_follow_ups_q = today_fu_base.order_by(FollowUp.follow_up_time.asc().nullslast(), FollowUp.created_at.desc()).limit(50)
     recent_follow_ups_rows = (await db.execute(recent_follow_ups_q)).scalars().all()
     recent_follow_ups_data = []
     for fu in recent_follow_ups_rows:
@@ -1375,7 +1372,7 @@ async def get_comprehensive_crm_dashboard(
     # Also check LeadCall records
     lead_call_base = select(LeadCall)
     if hospital_id:
-        lead_call_base = lead_call_base.where(LeadCall.hospital_id == hospital_id)
+        lead_call_base = lead_call_base.join(Lead, LeadCall.lead_id == Lead.id).where(Lead.hospital_id == hospital_id)
     total_lead_calls = (await db.execute(select(func.count()).select_from(lead_call_base.subquery()))).scalar() or 0
     total_calls += total_lead_calls
 
@@ -1389,14 +1386,13 @@ async def get_comprehensive_crm_dashboard(
     # Avg duration from LeadCall
     avg_duration_q = select(func.coalesce(func.avg(LeadCall.duration_seconds), 0))
     if hospital_id:
-        avg_duration_q = avg_duration_q.where(LeadCall.hospital_id == hospital_id)
+        avg_duration_q = avg_duration_q.select_from(LeadCall).join(Lead, LeadCall.lead_id == Lead.id).where(Lead.hospital_id == hospital_id)
     avg_duration = float((await db.execute(avg_duration_q)).scalar() or 0)
 
     # Calls per day
     calls_per_day_raw = select(
         func.date(CommunicationLog.created_at).label("day"),
-        func.count(CommunicationLog.id).label("count"),
-    ).where(CommunicationLog.channel == "CALL")
+        func.count(CommunicationLog.id).label("count")).where(CommunicationLog.channel == "CALL")
     if hospital_id:
         calls_per_day_raw = calls_per_day_raw.where(CommunicationLog.hospital_id == hospital_id)
     calls_per_day_raw = calls_per_day_raw.group_by(func.date(CommunicationLog.created_at)).order_by(func.date(CommunicationLog.created_at).desc()).limit(30)
@@ -1417,12 +1413,15 @@ async def get_comprehensive_crm_dashboard(
     appointment_reminders = (await db.execute(select(func.count()).select_from(appointment_reminders_q.subquery()))).scalar() or 0
     recall_messages_q = wa_base.where(CommunicationLog.message_type == "RECALL")
     recall_messages = (await db.execute(select(func.count()).select_from(recall_messages_q.subquery()))).scalar() or 0
+    enquiry_messages_q = wa_base.where(CommunicationLog.message_type == "ENQUIRY")
+    enquiry_messages = (await db.execute(select(func.count()).select_from(enquiry_messages_q.subquery()))).scalar() or 0
+    lead_messages_q = wa_base.where(CommunicationLog.message_type == "LEAD")
+    lead_messages = (await db.execute(select(func.count()).select_from(lead_messages_q.subquery()))).scalar() or 0
 
     # Messages by day
     wa_by_day_raw = select(
         func.date(CommunicationLog.created_at).label("day"),
-        func.count(CommunicationLog.id).label("count"),
-    ).where(CommunicationLog.channel == "WHATSAPP")
+        func.count(CommunicationLog.id).label("count")).where(CommunicationLog.channel == "WHATSAPP")
     if hospital_id:
         wa_by_day_raw = wa_by_day_raw.where(CommunicationLog.hospital_id == hospital_id)
     wa_by_day_raw = wa_by_day_raw.group_by(func.date(CommunicationLog.created_at)).order_by(func.date(CommunicationLog.created_at).desc()).limit(30)
@@ -1434,8 +1433,7 @@ async def get_comprehensive_crm_dashboard(
     # Messages by template
     wa_by_template_raw = select(
         CommunicationLog.message_type,
-        func.count(CommunicationLog.id).label("count"),
-    ).where(CommunicationLog.channel == "WHATSAPP")
+        func.count(CommunicationLog.id).label("count")).where(CommunicationLog.channel == "WHATSAPP")
     if hospital_id:
         wa_by_template_raw = wa_by_template_raw.where(CommunicationLog.hospital_id == hospital_id)
     wa_by_template_raw = wa_by_template_raw.group_by(CommunicationLog.message_type).order_by(func.count(CommunicationLog.id).desc())
@@ -1471,112 +1469,171 @@ async def get_comprehensive_crm_dashboard(
         select(func.count(CampaignRecipient.id)).select_from(camp_base.subquery())
     )).scalar() or 0
 
-    camp_leads_generated = 0
-    camp_appointments_generated = 0
-    camp_revenue_generated = 0.0
     campaign_analytics = []
-    campaigns_list = (await db.execute(camp_base.order_by(Campaign.created_at.desc()).limit(20))).scalars().all()
+    campaigns_list = (await db.execute(camp_base.order_by(Campaign.created_at.desc()).limit(50))).scalars().all()
     for c in campaigns_list:
-        c_leads_q = lead_base.where(Lead.source.ilike(f"%{c.name}%"))
-        c_leads = (await db.execute(select(func.count()).select_from(c_leads_q.subquery()))).scalar() or 0
-        c_conversions_q = lead_base.where(Lead.source.ilike(f"%{c.name}%"), Lead.status == LeadStatus.CONVERTED.value)
-        c_conversions = (await db.execute(select(func.count()).select_from(c_conversions_q.subquery()))).scalar() or 0
-        c_rev = float(c.revenue_generated or 0)
+        # Find patients attributed to this campaign via source_campaign_name
+        c_pat_q = select(Patient.id).where(
+            Patient.source_campaign_name == c.name,
+            Patient.source_campaign_id == str(c.id))
+        if hospital_id:
+            c_pat_q = c_pat_q.where(Patient.hospital_id == hospital_id)
+        c_pids = [r[0] for r in (await db.execute(c_pat_q)).all()]
+        c_lead_count = len(c_pids)
+        c_conv_count = 0
+        c_rev = 0.0
+        if c_pids:
+            c_conv_count = (await db.execute(
+                select(func.count(func.distinct(Case.patient_id))).where(Case.patient_id.in_(c_pids))
+            )).scalar() or 0
+            c_cids = [r[0] for r in (await db.execute(select(Case.id).where(Case.patient_id.in_(c_pids)))).all()]
+            if c_cids:
+                c_rev = float((await db.execute(
+                    select(func.coalesce(func.sum(Billing.paid_amount), 0)).where(Billing.case_id.in_(c_cids))
+                )).scalar() or 0)
         c_cost = float(c.messages_sent or 0) * 0.5
         c_roi = round(((c_rev - c_cost) / c_cost * 100), 1) if c_cost > 0 else 0
-        c_cpl = round(c_cost / c_leads, 2) if c_leads > 0 else 0
-        c_cpc = round(c_cost / c_conversions, 2) if c_conversions > 0 else 0
-        c_cr = round((c_conversions / c_leads * 100), 1) if c_leads > 0 else 0
+        c_cpl = round(c_cost / c_lead_count, 2) if c_lead_count > 0 else 0
+        c_cpc = round(c_cost / c_conv_count, 2) if c_conv_count > 0 else 0
+        c_cr = round((c_conv_count / c_lead_count * 100), 1) if c_lead_count > 0 else 0
         campaign_analytics.append({
             "id": str(c.id), "name": c.name,
-            "messages": c.messages_sent or 0,
-            "leads": c_leads, "conversions": c_conversions,
+            "sent": c.messages_sent or 0,
+            "leads": c_lead_count, "appts": c_conv_count,
             "revenue": c_rev, "roi": c_roi,
             "cost": c_cost, "cost_per_lead": c_cpl,
             "cost_per_conversion": c_cpc, "conversion_rate": c_cr,
         })
-        camp_leads_generated += c_leads
-        camp_appointments_generated += c_conversions
-        camp_revenue_generated += c_rev
+    camp_leads_generated = sum(c["leads"] for c in campaign_analytics)
+    camp_appointments_generated = sum(c["appts"] for c in campaign_analytics)
+    camp_revenue_generated = sum(c["revenue"] for c in campaign_analytics)
 
     # =========================================================================
-    # PATIENT ACQUISITION ANALYTICS
+    # PATIENT ACQUISITION ANALYTICS (via Patient.source → Case → Billing)
     # =========================================================================
-    patient_base = select(Patient)
-    if hospital_id:
-        patient_base = patient_base.where(Patient.hospital_id == hospital_id)
-
-    acquisition_sources = ["Google", "Instagram", "Facebook", "Referral", "WhatsApp", "Website", "Walk-In", "Campaign", "Doctor Referral", "Other"]
+    pat_source_patterns = {
+        "Lead": ("Lead"),
+        "Google Search": ("GOOGLE_SEARCH", "Google Search"),
+        "Google Maps": ("GOOGLE_MAPS", "Google Maps"),
+        "Instagram": ("INSTAGRAM", "Instagram"),
+        "Facebook": ("FACEBOOK", "Facebook"),
+        "WhatsApp": ("WHATSAPP", "WhatsApp"),
+        "Website": ("WEBSITE", "Website"),
+        "Referral": ("REFERRAL", "Referral - Existing Patient", "Referral - Doctor", "Referral - Clinic"),
+        "Walk-In": ("WALK_IN", "Walk-In"),
+        "Campaign": ("CAMPAIGN", "Campaign"),
+        "Doctor Referral": ("DOCTOR_REFERRAL", "CLINIC_REFERRAL"),
+    }
+    all_pat_sources = {v for vals in pat_source_patterns.values() for v in vals} | {"OTHER"}
+    acquisition_sources = ["Lead", "Google Search", "Google Maps", "Instagram", "Facebook", "WhatsApp", "Website", "Referral", "Walk-In", "Campaign", "Doctor Referral", "Other"]
     acquisition_data = []
-    for src in acquisition_sources:
-        p_q = patient_base.where(Patient.patient_source.ilike(f"%{src}%"))
-        p_count = (await db.execute(select(func.count()).select_from(p_q.subquery()))).scalar() or 0
-        src_leads = 0
+    for src_display in acquisition_sources:
+        if src_display == "Lead":
+            src_filter = Patient.patient_source == "Lead"
+        elif src_display == "Other":
+            src_filter = ~Patient.patient_source.in_(all_pat_sources)
+        else:
+            patterns = pat_source_patterns.get(src_display)
+            if patterns:
+                src_filter = Patient.patient_source.in_(patterns)
+            else:
+                src_filter = Patient.patient_source.ilike(f"%{src_display}%")
+        pat_q = select(Patient.id).where(src_filter, Patient.patient_source.isnot(None))
+        if hospital_id:
+            pat_q = pat_q.where(Patient.hospital_id == hospital_id)
+        pids = [r[0] for r in (await db.execute(pat_q)).all()]
+        src_patients = len(pids)
         src_revenue = 0.0
-        if p_count > 0:
-            pids = [row[0] for row in (await db.execute(select(Patient.id).where(Patient.patient_source.ilike(f"%{src}%")))).all()]
-            if hospital_id:
-                pids = [row[0] for row in (await db.execute(
-                    select(Patient.id).where(Patient.hospital_id == hospital_id, Patient.patient_source.ilike(f"%{src}%"))
-                )).all()]
-            src_lead_q = lead_base.where(Lead.source.ilike(f"%{src}%"))
-            src_leads = (await db.execute(select(func.count()).select_from(src_lead_q.subquery()))).scalar() or 0
-            if pids:
-                case_ids_q = select(Case.id).where(Case.patient_id.in_(pids))
-                cids = [row[0] for row in (await db.execute(case_ids_q)).all()]
-                if cids:
-                    src_revenue = float((await db.execute(
-                        select(func.coalesce(func.sum(Billing.paid_amount), 0)).where(Billing.case_id.in_(cids))
-                    )).scalar() or 0)
+        if pids:
+            cids = [r[0] for r in (await db.execute(select(Case.id).where(Case.patient_id.in_(pids)))).all()]
+            if cids:
+                src_revenue = float((await db.execute(
+                    select(func.coalesce(func.sum(Billing.paid_amount), 0)).where(Billing.case_id.in_(cids))
+                )).scalar() or 0)
         acquisition_data.append({
-            "source": src, "patients": p_count, "leads": src_leads,
-            "conversion_rate": round((p_count / (src_leads or 1) * 100), 1) if src_leads > 0 else 0,
+            "source": src_display, "patients": src_patients,
             "revenue": src_revenue,
+            "conversion_rate": 0,
         })
 
     # =========================================================================
-    # REVENUE ATTRIBUTION
+    # REVENUE ATTRIBUTION (via Patient.source → Case → Billing)
     # =========================================================================
+    pat_source_list = ["Lead", "Google Search", "Google Maps", "Instagram", "Facebook", "WhatsApp", "Website", "Referral", "Walk-In", "Campaign", "Doctor Referral", "Other"]
+
     revenue_by_source_data = []
-    source_list = ["Google", "Instagram", "Facebook", "Referral", "WhatsApp", "Website", "Walk-In", "Campaign", "Doctor Referral", "Other"]
-    for src in source_list:
-        p_q = patient_base.where(Patient.patient_source.ilike(f"%{src}%"))
-        pids = [row[0] for row in (await db.execute(select(Patient.id).where(Patient.patient_source.ilike(f"%{src}%")))).all()]
+    for src_display in pat_source_list:
+        if src_display == "Lead":
+            src_filter = Patient.patient_source == "Lead"
+        elif src_display == "Other":
+            src_filter = ~Patient.patient_source.in_(all_pat_sources)
+        else:
+            patterns = pat_source_patterns.get(src_display)
+            if patterns:
+                src_filter = Patient.patient_source.in_(patterns)
+            else:
+                src_filter = Patient.patient_source.ilike(f"%{src_display}%")
+        pat_q = select(Patient.id).where(src_filter, Patient.patient_source.isnot(None))
         if hospital_id:
-            pids = [row[0] for row in (await db.execute(
-                select(Patient.id).where(Patient.hospital_id == hospital_id, Patient.patient_source.ilike(f"%{src}%"))
-            )).all()]
+            pat_q = pat_q.where(Patient.hospital_id == hospital_id)
+        pids = [r[0] for r in (await db.execute(pat_q)).all()]
         rev = 0.0
         if pids:
-            cids = [row[0] for row in (await db.execute(select(Case.id).where(Case.patient_id.in_(pids)))).all()]
+            cids = [r[0] for r in (await db.execute(select(Case.id).where(Case.patient_id.in_(pids)))).all()]
             if cids:
                 rev = float((await db.execute(
                     select(func.coalesce(func.sum(Billing.paid_amount), 0)).where(Billing.case_id.in_(cids))
                 )).scalar() or 0)
-        revenue_by_source_data.append({"source": src, "revenue": rev})
+        revenue_by_source_data.append({"source": src_display, "revenue": rev})
 
-    # Revenue by campaign (already in campaign_analytics)
-    # Revenue by doctor
+    # Revenue by doctor with proper hospital + doctor isolation
     revenue_by_doctor_data = []
-    doc_cases_raw = select(Case.doctor_id, func.coalesce(func.sum(Billing.paid_amount), 0).label("revenue")).select_from(Case).join(Billing, Billing.case_id == Case.id).where(Case.doctor_id.isnot(None))
+    doc_rev_raw = select(
+        Case.doctor_id,
+        func.coalesce(func.sum(Billing.paid_amount), 0).label("paid_amount"),
+        func.coalesce(func.sum(Billing.pending_amount), 0).label("pending_amount"),
+        func.coalesce(func.sum(Billing.total_amount), 0).label("total_amount"),
+        func.count(func.distinct(Case.patient_id)).label("patient_count"),
+        func.count(func.distinct(Case.id)).label("treatment_count")).select_from(Case).join(Billing, Billing.case_id == Case.id).join(Patient, Patient.id == Case.patient_id).where(Case.doctor_id.isnot(None))
     if hospital_id:
-        doc_pids = [row[0] for row in (await db.execute(select(Patient.id).where(Patient.hospital_id == hospital_id))).all()]
-        if doc_pids:
-            doc_cases_raw = doc_cases_raw.where(Case.patient_id.in_(doc_pids))
-    doc_cases_raw = doc_cases_raw.group_by(Case.doctor_id).order_by(func.sum(Billing.paid_amount).desc())
-    for doc_id, rev in (await db.execute(doc_cases_raw)).all():
-        d = await db.get(User, doc_id)
-        revenue_by_doctor_data.append({"doctor_id": doc_id, "doctor_name": d.full_name if d else "Unknown", "revenue": float(rev)})
+        doc_rev_raw = doc_rev_raw.where(Patient.hospital_id == hospital_id)
+        doc_rev_raw = doc_rev_raw.where(
+            Case.doctor_id.in_(
+                select(User.id).where(User.hospital_id == hospital_id, User.role == "DOCTOR")
+            )
+        )
+    doc_rev_raw = doc_rev_raw.group_by(Case.doctor_id).order_by(func.sum(Billing.paid_amount).desc())
+    for row in (await db.execute(doc_rev_raw)).all():
+        d = await db.get(User, row.doctor_id)
+        paid = float(row.paid_amount)
+        total = float(row.total_amount)
+        patients = row.patient_count
+        treatments = row.treatment_count
+        avg_billing = round(total / treatments, 2) if treatments > 0 else 0
+        revenue_by_doctor_data.append({
+            "doctor_id": row.doctor_id, "doctor_name": d.full_name if d else "Unknown",
+            "paid_amount": paid, "pending_amount": float(row.pending_amount),
+            "total_amount": total, "patient_count": patients,
+            "treatment_count": treatments, "avg_billing_value": avg_billing,
+        })
 
-    # Revenue by treatment
+    # Revenue by treatment (with patients + avg ticket)
     revenue_by_treatment_data = []
-    tp_rev_raw = select(TreatmentPlan.treatment_name, func.coalesce(func.sum(Billing.paid_amount), 0).label("revenue")).select_from(TreatmentPlan).join(Case, Case.id == TreatmentPlan.case_id, isouter=True).join(Billing, Billing.case_id == Case.id, isouter=True).where(TreatmentPlan.treatment_name.isnot(None))
+    tp_rev_raw = select(
+        TreatmentPlan.treatment_name,
+        func.coalesce(func.sum(Billing.paid_amount), 0).label("revenue"),
+        func.count(func.distinct(Case.patient_id)).label("patients"),
+        func.count(func.distinct(TreatmentPlan.id)).label("treatments")).select_from(TreatmentPlan).join(Case, Case.id == TreatmentPlan.case_id, isouter=True).join(Patient, Patient.id == Case.patient_id, isouter=True).join(Billing, Billing.case_id == Case.id, isouter=True).where(TreatmentPlan.treatment_name.isnot(None))
     if hospital_id:
-        tp_pids = [row[0] for row in (await db.execute(select(Patient.id).where(Patient.hospital_id == hospital_id))).all()]
-        if tp_pids:
-            tp_rev_raw = tp_rev_raw.where(Case.patient_id.in_(tp_pids))
+        tp_rev_raw = tp_rev_raw.where(Patient.hospital_id == hospital_id)
     tp_rev_raw = tp_rev_raw.group_by(TreatmentPlan.treatment_name).order_by(func.sum(Billing.paid_amount).desc()).limit(10)
-    revenue_by_treatment_data = [{"treatment": r[0], "revenue": float(r[1])} for r in (await db.execute(tp_rev_raw)).all()]
+    for row in (await db.execute(tp_rev_raw)).all():
+        rev = float(row.revenue)
+        pats = row.patients
+        revenue_by_treatment_data.append({
+            "treatment": row.treatment_name, "revenue": rev,
+            "patients": pats, "avg_ticket_size": round(rev / pats, 2) if pats > 0 else 0,
+        })
 
     # Revenue trend (monthly)
     revenue_trend_data = []
@@ -1596,8 +1653,7 @@ async def get_comprehensive_crm_dashboard(
                 select(func.coalesce(func.sum(Billing.paid_amount), 0)).where(
                     Billing.case_id.in_(m_cids),
                     Billing.updated_at >= datetime.combine(m_start, datetime.min.time()),
-                    Billing.updated_at <= datetime.combine(m_end, datetime.max.time()),
-                )
+                    Billing.updated_at <= datetime.combine(m_end, datetime.max.time()))
             )).scalar() or 0)
         revenue_trend_data.append({"month": m_start.strftime("%b %Y"), "revenue": m_rev})
 
@@ -1624,16 +1680,67 @@ async def get_comprehensive_crm_dashboard(
     # Low conversion alert
     low_conversion_alert = conversion_rate < 20
 
+    # Patient acquisition count (total patients accumulated)
+    pat_base = select(Patient)
+    if hospital_id:
+        pat_base = pat_base.where(Patient.hospital_id == hospital_id)
+    patient_acquisition_total = (await db.execute(select(func.count()).select_from(pat_base.subquery()))).scalar() or 0
+
+    # Lead sources count (distinct)
+    ls_base = select(Lead.source).distinct().where(Lead.source.isnot(None))
+    if hospital_id:
+        ls_base = ls_base.where(Lead.hospital_id == hospital_id)
+    lead_sources_count = len((await db.execute(ls_base)).scalars().all())
+
     kpis = {
         "total_leads": total_leads,
         "new_leads": new_leads,
         "converted_leads": converted_leads,
         "conversion_rate": conversion_rate,
-        "revenue_from_crm": crm_revenue,
-        "cost_per_lead": cost_per_lead,
+        "total_follow_ups": total_fu,
         "pending_follow_ups_today": pending_follow_ups_today,
-        "pending_enquiries_today": pending_enquiries,
+        "pending_follow_ups": pending_follow_ups,
+        "completed_follow_ups": completed_follow_ups,
+        "response_follow_ups": response_follow_ups,
+        "feedback_count": feedback_count,
+        "active_campaigns": active_campaigns,
+        "patient_acquisition": patient_acquisition_total,
+        "lead_sources": lead_sources_count,
     }
+
+    # =========================================================================
+    # REVENUE FROM LEADS TREND
+    # =========================================================================
+    revenue_from_leads_trend = []
+    for i in range(5, -1, -1):
+        ym = today - timedelta(days=30 * i)
+        m_start = ym.replace(day=1)
+        m_end = (m_start + timedelta(days=32)).replace(day=1)
+        rev_q = select(
+            Lead.source,
+            func.coalesce(func.sum(Billing.paid_amount), 0).label('revenue'),
+            func.count(func.distinct(Lead.id)).label('lead_count')).select_from(Lead).join(
+            Patient, Lead.converted_patient_id == Patient.id
+        ).join(
+            Case, Case.patient_id == Patient.id
+        ).join(
+            Billing, Billing.case_id == Case.id
+        ).where(
+            Lead.converted_patient_id.isnot(None),
+            Billing.paid_amount > 0,
+            Billing.created_at >= datetime.combine(m_start, datetime.min.time()),
+            Billing.created_at < datetime.combine(m_end, datetime.min.time()))
+        if hospital_id:
+            rev_q = rev_q.where(Lead.hospital_id == hospital_id)
+        rev_q = rev_q.group_by(Lead.source)
+        rev_rows = (await db.execute(rev_q)).all()
+        sources_data = [{"source": r[0], "revenue": float(r[1] or 0), "lead_count": r[2]} for r in rev_rows]
+        total_rev = sum(s["revenue"] for s in sources_data)
+        revenue_from_leads_trend.append({
+            "month": m_start.strftime("%b %Y"),
+            "total_revenue": total_rev,
+            "by_source": sources_data,
+        })
 
     return {
         "kpis": kpis,
@@ -1644,48 +1751,44 @@ async def get_comprehensive_crm_dashboard(
             "by_doctor": leads_by_doctor,
             "by_status": leads_by_status,
             "timeline": lead_timeline_data,
-            "funnel": funnel_data,
+            "score_distribution": score_distribution,
+            "score_distribution_categories": [s["category"] for s in score_distribution],
         },
         "conversion_analytics": {
-            "funnel": funnel_data,
             "revenue_generated": crm_revenue,
             "conversion_trend": lead_growth_trend,
             "top_sources": leads_by_source[:5],
             "top_staff": leads_by_staff[:5],
         },
-        "revenue_analytics": {
-            "revenue_trend": revenue_trend_data,
-            "by_source": revenue_by_source_data,
-            "by_campaign": [{"name": c["name"], "revenue": c["revenue"]} for c in campaign_analytics],
-            "by_doctor": revenue_by_doctor_data,
-            "by_treatment": revenue_by_treatment_data,
-            "monthly_comparison": revenue_trend_data,
-        },
+        "revenue_by_doctor": revenue_by_doctor_data,
+        "revenue_from_leads_trend": revenue_from_leads_trend,
         "lead_dashboard": recent_leads_data,
         "enquiry_dashboard": {
             "today": todays_enquiries_count,
             "tomorrow": tomorrows_enquiries_count,
             "this_week": this_week_enquiries_count,
             "overdue": overdue_enquiries_count,
+            "completed": completed_enquiries_count,
             "six_month_recall": six_month_recall_count,
             "todays_detail": todays_enquiries_detail,
         },
         "follow_up_dashboard": {
-            "active": active_follow_ups,
-            "upcoming": upcoming_follow_ups,
+            "pending": pending_follow_ups,
             "completed": completed_follow_ups,
-            "overdue": overdue_follow_ups,
+            "response": response_follow_ups,
+            "feedback": feedback_count,
             "recent": recent_follow_ups_data,
         },
         "follow_up_analytics": {
             "total_follow_ups": total_fu,
             "completed_follow_ups": completed_follow_ups,
-            "pending_follow_ups": active_follow_ups,
-            "overdue_follow_ups": overdue_follow_ups,
+            "pending_follow_ups": pending_follow_ups,
+            "response_follow_ups": response_follow_ups,
+            "feedback_count": feedback_count,
             "successful_follow_ups": successful_follow_ups,
             "failed_follow_ups": failed_follow_ups,
             "by_staff": follow_ups_by_staff,
-            "by_doctor": follow_ups_by_staff,
+            "by_doctor": leads_by_doctor[:10],
             "by_source": follow_ups_by_source,
             "by_outcome": follow_ups_by_outcome,
             "completion_rate": fu_completion_rate,
@@ -1707,6 +1810,8 @@ async def get_comprehensive_crm_dashboard(
             "campaign_messages": campaign_messages,
             "appointment_reminders": appointment_reminders,
             "recall_messages": recall_messages,
+            "enquiry_messages": enquiry_messages,
+            "lead_messages": lead_messages,
             "messages_by_day": messages_by_day,
             "messages_by_campaign": messages_by_campaign,
             "messages_by_template": messages_by_template,
@@ -1723,13 +1828,6 @@ async def get_comprehensive_crm_dashboard(
             "campaigns": campaign_analytics,
         },
         "patient_acquisition": acquisition_data,
-        "revenue_attribution": {
-            "by_source": revenue_by_source_data,
-            "by_campaign": [{"name": c["name"], "revenue": c["revenue"]} for c in campaign_analytics],
-            "by_doctor": revenue_by_doctor_data,
-            "by_treatment": revenue_by_treatment_data,
-            "revenue_trend": revenue_trend_data,
-        },
         "calendar_widget": {
             "enquiries": calendar_enquiries,
             "follow_ups": pending_follow_ups_today,
@@ -1737,7 +1835,9 @@ async def get_comprehensive_crm_dashboard(
             "campaign_schedules": active_campaigns,
         },
         "alerts": {
-            "overdue_follow_ups": overdue_follow_ups,
+            "overdue_follow_ups": overdue_count,
+            "response_follow_ups": response_follow_ups,
+            "feedback_count": feedback_count,
             "high_priority_leads": high_priority_leads,
             "missed_calls_action": missed_calls_action,
             "pending_enquiries": pending_enquiries,
@@ -1753,8 +1853,8 @@ async def get_comprehensive_crm_dashboard(
 @router.get("/dashboard")
 async def get_crm_dashboard(
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.VIEW_CRM_DASHBOARD)
     hospital_id = current_user.get("hospital_id")
     today = date.today()
 
@@ -1846,8 +1946,7 @@ async def get_crm_dashboard(
         ).where(
             Patient.patient_source.isnot(None),
             Patient.created_at >= m_start,
-            Patient.created_at <= m_end,
-        )
+            Patient.created_at <= m_end)
         if hospital_id:
             m_sources_q = m_sources_q.where(Patient.hospital_id == hospital_id)
         m_sources_q = m_sources_q.group_by(Patient.patient_source)
@@ -1957,8 +2056,7 @@ async def get_crm_dashboard(
 @router.get("/source-analytics")
 async def get_source_analytics(
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
     hospital_id = current_user.get("hospital_id")
     today = date.today()
 
@@ -1976,8 +2074,7 @@ async def get_source_analytics(
     revenue_q = select(
         Patient.patient_source,
         func.coalesce(func.sum(Billing.paid_amount), 0).label("revenue"),
-        func.count(Patient.id).label("count"),
-    ).join(Case, Case.patient_id == Patient.id, isouter=True
+        func.count(Patient.id).label("count")).join(Case, Case.patient_id == Patient.id, isouter=True
     ).join(Billing, Billing.case_id == Case.id, isouter=True
     ).where(Patient.patient_source.isnot(None))
     if hospital_id:
@@ -1994,8 +2091,7 @@ async def get_source_analytics(
         m_sources_q = patient_base.where(
             Patient.patient_source.isnot(None),
             Patient.created_at >= m_start,
-            Patient.created_at <= (m_start + timedelta(days=32)).replace(day=1) - timedelta(days=1),
-        ).add_columns(
+            Patient.created_at <= (m_start + timedelta(days=32)).replace(day=1) - timedelta(days=1)).add_columns(
             Patient.patient_source, func.count(Patient.id).label("count")
         ).group_by(Patient.patient_source)
         m_rows = (await db.execute(m_sources_q)).all()
@@ -2011,15 +2107,13 @@ async def get_source_analytics(
     this_month_count = (await db.execute(
         select(func.count(Patient.id)).where(
             Patient.created_at >= this_month_start,
-            Patient.patient_source.isnot(None),
-        )
+            Patient.patient_source.isnot(None))
     )).scalar() or 0
     last_month_count = (await db.execute(
         select(func.count(Patient.id)).where(
             Patient.created_at >= last_month_start,
             Patient.created_at <= last_month_end,
-            Patient.patient_source.isnot(None),
-        )
+            Patient.patient_source.isnot(None))
     )).scalar() or 0
     growth_pct = round((this_month_count - last_month_count) / (last_month_count or 1) * 100, 1)
 
@@ -2043,8 +2137,7 @@ async def list_follow_ups_filtered(
     status: Optional[str] = Query(None),
     patient_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
     hospital_id = current_user.get("hospital_id")
     today = date.today()
     q = select(FollowUp)
@@ -2067,13 +2160,11 @@ async def list_follow_ups_filtered(
     elif filter == "this_month":
         q = q.where(
             FollowUp.follow_up_date >= today.replace(day=1),
-            FollowUp.follow_up_date <= today.replace(day=1) + timedelta(days=31),
-        )
+            FollowUp.follow_up_date <= today.replace(day=1) + timedelta(days=31))
     elif filter == "overdue":
         q = q.where(
             FollowUp.follow_up_date < today,
-            FollowUp.status.in_(["SCHEDULED", "PENDING", "CONTACTED", "NO_RESPONSE"]),
-        )
+            FollowUp.status.in_(["SCHEDULED", "PENDING", "CONTACTED", "NO_RESPONSE"]))
     elif filter == "one_day":
         q = q.where(FollowUp.follow_up_type == "1_DAY_POST_TREATMENT")
     elif filter == "six_month":
@@ -2144,12 +2235,12 @@ async def mark_follow_up_done(
     follow_up_id: str,
     req: MarkDoneRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_PATIENTS)
     fu = await db.get(FollowUp, follow_up_id)
     if not fu:
         raise HTTPException(status_code=404, detail="Follow-up not found")
+    _verify_hospital_access(fu, current_user)
     fu.status = FollowUpStatus.COMPLETED.value
     fu.completed_date = datetime.now(timezone.utc)
     fu.completed_by = current_user.get("sub")
@@ -2170,12 +2261,12 @@ async def log_follow_up_communication(
     follow_up_id: str,
     req: LogCommunicationRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_PATIENTS)
     fu = await db.get(FollowUp, follow_up_id)
     if not fu:
         raise HTTPException(status_code=404, detail="Follow-up not found")
+    _verify_hospital_access(fu, current_user)
 
     hospital_id = current_user.get("hospital_id") or fu.hospital_id
     patient = await db.get(Patient, fu.patient_id)
@@ -2209,8 +2300,7 @@ async def log_follow_up_communication(
         message_type="FOLLOW_UP",
         message=req.message,
         status=comm_status,
-        sent_at=datetime.now(timezone.utc),
-    )
+        sent_at=datetime.now(timezone.utc))
     db.add(log)
     await db.commit()
     return {"success": True, "log_id": str(log.id)}
@@ -2227,12 +2317,12 @@ async def record_follow_up_response_crm(
     follow_up_id: str,
     req: RecordResponseRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_PATIENTS)
     fu = await db.get(FollowUp, follow_up_id)
     if not fu:
         raise HTTPException(status_code=404, detail="Follow-up not found")
+    _verify_hospital_access(fu, current_user)
 
     feedback_val = req.feedback
     if not feedback_val:
@@ -2253,8 +2343,7 @@ async def record_follow_up_response_crm(
         response_status=req.response_status,
         feedback=feedback_val,
         follow_up_required=req.response_status in ("NEEDS_ATTENTION", "COMPLAINT", "EMERGENCY"),
-        created_by=current_user.get("sub"),
-    )
+        created_by=current_user.get("sub"))
     db.add(fr)
 
     if req.response_status == "POSITIVE":
@@ -2289,8 +2378,7 @@ class CreateFollowUpFromEnquiryRequest(BaseModel):
 async def create_follow_up_from_enquiry(
     req: CreateFollowUpFromEnquiryRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
     hospital_id = current_user.get("hospital_id")
     if not hospital_id:
         raise HTTPException(status_code=400, detail="User has no hospital assigned")
@@ -2314,8 +2402,7 @@ async def create_follow_up_from_enquiry(
         appointment_time=req.follow_up_time or now.time(),
         status=AppointmentStatus.SCHEDULED,
         appointment_type=AppointmentType.FOLLOW_UP,
-        notes=f"Follow-Up: {req.follow_up_reason}" + (f"\n{req.notes}" if req.notes else ""),
-    )
+        notes=f"Follow-Up: {req.follow_up_reason}" + (f"\n{req.notes}" if req.notes else ""))
     db.add(appt)
     await db.flush()
 
@@ -2330,8 +2417,7 @@ async def create_follow_up_from_enquiry(
         notes=req.notes or req.follow_up_reason,
         appointment_id=str(appt.id),
         status=FollowUpStatus.SCHEDULED.value,
-        created_at=now,
-    )
+        created_at=now)
     db.add(follow_up)
     await db.flush()
 
@@ -2355,14 +2441,12 @@ async def create_follow_up_from_enquiry(
 @router.get("/recalls")
 async def get_recall_list(
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
     hospital_id = current_user.get("hospital_id")
     today = date.today()
     q = select(FollowUp).where(
         FollowUp.follow_up_type == "6_MONTH_RECALL",
-        FollowUp.follow_up_date == today,
-    )
+        FollowUp.follow_up_date == today)
     if hospital_id:
         q = q.where(FollowUp.hospital_id == hospital_id)
     q = q.order_by(FollowUp.follow_up_time).limit(50)
@@ -2392,8 +2476,11 @@ async def get_recall_list(
 async def get_patient_follow_up_history(
     patient_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
+    pat = await db.get(Patient, patient_id)
+    if not pat:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    _verify_hospital_access(pat, current_user)
     q = select(FollowUp).where(FollowUp.patient_id == patient_id).order_by(desc(FollowUp.created_at)).limit(50)
     result = await db.execute(q)
     items = result.scalars().all()
@@ -2428,8 +2515,7 @@ async def get_patient_follow_up_history(
 @router.get("/enquiry/dashboard")
 async def get_enquiry_dashboard(
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
     hospital_id = current_user.get("hospital_id")
     today = date.today()
     base = select(FollowUp)
@@ -2480,8 +2566,7 @@ async def get_enquiry_dashboard(
 
     overdue_q = base.where(
         FollowUp.follow_up_date < today,
-        FollowUp.status.in_(["SCHEDULED", "PENDING", "CONTACTED", "NO_RESPONSE"]),
-    )
+        FollowUp.status.in_(["SCHEDULED", "PENDING", "CONTACTED", "NO_RESPONSE"]))
     overdue = (await db.execute(select(func.count()).select_from(overdue_q.subquery()))).scalar() or 0
 
     return {
@@ -2506,8 +2591,7 @@ async def get_todays_enquiries(
     tab: str = Query("today", description="Filter: today, tomorrow, week, overdue, recalls, completed, calendar"),
     calendar_date: Optional[str] = Query(None, description="Date for calendar view (YYYY-MM-DD)"),
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
     hospital_id = current_user.get("hospital_id")
     today = date.today()
     q = select(FollowUp)
@@ -2523,13 +2607,11 @@ async def get_todays_enquiries(
     elif tab == "overdue":
         q = q.where(
             FollowUp.follow_up_date < today,
-            FollowUp.status.notin_(["COMPLETED", "CANCELLED", "MISSED"]),
-        )
+            FollowUp.status.notin_(["COMPLETED", "CANCELLED", "MISSED"]))
     elif tab == "recalls":
         q = q.where(
             FollowUp.follow_up_type == "6_MONTH_RECALL",
-            FollowUp.status.notin_(["COMPLETED", "CANCELLED"]),
-        ).order_by(FollowUp.follow_up_date)
+            FollowUp.status.notin_(["COMPLETED", "CANCELLED"])).order_by(FollowUp.follow_up_date)
     elif tab == "completed":
         q = q.where(FollowUp.status == "COMPLETED")
     elif tab == "calendar" and calendar_date:
@@ -2609,14 +2691,14 @@ class CampaignWhatsAppSendRequest(BaseModel):
 async def send_campaign_whatsapp(
     req: CampaignWhatsAppSendRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_PATIENTS)
     from app.models.campaign import Campaign, CampaignRecipient, CampaignRecipientStatus, CampaignStatus
 
     campaign = await db.get(Campaign, req.campaign_id)
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
+    _verify_hospital_access(campaign, current_user)
 
     template_message = None
     if req.template_id:
@@ -2636,8 +2718,7 @@ async def send_campaign_whatsapp(
 
     recipients_q = select(CampaignRecipient).where(
         CampaignRecipient.campaign_id == req.campaign_id,
-        CampaignRecipient.status == CampaignRecipientStatus.PENDING,
-    )
+        CampaignRecipient.status == CampaignRecipientStatus.PENDING)
     recipients = (await db.execute(recipients_q)).scalars().all()
 
     provider = WhatsAppProvider()
@@ -2653,8 +2734,7 @@ async def send_campaign_whatsapp(
         variables = TemplateEngine.build_variables(
             patient_name=patient.full_name,
             doctor_name=doctor.full_name if doctor else None,
-            hospital_name=hospital_name,
-        )
+            hospital_name=hospital_name)
         rendered = TemplateEngine.render_template(message, variables)
         success = await provider.send_message(patient.phone, rendered)
         if success:
@@ -2671,8 +2751,7 @@ async def send_campaign_whatsapp(
             channel="WHATSAPP", message_type="CAMPAIGN",
             message=rendered,
             status="SENT" if success else "FAILED",
-            sent_at=datetime.now(timezone.utc) if success else None,
-        )
+            sent_at=datetime.now(timezone.utc) if success else None)
         db.add(log)
 
     campaign.messages_sent = (campaign.messages_sent or 0) + sent
@@ -2687,3 +2766,487 @@ async def send_campaign_whatsapp(
         "failed": failed,
         "total": len(recipients),
     }
+
+
+# =========================================================================
+# CRM QUICK VIEW ENDPOINTS
+# =========================================================================
+
+
+@router.get("/quick-view/leads")
+async def crm_quick_view_leads(
+    period: str = Query("this_month"),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.VIEW_CRM_DASHBOARD)
+    hospital_id = current_user.get("hospital_id")
+    today = date.today()
+
+    if period == "today":
+        date_start = today
+        date_end = today
+    elif period == "this_week":
+        date_start = today - timedelta(days=today.weekday())
+        date_end = date_start + timedelta(days=6)
+    elif period == "this_month":
+        date_start = today.replace(day=1)
+        date_end = today
+    elif period == "this_quarter":
+        q = (today.month - 1) // 3
+        date_start = today.replace(month=q*3+1, day=1)
+        date_end = today
+    elif period == "this_year":
+        date_start = today.replace(month=1, day=1)
+        date_end = today
+    elif period == "custom" and start_date and end_date:
+        date_start = date.fromisoformat(start_date)
+        date_end = date.fromisoformat(end_date)
+    else:
+        date_start = today.replace(day=1)
+        date_end = today
+
+    lead_base = select(Lead)
+    if hospital_id:
+        lead_base = lead_base.where(Lead.hospital_id == hospital_id)
+
+    # Lead growth trend (last 6 months)
+    lead_growth_trend = []
+    for i in range(5, -1, -1):
+        ym = today - timedelta(days=30 * i)
+        m_start = ym.replace(day=1)
+        m_q = lead_base.where(
+            Lead.created_at >= datetime.combine(m_start, datetime.min.time()),
+            Lead.created_at < datetime.combine((m_start + timedelta(days=32)).replace(day=1), datetime.min.time()))
+        m_count = (await db.execute(select(func.count()).select_from(m_q.subquery()))).scalar() or 0
+        lead_growth_trend.append({"month": m_start.strftime("%b %Y"), "count": m_count})
+
+    # Leads by source
+    ls_raw = select(Lead.source, func.count(Lead.id).label("count")).where(Lead.source.isnot(None))
+    if hospital_id:
+        ls_raw = ls_raw.where(Lead.hospital_id == hospital_id)
+    ls_raw = ls_raw.group_by(Lead.source).order_by(func.count(Lead.id).desc())
+    leads_by_source = [{"source": r[0], "count": r[1]} for r in (await db.execute(ls_raw)).all()]
+
+    # Leads by status
+    ls_status_raw = select(Lead.status, func.count(Lead.id).label("count"))
+    if hospital_id:
+        ls_status_raw = ls_status_raw.where(Lead.hospital_id == hospital_id)
+    ls_status_raw = ls_status_raw.group_by(Lead.status).order_by(func.count(Lead.id).desc())
+    leads_by_status = [{"status": r[0], "count": r[1]} for r in (await db.execute(ls_status_raw)).all()]
+
+    # Score distribution
+    all_leads = (await db.execute(lead_base.add_columns(Lead.lead_score))).all()
+    score_categories = [("Hot (81-100)", 81, 100), ("Warm (61-80)", 61, 80), ("Cold (21-60)", 21, 60), ("Lost (0-20)", 0, 20)]
+    score_distribution = []
+    for label, lo, hi in score_categories:
+        cnt = sum(1 for row in all_leads if row.lead_score is not None and lo <= row.lead_score <= hi)
+        score_distribution.append({"category": label, "count": cnt})
+
+    # Conversion analytics
+    total_leads = (await db.execute(select(func.count()).select_from(lead_base.subquery()))).scalar() or 0
+    converted_q = lead_base.where(Lead.status == LeadStatus.CONVERTED.value)
+    converted_leads = (await db.execute(select(func.count()).select_from(converted_q.subquery()))).scalar() or 0
+    conversion_rate = round((converted_leads / total_leads * 100), 1) if total_leads > 0 else 0
+
+    # Top converting sources
+    top_converting = []
+    for src_info in leads_by_source:
+        conv_q = select(func.count(Lead.id)).where(Lead.source == src_info["source"], Lead.converted_patient_id.isnot(None))
+        if hospital_id:
+            conv_q = conv_q.where(Lead.hospital_id == hospital_id)
+        conv = (await db.execute(conv_q)).scalar() or 0
+        top_converting.append({"source": src_info["source"], "count": src_info["count"], "converted": conv})
+
+    return {
+        "growth_trend": lead_growth_trend,
+        "by_source": leads_by_source,
+        "by_status": leads_by_status,
+        "score_distribution": score_distribution,
+        "conversion_rate": conversion_rate,
+        "total_leads": total_leads,
+        "converted_leads": converted_leads,
+        "top_converting_sources": sorted(top_converting, key=lambda x: x["converted"], reverse=True)[:5],
+    }
+
+
+@router.get("/quick-view/converted-leads")
+async def crm_quick_view_converted_leads(
+    period: str = Query("this_month"),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.VIEW_CRM_DASHBOARD)
+    hospital_id = current_user.get("hospital_id")
+    today = date.today()
+
+    if period == "today":
+        date_start = today
+        date_end = today
+    elif period == "this_week":
+        date_start = today - timedelta(days=today.weekday())
+        date_end = date_start + timedelta(days=6)
+    elif period == "this_month":
+        date_start = today.replace(day=1)
+        date_end = today
+    elif period == "this_quarter":
+        q = (today.month - 1) // 3
+        date_start = today.replace(month=q*3+1, day=1)
+        date_end = today
+    elif period == "this_year":
+        date_start = today.replace(month=1, day=1)
+        date_end = today
+    elif period == "custom" and start_date and end_date:
+        date_start = date.fromisoformat(start_date)
+        date_end = date.fromisoformat(end_date)
+    else:
+        date_start = today.replace(day=1)
+        date_end = today
+
+    lead_base = select(Lead)
+    if hospital_id:
+        lead_base = lead_base.where(Lead.hospital_id == hospital_id)
+    converted_base = lead_base.where(Lead.status == LeadStatus.CONVERTED.value)
+
+    # Converted patients list
+    converted_rows = (await db.execute(converted_base.order_by(Lead.created_at.desc()).limit(50))).scalars().all()
+    converted_patients = []
+    for l in converted_rows:
+        pat = await db.get(Patient, l.converted_patient_id) if l.converted_patient_id else None
+        converted_patients.append({
+            "lead_id": str(l.id), "lead_name": l.lead_name, "source": l.source,
+            "patient_name": pat.full_name if pat else None,
+            "converted_at": l.updated_at.isoformat() if l.updated_at else None,
+        })
+
+    # Monthly conversion trend (last 6 months)
+    monthly_trend = []
+    for i in range(5, -1, -1):
+        ym = today - timedelta(days=30 * i)
+        m_start = ym.replace(day=1)
+        m_q = converted_base.where(
+            Lead.updated_at >= datetime.combine(m_start, datetime.min.time()),
+            Lead.updated_at < datetime.combine((m_start + timedelta(days=32)).replace(day=1), datetime.min.time()))
+        m_count = (await db.execute(select(func.count()).select_from(m_q.subquery()))).scalar() or 0
+        monthly_trend.append({"month": m_start.strftime("%b %Y"), "count": m_count})
+
+    # By source
+    source_conv_raw = select(Lead.source, func.count(Lead.id).label("count")).where(
+        Lead.status == LeadStatus.CONVERTED.value, Lead.source.isnot(None))
+    if hospital_id:
+        source_conv_raw = source_conv_raw.where(Lead.hospital_id == hospital_id)
+    source_conv_raw = source_conv_raw.group_by(Lead.source).order_by(func.count(Lead.id).desc())
+    by_source = [{"source": r[0], "count": r[1]} for r in (await db.execute(source_conv_raw)).all()]
+
+    # By doctor
+    doc_conv_raw = select(Lead.assigned_doctor_id, func.count(Lead.id).label("count")).where(
+        Lead.status == LeadStatus.CONVERTED.value, Lead.assigned_doctor_id.isnot(None))
+    if hospital_id:
+        doc_conv_raw = doc_conv_raw.where(Lead.hospital_id == hospital_id)
+    doc_conv_raw = doc_conv_raw.group_by(Lead.assigned_doctor_id).order_by(func.count(Lead.id).desc())
+    by_doctor = []
+    for doc_id, cnt in (await db.execute(doc_conv_raw)).all():
+        d = await db.get(User, doc_id)
+        by_doctor.append({"doctor_id": doc_id, "doctor_name": d.full_name if d else "Unknown", "count": cnt})
+
+    # Campaign conversion
+    campaign_conv = []
+    pat_source_q = select(Patient.id).where(Patient.source_campaign_id.isnot(None))
+    if hospital_id:
+        pat_source_q = pat_source_q.where(Patient.hospital_id == hospital_id)
+    camp_pids = [r[0] for r in (await db.execute(pat_source_q)).all()]
+    if camp_pids:
+        lead_ids_from_camp = [r[0] for r in (await db.execute(
+            select(Lead.id).where(Lead.converted_patient_id.in_(camp_pids), Lead.status == LeadStatus.CONVERTED.value)
+        )).all()]
+        campaign_conv.append({"source": "Campaign", "count": len(lead_ids_from_camp)})
+
+    return {
+        "converted_patients": converted_patients,
+        "monthly_trend": monthly_trend,
+        "by_source": by_source,
+        "by_doctor": by_doctor,
+        "by_campaign": campaign_conv,
+    }
+
+
+@router.get("/quick-view/follow-ups")
+async def crm_quick_view_follow_ups(
+    period: str = Query("this_month"),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.VIEW_CRM_DASHBOARD)
+    hospital_id = current_user.get("hospital_id")
+    today = date.today()
+
+    fu_base = select(FollowUp)
+    if hospital_id:
+        fu_base = fu_base.where(FollowUp.hospital_id == hospital_id)
+
+    active = (await db.execute(select(func.count()).select_from(
+        fu_base.where(FollowUp.status.in_(["SCHEDULED", "PENDING", "OPEN"])).subquery()
+    ))).scalar() or 0
+    upcoming = (await db.execute(select(func.count()).select_from(
+        fu_base.where(FollowUp.follow_up_date >= today, FollowUp.status.in_(["SCHEDULED", "PENDING"])).subquery()
+    ))).scalar() or 0
+    completed = (await db.execute(select(func.count()).select_from(
+        fu_base.where(FollowUp.status == "COMPLETED").subquery()
+    ))).scalar() or 0
+    overdue = (await db.execute(select(func.count()).select_from(
+        fu_base.where(FollowUp.follow_up_date < today, FollowUp.status.in_(["SCHEDULED", "PENDING", "OPEN"])).subquery()
+    ))).scalar() or 0
+
+    # Priority breakdown
+    high_priority = (await db.execute(select(func.count()).select_from(
+        fu_base.where(FollowUp.follow_up_type == "1_DAY_POST_TREATMENT").subquery()
+    ))).scalar() or 0
+    medium_priority = (await db.execute(select(func.count()).select_from(
+        fu_base.where(FollowUp.follow_up_type == "MANUAL").subquery()
+    ))).scalar() or 0
+    low_priority = (await db.execute(select(func.count()).select_from(
+        fu_base.where(FollowUp.follow_up_type.in_(["6_MONTH_RECALL", "3_MONTH_FOLLOW_UP", "YEARLY_FOLLOW_UP"])).subquery()
+    ))).scalar() or 0
+
+    # Doctor-wise follow-ups
+    doc_fu_raw = select(FollowUp.doctor_id, func.count(FollowUp.id).label("count")).where(FollowUp.doctor_id.isnot(None))
+    if hospital_id:
+        doc_fu_raw = doc_fu_raw.where(FollowUp.hospital_id == hospital_id)
+    doc_fu_raw = doc_fu_raw.group_by(FollowUp.doctor_id).order_by(func.count(FollowUp.id).desc())
+    by_doctor = []
+    for doc_id, cnt in (await db.execute(doc_fu_raw)).all():
+        d = await db.get(User, doc_id)
+        by_doctor.append({"doctor_id": doc_id, "doctor_name": d.full_name if d else "Unknown", "count": cnt})
+
+    # Follow-up trend (last 6 months)
+    trend = []
+    for i in range(5, -1, -1):
+        ym = today - timedelta(days=30 * i)
+        m_start = ym.replace(day=1)
+        m_end = (m_start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+        m_q = fu_base.where(FollowUp.follow_up_date >= m_start, FollowUp.follow_up_date <= m_end)
+        m_count = (await db.execute(select(func.count()).select_from(m_q.subquery()))).scalar() or 0
+        trend.append({"month": m_start.strftime("%b %Y"), "count": m_count})
+
+    # Outcome trend
+    outcome_raw = select(FollowUp.status, func.count(FollowUp.id).label("count"))
+    if hospital_id:
+        outcome_raw = outcome_raw.where(FollowUp.hospital_id == hospital_id)
+    outcome_raw = outcome_raw.group_by(FollowUp.status).order_by(func.count(FollowUp.id).desc())
+    by_outcome = [{"status": r[0], "count": r[1]} for r in (await db.execute(outcome_raw)).all()]
+
+    # Patient breakdown (recent follow-ups) — only today's active
+    today_fu_base = fu_base.where(
+        FollowUp.follow_up_date == today,
+        FollowUp.status.in_(["SCHEDULED", "PENDING", "OPEN"]))
+    recent_rows = (await db.execute(
+        today_fu_base.order_by(FollowUp.follow_up_time.asc().nullslast(), FollowUp.created_at.desc()).limit(20)
+    )).scalars().all()
+    by_patient = []
+    for fu in recent_rows:
+        pat = await db.get(Patient, fu.patient_id) if fu.patient_id else None
+        by_patient.append({
+            "patient_id": str(fu.patient_id) if fu.patient_id else None,
+            "patient_name": pat.full_name if pat else "Unknown",
+            "status": fu.status, "follow_up_date": fu.follow_up_date.isoformat() if fu.follow_up_date else None,
+        })
+
+    return {
+        "active": active, "upcoming": upcoming,
+        "completed": completed, "overdue": overdue,
+        "high_priority": high_priority, "medium_priority": medium_priority, "low_priority": low_priority,
+        "by_doctor": by_doctor, "by_patient": by_patient, "by_outcome": by_outcome,
+        "trend": trend,
+    }
+
+
+@router.get("/quick-view/campaigns")
+async def crm_quick_view_campaigns(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.VIEW_CRM_DASHBOARD)
+    hospital_id = current_user.get("hospital_id")
+    camp_base = select(Campaign)
+    if hospital_id:
+        camp_base = camp_base.where(Campaign.hospital_id == hospital_id)
+
+    campaigns = (await db.execute(camp_base.order_by(Campaign.created_at.desc()).limit(50))).scalars().all()
+    result = []
+    for c in campaigns:
+        c_pat_q = select(Patient.id).where(
+            Patient.source_campaign_name == c.name,
+            Patient.source_campaign_id == str(c.id))
+        if hospital_id:
+            c_pat_q = c_pat_q.where(Patient.hospital_id == hospital_id)
+        c_pids = [r[0] for r in (await db.execute(c_pat_q)).all()]
+        c_conv = 0
+        if c_pids:
+            c_conv = (await db.execute(
+                select(func.count(func.distinct(Case.patient_id))).where(Case.patient_id.in_(c_pids))
+            )).scalar() or 0
+        result.append({
+            "id": str(c.id), "name": c.name, "campaign_type": c.campaign_type,
+            "channel": c.channel, "target": c.target, "status": c.status,
+            "messages_sent": c.messages_sent or 0,
+            "patients_reached": len(c_pids),
+            "leads_generated": len(c_pids),
+            "appointments_generated": c_conv,
+            "start_date": c.start_date.isoformat() if c.start_date else None,
+            "end_date": c.end_date.isoformat() if c.end_date else None,
+        })
+    return {"campaigns": result}
+
+
+@router.get("/quick-view/patient-acquisition")
+async def crm_quick_view_patient_acquisition(
+    period: str = Query("this_month"),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.VIEW_CRM_DASHBOARD)
+    hospital_id = current_user.get("hospital_id")
+    today = date.today()
+
+    pat_source_patterns = {
+        "Lead": ("Lead"),
+        "Google Search": ("GOOGLE_SEARCH", "Google Search"),
+        "Google Maps": ("GOOGLE_MAPS", "Google Maps"),
+        "Instagram": ("INSTAGRAM", "Instagram"),
+        "Facebook": ("FACEBOOK", "Facebook"),
+        "WhatsApp": ("WHATSAPP", "WhatsApp"),
+        "Website": ("WEBSITE", "Website"),
+        "Referral": ("REFERRAL", "Referral - Existing Patient", "Referral - Doctor", "Referral - Clinic"),
+        "Walk-In": ("WALK_IN", "Walk-In"),
+        "Campaign": ("CAMPAIGN", "Campaign"),
+        "Doctor Referral": ("DOCTOR_REFERRAL", "CLINIC_REFERRAL"),
+    }
+    all_pat_sources = {v for vals in pat_source_patterns.values() for v in vals} | {"OTHER"}
+    acquisition_sources = ["Lead", "Google Search", "Google Maps", "Instagram", "Facebook", "WhatsApp", "Website", "Referral", "Walk-In", "Campaign", "Doctor Referral", "Other"]
+
+    pat_base = select(Patient)
+    if hospital_id:
+        pat_base = pat_base.where(Patient.hospital_id == hospital_id)
+
+    patients_by_source = []
+    for src_display in acquisition_sources:
+        if src_display == "Lead":
+            src_filter = Patient.patient_source == "Lead"
+        elif src_display == "Other":
+            src_filter = ~Patient.patient_source.in_(all_pat_sources)
+        else:
+            patterns = pat_source_patterns.get(src_display)
+            src_filter = Patient.patient_source.in_(patterns) if patterns else Patient.patient_source.ilike(f"%{src_display}%")
+        pat_q = pat_base.where(src_filter, Patient.patient_source.isnot(None))
+        cnt = (await db.execute(select(func.count()).select_from(pat_q.subquery()))).scalar() or 0
+        patients_by_source.append({"source": src_display, "count": cnt})
+
+    # Monthly acquisition (last 6 months)
+    monthly = []
+    for i in range(5, -1, -1):
+        ym = today - timedelta(days=30 * i)
+        m_start = ym.replace(day=1)
+        m_end = (m_start + timedelta(days=32)).replace(day=1) - timedelta(days=1) if i > 0 else today
+        m_q = pat_base.where(Patient.created_at >= m_start, Patient.created_at <= m_end)
+        m_count = (await db.execute(select(func.count()).select_from(m_q.subquery()))).scalar() or 0
+        monthly.append({"month": m_start.strftime("%b %Y"), "count": m_count})
+
+    # Growth (cumulative)
+    growth = []
+    cumulative = 0
+    for m in monthly:
+        cumulative += m["count"]
+        growth.append({"month": m["month"], "cumulative": cumulative})
+
+    return {
+        "by_source": patients_by_source,
+        "monthly": monthly,
+        "growth": growth,
+    }
+
+
+@router.get("/quick-view/lead-sources")
+async def crm_quick_view_lead_sources(
+    period: str = Query("this_month"),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.VIEW_CRM_DASHBOARD)
+    hospital_id = current_user.get("hospital_id")
+    today = date.today()
+
+    lead_base = select(Lead)
+    if hospital_id:
+        lead_base = lead_base.where(Lead.hospital_id == hospital_id)
+
+    ls_raw = select(Lead.source, func.count(Lead.id).label("count")).where(Lead.source.isnot(None))
+    if hospital_id:
+        ls_raw = ls_raw.where(Lead.hospital_id == hospital_id)
+    ls_raw = ls_raw.group_by(Lead.source).order_by(func.count(Lead.id).desc())
+    sources = []
+    for src, cnt in (await db.execute(ls_raw)).all():
+        conv_q = select(func.count(Lead.id)).where(Lead.source == src, Lead.converted_patient_id.isnot(None))
+        if hospital_id:
+            conv_q = conv_q.where(Lead.hospital_id == hospital_id)
+        conv = (await db.execute(conv_q)).scalar() or 0
+        sources.append({
+            "source": src, "count": cnt,
+            "converted": conv,
+            "conversion_rate": round((conv / cnt) * 100, 1) if cnt > 0 else 0,
+        })
+
+    # Growth trend (last 6 months)
+    growth = []
+    for i in range(5, -1, -1):
+        ym = today - timedelta(days=30 * i)
+        m_start = ym.replace(day=1)
+        m_q = lead_base.where(
+            Lead.created_at >= datetime.combine(m_start, datetime.min.time()),
+            Lead.created_at < datetime.combine((m_start + timedelta(days=32)).replace(day=1), datetime.min.time()))
+        m_count = (await db.execute(select(func.count()).select_from(m_q.subquery()))).scalar() or 0
+        growth.append({"month": m_start.strftime("%b %Y"), "count": m_count})
+
+    return {"sources": sources, "growth_trend": growth}
+
+
+@router.get("/analytics/revenue-by-doctor")
+async def crm_revenue_by_doctor(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.VIEW_CRM_DASHBOARD)
+    hospital_id = current_user.get("hospital_id")
+
+    doc_rev_raw = select(
+        Case.doctor_id,
+        func.coalesce(func.sum(Billing.paid_amount), 0).label("paid_amount"),
+        func.coalesce(func.sum(Billing.pending_amount), 0).label("pending_amount"),
+        func.coalesce(func.sum(Billing.total_amount), 0).label("total_amount"),
+        func.count(func.distinct(Case.patient_id)).label("patient_count"),
+        func.count(func.distinct(Case.id)).label("treatment_count")).select_from(Case).join(Billing, Billing.case_id == Case.id).join(Patient, Patient.id == Case.patient_id).where(Case.doctor_id.isnot(None))
+    if hospital_id:
+        doc_rev_raw = doc_rev_raw.where(Patient.hospital_id == hospital_id)
+        doc_rev_raw = doc_rev_raw.where(
+            Case.doctor_id.in_(
+                select(User.id).where(User.hospital_id == hospital_id, User.role == "DOCTOR")
+            )
+        )
+    doc_rev_raw = doc_rev_raw.group_by(Case.doctor_id).order_by(func.sum(Billing.paid_amount).desc())
+    data = []
+    for row in (await db.execute(doc_rev_raw)).all():
+        d = await db.get(User, row.doctor_id)
+        paid = float(row.paid_amount)
+        total = float(row.total_amount)
+        treatments = row.treatment_count
+        patients = row.patient_count
+        avg_billing = round(total / treatments, 2) if treatments > 0 else 0
+        data.append({
+            "doctor_id": row.doctor_id, "doctor_name": d.full_name if d else "Unknown",
+            "paid_amount": paid, "pending_amount": float(row.pending_amount),
+            "total_amount": total, "patient_count": patients,
+            "treatment_count": treatments, "avg_billing_value": avg_billing,
+        })
+    return data

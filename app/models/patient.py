@@ -27,6 +27,7 @@ class Patient(Base):
     phone: Mapped[str] = mapped_column(String(50), nullable=True)
     email: Mapped[str] = mapped_column(String(255), nullable=True)
     patient_source: Mapped[str] = mapped_column(String(100), index=True, nullable=True)
+    original_source: Mapped[str] = mapped_column(String(100), nullable=True)
     source_campaign_name: Mapped[str] = mapped_column(String(255), nullable=True)
     source_campaign_id: Mapped[str] = mapped_column(String(100), nullable=True)
     source_campaign_date: Mapped[date] = mapped_column(Date, nullable=True)

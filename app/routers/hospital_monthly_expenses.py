@@ -64,7 +64,7 @@ async def get_expense(expense_id: str, db: AsyncSession = Depends(get_db), curre
     expense = await service.get(expense_id)
     if not expense:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Expense not found")
-    await verify_tenant_access(current_user, expense, "hospital_id", db)
+    await verify_tenant_access(current_user, expense, "hospital", db)
     return expense
 
 
@@ -75,7 +75,7 @@ async def update_expense(expense_id: str, data: HospitalMonthlyExpenseUpdate, db
     expense = await service.get(expense_id)
     if not expense:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Expense not found")
-    await verify_tenant_access(current_user, expense, "hospital_id", db)
+    await verify_tenant_access(current_user, expense, "hospital", db)
     expense = await service.update(expense_id, data.model_dump(exclude_none=True), user_id=current_user.get("sub"))
     return expense
 
@@ -87,6 +87,6 @@ async def delete_expense(expense_id: str, db: AsyncSession = Depends(get_db), cu
     expense = await service.get(expense_id)
     if not expense:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Expense not found")
-    await verify_tenant_access(current_user, expense, "hospital_id", db)
+    await verify_tenant_access(current_user, expense, "hospital", db)
     deleted = await service.delete(expense_id, user_id=current_user.get("sub"))
     return MessageResponse(message="Expense deleted successfully")

@@ -131,8 +131,9 @@ export default function BillingList() {
       setDeleteDialogOpen(false)
       setDeletingBilling(null)
     },
-    onError: () => {
-      addToast({ title: "Error", description: "Failed to delete invoice", variant: "destructive" })
+    onError: (err: any) => {
+      const msg = err?.response?.data?.detail || "Failed to delete invoice"
+      addToast({ title: "Error", description: msg, variant: "destructive" })
     },
   })
 

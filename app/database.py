@@ -1,16 +1,12 @@
+from typing import Optional
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 from app.config import settings
 
 
 def create_db_engine():
-    url = settings.DATABASE_URL
-    connect_args = {}
-    if settings.DB_IS_SQLITE:
-        connect_args["check_same_thread"] = False
-        return create_async_engine(url, echo=settings.DEBUG, connect_args=connect_args)
     return create_async_engine(
-        url,
+        settings.DATABASE_URL,
         echo=settings.DEBUG,
         pool_size=20,
         max_overflow=10,

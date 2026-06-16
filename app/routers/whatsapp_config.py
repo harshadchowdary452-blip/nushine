@@ -5,8 +5,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.core.permissions import verify_permission, Permission
+from app.core.permissions import verify_permission, verify_tenant_access, Permission
 from app.models.whatsapp_config import WhatsAppConfig
+from app.models.hospital import Hospital
 
 router = APIRouter(prefix="/whatsapp-config", tags=["WhatsApp Config"])
 
@@ -15,6 +16,7 @@ class WhatsAppConfigResponse(BaseModel):
     id: str
     hospital_id: str
     enabled: bool
+    whatsapp_mode: str
     clinic_whatsapp_number: Optional[str]
     country_code: str
     default_message_templates_enabled: bool
@@ -26,6 +28,7 @@ class WhatsAppConfigResponse(BaseModel):
 
 class WhatsAppConfigUpdate(BaseModel):
     enabled: Optional[bool] = None
+    whatsapp_mode: Optional[str] = None
     clinic_whatsapp_number: Optional[str] = None
     country_code: Optional[str] = None
     default_message_templates_enabled: Optional[bool] = None
@@ -35,6 +38,10 @@ class WhatsAppConfigUpdate(BaseModel):
 
 @router.get("/{hospital_id}", response_model=WhatsAppConfigResponse)
 async def get_whatsapp_config(hospital_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    hosp = await db.get(Hospital, hospital_id)
+    if not hosp:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hospital not found")
+    await verify_tenant_access(current_user, hosp, "hospital", db)
     q = await db.execute(select(WhatsAppConfig).where(WhatsAppConfig.hospital_id == hospital_id))
     config = q.scalar_one_or_none()
     if not config:
@@ -48,6 +55,10 @@ async def get_whatsapp_config(hospital_id: str, db: AsyncSession = Depends(get_d
 @router.put("/{hospital_id}", response_model=WhatsAppConfigResponse)
 async def update_whatsapp_config(hospital_id: str, data: WhatsAppConfigUpdate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_PATIENTS)
+    hosp = await db.get(Hospital, hospital_id)
+    if not hosp:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hospital not found")
+    await verify_tenant_access(current_user, hosp, "hospital", db)
     q = await db.execute(select(WhatsAppConfig).where(WhatsAppConfig.hospital_id == hospital_id))
     config = q.scalar_one_or_none()
     if not config:
@@ -55,8 +66,7 @@ async def update_whatsapp_config(hospital_id: str, data: WhatsAppConfigUpdate, d
         db.add(config)
         await db.flush()
         await db.refresh(config)
-    update_data = data.model_dump(exclude_none=True)
-    for k, v in update_data.items():
+    for k, v in data.model_dump(exclude_none=True).items():
         setattr(config, k, v)
     await db.flush()
     await db.refresh(config)

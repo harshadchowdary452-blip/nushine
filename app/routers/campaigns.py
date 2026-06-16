@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from typing import Optional
 from datetime import date
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,8 +7,19 @@ from app.dependencies import get_current_user
 from app.core.permissions import verify_permission, Permission
 from app.schemas.campaign import CampaignCreate, CampaignUpdate, CampaignResponse, CampaignLaunchResponse, CampaignAnalytics, CampaignRecipientResponse
 from app.services.campaign_service import CampaignService
+from app.models.campaign import Campaign
 
 router = APIRouter(prefix="/campaigns", tags=["Campaigns"])
+
+
+def _verify_hospital_access(entity, current_user):
+    """Raise 403 if the entity's hospital_id doesn't match the user's hospital_id."""
+    role = current_user.get("role")
+    if role in ("HOSPITAL_ADMIN", "DOCTOR"):
+        entity_hid = getattr(entity, "hospital_id", None)
+        user_hid = current_user.get("hospital_id")
+        if entity_hid and user_hid and str(entity_hid) != str(user_hid):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: entity belongs to another hospital")
 
 
 @router.post("/", status_code=201)
@@ -61,6 +72,7 @@ async def get_campaign(
     c = await svc.get(campaign_id)
     if not c:
         raise HTTPException(status_code=404, detail="Campaign not found")
+    _verify_hospital_access(c, current_user)
     return {
         "id": c.id, "name": c.name, "campaign_type": c.campaign_type,
         "channel": c.channel, "target": c.target, "message": c.message,
@@ -83,6 +95,10 @@ async def update_campaign(
 ):
     verify_permission(current_user, Permission.MANAGE_PATIENTS)
     svc = CampaignService(db)
+    existing = await svc.get(campaign_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    _verify_hospital_access(existing, current_user)
     c = await svc.update(campaign_id, data.model_dump(exclude_none=True))
     await db.commit()
     return {"success": True}
@@ -96,8 +112,11 @@ async def delete_campaign(
 ):
     verify_permission(current_user, Permission.MANAGE_PATIENTS)
     svc = CampaignService(db)
-    if not await svc.delete(campaign_id):
+    existing = await svc.get(campaign_id)
+    if not existing:
         raise HTTPException(status_code=404, detail="Campaign not found")
+    _verify_hospital_access(existing, current_user)
+    await svc.delete(campaign_id, user_id=current_user.get("sub"))
     await db.commit()
     return {"success": True}
 
@@ -113,6 +132,10 @@ async def launch_campaign(
     if not hospital_id:
         raise HTTPException(status_code=400, detail="Hospital ID required")
     svc = CampaignService(db)
+    existing = await svc.get(campaign_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    _verify_hospital_access(existing, current_user)
     result = await svc.launch(campaign_id, hospital_id)
     await db.commit()
     return result
@@ -125,6 +148,10 @@ async def get_campaign_recipients(
     current_user: dict = Depends(get_current_user),
 ):
     verify_permission(current_user, Permission.MANAGE_PATIENTS)
+    existing = await db.get(Campaign, campaign_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    _verify_hospital_access(existing, current_user)
     from sqlalchemy import select, desc
     from app.models.campaign import CampaignRecipient
     from app.models.patient import Patient
@@ -199,5 +226,10 @@ async def patient_interactions(
     current_user: dict = Depends(get_current_user),
 ):
     verify_permission(current_user, Permission.MANAGE_PATIENTS)
+    from app.models.patient import Patient
+    pat = await db.get(Patient, patient_id)
+    if not pat:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    _verify_hospital_access(pat, current_user)
     svc = CampaignService(db)
     return await svc.get_patient_interactions(patient_id=patient_id)

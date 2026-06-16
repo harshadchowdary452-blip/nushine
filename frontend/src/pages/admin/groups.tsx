@@ -94,8 +94,9 @@ export default function AdminGroups() {
       setDeleteDialogOpen(false)
       setDeletingGroup(null)
     },
-    onError: () => {
-      addToast({ title: "Error", description: "Failed to delete group", variant: "destructive" })
+    onError: (err: any) => {
+      const msg = err?.response?.data?.detail || "Failed to delete group"
+      addToast({ title: "Error", description: msg, variant: "destructive" })
     },
   })
 

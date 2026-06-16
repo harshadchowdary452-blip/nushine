@@ -1,17 +1,28 @@
 import asyncio
+import traceback
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
+from sqlalchemy.exc import IntegrityError
 from alembic import command
 from alembic.config import Config
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.config import settings
 from app.database import engine
 from app.core.security import hash_password
 from app.core.permissions import Role
 from app.utils.scheduler import check_appointment_reminders, check_same_day_appointments, check_missed_appointments
 from app.routers import auth, admin_groups, hospitals, doctors, consultants, patients, cases, consultant_notes, treatment_plans, treatment_sittings, appointments, billings, pre_ops, post_ops, dashboards, whatsapp_messaging, whatsapp_config, notifications, hospital_monthly_expenses, reports, crm, calendar, status_audit, campaigns, leads
+
+logger = logging.getLogger("app")
+fh = logging.FileHandler("server_errors.log", mode="a")
+fh.setLevel(logging.DEBUG)
+fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+logger.addHandler(fh)
 
 
 def run_migrations():
@@ -73,6 +84,24 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+
+@app.exception_handler(IntegrityError)
+async def integrity_error_handler(request: Request, exc: IntegrityError):
+    tb = traceback.format_exc()
+    with open("server_errors.log", "a") as f:
+        f.write(f"\n===== 409 on {request.method} {request.url.path} =====\n")
+        f.write(f"{tb}\n")
+    return JSONResponse(status_code=409, content={"detail": "Operation failed: this record has related data and cannot be deleted. Try deactivating it instead."})
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    tb = traceback.format_exc()
+    with open("server_errors.log", "a") as f:
+        f.write(f"\n===== 500 on {request.method} {request.url.path} =====\n")
+        f.write(f"{tb}\n")
+    return JSONResponse(status_code=500, content={"detail": f"Internal Server Error: {repr(exc)}", "path": request.url.path})
+
 
 app.add_middleware(
     CORSMiddleware,

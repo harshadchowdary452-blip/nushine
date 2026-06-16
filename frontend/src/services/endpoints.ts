@@ -11,7 +11,7 @@ function withPagination(params?: PaginationParams) {
 }
 
 export const authApi = {
-  login: (data: LoginRequest) => api.post<LoginResponse>("/auth/login", data).then((r) => r.data),
+  login: (data: LoginRequest) => api.post<LoginResponse>("/auth/login", data, { timeout: 30000 }).then((r) => r.data),
   refresh: (refresh_token: string) =>
     api.post<{ access_token: string; refresh_token: string }>("/auth/refresh", { refresh_token }).then((r) => r.data),
   logout: (refresh_token: string) => api.post("/auth/logout", { refresh_token }),
@@ -27,7 +27,7 @@ export const groupsApi = {
   get: (id: string) => api.get(`/admin-groups/${id}`).then((r) => r.data),
   create: (data: any) => api.post("/admin-groups", data).then((r) => r.data),
   update: (id: string, data: any) => api.put(`/admin-groups/${id}`, data).then((r) => r.data),
-  delete: (id: string) => api.delete(`/admin-groups/${id}`),
+  delete: (id: string) => api.delete(`/admin-groups/${id}`).then((r) => r.data),
   createAdmin: (groupId: string, data: any) => api.post(`/admin-groups/${groupId}/admins`, data).then((r) => r.data),
 };
 
@@ -36,7 +36,7 @@ export const hospitalsApi = {
   get: (id: string) => api.get(`/hospitals/${id}`).then((r) => r.data),
   create: (data: any) => api.post("/hospitals", data).then((r) => r.data),
   update: (id: string, data: any) => api.put(`/hospitals/${id}`, data).then((r) => r.data),
-  delete: (id: string) => api.delete(`/hospitals/${id}`),
+  delete: (id: string) => api.delete(`/hospitals/${id}`).then((r) => r.data),
   createAdmin: (hospitalId: string, data: any) => api.post(`/hospitals/${hospitalId}/admins`, data).then((r) => r.data),
 };
 
@@ -45,7 +45,7 @@ export const usersApi = {
   get: (id: string) => api.get(`/users/${id}`).then((r) => r.data),
   create: (data: any) => api.post("/users", data).then((r) => r.data),
   update: (id: string, data: any) => api.put(`/users/${id}`, data).then((r) => r.data),
-  delete: (id: string) => api.delete(`/users/${id}`),
+  delete: (id: string) => api.delete(`/users/${id}`).then((r) => r.data),
 };
 
 export const doctorsApi = {
@@ -62,7 +62,7 @@ export const patientsApi = {
   get: (id: string) => api.get(`/patients/${id}`).then((r) => r.data),
   create: (data: any) => api.post("/patients", data).then((r) => r.data),
   update: (id: string, data: any) => api.put(`/patients/${id}`, data).then((r) => r.data),
-  delete: (id: string) => api.delete(`/patients/${id}`),
+  delete: (id: string) => api.delete(`/patients/${id}`).then((r) => r.data),
   search: (params?: PaginationParams) => api.get("/patients/search", { params: withPagination(params) }).then((r) => r.data),
 };
 
@@ -71,7 +71,7 @@ export const casesApi = {
   get: (id: string) => api.get(`/cases/${id}`).then((r) => r.data),
   create: (data: any) => api.post("/cases", data).then((r) => r.data),
   update: (id: string, data: any) => api.put(`/cases/${id}`, data).then((r) => r.data),
-  delete: (id: string) => api.delete(`/cases/${id}`),
+  delete: (id: string) => api.delete(`/cases/${id}`).then((r) => r.data),
 };
 
 export const appointmentsApi = {
@@ -79,7 +79,7 @@ export const appointmentsApi = {
   get: (id: string) => api.get(`/appointments/${id}`).then((r) => r.data),
   create: (data: any) => api.post("/appointments", data).then((r) => r.data),
   update: (id: string, data: any) => api.put(`/appointments/${id}`, data).then((r) => r.data),
-  delete: (id: string) => api.delete(`/appointments/${id}`),
+  delete: (id: string) => api.delete(`/appointments/${id}`).then((r) => r.data),
   checkAvailability: (params: { doctor_id: string; appointment_date: string; appointment_time: string }) =>
     api.get("/appointments/availability", { params }).then((r) => r.data),
   reassignDoctor: (id: string, data: { doctor_id: string; reason?: string }) =>
@@ -91,7 +91,7 @@ export const consultantsApi = {
   get: (id: string) => api.get(`/consultants/${id}`).then((r) => r.data),
   create: (data: any) => api.post("/consultants", data).then((r) => r.data),
   update: (id: string, data: any) => api.put(`/consultants/${id}`, data).then((r) => r.data),
-  delete: (id: string) => api.delete(`/consultants/${id}`),
+  delete: (id: string) => api.delete(`/consultants/${id}`).then((r) => r.data),
 };
 
 export const consultantNotesApi = {
@@ -106,7 +106,7 @@ export const treatmentApi = {
   create: (data: any) => api.post("/treatment-plans", data).then((r) => r.data),
   update: (id: string, data: any) => api.put(`/treatment-plans/${id}`, data).then((r) => r.data),
   updateStatus: (id: string, status: string) => api.put(`/treatment-plans/${id}/status`, null, { params: { status } }).then((r) => r.data),
-  delete: (id: string) => api.delete(`/treatment-plans/${id}`),
+  delete: (id: string) => api.delete(`/treatment-plans/${id}`).then((r) => r.data),
 };
 
 export const treatmentSittingsApi = {
@@ -121,10 +121,11 @@ export const billingApi = {
   get: (id: string) => api.get(`/billings/${id}`).then((r) => r.data),
   create: (data: any) => api.post("/billings", data).then((r) => r.data),
   update: (id: string, data: any) => api.put(`/billings/${id}`, data).then((r) => r.data),
-  delete: (id: string) => api.delete(`/billings/${id}`),
+  delete: (id: string) => api.delete(`/billings/${id}`).then((r) => r.data),
   updatePayment: (id: string, data: any) => api.put(`/billings/${id}/payment`, data).then((r) => r.data),
   getPdf: (id: string) => api.get(`/billings/${id}/pdf`, { responseType: "blob" }).then((r) => r.data),
   getTransactions: (id: string) => api.get(`/billings/${id}/transactions`).then((r) => r.data),
+  getHistory: (id: string) => api.get(`/billings/${id}/history`).then((r) => r.data),
   applyDiscount: (id: string, data: { discount_type?: string; discount_percent?: number; discount_amount?: number; discount_reason?: string }) =>
     api.put(`/billings/${id}/discount`, data).then((r) => r.data),
 };
@@ -132,7 +133,7 @@ export const billingApi = {
 export const dashboardApi = {
   superAdmin: (params?: { period?: string; start_date?: string; end_date?: string }) =>
     api.get("/dashboards/super-admin", { params }).then((r) => r.data),
-  groupAdmin: (params?: { period?: string; start_date?: string; end_date?: string }) =>
+  groupAdmin: (params?: { period?: string; start_date?: string; end_date?: string; hospital_id?: string }) =>
     api.get("/dashboards/group-admin", { params }).then((r) => r.data),
   hospitalAdmin: (params?: { period?: string; start_date?: string; end_date?: string }) =>
     api.get("/dashboards/hospital-admin", { params }).then((r) => r.data),
@@ -152,7 +153,7 @@ export const expensesApi = {
   get: (id: string) => api.get(`/expenses/${id}`).then((r) => r.data),
   create: (data: any) => api.post("/expenses", data).then((r) => r.data),
   update: (id: string, data: any) => api.put(`/expenses/${id}`, data).then((r) => r.data),
-  delete: (id: string) => api.delete(`/expenses/${id}`),
+  delete: (id: string) => api.delete(`/expenses/${id}`).then((r) => r.data),
 };
 
 export const reportsApi = {
@@ -192,7 +193,7 @@ export const campaignsApi = {
   get: (id: string) => api.get(`/campaigns/${id}`).then((r) => r.data),
   create: (data: any) => api.post("/campaigns", data).then((r) => r.data),
   update: (id: string, data: any) => api.put(`/campaigns/${id}`, data).then((r) => r.data),
-  delete: (id: string) => api.delete(`/campaigns/${id}`),
+  delete: (id: string) => api.delete(`/campaigns/${id}`).then((r) => r.data),
   launch: (id: string) => api.post(`/campaigns/${id}/launch`).then((r) => r.data),
   recipients: (id: string) => api.get(`/campaigns/${id}/recipients`).then((r) => r.data),
   analytics: {
@@ -216,7 +217,7 @@ export const whatsappTemplatesApi = {
   create: (data: { name: string; message: string }) => api.post("/crm/whatsapp-templates", data).then((r) => r.data),
   update: (id: string, data: { name?: string; message?: string; is_active?: boolean }) =>
     api.put(`/crm/whatsapp-templates/${id}`, data).then((r) => r.data),
-  delete: (id: string) => api.delete(`/crm/whatsapp-templates/${id}`),
+  delete: (id: string) => api.delete(`/crm/whatsapp-templates/${id}`).then((r) => r.data),
 };
 
 export const leadsApi = {
@@ -225,7 +226,7 @@ export const leadsApi = {
   create: (data: Partial<Lead>) => api.post<Lead>("/leads", data).then((r) => r.data),
   update: (id: string, data: Partial<Lead>) => api.put<Lead>(`/leads/${id}`, data).then((r) => r.data),
   updateStatus: (id: string, status: string) => api.put<Lead>(`/leads/${id}/status`, { status }).then((r) => r.data),
-  delete: (id: string) => api.delete(`/leads/${id}`),
+  delete: (id: string) => api.delete(`/leads/${id}`).then((r) => r.data),
   getCommunications: (id: string) => api.get<LeadCommunication[]>(`/leads/${id}/communications`).then((r) => r.data),
   addCommunication: (id: string, data: { channel: string; message: string }) =>
     api.post<LeadCommunication>(`/leads/${id}/communications`, data).then((r) => r.data),
@@ -255,7 +256,7 @@ export const crmApi = {
       api.post("/crm/templates", data).then((r) => r.data),
     update: (id: string, data: { name?: string; subject?: string; body?: string; is_active?: boolean }) =>
       api.put(`/crm/templates/${id}`, data).then((r) => r.data),
-    delete: (id: string) => api.delete(`/crm/templates/${id}`),
+    delete: (id: string) => api.delete(`/crm/templates/${id}`).then((r) => r.data),
   },
   followUps: {
     list: (params?: { patient_id?: string; status?: string }) =>
@@ -264,7 +265,7 @@ export const crmApi = {
       api.post("/crm/follow-ups", data).then((r) => r.data),
     update: (id: string, data: { status?: string; notes?: string }) =>
       api.put(`/crm/follow-ups/${id}`, data).then((r) => r.data),
-    delete: (id: string) => api.delete(`/crm/follow-ups/${id}`),
+    delete: (id: string) => api.delete(`/crm/follow-ups/${id}`).then((r) => r.data),
   },
   followUpsFiltered: (params?: {
     filter?: string; follow_up_type?: string; status?: string; patient_id?: string;
@@ -287,7 +288,7 @@ export const crmApi = {
       api.post("/crm/whatsapp-templates", data).then((r) => r.data),
     update: (id: string, data: { name?: string; message?: string; is_active?: boolean }) =>
       api.put(`/crm/whatsapp-templates/${id}`, data).then((r) => r.data),
-    delete: (id: string) => api.delete(`/crm/whatsapp-templates/${id}`),
+    delete: (id: string) => api.delete(`/crm/whatsapp-templates/${id}`).then((r) => r.data),
   },
   feedback: {
     list: (params?: { hospital_id?: string; doctor_id?: string }) =>
@@ -325,6 +326,20 @@ export const crmApi = {
   getTodaysEnquiries: (tab?: string, calendarDate?: string) => api.get("/crm/enquiry/today", { params: { tab, calendar_date: calendarDate } }).then((r) => r.data),
   dashboard2: (params?: { period?: string; start_date?: string; end_date?: string; doctor?: string; source?: string; campaign?: string; staff?: string; lead_status?: string; follow_up_status?: string; priority?: string; enquiry_type?: string; treatment?: string }) =>
     api.get("/crm/dashboard2", { params }).then((r) => r.data),
+  quickView: {
+    leads: (params?: { period?: string; start_date?: string; end_date?: string }) =>
+      api.get("/crm/quick-view/leads", { params }).then((r) => r.data),
+    convertedLeads: (params?: { period?: string; start_date?: string; end_date?: string }) =>
+      api.get("/crm/quick-view/converted-leads", { params }).then((r) => r.data),
+    followUps: (params?: { period?: string; start_date?: string; end_date?: string }) =>
+      api.get("/crm/quick-view/follow-ups", { params }).then((r) => r.data),
+    campaigns: () => api.get("/crm/quick-view/campaigns").then((r) => r.data),
+    patientAcquisition: (params?: { period?: string; start_date?: string; end_date?: string }) =>
+      api.get("/crm/quick-view/patient-acquisition", { params }).then((r) => r.data),
+    leadSources: (params?: { period?: string; start_date?: string; end_date?: string }) =>
+      api.get("/crm/quick-view/lead-sources", { params }).then((r) => r.data),
+  },
+  revenueByDoctor: () => api.get("/crm/analytics/revenue-by-doctor").then((r) => r.data),
 };
 
 

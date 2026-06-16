@@ -94,7 +94,9 @@ async def delete_notification(
     n = await db.get(Notification, notification_id)
     if not n or n.user_id != current_user.get("sub"):
         raise HTTPException(status_code=404, detail="Notification not found")
-    await db.delete(n)
+    n
+    n.deleted_at = datetime.now(timezone.utc)
+    n.deleted_by = current_user.get("sub")
     await db.commit()
     return {"success": True}
 
@@ -109,7 +111,9 @@ async def delete_all_notifications(
         select(Notification).where(Notification.user_id == uid)
     )
     for n in result.scalars().all():
-        await db.delete(n)
+        n
+        n.deleted_at = datetime.now(timezone.utc)
+        n.deleted_by = uid
     await db.commit()
     return {"success": True}
 

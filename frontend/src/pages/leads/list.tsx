@@ -293,9 +293,11 @@ export default function LeadList() {
                           <Calendar className="h-4 w-4 mr-2" /> Book Appointment
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/leads/${lead.id}`) }}>
-                          <Target className="h-4 w-4 mr-2" /> Convert
-                        </DropdownMenuItem>
+                        {lead.status !== "CONVERTED" && lead.status !== "LOST" && lead.status !== "NOT_INTERESTED" && lead.status !== "NO_RESPONSE" && (
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/leads/${lead.id}`) }}>
+                            <Target className="h-4 w-4 mr-2" /> Convert
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </td>

@@ -17,6 +17,9 @@ class BillingRepository(BaseRepository[Billing]):
             hospital_id = filters.pop("hospital_id", None)
             if hospital_id:
                 query = query.join(Case, Billing.case_id == Case.id).join(Patient, Case.patient_id == Patient.id).where(Patient.hospital_id == hospital_id)
+            hospital_ids_in = filters.pop("hospital_id__in", None)
+            if hospital_ids_in:
+                query = query.join(Case, Billing.case_id == Case.id).join(Patient, Case.patient_id == Patient.id).where(Patient.hospital_id.in_(hospital_ids_in))
             for key, value in filters.items():
                 if key.endswith("__in") and isinstance(value, (list, tuple)):
                     attr_name = key[:-4]

@@ -1,5 +1,9 @@
+from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
+
+
+BASE_DIR = Path(__file__).resolve().parents[1]
 
 
 class Settings(BaseSettings):
@@ -10,16 +14,12 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     ENVIRONMENT: str = "development"
 
-    DATABASE_URL: str = "sqlite+aiosqlite:///./dental_hospital.db"
-    DATABASE_URL_SYNC: str = "sqlite:///./dental_hospital.db"
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/nushine"
+    DATABASE_URL_SYNC: str = "postgresql://postgres:postgres@localhost:5432/nushine"
 
     @property
     def DB_IS_POSTGRESQL(self) -> bool:
         return self.DATABASE_URL.startswith("postgresql")
-
-    @property
-    def DB_IS_SQLITE(self) -> bool:
-        return self.DATABASE_URL.startswith("sqlite")
 
     @property
     def DB_DRIVER(self) -> str:
@@ -27,8 +27,6 @@ class Settings(BaseSettings):
             return self.DATABASE_URL.split("://")[0]
         if self.DB_IS_POSTGRESQL:
             return "postgresql+asyncpg"
-        if self.DB_IS_SQLITE:
-            return "sqlite+aiosqlite"
         return self.DATABASE_URL.split("://")[0]
 
     @property

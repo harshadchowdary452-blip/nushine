@@ -1,7 +1,8 @@
 import logging
 from typing import Optional, List
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete as sa_delete
 from fastapi import HTTPException, status
 from app.repositories.case_repository import CaseRepository
 from app.repositories.audit_log_repository import AuditLogRepository
@@ -9,6 +10,12 @@ from app.models.case import Case, CaseStatus
 from app.models.patient import Patient
 from app.models.user import User
 from app.models.appointment import Appointment, AppointmentStatus
+from app.models.billing import Billing
+from app.models.treatment_plan import TreatmentPlan
+from app.models.treatment_sitting import TreatmentSitting
+from app.models.pre_op import PreOp
+from app.models.post_op import PostOp
+from app.models.consultant_note import ConsultantNote
 
 logger = logging.getLogger(__name__)
 
@@ -146,6 +153,14 @@ class CaseService:
 
     async def delete(self, case_id: str, user_id: str = None) -> bool:
         try:
+            await self.db.execute(sa_delete(PreOp).where(PreOp.case_id == case_id))
+            await self.db.execute(sa_delete(PostOp).where(PostOp.case_id == case_id))
+            await self.db.execute(sa_delete(ConsultantNote).where(ConsultantNote.case_id == case_id))
+            tps = (await self.db.execute(select(TreatmentPlan).where(TreatmentPlan.case_id == case_id))).scalars().all()
+            for tp in tps:
+                await self.db.execute(sa_delete(TreatmentSitting).where(TreatmentSitting.treatment_plan_id == tp.id))
+            await self.db.execute(sa_delete(TreatmentPlan).where(TreatmentPlan.case_id == case_id))
+            await self.db.execute(sa_delete(Billing).where(Billing.case_id == case_id))
             result = await self.repo.delete(case_id)
             if result:
                 await self.audit_log_repo.create(user_id=user_id, action="DELETE_CASE", entity_type="CASE", entity_id=case_id, details="Case deleted")

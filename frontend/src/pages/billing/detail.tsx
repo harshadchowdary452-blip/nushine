@@ -64,6 +64,11 @@ export default function BillingDetail() {
     enabled: historyOpen,
   });
 
+  const { data: historyEntries } = useQuery({
+    queryKey: ["billing", id, "history"],
+    queryFn: () => billingApi.getHistory(id!),
+  });
+
   const originalAmount = billing?.original_amount || billing?.total_amount || 0;
 
   const computedDiscount = useMemo(() => {
@@ -172,7 +177,7 @@ export default function BillingDetail() {
         <TabsList className="bg-white border border-border rounded-xl p-1">
           <TabsTrigger value="invoice">Invoice</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
-          <TabsTrigger value="history">History</TabsTrigger>
+          <TabsTrigger value="timeline">Timeline</TabsTrigger>
           <TabsTrigger value="pdf">PDF</TabsTrigger>
         </TabsList>
 
@@ -343,32 +348,69 @@ export default function BillingDetail() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="history" className="mt-6">
+        <TabsContent value="timeline" className="mt-6">
           <Card className="p-6 border-border shadow-card">
             <h2 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
               <History className="h-5 w-5 text-primary" />
-              Payment History
+              Billing Timeline
             </h2>
             {(() => {
-              if (!transactions || transactions.length === 0) {
-                return <p className="text-center text-sm text-text-muted py-8">No payment transactions recorded yet.</p>;
+              if (!historyEntries || historyEntries.length === 0) {
+                return <p className="text-center text-sm text-text-muted py-8">No billing history recorded yet.</p>;
               }
+              const actionConfig: Record<string, { icon: string; color: string; label: string }> = {
+                CREATE_BILLING: { icon: "\u2795", color: "text-blue-600 bg-blue-100", label: "Created" },
+                PAYMENT_UPDATE: { icon: "\uD83D\uDCB0", color: "text-green-600 bg-green-100", label: "Payment" },
+                DISCOUNT_APPLIED: { icon: "\uD83C\uDFAF", color: "text-purple-600 bg-purple-100", label: "Discount" },
+                DELETE_BILLING: { icon: "\u274C", color: "text-red-600 bg-red-100", label: "Deleted" },
+              };
               return (
-                <div className="space-y-3">
-                  {transactions.map((txn: any) => (
-                    <div key={txn.id} className="flex items-center justify-between rounded-lg border p-4">
-                      <div>
-                        <p className="font-semibold text-green-700">{formatIndianRupees(txn.amount)}</p>
-                        <p className="text-xs text-text-muted mt-0.5">
-                          {txn.payment_method || "\u2014"}
-                          {txn.notes ? ` \u00b7 ${txn.notes}` : ""}
-                        </p>
-                      </div>
-                      <p className="text-xs text-text-muted">
-                        {format(new Date(txn.created_at), "MMM dd, yyyy h:mm a")}
-                      </p>
-                    </div>
-                  ))}
+                <div className="relative">
+                  <div className="absolute left-6 top-2 bottom-2 w-0.5 bg-gray-200" />
+                  <div className="space-y-0">
+                    {historyEntries.map((entry: any) => {
+                      const cfg = actionConfig[entry.action] || { icon: "\uD83D\uDCCB", color: "text-gray-600 bg-gray-100", label: entry.action };
+                      return (
+                        <div key={entry.id} className="relative flex gap-4 pb-6 last:pb-0">
+                          <div className={`relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${cfg.color}`}>
+                            <span className="text-sm">{cfg.icon}</span>
+                          </div>
+                          <div className="flex-1 min-w-0 pt-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-semibold text-text-primary">{cfg.label}</p>
+                              <p className="text-xs text-text-muted whitespace-nowrap">
+                                {format(new Date(entry.created_at), "MMM dd, yyyy h:mm a")}
+                              </p>
+                            </div>
+                            {entry.changes_summary && (
+                              <p className="text-sm text-text-secondary mt-0.5">{entry.changes_summary}</p>
+                            )}
+                            {entry.new_data && entry.action !== "DELETE_BILLING" && (
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {(() => {
+                                  try {
+                                    const nd = JSON.parse(entry.new_data);
+                                    return Object.entries(nd).map(([k, v]) => (
+                                      <span key={k} className="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-0.5 text-xs text-text-muted border border-border">
+                                        <span className="capitalize">{k.replace(/_/g, " ")}:</span>
+                                        <span className="font-medium text-text-primary">
+                                          {k.includes("amount") || k.includes("paid") || k.includes("pending") || k.includes("total")
+                                            ? formatIndianRupees(Number(v))
+                                            : String(v)}
+                                        </span>
+                                      </span>
+                                    ));
+                                  } catch {
+                                    return null;
+                                  }
+                                })()}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               );
             })()}

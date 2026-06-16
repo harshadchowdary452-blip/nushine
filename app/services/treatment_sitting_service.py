@@ -156,13 +156,13 @@ class TreatmentSittingService:
             logger.exception("UPDATE_TREATMENT_SITTING - Error: %s", str(e))
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update treatment sitting: {str(e)}")
 
-    async def delete(self, sitting_id: str, user_id: str = None) -> bool:
+    async def delete(self, sitting_id: str) -> bool:
         try:
             sitting = await self.repo.get(sitting_id)
             plan_id = sitting.treatment_plan_id if sitting else None
             result = await self.repo.delete(sitting_id)
             if result:
-                await self.audit_log_repo.create(user_id=user_id, action="DELETE_TREATMENT_SITTING", entity_type="TREATMENT_SITTING", entity_id=sitting_id, details="Treatment sitting deleted")
+                await self.audit_log_repo.create(user_id=None, action="DELETE_TREATMENT_SITTING", entity_type="TREATMENT_SITTING", entity_id=sitting_id, details="Treatment sitting deleted")
                 if plan_id:
                     await self._recalculate_plan_sitting_counts(plan_id)
             return result

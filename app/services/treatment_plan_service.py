@@ -180,6 +180,9 @@ class TreatmentPlanService:
 
     async def delete(self, plan_id: str, user_id: str = None) -> bool:
         try:
+            from sqlalchemy import delete as sa_delete
+            from app.models.treatment_sitting import TreatmentSitting
+            await self.db.execute(sa_delete(TreatmentSitting).where(TreatmentSitting.treatment_plan_id == plan_id))
             result = await self.repo.delete(plan_id)
             if result:
                 await self.audit_log_repo.create(user_id=user_id, action="DELETE_TREATMENT_PLAN", entity_type="TREATMENT_PLAN", entity_id=plan_id, details="Treatment plan deleted")

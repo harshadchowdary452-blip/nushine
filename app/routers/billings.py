@@ -8,12 +8,14 @@ import os
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.core.permissions import verify_permission, verify_tenant_access, Permission, Role
+from app.core.tenant import get_hospital_filter
 from app.services.billing_service import BillingService
-from app.schemas.billing import BillingCreate, BillingUpdate, BillingDiscountUpdate, BillingResponse
+from app.schemas.billing import BillingCreate, BillingUpdate, BillingDiscountUpdate, BillingResponse, BillingHistoryResponse
 from app.schemas.common import MessageResponse
 from app.models.case import Case
 from app.models.patient import Patient
 from app.models.hospital import Hospital
+from app.models.billing_history import BillingHistory
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/billings", tags=["Billings"])
@@ -47,42 +49,46 @@ async def get_billings(skip: int = Query(0, ge=0), limit: int = Query(100, ge=1,
             if not patient_case_ids:
                 return []
 
-        role_allowed_case_ids = None
         role = current_user.get("role")
-        if role == Role.DOCTOR.value:
-            case_result = await db.execute(select(Case.id).where(Case.doctor_id == current_user.get("sub")))
-            role_allowed_case_ids = [row[0] for row in case_result.all()]
-        elif role == Role.HOSPITAL_ADMIN.value:
-            hid = hospital_id or current_user.get("hospital_id")
-            if hid:
-                patient_result = await db.execute(select(Patient.id).where(Patient.hospital_id == hid))
-                pids = [row[0] for row in patient_result.all()]
-                if pids:
-                    case_result = await db.execute(select(Case.id).where(Case.patient_id.in_(pids)))
-                    role_allowed_case_ids = [row[0] for row in case_result.all()]
-        elif role == Role.GROUP_ADMIN.value:
-            agid = current_user.get("admin_group_id")
-            if agid:
-                hosp_result = await db.execute(select(Hospital.id).where(Hospital.admin_group_id == agid))
-                hids = [row[0] for row in hosp_result.all()]
-                if hids:
-                    patient_result = await db.execute(select(Patient.id).where(Patient.hospital_id.in_(hids)))
-                    pids = [row[0] for row in patient_result.all()]
-                    if pids:
-                        case_result = await db.execute(select(Case.id).where(Case.patient_id.in_(pids)))
-                        role_allowed_case_ids = [row[0] for row in case_result.all()]
 
-        if patient_case_ids is not None and role_allowed_case_ids is not None:
-            cids = list(set(patient_case_ids) & set(role_allowed_case_ids))
-            if not cids:
+        if role == Role.SUPER_ADMIN.value:
+            if hospital_id:
+                filters["hospital_id"] = hospital_id
+        elif role == Role.HOSPITAL_ADMIN.value:
+            hid = current_user.get("hospital_id")
+            if not hid:
                 return []
-            filters["case_id__in"] = cids
-        elif patient_case_ids is not None:
-            filters["case_id__in"] = patient_case_ids
-        elif role_allowed_case_ids is not None:
+            patient_result = await db.execute(select(Patient.id).where(Patient.hospital_id == hid))
+            pids = [row[0] for row in patient_result.all()]
+            if not pids:
+                return []
+            case_result = await db.execute(select(Case.id).where(Case.patient_id.in_(pids)))
+            role_allowed_case_ids = [row[0] for row in case_result.all()]
             if not role_allowed_case_ids:
                 return []
             filters["case_id__in"] = role_allowed_case_ids
+        elif role == Role.DOCTOR.value:
+            case_result = await db.execute(select(Case.id).where(Case.doctor_id == current_user.get("sub")))
+            role_allowed_case_ids = [row[0] for row in case_result.all()]
+            if not role_allowed_case_ids:
+                return []
+            filters["case_id__in"] = role_allowed_case_ids
+        elif role == Role.GROUP_ADMIN.value:
+            tenant_filter = await get_hospital_filter(current_user, db)
+            if tenant_filter is None or "id" in tenant_filter:
+                return []
+            if "hospital_id__in" in tenant_filter:
+                hids = tenant_filter["hospital_id__in"]
+                patient_result = await db.execute(select(Patient.id).where(Patient.hospital_id.in_(hids)))
+                pids = [row[0] for row in patient_result.all()]
+                if not pids:
+                    return []
+                case_result = await db.execute(select(Case.id).where(Case.patient_id.in_(pids)))
+                role_allowed_case_ids = [row[0] for row in case_result.all()]
+                if not role_allowed_case_ids:
+                    return []
+                filters["case_id__in"] = role_allowed_case_ids
+
         return await service.get_all(skip=skip, limit=limit, filters=filters or None)
     except HTTPException:
         raise
@@ -106,9 +112,25 @@ async def get_billings_by_case(case_id: str, db: AsyncSession = Depends(get_db),
     return await service.get_by_case(case_id)
 
 
+async def _check_billing_hospital(billing_id: str, current_user: dict, db: AsyncSession):
+    """Verify HOSPITAL_ADMIN/DOCTOR can access this billing via its patient's hospital."""
+    role = current_user.get("role")
+    if role not in ("HOSPITAL_ADMIN", "DOCTOR"):
+        return
+    from app.models.billing import Billing as BillingModel
+    q = select(Patient.hospital_id).select_from(BillingModel).join(Case, BillingModel.case_id == Case.id).join(Patient, Case.patient_id == Patient.id).where(BillingModel.id == billing_id)
+    r = await db.execute(q)
+    row = r.one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Billing not found")
+    if str(row[0]) != str(current_user.get("hospital_id")):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+
 @router.get("/{billing_id}/pdf")
 async def get_billing_pdf(billing_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_BILLING)
+    await _check_billing_hospital(billing_id, current_user, db)
     service = BillingService(db)
     pdf_path, error = await service.get_pdf_path(billing_id)
     if not pdf_path:
@@ -123,6 +145,7 @@ async def get_billing_pdf(billing_id: str, db: AsyncSession = Depends(get_db), c
 @router.post("/{billing_id}/pdf/regenerate")
 async def regenerate_billing_pdf(billing_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_BILLING)
+    await _check_billing_hospital(billing_id, current_user, db)
     service = BillingService(db)
     pdf_path, error = await service.regenerate_pdf(billing_id)
     if not pdf_path:
@@ -134,6 +157,7 @@ async def regenerate_billing_pdf(billing_id: str, db: AsyncSession = Depends(get
 @router.delete("/{billing_id}", response_model=MessageResponse)
 async def delete_billing(billing_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_BILLING)
+    await _check_billing_hospital(billing_id, current_user, db)
     service = BillingService(db)
     billing = await service.get(billing_id)
     if not billing:
@@ -146,6 +170,7 @@ async def delete_billing(billing_id: str, db: AsyncSession = Depends(get_db), cu
 @router.get("/{billing_id}", response_model=BillingResponse)
 async def get_billing(billing_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_BILLING)
+    await _check_billing_hospital(billing_id, current_user, db)
     service = BillingService(db)
     billing = await service.get(billing_id)
     if not billing:
@@ -157,6 +182,7 @@ async def get_billing(billing_id: str, db: AsyncSession = Depends(get_db), curre
 @router.put("/{billing_id}/payment", response_model=BillingResponse)
 async def update_payment(billing_id: str, data: BillingUpdate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.UPDATE_BILLING)
+    await _check_billing_hospital(billing_id, current_user, db)
     service = BillingService(db)
     billing = await service.get(billing_id)
     if not billing:
@@ -170,6 +196,7 @@ async def update_payment(billing_id: str, data: BillingUpdate, db: AsyncSession 
 @router.put("/{billing_id}/discount", response_model=BillingResponse)
 async def apply_discount(billing_id: str, data: BillingDiscountUpdate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.UPDATE_BILLING)
+    await _check_billing_hospital(billing_id, current_user, db)
     service = BillingService(db)
     billing = await service.get(billing_id)
     if not billing:
@@ -188,6 +215,7 @@ async def apply_discount(billing_id: str, data: BillingDiscountUpdate, db: Async
 @router.get("/{billing_id}/transactions")
 async def get_billing_transactions(billing_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_BILLING)
+    await _check_billing_hospital(billing_id, current_user, db)
     service = BillingService(db)
     billing = await service.get(billing_id)
     if not billing:
@@ -204,3 +232,18 @@ async def get_billing_transactions(billing_id: str, db: AsyncSession = Depends(g
         }
         for t in transactions
     ]
+
+
+@router.get("/{billing_id}/history", response_model=List[BillingHistoryResponse])
+async def get_billing_history(billing_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.MANAGE_BILLING)
+    await _check_billing_hospital(billing_id, current_user, db)
+    service = BillingService(db)
+    billing = await service.get(billing_id)
+    if not billing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Billing not found")
+    await verify_tenant_access(current_user, billing, "billing", db)
+    r = await db.execute(
+        select(BillingHistory).where(BillingHistory.billing_id == billing_id).order_by(BillingHistory.created_at.desc())
+    )
+    return r.scalars().all()

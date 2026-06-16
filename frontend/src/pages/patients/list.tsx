@@ -59,7 +59,7 @@ const SOURCE_OPTIONS = [
   "Walk-In", "Google Search", "Google Maps", "Instagram", "Facebook",
   "WhatsApp", "Website", "Referral - Existing Patient", "Referral - Doctor",
   "Referral - Clinic", "Advertisement", "Banner", "Newspaper", "YouTube",
-  "Campaign", "Event", "Other",
+  "Campaign", "Event", "Lead", "Other",
 ]
 
 interface PatientForm {
@@ -124,8 +124,9 @@ export default function PatientList() {
       setDeleteDialogOpen(false)
       setDeletingPatient(null)
     },
-    onError: () => {
-      addToast({ title: "Error", description: "Failed to delete patient", variant: "destructive" })
+    onError: (err: any) => {
+      const msg = err?.response?.data?.detail || "Failed to delete patient"
+      addToast({ title: "Error", description: msg, variant: "destructive" })
     },
   })
 
