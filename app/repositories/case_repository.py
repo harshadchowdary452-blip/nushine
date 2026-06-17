@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from app.repositories.base import BaseRepository
-from app.models.case import Case
+from app.models.case import Case, ClinicalFinding
 from app.models.patient import Patient
 from app.models.user import User
 
@@ -17,6 +17,7 @@ class CaseRepository(BaseRepository[Case]):
             selectinload(self.model.patient),
             selectinload(self.model.doctor),
             selectinload(self.model.consultant),
+            selectinload(self.model.findings),
         )
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
@@ -26,6 +27,7 @@ class CaseRepository(BaseRepository[Case]):
             selectinload(self.model.patient),
             selectinload(self.model.doctor),
             selectinload(self.model.consultant),
+            selectinload(self.model.findings),
         )
         if filters:
             hospital_id = filters.pop("hospital_id", None)

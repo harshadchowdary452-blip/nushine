@@ -857,10 +857,19 @@ async def doctor_dashboard(db: AsyncSession = Depends(get_db), current_user: dic
 
     # Appointment capacity
     max_per_hour = 4
-    doctor_hosp_result = await db.execute(select(User.hospital_id).where(User.id == doctor_id))
+    doctor_hosp_result = await db.execute(select(User.hospital_id, User.admin_group_id).where(User.id == doctor_id))
     dh_row = doctor_hosp_result.one_or_none()
-    if dh_row and dh_row[0]:
-        h_set_result = await db.execute(select(Hospital.settings).where(Hospital.id == dh_row[0]))
+    hospital_id_for_capacity = dh_row[0] if dh_row else None
+    admin_group_id_for_capacity = dh_row[1] if dh_row else None
+    if not hospital_id_for_capacity and admin_group_id_for_capacity:
+        # Doctor has no hospital_id; use any hospital in their admin group for settings
+        any_hosp = await db.execute(
+            select(Hospital.id).where(Hospital.admin_group_id == admin_group_id_for_capacity).limit(1)
+        )
+        any_hosp_row = any_hosp.one_or_none()
+        hospital_id_for_capacity = any_hosp_row[0] if any_hosp_row else None
+    if hospital_id_for_capacity:
+        h_set_result = await db.execute(select(Hospital.settings).where(Hospital.id == hospital_id_for_capacity))
         h_set_row = h_set_result.one_or_none()
         if h_set_row and h_set_row[0]:
             try:

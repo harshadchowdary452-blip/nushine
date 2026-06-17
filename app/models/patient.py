@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, date, timezone
-from sqlalchemy import String, DateTime, Date, Text, Boolean, ForeignKey, Enum as SAEnum
+from sqlalchemy import String, DateTime, Date, Text, Boolean, Float, ForeignKey, Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 from enum import Enum
@@ -32,8 +32,14 @@ class Patient(Base):
     source_campaign_id: Mapped[str] = mapped_column(String(100), nullable=True)
     source_campaign_date: Mapped[date] = mapped_column(Date, nullable=True)
     address: Mapped[str] = mapped_column(Text, nullable=True)
+    height: Mapped[float] = mapped_column(Float, nullable=True)
+    weight: Mapped[float] = mapped_column(Float, nullable=True)
+    bp: Mapped[str] = mapped_column(String(20), nullable=True)
+    sugar: Mapped[str] = mapped_column(String(20), nullable=True)
+    spo2: Mapped[str] = mapped_column(String(10), nullable=True)
     medical_history: Mapped[str] = mapped_column(Text, nullable=True)
     diagnosis: Mapped[str] = mapped_column(Text, nullable=True)
+    op_no: Mapped[str] = mapped_column(String(100), nullable=True)
     emergency_contact: Mapped[str] = mapped_column(String(255), nullable=True)
     photo_url: Mapped[str] = mapped_column(String(500), nullable=True)
     status: Mapped[PatientStatus] = mapped_column(SAEnum(PatientStatus, create_constraint=False), default=PatientStatus.NEW, nullable=False)

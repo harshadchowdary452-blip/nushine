@@ -8,7 +8,7 @@ from app.database import get_db
 from app.dependencies import get_current_user
 from app.core.permissions import verify_permission, verify_tenant_access, Permission, Role
 from app.services.appointment_service import AppointmentService
-from app.schemas.appointment import AppointmentCreate, AppointmentUpdate, AppointmentResponse, ReassignDoctorRequest
+from app.schemas.appointment import AppointmentCreate, AppointmentUpdate, AppointmentResponse, ReassignDoctorRequest, DoctorSlotResponse
 from app.schemas.common import MessageResponse
 from app.models.patient import Patient
 from app.models.hospital import Hospital
@@ -52,6 +52,25 @@ async def _scope_appointments_by_role(db: AsyncSession, current_user: dict, filt
     return filters
 
 
+@router.get("/slots", response_model=DoctorSlotResponse)
+async def get_doctor_slots(
+    doctor_id: str = Query(...),
+    date: str = Query(...),
+    duration_minutes: int = Query(30),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Get available time slots for a doctor on a given date."""
+    from datetime import date as date_type
+    from app.services.appointment_service import AppointmentService
+    try:
+        appointment_date = date_type.fromisoformat(date)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date format")
+    service = AppointmentService(db)
+    return await service.get_doctor_slots(doctor_id, appointment_date, duration_minutes)
+
+
 @router.post("/", response_model=AppointmentResponse, status_code=status.HTTP_201_CREATED)
 async def create_appointment(data: AppointmentCreate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     """
@@ -77,21 +96,21 @@ async def create_appointment(data: AppointmentCreate, db: AsyncSession = Depends
     # ===== HOSPITAL_ADMIN TENANT ISOLATION =====
     if role == Role.HOSPITAL_ADMIN.value:
         logger.warning("Validating HOSPITAL_ADMIN tenant isolation...")
-        
+
         if not current_user_hospital_id:
             logger.warning("FAIL: HOSPITAL_ADMIN has no hospital_id assigned")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Admin has no hospital assigned"
             )
-        
+
         # Verify patient belongs to admin's hospital
         patient_result = await db.execute(select(Patient.hospital_id).where(Patient.id == data.patient_id))
         patient_row = patient_result.one_or_none()
         if not patient_row:
             logger.warning(f"FAIL: Patient {data.patient_id} not found")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
-        
+
         patient_hospital_id = patient_row[0]
         if patient_hospital_id != current_user_hospital_id:
             logger.warning(f"FAIL: Patient hospital {patient_hospital_id} != Admin hospital {current_user_hospital_id}")
@@ -100,27 +119,32 @@ async def create_appointment(data: AppointmentCreate, db: AsyncSession = Depends
                 detail="Patient belongs to different hospital"
             )
         logger.warning(f"✓ Patient hospital matches: {patient_hospital_id}")
-        
-        # Verify doctor belongs to admin's hospital
-        doctor_result = await db.execute(select(User.hospital_id).where(User.id == data.doctor_id))
+
+        # Verify doctor belongs to admin's admin group (group-level doctor sharing)
+        doctor_result = await db.execute(select(User.admin_group_id).where(User.id == data.doctor_id))
         doctor_row = doctor_result.one_or_none()
         if not doctor_row:
             logger.warning(f"FAIL: Doctor {data.doctor_id} not found")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor not found")
-        
-        doctor_hospital_id = doctor_row[0]
-        if doctor_hospital_id != current_user_hospital_id:
-            logger.warning(f"FAIL: Doctor hospital {doctor_hospital_id} != Admin hospital {current_user_hospital_id}")
+
+        doctor_admin_group_id = doctor_row[0]
+        # Get admin's admin_group_id from their hospital
+        admin_hosp_result = await db.execute(select(Hospital.admin_group_id).where(Hospital.id == current_user_hospital_id))
+        admin_hosp_row = admin_hosp_result.one_or_none()
+        admin_group_id_from_hospital = admin_hosp_row[0] if admin_hosp_row else None
+
+        if not admin_group_id_from_hospital or doctor_admin_group_id != admin_group_id_from_hospital:
+            logger.warning(f"FAIL: Doctor admin_group {doctor_admin_group_id} != Admin's hospital admin_group {admin_group_id_from_hospital}")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Doctor belongs to different hospital"
+                detail="Doctor not in your admin group"
             )
-        logger.warning(f"✓ Doctor hospital matches: {doctor_hospital_id}")
-    
+        logger.warning(f"✓ Doctor in same admin group: {admin_group_id_from_hospital}")
+
     # ===== GROUP_ADMIN TENANT ISOLATION =====
     elif role == Role.GROUP_ADMIN.value:
         logger.warning("Validating GROUP_ADMIN tenant isolation...")
-        
+
         admin_group_id = current_user.get("admin_group_id")
         if not admin_group_id:
             logger.warning("FAIL: GROUP_ADMIN has no admin_group_id assigned")
@@ -128,19 +152,19 @@ async def create_appointment(data: AppointmentCreate, db: AsyncSession = Depends
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Admin has no group assigned"
             )
-        
+
         # Verify patient's hospital belongs to admin's group
         patient_result = await db.execute(select(Patient.hospital_id).where(Patient.id == data.patient_id))
         patient_row = patient_result.one_or_none()
         if not patient_row:
             logger.warning(f"FAIL: Patient {data.patient_id} not found")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
-        
+
         patient_hospital_id = patient_row[0]
         hosp_result = await db.execute(select(Hospital.admin_group_id).where(Hospital.id == patient_hospital_id))
         hosp_row = hosp_result.one_or_none()
         patient_admin_group_id = hosp_row[0] if hosp_row else None
-        
+
         if patient_admin_group_id != admin_group_id:
             logger.warning(f"FAIL: Patient admin_group {patient_admin_group_id} != Group Admin group {admin_group_id}")
             raise HTTPException(
@@ -148,21 +172,17 @@ async def create_appointment(data: AppointmentCreate, db: AsyncSession = Depends
                 detail="Patient not in your admin group"
             )
         logger.warning(f"✓ Patient in same admin group: {admin_group_id}")
-        
-        # Verify doctor's hospital belongs to admin's group
-        doctor_result = await db.execute(select(User.hospital_id).where(User.id == data.doctor_id))
+
+        # Verify doctor belongs to admin's group (direct admin_group_id check)
+        doctor_result = await db.execute(select(User.admin_group_id).where(User.id == data.doctor_id))
         doctor_row = doctor_result.one_or_none()
         if not doctor_row:
             logger.warning(f"FAIL: Doctor {data.doctor_id} not found")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor not found")
-        
-        doctor_hospital_id = doctor_row[0]
-        hosp_result = await db.execute(select(Hospital.admin_group_id).where(Hospital.id == doctor_hospital_id))
-        hosp_row = hosp_result.one_or_none()
-        doctor_admin_group_id = hosp_row[0] if hosp_row else None
-        
+
+        doctor_admin_group_id = doctor_row[0]
         if doctor_admin_group_id != admin_group_id:
-            logger.warning(f"FAIL: Doctor admin_group {doctor_admin_group_id} != Group Admin group {admin_group_id}")
+            logger.warning(f"FAIL: Doctor admin_group {doctor_admin_group_id} != Admin group {admin_group_id}")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Doctor not in your admin group"

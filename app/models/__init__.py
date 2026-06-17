@@ -3,11 +3,15 @@ from app.models.hospital import Hospital
 from app.models.user import User
 from app.models.patient import Patient
 from app.models.consultant import Consultant
-from app.models.case import Case
+from app.models.case import Case, ClinicalFinding
 from app.models.consultant_note import ConsultantNote
 from app.models.treatment_plan import TreatmentPlan
 from app.models.treatment_sitting import TreatmentSitting
-from app.models.appointment import Appointment, AppointmentStatus, AppointmentType
+from app.models.appointment import Appointment, AppointmentStatus, AppointmentType, TREATMENT_DURATIONS
+from app.models.doctor_working_hour import DoctorWorkingHour, WEEKDAYS
+from app.models.doctor_availability import DoctorAvailability
+from app.models.doctor_leave import DoctorLeave, LeaveStatus
+from app.models.doctor_blocked_slot import DoctorBlockedSlot
 from app.models.pre_op import PreOp
 from app.models.post_op import PostOp
 from app.models.billing import Billing, DiscountType, PaymentStatus
@@ -42,6 +46,7 @@ __all__ = [
     "FollowUpResponse", "FollowUpResponseStatus", "FeedbackType", "EnquiryOutcome",
     "WhatsAppTemplate",
     "WhatsAppConfig",
+    "DoctorWorkingHour", "DoctorAvailability", "DoctorLeave", "LeaveStatus", "DoctorBlockedSlot", "WEEKDAYS", "TREATMENT_DURATIONS",
     "Lead", "LeadCommunication", "LeadCall", "LeadSource", "LeadStatus", "LeadCallOutcome",
     "BillingHistory",
 ]

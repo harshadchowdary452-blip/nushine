@@ -2,7 +2,7 @@
 import { useState, useMemo } from "react"
 import { useParams, useNavigate, Link } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { ArrowLeft, Calendar, CalendarDays, Clock, User, Activity, FileText, Edit3, Plus, MessageSquare, History, DollarSign, Camera, ZoomIn, ZoomOut, RotateCcw, Download, ExternalLink, Maximize, Minimize } from "lucide-react"
+import { ArrowLeft, Calendar, CalendarDays, Clock, User, Activity, FileText, Edit3, Plus, MessageSquare, History, DollarSign, Camera, ZoomIn, ZoomOut, RotateCcw, Download, ExternalLink, Maximize, Minimize, Eye } from "lucide-react"
 import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -25,6 +25,7 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
+  DialogBody,
   DialogTitle,
   DialogDescription,
   DialogFooter,
@@ -72,6 +73,7 @@ export default function TreatmentDetail() {
   const [sittingForm, setSittingForm] = useState({ sitting_number: 1, work_done: "", doctor_notes: "", next_appointment_date: "", next_appointment_time: "" })
   const [editingSitting, setEditingSitting] = useState<TreatmentSitting | null>(null)
   const [editSittingForm, setEditSittingForm] = useState({ work_done: "", doctor_notes: "", status: "", next_appointment_date: "", next_appointment_time: "" })
+  const [viewSitting, setViewSitting] = useState<TreatmentSitting | null>(null)
 
   const { data: plan, isLoading } = useQuery({
     queryKey: ["treatment-plan", id],
@@ -462,7 +464,11 @@ export default function TreatmentDetail() {
                               <p>Next: {format(new Date(s.next_appointment_date), "dd MMM yy")}{s.next_appointment_time ? ` ${s.next_appointment_time}` : ""}</p>
                             )}
                           </div>
-                          {s.status !== "COMPLETED" && s.status !== "CANCELLED" && (
+                          {(s.status === "COMPLETED" || s.status === "CANCELLED") ? (
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setViewSitting(s)}>
+                              <Eye className="h-3.5 w-3.5" />
+                            </Button>
+                          ) : (
                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
                               setEditingSitting(s)
                               setEditSittingForm({
@@ -541,6 +547,28 @@ export default function TreatmentDetail() {
               </Card>
             )}
           </div>
+          {sittingList.length > 0 && (
+            <Card className="mt-6">
+              <CardHeader><CardTitle className="text-base">Work Done (Sittings)</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                {sittingList.map((s) => (
+                  <div key={s.id} className="rounded-lg border border-border p-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-mono font-semibold">Sitting #{s.sitting_number}</span>
+                      <StatusBadge status={s.status} />
+                      {s.created_at && <span className="text-xs text-muted-foreground ml-auto">{format(new Date(s.created_at), "dd MMM yyyy")}</span>}
+                    </div>
+                    {s.work_done ? (
+                      <p className="text-sm">{s.work_done}</p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">No work recorded</p>
+                    )}
+                    {s.doctor_notes && <p className="text-xs text-muted-foreground mt-1 italic">Notes: {s.doctor_notes}</p>}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="photos" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
@@ -635,7 +663,7 @@ export default function TreatmentDetail() {
 
       {/* Add sitting dialog */}
       <Dialog open={sittingDialogOpen} onOpenChange={setSittingDialogOpen}>
-        <DialogContent className="sm:max-w-[450px]">
+        <DialogContent className="sm:max-w-[450px] max-h-[80vh]">
           <DialogHeader><DialogTitle>Add Sitting</DialogTitle><DialogDescription>Record a new treatment sitting.</DialogDescription></DialogHeader>
           <form onSubmit={(e) => {
             e.preventDefault()
@@ -648,6 +676,7 @@ export default function TreatmentDetail() {
               next_appointment_date: sittingForm.next_appointment_date || undefined,
             })
           }} className="space-y-4">
+            <div className="overflow-y-auto max-h-[55vh] space-y-4 pr-1">
             <div className="grid gap-2">
               <Label>Sitting #</Label>
               <Input type="number" min={1} value={sittingForm.sitting_number} onChange={(e) => setSittingForm({ ...sittingForm, sitting_number: Number(e.target.value) })} />
@@ -670,6 +699,7 @@ export default function TreatmentDetail() {
                 <Input type="time" value={sittingForm.next_appointment_time} onChange={(e) => setSittingForm({ ...sittingForm, next_appointment_time: e.target.value })} />
               </div>
             </div>
+            </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setSittingDialogOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={createSittingMutation.isPending}>Save Sitting</Button>
@@ -680,7 +710,7 @@ export default function TreatmentDetail() {
 
       {/* Mark sitting complete dialog */}
       <Dialog open={!!editingSitting} onOpenChange={(o) => { if (!o) setEditingSitting(null) }}>
-        <DialogContent className="sm:max-w-[450px]">
+        <DialogContent className="sm:max-w-[450px] max-h-[80vh]">
           <DialogHeader><DialogTitle>Mark Sitting Complete</DialogTitle><DialogDescription>Update sitting #{editingSitting?.sitting_number} status.</DialogDescription></DialogHeader>
           <form onSubmit={(e) => {
             e.preventDefault()
@@ -693,6 +723,7 @@ export default function TreatmentDetail() {
             if (editSittingForm.next_appointment_time) data.next_appointment_time = editSittingForm.next_appointment_time
             updateSittingMutation.mutate({ sid: editingSitting.id, data })
           }} className="space-y-4">
+            <div className="overflow-y-auto max-h-[55vh] space-y-4 pr-1">
             <div className="grid gap-2">
               <Label>Status</Label>
               <Select value={editSittingForm.status} onValueChange={(v) => setEditSittingForm({ ...editSittingForm, status: v })}>
@@ -722,11 +753,61 @@ export default function TreatmentDetail() {
                 <Input type="time" value={editSittingForm.next_appointment_time} onChange={(e) => setEditSittingForm({ ...editSittingForm, next_appointment_time: e.target.value })} />
               </div>
             </div>
+            </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setEditingSitting(null)}>Cancel</Button>
               <Button type="submit" disabled={updateSittingMutation.isPending}>Save</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* View sitting dialog */}
+      <Dialog open={!!viewSitting} onOpenChange={(o) => { if (!o) setViewSitting(null) }}>
+        <DialogContent className="sm:max-w-[500px]">
+          {viewSitting && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Sitting #{viewSitting.sitting_number}</DialogTitle>
+                <DialogDescription>Details of this sitting</DialogDescription>
+              </DialogHeader>
+              <DialogBody>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold">Status:</span>
+                    <StatusBadge status={viewSitting.status} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground mb-1">Work Done</p>
+                    <p className="text-sm">{viewSitting.work_done || <span className="italic text-muted-foreground">Not recorded</span>}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground mb-1">Doctor Notes</p>
+                    <p className="text-sm italic">{viewSitting.doctor_notes || <span className="italic text-muted-foreground">No notes</span>}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    {viewSitting.created_at && (
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground mb-1">Created</p>
+                        <p className="text-sm">{format(new Date(viewSitting.created_at), "dd MMM yyyy")}</p>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground mb-1">Next Appointment</p>
+                      <p className="text-sm">
+                        {viewSitting.next_appointment_date
+                          ? `${format(new Date(viewSitting.next_appointment_date), "dd MMM yy")}${viewSitting.next_appointment_time ? ` ${viewSitting.next_appointment_time}` : ""}`
+                          : <span className="italic text-muted-foreground">Not scheduled</span>}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </DialogBody>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setViewSitting(null)}>Close</Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>

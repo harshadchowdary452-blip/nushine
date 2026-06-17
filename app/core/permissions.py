@@ -44,6 +44,7 @@ class Permission(str, Enum):
     COMPLETE_TREATMENT = "COMPLETE_TREATMENT"
     MANAGE_EXPENSES = "MANAGE_EXPENSES"
     VIEW_EXPENSES = "VIEW_EXPENSES"
+    DELETE_EXPENSE = "DELETE_EXPENSE"
     MANAGE_LEADS = "MANAGE_LEADS"
     VIEW_LEADS = "VIEW_LEADS"
     VIEW_CRM_DASHBOARD = "VIEW_CRM_DASHBOARD"
@@ -63,8 +64,8 @@ ROLE_PERMISSIONS = {
         Permission.CREATE_CASE, Permission.MANAGE_CASES,
         Permission.CREATE_TREATMENT_PLAN, Permission.ADD_PRE_OP,
         Permission.ADD_POST_OP, Permission.ASSIGN_CONSULTANT,
-        Permission.UPDATE_BILLING, Permission.COMPLETE_TREATMENT,
-        Permission.MANAGE_EXPENSES, Permission.VIEW_EXPENSES,
+        Permission.UPDATE_BILLING,         Permission.COMPLETE_TREATMENT,
+        Permission.MANAGE_EXPENSES, Permission.VIEW_EXPENSES, Permission.DELETE_EXPENSE,
         Permission.MANAGE_LEADS, Permission.VIEW_LEADS,
         Permission.VIEW_CRM_DASHBOARD,
     ],
@@ -79,7 +80,7 @@ ROLE_PERMISSIONS = {
         Permission.CREATE_CASE, Permission.CREATE_TREATMENT_PLAN,
         Permission.CREATE_CONSULTANT,
         Permission.UPDATE_BILLING,
-        Permission.VIEW_EXPENSES,
+        Permission.MANAGE_EXPENSES, Permission.VIEW_EXPENSES, Permission.DELETE_EXPENSE,
         Permission.MANAGE_LEADS, Permission.VIEW_LEADS,
     ],
     Role.HOSPITAL_ADMIN: [
@@ -90,7 +91,7 @@ ROLE_PERMISSIONS = {
         Permission.CREATE_TREATMENT_PLAN,
         Permission.ADD_PRE_OP, Permission.ADD_POST_OP,
         Permission.UPDATE_BILLING,
-        Permission.MANAGE_EXPENSES,
+        Permission.MANAGE_EXPENSES, Permission.VIEW_EXPENSES,
         Permission.MANAGE_LEADS, Permission.VIEW_LEADS,
         Permission.VIEW_CRM_DASHBOARD,
     ],

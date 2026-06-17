@@ -18,6 +18,7 @@ import { format } from "date-fns"
 import PageHeader from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -73,14 +74,22 @@ interface PatientForm {
   source_campaign_id: string
   source_campaign_date: string
   address: string
+  medical_history: string
   diagnosis: string
+  height: string
+  weight: string
+  bp: string
+  sugar: string
+  spo2: string
+  op_no: string
 }
 
 function getEmptyForm(): PatientForm {
   return {
     full_name: "", email: "", phone: "", gender: "", age: "",
     patient_source: "", source_campaign_name: "", source_campaign_id: "",
-    source_campaign_date: "", address: "", diagnosis: "",
+    source_campaign_date: "", address: "", medical_history: "", diagnosis: "",
+    height: "", weight: "", bp: "", sugar: "", spo2: "", op_no: "",
   }
 }
 
@@ -88,7 +97,8 @@ function stripEmptyFormFields(data: PatientForm): Record<string, unknown> {
   const cleaned: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(data)) {
     if (value !== "" && value !== undefined) {
-      cleaned[key] = value
+      if (key === "height" || key === "weight") cleaned[key] = Number(value)
+      else cleaned[key] = value
     }
   }
   return cleaned
@@ -535,6 +545,15 @@ export default function PatientList() {
                 />
               </div>
               <div className="grid gap-2">
+                <Label htmlFor="op_no">OP No.</Label>
+                <Input
+                  id="op_no"
+                  value={form.op_no}
+                  onChange={(e) => setForm({ ...form, op_no: e.target.value })}
+                  placeholder="e.g. OP-2024-001"
+                />
+              </div>
+              <div className="grid gap-2">
                 <Label htmlFor="diagnosis">Diagnosis</Label>
                 <Input
                   id="diagnosis"
@@ -542,6 +561,40 @@ export default function PatientList() {
                   onChange={(e) => setForm({ ...form, diagnosis: e.target.value })}
                   placeholder="Initial diagnosis..."
                 />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="medical_history">Medical History</Label>
+                <Textarea
+                  id="medical_history"
+                  value={form.medical_history}
+                  onChange={(e) => setForm({ ...form, medical_history: e.target.value })}
+                  placeholder="Past medical history, allergies, medications..."
+                />
+              </div>
+              <div className="border-t pt-4 mt-2">
+                <p className="text-xs font-semibold text-muted-foreground mb-3">Vitals</p>
+                <div className="grid grid-cols-5 gap-3">
+                  <div className="grid gap-1">
+                    <Label htmlFor="height" className="text-xs">Height (cm)</Label>
+                    <Input id="height" type="number" step="0.1" className="h-8 text-xs" value={form.height} onChange={(e) => setForm({ ...form, height: e.target.value })} />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label htmlFor="weight" className="text-xs">Weight (kg)</Label>
+                    <Input id="weight" type="number" step="0.1" className="h-8 text-xs" value={form.weight} onChange={(e) => setForm({ ...form, weight: e.target.value })} />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label htmlFor="bp" className="text-xs">BP</Label>
+                    <Input id="bp" className="h-8 text-xs" placeholder="120/80" value={form.bp} onChange={(e) => setForm({ ...form, bp: e.target.value })} />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label htmlFor="sugar" className="text-xs">Sugar</Label>
+                    <Input id="sugar" className="h-8 text-xs" placeholder="mg/dL" value={form.sugar} onChange={(e) => setForm({ ...form, sugar: e.target.value })} />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label htmlFor="spo2" className="text-xs">SpO2 (%)</Label>
+                    <Input id="spo2" type="number" step="0.1" className="h-8 text-xs" placeholder="98" value={form.spo2} onChange={(e) => setForm({ ...form, spo2: e.target.value })} />
+                  </div>
+                </div>
               </div>
             </div>
             <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-gray-100">

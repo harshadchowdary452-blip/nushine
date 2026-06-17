@@ -139,8 +139,8 @@ export default function LeadDetail() {
 
   const currentUser = useAuthStore((s) => s.user)
   const { data: doctorsData } = useQuery({
-    queryKey: ["doctors", "dropdown", currentUser?.hospital_id],
-    queryFn: () => doctorsApi.list({ page_size: 200, hospital_id: currentUser?.hospital_id || undefined }),
+    queryKey: ["doctors", "leads-dropdown", currentUser?.admin_group_id],
+    queryFn: () => doctorsApi.list({ page_size: 200, admin_group_id: currentUser?.admin_group_id || undefined }),
     enabled: !!currentUser,
   })
   const doctors: any[] = Array.isArray(doctorsData) ? doctorsData : doctorsData?.items || []

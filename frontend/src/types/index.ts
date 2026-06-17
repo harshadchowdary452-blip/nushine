@@ -95,8 +95,14 @@ export interface Patient {
   source_campaign_id: string | null;
   source_campaign_date: string | null;
   address: string | null;
+  height: number | null;
+  weight: number | null;
+  bp: string | null;
+  sugar: string | null;
+  spo2: string | null;
   medical_history: string | null;
   diagnosis: string | null;
+  op_no: string | null;
   photo_url: string | null;
   status: PatientStatus;
   is_active: boolean;
@@ -108,8 +114,19 @@ export type CaseStatus = "NEW" | "DIAGNOSIS_PENDING" | "TREATMENT_PLANNED" | "IN
 
 export type PatientStatus = "NEW" | "ACTIVE" | "UNDER_TREATMENT" | "FOLLOW_UP" | "COMPLETED" | "INACTIVE";
 
+export interface ClinicalFinding {
+  id: string;
+  case_id: string;
+  finding_type: string;
+  tooth_number: string | null;
+  severity: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
 export interface Case {
   id: string;
+  case_number?: string | null;
   patient_id: string;
   doctor_id: string | null;
   consultant_id: string | null;
@@ -118,8 +135,10 @@ export interface Case {
   doctor_name?: string;
   chief_complaint: string;
   diagnosis: string | null;
+  initial_treatment_plan?: string | null;
   status: CaseStatus;
   notes: string | null;
+  findings?: ClinicalFinding[] | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -209,6 +228,9 @@ export interface Appointment {
   doctor_name?: string;
   appointment_date: string;
   appointment_time: string;
+  duration_minutes: number;
+  end_time: string;
+  appointment_type: string;
   status: AppointmentStatus;
   notes: string | null;
   is_active: boolean;
@@ -216,6 +238,85 @@ export interface Appointment {
   updated_at: string;
   patient?: Patient;
   doctor?: User;
+}
+
+export interface TimeSlot {
+  time: string;
+  available: boolean;
+  status: "available" | "booked" | "leave" | "blocked" | "past" | "selected";
+  patient_name?: string;
+  appointment_type?: string;
+  duration_minutes?: number;
+  appointment_id?: string;
+}
+
+export interface DoctorSlotResponse {
+  doctor_id: string;
+  doctor_name: string;
+  date: string;
+  slots: TimeSlot[];
+  is_on_leave: boolean;
+  leave_reason?: string;
+  working_hours?: string;
+}
+
+export interface DoctorWorkingHour {
+  id: string;
+  doctor_id: string;
+  hospital_id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  lunch_start?: string | null;
+  lunch_end?: string | null;
+  is_available: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DoctorAvailability {
+  id: string;
+  doctor_id: string;
+  hospital_id: string;
+  date: string;
+  start_time?: string | null;
+  end_time?: string | null;
+  lunch_start?: string | null;
+  lunch_end?: string | null;
+  is_available: boolean;
+  reason?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DoctorLeave {
+  id: string;
+  doctor_id: string;
+  hospital_id: string;
+  start_date: string;
+  end_date: string;
+  reason?: string | null;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  created_by?: string | null;
+  updated_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DoctorBlockedSlot {
+  id: string;
+  doctor_id: string;
+  hospital_id: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  reason?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export type PaymentStatus = "PENDING" | "PARTIAL" | "PAID" | "OVERDUE";

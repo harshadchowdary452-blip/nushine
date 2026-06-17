@@ -102,18 +102,9 @@ class TreatmentEnquiryService:
             extra_vars={"treatment_name": treatment_name},
         )
 
-    async def on_sitting_completed(self, plan_id: str) -> None:
+    async def on_sitting_completed(self, plan_id: str, sitting_number: int = 0) -> None:
         ctx = await self._get_plan_context(plan_id)
         if not ctx:
-            return
-        existing = await self.db.execute(
-            select(FollowUp).where(
-                FollowUp.treatment_id == plan_id,
-                FollowUp.follow_up_type == FollowUpType.ONE_DAY_POST_TREATMENT.value,
-            )
-        )
-        if existing.scalar_one_or_none():
-            logger.info("1-day follow-up already exists for plan %s, skipping", plan_id)
             return
         today = date.today()
         tomorrow = today + timedelta(days=1)
@@ -129,7 +120,7 @@ class TreatmentEnquiryService:
             follow_up_type=FollowUpType.ONE_DAY_POST_TREATMENT.value,
             status=FollowUpStatus.SCHEDULED.value,
             treatment_completed_date=today,
-            notes=f"Auto-generated: 1-day post treatment check for '{ctx['plan'].treatment_name}'",
+            notes=f"Auto-generated: 1-day post treatment check for '{ctx['plan'].treatment_name}' (sitting #{sitting_number})",
         )
         self.db.add(fu)
         await self.db.flush()

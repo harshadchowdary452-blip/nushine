@@ -29,11 +29,11 @@ async def create_campaign(
     current_user: dict = Depends(get_current_user),
 ):
     verify_permission(current_user, Permission.MANAGE_PATIENTS)
-    hospital_id = current_user.get("hospital_id")
+    hospital_id = current_user.get("hospital_id") or data.hospital_id
     if not hospital_id:
         raise HTTPException(status_code=400, detail="Hospital ID required")
     svc = CampaignService(db)
-    campaign = await svc.create(data.model_dump(), hospital_id=hospital_id, created_by=current_user.get("sub"))
+    campaign = await svc.create(data.model_dump(exclude={"hospital_id"}), hospital_id=hospital_id, created_by=current_user.get("sub"))
     await db.commit()
     return {"id": campaign.id, "name": campaign.name}
 
@@ -116,7 +116,7 @@ async def delete_campaign(
     if not existing:
         raise HTTPException(status_code=404, detail="Campaign not found")
     _verify_hospital_access(existing, current_user)
-    await svc.delete(campaign_id, user_id=current_user.get("sub"))
+    await svc.delete(campaign_id)
     await db.commit()
     return {"success": True}
 
@@ -129,6 +129,8 @@ async def launch_campaign(
 ):
     verify_permission(current_user, Permission.MANAGE_PATIENTS)
     hospital_id = current_user.get("hospital_id")
+    if not hospital_id:
+        hospital_id = getattr(existing, "hospital_id", None)
     if not hospital_id:
         raise HTTPException(status_code=400, detail="Hospital ID required")
     svc = CampaignService(db)

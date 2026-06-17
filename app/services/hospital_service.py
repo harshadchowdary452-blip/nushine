@@ -50,17 +50,38 @@ class HospitalService:
             await self.audit_log_repo.create(user_id=user_id, action="UPDATE_HOSPITAL", entity_type="HOSPITAL", entity_id=hospital_id, details="Hospital updated")
         return hospital
 
-    async def delete(self, hospital_id: str, user_id: str = None) -> bool:
-        import logging
-        logger = logging.getLogger(__name__)
-        try:
-            result = await self.repo.delete(hospital_id)
-            if result:
-                await self.audit_log_repo.create(user_id=user_id, action="DELETE_HOSPITAL", entity_type="HOSPITAL", entity_id=hospital_id, details="Hospital deleted")
-            return result
-        except Exception as e:
-            logger.exception("DELETE_HOSPITAL - Unexpected error: %s", str(e))
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to delete hospital: {str(e)}")
+async def delete(self, hospital_id: str, user_id: str = None) -> bool:
+    import logging
+    from sqlalchemy import select, func
+    from app.models.user import User
+    from app.models.patient import Patient
+    from app.models.consultant import Consultant
+    from app.models.hospital_monthly_expense import HospitalMonthlyExpense as Expense
+    from app.models.campaign import Campaign
+    from app.models.lead import Lead
+    logger = logging.getLogger(__name__)
+    try:
+        # Pre-delete check to give a clear error message
+        counts = {}
+        counts["users"] = (await self.db.execute(select(func.count()).select_from(User).where(User.hospital_id == hospital_id))).scalar()
+        counts["patients"] = (await self.db.execute(select(func.count()).select_from(Patient).where(Patient.hospital_id == hospital_id))).scalar()
+        counts["consultants"] = (await self.db.execute(select(func.count()).select_from(Consultant).where(Consultant.hospital_id == hospital_id))).scalar()
+        counts["expenses"] = (await self.db.execute(select(func.count()).select_from(Expense).where(Expense.hospital_id == hospital_id))).scalar()
+        counts["campaigns"] = (await self.db.execute(select(func.count()).select_from(Campaign).where(Campaign.hospital_id == hospital_id))).scalar()
+        counts["leads"] = (await self.db.execute(select(func.count()).select_from(Lead).where(Lead.hospital_id == hospital_id))).scalar()
+        active = {k: v for k, v in counts.items() if v > 0}
+        if active:
+            detail = "Cannot delete hospital with associated records: " + ", ".join(f"{k} ({v})" for k, v in active.items())
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+        result = await self.repo.delete(hospital_id)
+        if result:
+            await self.audit_log_repo.create(user_id=user_id, action="DELETE_HOSPITAL", entity_type="HOSPITAL", entity_id=hospital_id, details="Hospital deleted")
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("DELETE_HOSPITAL - Unexpected error: %s", str(e))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to delete hospital: {str(e)}")
 
     async def get_analytics(self, hospital_id: str = None) -> Dict[str, Any]:
         return {"total_hospitals": 1 if hospital_id else await self.repo.count(), "total_doctors": await self.user_repo.count({"hospital_id": hospital_id, "role": Role.DOCTOR.value}) if hospital_id else 0, "total_patients": await self.patient_repo.count({"hospital_id": hospital_id}) if hospital_id else 0}

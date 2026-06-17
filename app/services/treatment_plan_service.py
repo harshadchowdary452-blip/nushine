@@ -135,8 +135,10 @@ class TreatmentPlanService:
         self.db.add(appt)
         await self.db.flush()
         try:
-            cnt = await self.db.execute(select(func.count(Appointment.id)))
-            appt.appointment_number = f"APPT-{cnt.scalar():04d}"
+            max_num = await self.db.execute(select(func.max(Appointment.appointment_number)))
+            max_val = max_num.scalar()
+            next_num = (int(max_val.split("-")[1]) + 1) if max_val else 1
+            appt.appointment_number = f"APPT-{next_num:04d}"
             await self.db.flush()
         except Exception:
             pass

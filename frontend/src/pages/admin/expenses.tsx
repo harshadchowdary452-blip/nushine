@@ -254,7 +254,7 @@ export default function AdminExpenses() {
                 ))}
               </SelectContent>
             </Select>
-            {(role === "SUPER_ADMIN") && Array.isArray(hospitals) && (
+            {(role === "SUPER_ADMIN" || role === "GROUP_ADMIN") && Array.isArray(hospitals) && (
               <Select value={filterHospitalId || "all"} onValueChange={(v) => setFilterHospitalId(v !== "all" ? v : undefined)}>
                 <SelectTrigger className="w-[200px]">
                   <Building2 className="h-4 w-4 mr-1" />
@@ -294,7 +294,7 @@ export default function AdminExpenses() {
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Category</th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Amount</th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Month</th>
-                    {role === "SUPER_ADMIN" && <th className="px-4 py-3 text-left font-medium text-muted-foreground">Hospital</th>}
+                    {(role === "SUPER_ADMIN" || role === "GROUP_ADMIN") && <th className="px-4 py-3 text-left font-medium text-muted-foreground">Hospital</th>}
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Actions</th>
                   </tr>
                 </thead>
@@ -323,19 +323,23 @@ export default function AdminExpenses() {
                       <td className="px-4 py-3 text-muted-foreground" data-label="Month">
                         {MONTHS.find((m) => m.value === expense.expense_month)?.label} {expense.expense_year}
                       </td>
-                      {role === "SUPER_ADMIN" && (
+                      {(role === "SUPER_ADMIN" || role === "GROUP_ADMIN") && (
                         <td className="px-4 py-3 text-muted-foreground" data-label="Hospital">
                           {hospitalMap[expense.hospital_id] || expense.hospital_id}
                         </td>
                       )}
                       <td className="px-4 py-3" data-label="Actions">
                         <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => openEditDialog(expense)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => { setDeletingExpense(expense); setDeleteDialogOpen(true) }}>
-                            <Trash2 className="h-4 w-4 text-danger" />
-                          </Button>
+                          {role !== "HOSPITAL_ADMIN" && (
+                            <>
+                              <Button variant="ghost" size="icon" onClick={() => openEditDialog(expense)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => { setDeletingExpense(expense); setDeleteDialogOpen(true) }}>
+                                <Trash2 className="h-4 w-4 text-danger" />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </motion.tr>
@@ -356,7 +360,7 @@ export default function AdminExpenses() {
             </DialogDescription>
           </DialogHeader>
           <DialogBody>
-            {role === "SUPER_ADMIN" && Array.isArray(hospitals) && (
+            {(role === "SUPER_ADMIN" || role === "GROUP_ADMIN") && Array.isArray(hospitals) && (
               <div className="space-y-2 mb-4">
                 <Label>Hospital</Label>
                 <Select value={formData.hospital_id} onValueChange={(v) => setFormData({ ...formData, hospital_id: v })}>

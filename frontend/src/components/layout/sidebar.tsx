@@ -32,6 +32,7 @@ const roleNav: Record<string, NavSection[]> = {
       { label: "Hospitals", icon: Building2, path: "/admin/hospitals" },
       { label: "Doctors", icon: Stethoscope, path: "/admin/doctors" },
     ]},
+    { label: "Finance", items: [{ label: "Expenses", icon: IndianRupee, path: "/admin/expenses" }] },
     { label: "Settings", items: [{ label: "Settings", icon: Settings, path: "/settings" }] },
   ],
   HOSPITAL_ADMIN: [
@@ -60,7 +61,10 @@ const roleNav: Record<string, NavSection[]> = {
     ]},
   ],
   DOCTOR: [
-    { label: "General", items: [{ label: "Dashboard", icon: BarChart3, path: "/" }] },
+    { label: "General", items: [
+      { label: "Dashboard", icon: BarChart3, path: "/" },
+      { label: "Availability", icon: Clock, path: "/doctors/availability" },
+    ] },
     { label: "Clinical", items: [
       { label: "Patients", icon: Users, path: "/patients" },
       { label: "Appointments", icon: CalendarDays, path: "/appointments" },

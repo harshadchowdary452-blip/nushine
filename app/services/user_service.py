@@ -30,8 +30,6 @@ class UserService:
             if not data.get("admin_group_id"):
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="admin_group_id is required for HOSPITAL_ADMIN users")
         elif role_str == Role.DOCTOR.value:
-            if not data.get("hospital_id"):
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="hospital_id is required for DOCTOR users")
             if not data.get("admin_group_id"):
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="admin_group_id is required for DOCTOR users")
 

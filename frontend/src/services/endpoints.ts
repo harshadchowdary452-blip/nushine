@@ -84,6 +84,34 @@ export const appointmentsApi = {
     api.get("/appointments/availability", { params }).then((r) => r.data),
   reassignDoctor: (id: string, data: { doctor_id: string; reason?: string }) =>
     api.post(`/appointments/${id}/reassign-doctor`, data).then((r) => r.data),
+  slots: (params: { doctor_id: string; date: string; duration_minutes?: number }) =>
+    api.get("/appointments/slots", { params }).then((r) => r.data),
+};
+
+export const doctorWorkingHoursApi = {
+  get: (doctorId: string) => api.get(`/doctors/${doctorId}/working-hours/`).then((r) => r.data),
+  bulkUpdate: (doctorId: string, data: { schedules: any[] }) => api.post(`/doctors/${doctorId}/working-hours/bulk`, data).then((r) => r.data),
+};
+
+export const doctorAvailabilityApi = {
+  list: (doctorId: string) => api.get(`/doctors/${doctorId}/availability/`).then((r) => r.data),
+  get: (doctorId: string, overrideId: string) => api.get(`/doctors/${doctorId}/availability/${overrideId}`).then((r) => r.data),
+  create: (doctorId: string, data: any) => api.post(`/doctors/${doctorId}/availability/`, data).then((r) => r.data),
+  update: (doctorId: string, overrideId: string, data: any) => api.put(`/doctors/${doctorId}/availability/${overrideId}`, data).then((r) => r.data),
+  delete: (doctorId: string, overrideId: string) => api.delete(`/doctors/${doctorId}/availability/${overrideId}`).then((r) => r.data),
+};
+
+export const doctorLeavesApi = {
+  list: (doctorId: string) => api.get(`/doctors/${doctorId}/leaves/`).then((r) => r.data),
+  create: (doctorId: string, data: any) => api.post(`/doctors/${doctorId}/leaves/`, data).then((r) => r.data),
+  update: (doctorId: string, leaveId: string, data: any) => api.put(`/doctors/${doctorId}/leaves/${leaveId}`, data).then((r) => r.data),
+  delete: (doctorId: string, leaveId: string) => api.delete(`/doctors/${doctorId}/leaves/${leaveId}`).then((r) => r.data),
+};
+
+export const doctorBlockedSlotsApi = {
+  list: (doctorId: string) => api.get(`/doctors/${doctorId}/blocked-slots/`).then((r) => r.data),
+  create: (doctorId: string, data: any) => api.post(`/doctors/${doctorId}/blocked-slots/`, data).then((r) => r.data),
+  delete: (doctorId: string, slotId: string) => api.delete(`/doctors/${doctorId}/blocked-slots/${slotId}`).then((r) => r.data),
 };
 
 export const consultantsApi = {

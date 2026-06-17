@@ -36,6 +36,7 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw,
+  Download,
 } from "lucide-react"
 
 function StatusBadge({ status }: { status: string }) {
@@ -124,6 +125,20 @@ export default function CaseDetail() {
     statusMutation.mutate(newStatus)
   }
 
+  const downloadPdf = async () => {
+    try {
+      const r = await api.get(`/cases/${id}/pdf`, { responseType: "blob" })
+      const url = window.URL.createObjectURL(new Blob([r.data]))
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `case_${id}.pdf`
+      a.click()
+      window.URL.revokeObjectURL(url)
+    } catch {
+      addToast({ title: "Error", description: "Failed to download PDF", variant: "destructive" })
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="space-y-6 animate-fade-in">
@@ -171,6 +186,10 @@ export default function CaseDetail() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={downloadPdf}>
+              <Download className="h-4 w-4 mr-1" />
+              PDF
+            </Button>
             <Select
               value={caseData.status}
               onValueChange={handleStatusChange}
@@ -247,9 +266,59 @@ export default function CaseDetail() {
               </dl>
             </Card>
 
+            {caseData.initial_treatment_plan && (
+              <Card className="p-6 border-border shadow-card md:col-span-2">
+                <h3 className="text-lg font-semibold mb-4">Initial Treatment Plan</h3>
+                <p className="text-text-secondary whitespace-pre-wrap">{caseData.initial_treatment_plan}</p>
+              </Card>
+            )}
+
+            <Card className="p-6 border-border shadow-card md:col-span-2">
+              <h3 className="text-lg font-semibold mb-4">Clinical Findings</h3>
+              {(!caseData.findings || caseData.findings.length === 0) ? (
+                <p className="text-text-secondary">No clinical findings recorded.</p>
+              ) : (
+                <>
+                  <div className="overflow-x-auto rounded-lg border">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-gray-50 border-b">
+                          <th className="px-4 py-2 text-left font-medium text-gray-500">Tooth</th>
+                          <th className="px-4 py-2 text-left font-medium text-gray-500">Finding</th>
+                          <th className="px-4 py-2 text-left font-medium text-gray-500">Severity</th>
+                          <th className="px-4 py-2 text-left font-medium text-gray-500">Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {caseData.findings.map((f: any) => (
+                          <tr key={f.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                            <td className="px-4 py-2 font-medium">{f.tooth_number || "—"}</td>
+                            <td className="px-4 py-2">{f.finding_type}</td>
+                            <td className="px-4 py-2">{f.severity || "—"}</td>
+                            <td className="px-4 py-2 text-gray-500">{f.notes || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-3 text-xs text-gray-500">
+                    {(() => {
+                      const counts: Record<string, number> = {}
+                      caseData.findings.forEach((f: any) => {
+                        counts[f.finding_type] = (counts[f.finding_type] || 0) + 1
+                      })
+                      return Object.entries(counts).map(([type, count]) => (
+                        <span key={type} className="bg-gray-100 px-2 py-1 rounded"><strong>{type}:</strong> {count}</span>
+                      ))
+                    })()}
+                  </div>
+                </>
+              )}
+            </Card>
+
             {caseData.notes && (
               <Card className="p-6 border-border shadow-card md:col-span-2">
-                <h3 className="text-lg font-semibold mb-4">Notes</h3>
+                <h3 className="text-lg font-semibold mb-4">Doctor Notes</h3>
                 <p className="text-text-secondary whitespace-pre-wrap">{caseData.notes}</p>
               </Card>
             )}

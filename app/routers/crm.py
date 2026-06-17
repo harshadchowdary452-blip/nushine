@@ -2559,6 +2559,11 @@ async def get_enquiry_dashboard(
         recall_q = recall_q.where(FollowUp.hospital_id == hospital_id)
     recall_conversions = (await db.execute(select(func.count()).select_from(recall_q.subquery()))).scalar() or 0
 
+    pending_6month_q = base.where(
+        FollowUp.follow_up_type == "6_MONTH_RECALL",
+        FollowUp.status.notin_(["COMPLETED", "CANCELLED"]))
+    pending_6month_recalls = (await db.execute(select(func.count()).select_from(pending_6month_q.subquery()))).scalar() or 0
+
     follow_ups_q = base.where(FollowUp.follow_up_type == "MANUAL")
     if hospital_id:
         follow_ups_q = follow_ups_q.where(FollowUp.hospital_id == hospital_id)
@@ -2581,6 +2586,7 @@ async def get_enquiry_dashboard(
         "follow_ups_created": follow_ups_created,
         "appointments_created": appointments_created,
         "recall_conversions": recall_conversions,
+        "pending_6month_recalls": pending_6month_recalls,
     }
 
 

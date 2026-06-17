@@ -30,3 +30,7 @@ class User(Base):
     cases = relationship("Case", back_populates="doctor")
     appointments = relationship("Appointment", back_populates="doctor")
     created_expenses = relationship("HospitalMonthlyExpense", back_populates="creator")
+    working_hours = relationship("DoctorWorkingHour", back_populates="doctor", cascade="all, delete-orphan")
+    availability_overrides = relationship("DoctorAvailability", back_populates="doctor", cascade="all, delete-orphan")
+    leaves = relationship("DoctorLeave", back_populates="doctor", cascade="all, delete-orphan")
+    blocked_slots = relationship("DoctorBlockedSlot", back_populates="doctor", cascade="all, delete-orphan")

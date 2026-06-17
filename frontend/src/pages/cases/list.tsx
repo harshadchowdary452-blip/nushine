@@ -68,16 +68,41 @@ const statusVariant: Record<string, "default" | "secondary" | "outline" | "destr
   CANCELLED: "destructive",
 }
 
+interface ClinicalFindingForm {
+  finding_type: string
+  tooth_number: string
+  severity: string
+  notes: string
+}
+
+const FINDING_TYPES = [
+  "Stains", "Calculus", "Decay", "Missing Tooth", "Mobility",
+  "Fracture", "Impaction", "Attrition", "Abrasion", "Sensitivity",
+  "Gingivitis", "Periodontitis", "Restoration", "Crown", "Bridge",
+  "Implant", "Other",
+]
+
+const SEVERITIES = ["Mild", "Moderate", "Severe"]
+
+function getEmptyFinding(): ClinicalFindingForm {
+  return { finding_type: "", tooth_number: "", severity: "", notes: "" }
+}
+
 interface CaseForm {
   patient_id: string
   doctor_id: string
   chief_complaint: string
   diagnosis: string
+  initial_treatment_plan: string
   notes: string
+  findings: ClinicalFindingForm[]
 }
 
 function getEmptyCaseForm(): CaseForm {
-  return { patient_id: "", doctor_id: "", chief_complaint: "", diagnosis: "", notes: "" }
+  return {
+    patient_id: "", doctor_id: "", chief_complaint: "", diagnosis: "",
+    initial_treatment_plan: "", notes: "", findings: [],
+  }
 }
 
 export default function CaseList() {
@@ -104,8 +129,8 @@ export default function CaseList() {
   })
 
   const { data: doctorsData } = useQuery<PaginatedResponse<User>>({
-    queryKey: ["doctors", "dropdown"],
-    queryFn: () => doctorsApi.list({ page_size: 200, hospital_id: currentUser?.hospital_id || undefined }),
+    queryKey: ["doctors", "cases-dropdown"],
+    queryFn: () => doctorsApi.list({ page_size: 200, admin_group_id: currentUser?.admin_group_id || undefined }),
   })
 
   const patients: Patient[] = useMemo(
@@ -474,6 +499,97 @@ export default function CaseList() {
                     onChange={(e) => setForm({ ...form, diagnosis: e.target.value })}
                     placeholder="Enter initial diagnosis..."
                   />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Initial Treatment Plan</Label>
+                  <Textarea
+                    value={form.initial_treatment_plan}
+                    onChange={(e) => setForm({ ...form, initial_treatment_plan: e.target.value })}
+                    placeholder={`Scaling & Root Planing\nRCT on Tooth 46\nComposite Filling on Tooth 16\nExtraction of Tooth 28`}
+                    rows={4}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Clinical Findings</Label>
+                    <Button type="button" variant="outline" size="sm"
+                      onClick={() => setForm({ ...form, findings: [...form.findings, getEmptyFinding()] })}>
+                      + Add Finding
+                    </Button>
+                  </div>
+                  {form.findings.length === 0 && (
+                    <p className="text-xs text-muted-foreground">No findings added yet.</p>
+                  )}
+                  {form.findings.map((finding, i) => (
+                    <div key={i} className="border rounded-lg p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-muted-foreground">Finding {i + 1}</span>
+                        <Button type="button" variant="ghost" size="icon-sm"
+                          onClick={() => setForm({
+                            ...form,
+                            findings: form.findings.filter((_, j) => j !== i),
+                          })}>
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="grid gap-1">
+                          <Label className="text-xs">Finding Type</Label>
+                          <Select value={finding.finding_type}
+                            onValueChange={(v) => {
+                              const updated = [...form.findings]
+                              updated[i] = { ...updated[i], finding_type: v }
+                              setForm({ ...form, findings: updated })
+                            }}>
+                            <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                            <SelectContent>
+                              {FINDING_TYPES.map((ft) => (
+                                <SelectItem key={ft} value={ft}>{ft}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid gap-1">
+                          <Label className="text-xs">Tooth #</Label>
+                          <Input value={finding.tooth_number}
+                            onChange={(e) => {
+                              const updated = [...form.findings]
+                              updated[i] = { ...updated[i], tooth_number: e.target.value }
+                              setForm({ ...form, findings: updated })
+                            }}
+                            placeholder="e.g. 16, 46" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="grid gap-1">
+                          <Label className="text-xs">Severity</Label>
+                          <Select value={finding.severity}
+                            onValueChange={(v) => {
+                              const updated = [...form.findings]
+                              updated[i] = { ...updated[i], severity: v }
+                              setForm({ ...form, findings: updated })
+                            }}>
+                            <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                            <SelectContent>
+                              {SEVERITIES.map((s) => (
+                                <SelectItem key={s} value={s}>{s}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid gap-1">
+                          <Label className="text-xs">Notes</Label>
+                          <Input value={finding.notes}
+                            onChange={(e) => {
+                              const updated = [...form.findings]
+                              updated[i] = { ...updated[i], notes: e.target.value }
+                              setForm({ ...form, findings: updated })
+                            }}
+                            placeholder="e.g. Deep proximal decay" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
                 <div className="grid gap-2">
                   <Label>Notes</Label>

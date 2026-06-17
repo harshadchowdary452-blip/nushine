@@ -10,6 +10,7 @@ class CampaignCreate(BaseModel):
     channel: CampaignChannel = CampaignChannel.WHATSAPP
     target: CampaignTarget = CampaignTarget.ALL
     message: str
+    hospital_id: Optional[str] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
 

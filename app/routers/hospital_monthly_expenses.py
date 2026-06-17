@@ -47,7 +47,10 @@ async def get_expenses(
         hospital_ids = [row[0] for row in result.all()]
         if not hospital_ids:
             return []
-        filters["hospital_id__in"] = hospital_ids
+        if hospital_id and hospital_id in hospital_ids:
+            filters["hospital_id"] = hospital_id
+        else:
+            filters["hospital_id__in"] = hospital_ids
     elif role == Role.SUPER_ADMIN.value and hospital_id:
         filters["hospital_id"] = hospital_id
     if expense_month is not None:
@@ -82,7 +85,7 @@ async def update_expense(expense_id: str, data: HospitalMonthlyExpenseUpdate, db
 
 @router.delete("/{expense_id}", response_model=MessageResponse)
 async def delete_expense(expense_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    verify_permission(current_user, Permission.MANAGE_EXPENSES)
+    verify_permission(current_user, Permission.DELETE_EXPENSE)
     service = HospitalMonthlyExpenseService(db)
     expense = await service.get(expense_id)
     if not expense:

@@ -25,6 +25,7 @@ import {
   User as UserIcon,
   BadgeCheck,
   X,
+  Clock,
 } from "lucide-react"
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay } from "date-fns"
 import PageHeader from "@/components/layout/page-header"
@@ -52,7 +53,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { appointmentsApi, patientsApi, doctorsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
-import type { Appointment, Patient, User, PaginatedResponse } from "@/types"
+import type { Appointment, Patient, User, PaginatedResponse, TimeSlot, DoctorSlotResponse } from "@/types"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/store/authStore"
 
@@ -76,10 +77,140 @@ interface AppointmentForm {
   appointment_date: string
   appointment_time: string
   notes: string
+  appointment_type: string
+  duration_minutes: number
 }
 
+const APPOINTMENT_TYPES = [
+  { value: "CONSULTATION", label: "Consultation", duration: 30 },
+  { value: "FOLLOW_UP", label: "Follow Up", duration: 30 },
+  { value: "TREATMENT", label: "Treatment", duration: 60 },
+  { value: "EMERGENCY", label: "Emergency", duration: 30 },
+  { value: "REVIEW", label: "Review", duration: 30 },
+]
+
 function getEmptyAppointmentForm(): AppointmentForm {
-  return { patient_id: "", doctor_id: "", appointment_date: "", appointment_time: "", notes: "" }
+  return {
+    patient_id: "", doctor_id: "", appointment_date: "", appointment_time: "",
+    notes: "", appointment_type: "CONSULTATION", duration_minutes: 30,
+  }
+}
+
+const SLOT_COLORS: Record<string, string> = {
+  available: "bg-green-100 text-green-800 border-green-300 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700 cursor-pointer",
+  booked: "bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700 cursor-not-allowed opacity-60",
+  leave: "bg-gray-100 text-gray-400 border-gray-200 dark:bg-gray-800 dark:text-gray-500 dark:border-gray-700 cursor-not-allowed opacity-50",
+  blocked: "bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-700 cursor-not-allowed opacity-60",
+  past: "bg-gray-50 text-gray-300 border-gray-100 dark:bg-gray-900 dark:text-gray-600 dark:border-gray-800 cursor-not-allowed opacity-40",
+  selected: "bg-blue-500 text-white border-blue-600 dark:bg-blue-600 dark:border-blue-700 cursor-pointer",
+}
+
+interface SlotGridProps {
+  doctorId: string
+  date: string
+  durationMinutes: number
+  selectedTime: string
+  onSelect: (time: string) => void
+}
+
+function SlotGrid({ doctorId, date, durationMinutes, selectedTime, onSelect }: SlotGridProps) {
+  const { data, isLoading, isError, error } = useQuery<DoctorSlotResponse>({
+    queryKey: ["doctor-slots", doctorId, date, durationMinutes],
+    queryFn: () => appointmentsApi.slots({ doctor_id: doctorId, date, duration_minutes: durationMinutes }),
+    enabled: !!doctorId && !!date,
+    retry: 0,
+  })
+
+  if (isLoading) {
+    return (
+      <div className="rounded-xl border p-4 space-y-2">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="h-2 w-2 rounded-full bg-yellow-400 animate-pulse" />
+          Loading available slots...
+        </div>
+      </div>
+    )
+  }
+
+  if (isError || !data) {
+    return (
+      <div className="rounded-xl border border-red-200 bg-red-50 p-4 space-y-2">
+        <p className="text-sm text-red-600 font-medium">Failed to load slots</p>
+        <p className="text-xs text-red-500">{(error as any)?.response?.data?.detail || (error as any)?.message || "Unknown error"}</p>
+        {date && doctorId && (
+          <p className="text-xs text-red-400">doctor_id={doctorId} date={date} duration={durationMinutes}</p>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-xl border p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-sm font-semibold">
+          {data.doctor_name} — {format(new Date(data.date), "MMM dd, yyyy")}
+        </h4>
+        {data.is_on_leave && (
+          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+            On Leave{data.leave_reason ? `: ${data.leave_reason}` : ""}
+          </span>
+        )}
+      </div>
+
+      {data.working_hours && (
+        <p className="text-xs text-muted-foreground mb-2">Working hours: {data.working_hours}</p>
+      )}
+
+      {data.slots.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-4 text-center">No slots available for this date.</p>
+      ) : (
+        <>
+          <div className="flex items-center gap-3 mb-3 flex-wrap text-xs">
+            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded border border-green-300 bg-green-100 dark:bg-green-900/30 dark:border-green-700" /> Available</span>
+            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded border border-red-300 bg-red-100 dark:bg-red-900/30 dark:border-red-700" /> Booked</span>
+            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded border border-gray-200 bg-gray-100 dark:bg-gray-800 dark:border-gray-700" /> Unavailable</span>
+            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-500" /> Selected</span>
+          </div>
+          <div className="flex flex-wrap gap-2 max-h-56 overflow-y-auto">
+            {data.slots.map((slot) => {
+              const isSelected = selectedTime === slot.time
+              const colorClass = isSelected ? SLOT_COLORS.selected : SLOT_COLORS[slot.status] || SLOT_COLORS.past
+              return (
+                <button
+                  key={slot.time}
+                  type="button"
+                  disabled={slot.status !== "available" && !isSelected}
+                  onClick={() => {
+                    if (slot.status === "available") onSelect(slot.time)
+                  }}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors",
+                    colorClass,
+                  )}
+                  title={
+                    slot.status === "booked"
+                      ? `Booked by ${slot.patient_name || "someone"}${slot.appointment_type ? ` (${slot.appointment_type})` : ""}`
+                      : slot.status === "blocked"
+                        ? "Blocked"
+                        : slot.status === "leave"
+                          ? "Doctor on leave"
+                          : slot.status === "past"
+                            ? "Past time"
+                            : `${slot.time} - Available`
+                  }
+                >
+                  <div className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {slot.time.slice(0, 5).replace(/^0(\d)/, "$1")}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  )
 }
 
 export default function AppointmentList() {
@@ -107,8 +238,8 @@ export default function AppointmentList() {
   })
 
   const { data: doctorsData } = useQuery<PaginatedResponse<User>>({
-    queryKey: ["doctors", "dropdown"],
-    queryFn: () => doctorsApi.list({ page_size: 200, hospital_id: currentUser?.hospital_id || undefined }),
+    queryKey: ["doctors", "appointments-dropdown"],
+    queryFn: () => doctorsApi.list({ page_size: 200, admin_group_id: currentUser?.admin_group_id || undefined }),
   })
 
   const [patientSearch, setPatientSearch] = useState("")
@@ -187,6 +318,7 @@ export default function AppointmentList() {
     mutationFn: (id: string) => appointmentsApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["appointments"], refetchType: "all" })
+      queryClient.invalidateQueries({ queryKey: ["doctor-slots"], refetchType: "all" })
       queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" })
       addToast({ title: "Success", description: "Appointment deleted successfully", variant: "success" })
       setDeleteDialogOpen(false)
@@ -213,6 +345,7 @@ export default function AppointmentList() {
     mutationFn: (data: any) => appointmentsApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["appointments"], refetchType: "all" })
+      queryClient.invalidateQueries({ queryKey: ["doctor-slots"], refetchType: "all" })
       queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" })
       addToast({ title: "Success", description: "Appointment created successfully", variant: "success" })
       resetForm()
@@ -659,6 +792,27 @@ export default function AppointmentList() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="grid gap-2">
+                <Label htmlFor="appointment_type">Appointment Type</Label>
+                <Select
+                  value={form.appointment_type}
+                  onValueChange={(v) => {
+                    const t = APPOINTMENT_TYPES.find((t) => t.value === v)
+                    setForm({ ...form, appointment_type: v, duration_minutes: t?.duration || 30, appointment_time: "" })
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {APPOINTMENT_TYPES.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>
+                        {t.label} ({t.duration} min)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="date">Date</Label>
@@ -667,67 +821,43 @@ export default function AppointmentList() {
                     type="date"
                     value={form.appointment_date}
                     onChange={(e) =>
-                      setForm({ ...form, appointment_date: e.target.value })
+                      setForm({ ...form, appointment_date: e.target.value, appointment_time: "" })
                     }
                     required
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="time">Time</Label>
-                  <Input
-                    id="time"
-                    type="time"
-                    value={form.appointment_time}
-                    onChange={(e) =>
-                      setForm({ ...form, appointment_time: e.target.value })
-                    }
-                    required
-                  />
+                  <Label htmlFor="duration">Duration (min)</Label>
+                  <Select
+                    value={String(form.duration_minutes)}
+                    onValueChange={(v) => {
+                      setForm({ ...form, duration_minutes: Number(v), appointment_time: "" })
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="15">15 min</SelectItem>
+                      <SelectItem value="30">30 min</SelectItem>
+                      <SelectItem value="45">45 min</SelectItem>
+                      <SelectItem value="60">60 min</SelectItem>
+                      <SelectItem value="90">90 min</SelectItem>
+                      <SelectItem value="120">120 min</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
-              {form.doctor_id && form.appointment_date && form.appointment_time && (
-                <div className="rounded-xl border border-[#E2E8F0] dark:border-[#334155] bg-white dark:bg-[#1E293B] p-4">
-                  {checkingAvailability ? (
-                    <div className="flex items-center gap-3">
-                      <div className="h-2 w-2 rounded-full bg-yellow-400 animate-pulse" />
-                      <span className="text-sm text-[#64748B] dark:text-[#CBD5E1]">Checking availability...</span>
-                    </div>
-                  ) : availability ? (
-                    <>
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="text-sm font-medium text-[#0F172A] dark:text-[#F8FAFC]">
-                          {doctors.find(d => d.id === form.doctor_id)?.full_name || "Doctor"}
-                        </h4>
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                          availability.available
-                            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                            : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                        }`}>
-                          {availability.available ? "AVAILABLE" : "FULL"}
-                        </span>
-                      </div>
-                      <div className="text-xs text-[#64748B] dark:text-[#CBD5E1]">
-                        <p>{form.appointment_time.slice(0, 5)} - {String(Number(form.appointment_time.slice(0, 2)) + 1).padStart(2, '0')}:{form.appointment_time.slice(3, 5)}</p>
-                      </div>
-                      <div className="mt-3 flex items-center gap-2">
-                        <div className="flex-1 h-2 rounded-full bg-[#E2E8F0] dark:bg-[#334155]">
-                          <div
-                            className={`h-2 rounded-full transition-all ${
-                              availability.available ? "bg-green-500" : "bg-red-500"
-                            }`}
-                            style={{ width: `${(availability.current_count / availability.max_allowed) * 100}%` }}
-                          />
-                        </div>
-                        <span className="text-xs font-medium text-[#0F172A] dark:text-[#F8FAFC]">
-                          {availability.current_count} / {availability.max_allowed}
-                        </span>
-                      </div>
-                      {!availability.available && availability.message && (
-                        <p className="mt-2 text-xs text-red-600 dark:text-red-400">{availability.message}</p>
-                      )}
-                    </>
-                  ) : null}
-                </div>
+
+              {/* Slot Grid */}
+              {form.doctor_id && form.appointment_date && (
+                <SlotGrid
+                  doctorId={form.doctor_id}
+                  date={form.appointment_date}
+                  durationMinutes={form.duration_minutes}
+                  selectedTime={form.appointment_time}
+                  onSelect={(time) => setForm({ ...form, appointment_time: time })}
+                />
               )}
               <div className="grid gap-2">
                 <Label htmlFor="notes">Notes</Label>

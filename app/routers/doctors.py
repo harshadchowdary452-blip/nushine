@@ -27,48 +27,44 @@ async def create_doctor(data: UserCreate, db: AsyncSession = Depends(get_db), cu
         if current_user.get("admin_group_id"):
             data_dict["admin_group_id"] = current_user.get("admin_group_id")
     elif role == Role.SUPER_ADMIN.value:
-        if not data_dict.get("hospital_id"):
-            if current_user.get("hospital_id"):
-                data_dict["hospital_id"] = current_user.get("hospital_id")
-            else:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="hospital_id is required when creating a doctor as super admin")
         if not data_dict.get("admin_group_id"):
             if current_user.get("admin_group_id"):
                 data_dict["admin_group_id"] = current_user.get("admin_group_id")
-            else:
+            elif data_dict.get("hospital_id"):
                 result = await db.execute(select(Hospital.admin_group_id).where(Hospital.id == data_dict["hospital_id"]))
                 hospital_row = result.one_or_none()
                 if not hospital_row:
                     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hospital not found")
                 data_dict["admin_group_id"] = str(hospital_row[0])
+        if not data_dict.get("hospital_id") and current_user.get("hospital_id"):
+            data_dict["hospital_id"] = current_user.get("hospital_id")
+        if not data_dict.get("admin_group_id"):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="admin_group_id is required when creating a doctor")
     else:
         if not data_dict.get("hospital_id") and current_user.get("hospital_id"):
             data_dict["hospital_id"] = current_user.get("hospital_id")
         if not data_dict.get("admin_group_id") and current_user.get("admin_group_id"):
             data_dict["admin_group_id"] = current_user.get("admin_group_id")
-        if not data_dict.get("hospital_id"):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="hospital_id is required")
     return await service.create(data_dict, user_id=current_user.get("sub"))
 
 
 @router.get("/")
-async def get_doctors(skip: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=200), search: Optional[str] = Query(None), hospital_id: Optional[str] = Query(None), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+async def get_doctors(skip: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=200), search: Optional[str] = Query(None), hospital_id: Optional[str] = Query(None), admin_group_id: Optional[str] = Query(None), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.VIEW_ALL_DOCTORS, Permission.MANAGE_STAFF)
     service = UserService(db)
     filters = {"role": Role.DOCTOR.value}
     if search:
         filters["search"] = search
     role = current_user.get("role")
-    if role == Role.DOCTOR.value:
-        if current_user.get("hospital_id"):
-            filters["hospital_id"] = current_user.get("hospital_id")
-    elif role == Role.HOSPITAL_ADMIN.value:
-        if current_user.get("hospital_id"):
-            filters["hospital_id"] = current_user.get("hospital_id")
+    if role == Role.DOCTOR.value or role == Role.HOSPITAL_ADMIN.value:
+        filters["admin_group_id"] = current_user.get("admin_group_id")
     elif role == Role.GROUP_ADMIN.value:
         filters["admin_group_id"] = current_user.get("admin_group_id")
-    elif role == Role.SUPER_ADMIN.value and hospital_id:
-        filters["hospital_id"] = hospital_id
+    elif role == Role.SUPER_ADMIN.value:
+        if admin_group_id:
+            filters["admin_group_id"] = admin_group_id
+        elif hospital_id:
+            filters["hospital_id"] = hospital_id
     return await service.get_all(skip=skip, limit=limit, filters=filters)
 
 

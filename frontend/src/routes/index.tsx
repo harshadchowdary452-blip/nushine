@@ -40,6 +40,7 @@ const Settings = lazy(() => import("@/pages/settings/profile"));
 const WhatsAppConfigPage = lazy(() => import("@/pages/settings/whatsapp-config"));
 const WhatsAppTemplates = lazy(() => import("@/pages/whatsapp/templates"));
 const WhatsAppBroadcast = lazy(() => import("@/pages/whatsapp/broadcast"));
+const DoctorAvailability = lazy(() => import("@/pages/doctors/availability"));
 const CrmDashboard = lazy(() => import("@/pages/dashboard/crm-dashboard"));
 
 const dashboardByRole: Record<Role, string> = {
@@ -138,6 +139,7 @@ export const router = createBrowserRouter([
       { path: "/patients/:id", element: withRoles(<PatientDetail />, CARE_ROLES) },
       { path: "/appointments", element: withRoles(<AppointmentList />, CARE_ROLES) },
       { path: "/appointments/:id", element: withRoles(<AppointmentDetail />, CARE_ROLES) },
+      { path: "/doctors/availability", element: withRoles(<DoctorAvailability />, ["DOCTOR"]) },
       { path: "/consultants", element: withRoles(<ConsultantList />, ["HOSPITAL_ADMIN"]) },
       { path: "/billing", element: withRoles(<BillingList />, CARE_ROLES) },
       { path: "/billing/:id", element: withRoles(<BillingDetail />, CARE_ROLES) },

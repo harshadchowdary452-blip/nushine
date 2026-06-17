@@ -103,16 +103,8 @@ export default function EnquiryCalendar({ embedded }: { embedded?: boolean }) {
     refetchInterval: 30000,
   })
 
-  // Dashboard metrics for KPI cards (always uses today tab)
-  const { data: dashboard } = useQuery({
-    queryKey: ["enquiry", "dashboard"],
-    queryFn: () => crmApi.getEnquiryDashboard(),
-    refetchInterval: 30000,
-  })
-
   const items: any[] = enquiries || []
 
-  // Calendar navigation helpers
   function calNav(direction: -1 | 1) {
     if (calendarView === "day") setCalDate(d => direction > 0 ? addDays(d, 1) : subDays(d, 1))
     else if (calendarView === "week") setCalDate(d => direction > 0 ? addWeeks(d, 1) : subWeeks(d, 1))
@@ -236,11 +228,6 @@ export default function EnquiryCalendar({ embedded }: { embedded?: boolean }) {
     setRespFeedback("")
   }
 
-  function getKpiValue(key: string): number {
-    if (!dashboard) return 0
-    return dashboard[key] ?? 0
-  }
-
   function renderEnquiryRow(enq: any) {
     return (
       <div key={enq.id} className="rounded-lg border p-4 hover:bg-gray-50 transition-colors">
@@ -325,40 +312,6 @@ export default function EnquiryCalendar({ embedded }: { embedded?: boolean }) {
           description="Manage patient enquiries, record responses, and create follow-ups."
         />
       )}
-
-      {/* KPI Cards */}
-      <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
-        <Card className="border-l-4 border-l-blue-500">
-          <CardContent className="p-3">
-            <p className="text-xs text-muted-foreground">Today's</p>
-            <p className="text-xl font-bold text-blue-600">{getKpiValue("todays_enquiries")}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-l-4 border-l-yellow-500">
-          <CardContent className="p-3">
-            <p className="text-xs text-muted-foreground">Pending</p>
-            <p className="text-xl font-bold text-yellow-600">{getKpiValue("pending_enquiries")}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-l-4 border-l-green-500">
-          <CardContent className="p-3">
-            <p className="text-xs text-muted-foreground">Completed</p>
-            <p className="text-xl font-bold text-green-600">{getKpiValue("completed_enquiries")}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-l-4 border-l-red-500">
-          <CardContent className="p-3">
-            <p className="text-xs text-muted-foreground">Emergency</p>
-            <p className="text-xl font-bold text-red-600">{getKpiValue("emergency_responses")}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-l-4 border-l-purple-500">
-          <CardContent className="p-3">
-            <p className="text-xs text-muted-foreground">Follow-Ups</p>
-            <p className="text-xl font-bold text-purple-600">{getKpiValue("follow_ups_created")}</p>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* Tabs */}
       <div className="flex flex-wrap gap-1 border-b pb-1">

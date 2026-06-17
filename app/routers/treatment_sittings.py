@@ -94,5 +94,5 @@ async def delete_sitting(sitting_id: str, db: AsyncSession = Depends(get_db), cu
     if not sitting:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Treatment sitting not found")
     await verify_tenant_access(current_user, sitting, "sitting", db)
-    deleted = await service.delete(sitting_id, user_id=current_user.get("sub"))
+    deleted = await service.delete(sitting_id)
     return MessageResponse(message="Treatment sitting deleted successfully")

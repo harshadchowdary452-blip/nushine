@@ -229,6 +229,27 @@ export default function AppointmentDetail() {
               <Separator />
               <div className="flex justify-between items-center">
                 <dt className="text-sm text-muted-foreground flex items-center gap-2">
+                  <Clock className="h-3.5 w-3.5" /> Duration
+                </dt>
+                <dd className="text-sm font-medium">{appointment.duration_minutes || 30} min</dd>
+              </div>
+              <Separator />
+              <div className="flex justify-between items-center">
+                <dt className="text-sm text-muted-foreground flex items-center gap-2">
+                  <Clock className="h-3.5 w-3.5" /> End Time
+                </dt>
+                <dd className="text-sm font-medium">{appointment.end_time || "—"}</dd>
+              </div>
+              <Separator />
+              <div className="flex justify-between items-center">
+                <dt className="text-sm text-muted-foreground flex items-center gap-2">
+                  <FileText className="h-3.5 w-3.5" /> Type
+                </dt>
+                <dd className="text-sm font-medium">{appointment.appointment_type || "—"}</dd>
+              </div>
+              <Separator />
+              <div className="flex justify-between items-center">
+                <dt className="text-sm text-muted-foreground flex items-center gap-2">
                   <FileText className="h-3.5 w-3.5" /> Status
                 </dt>
                 <dd>

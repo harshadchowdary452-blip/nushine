@@ -107,12 +107,18 @@ export default function PatientDetail() {
     patient_source: "",
     source_campaign_name: "",
     source_campaign_id: "",
-        source_campaign_date: "",
-        address: "",
-        medical_history: "",
-        diagnosis: "",
-        age: "",
+    source_campaign_date: "",
+    address: "",
+    medical_history: "",
+    diagnosis: "",
+    age: "",
     status: "",
+    height: "",
+    weight: "",
+    bp: "",
+    sugar: "",
+    spo2: "",
+    op_no: "",
   });
 
   // Quick Create dialogs
@@ -244,6 +250,12 @@ export default function PatientDetail() {
         diagnosis: patient.diagnosis || "",
         age: patient.age?.toString() || "",
         status: patient.status || "",
+        height: patient.height?.toString() || "",
+        weight: patient.weight?.toString() || "",
+        bp: patient.bp || "",
+        sugar: patient.sugar || "",
+        spo2: patient.spo2 || "",
+        op_no: patient.op_no || "",
       });
     }
   }, [patient]);
@@ -586,6 +598,14 @@ export default function PatientDetail() {
                           />
                         </div>
                       </div>
+                      <div className="grid gap-2 mt-3">
+                        <Label>OP No.</Label>
+                        <Input
+                          value={editForm.op_no}
+                          onChange={(e) => setEditForm((f) => ({ ...f, op_no: e.target.value }))}
+                          placeholder="e.g. OP-2024-001"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -682,6 +702,36 @@ export default function PatientDetail() {
                     </div>
                   </div>
 
+                  {/* Vitals */}
+                  <div className="rounded-xl border border-gray-100 dark:border-[#334155] p-4 mb-4">
+                    <h4 className="text-sm font-semibold text-primary flex items-center gap-2 mb-3">
+                      <Activity className="h-4 w-4" />
+                      Vitals
+                    </h4>
+                    <div className="grid grid-cols-5 gap-3">
+                      <div className="grid gap-1">
+                        <Label className="text-xs">Height (cm)</Label>
+                        <Input type="number" step="0.1" className="h-8 text-xs" value={editForm.height} onChange={(e) => setEditForm((f) => ({ ...f, height: e.target.value }))} />
+                      </div>
+                      <div className="grid gap-1">
+                        <Label className="text-xs">Weight (kg)</Label>
+                        <Input type="number" step="0.1" className="h-8 text-xs" value={editForm.weight} onChange={(e) => setEditForm((f) => ({ ...f, weight: e.target.value }))} />
+                      </div>
+                      <div className="grid gap-1">
+                        <Label className="text-xs">BP</Label>
+                        <Input className="h-8 text-xs" placeholder="120/80" value={editForm.bp} onChange={(e) => setEditForm((f) => ({ ...f, bp: e.target.value }))} />
+                      </div>
+                      <div className="grid gap-1">
+                        <Label className="text-xs">Sugar</Label>
+                        <Input className="h-8 text-xs" placeholder="mg/dL" value={editForm.sugar} onChange={(e) => setEditForm((f) => ({ ...f, sugar: e.target.value }))} />
+                      </div>
+                      <div className="grid gap-1">
+                        <Label className="text-xs">SpO2 (%)</Label>
+                        <Input type="number" step="0.1" className="h-8 text-xs" placeholder="98" value={editForm.spo2} onChange={(e) => setEditForm((f) => ({ ...f, spo2: e.target.value }))} />
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Status */}
                   <div className="rounded-xl border border-gray-100 dark:border-[#334155] p-4">
                     <h4 className="text-sm font-semibold text-primary flex items-center gap-2 mb-3">
@@ -713,6 +763,7 @@ export default function PatientDetail() {
                       for (const [key, value] of Object.entries(editForm)) {
                         if (value === "" || value === null || value === undefined) continue
                         if (key === "age") cleaned[key] = Number(value)
+                        else if (key === "height" || key === "weight") cleaned[key] = Number(value)
                         else cleaned[key] = value
                       }
                       updateMutation.mutate(cleaned)
@@ -779,6 +830,10 @@ export default function PatientDetail() {
                   <dt className="text-text-secondary">Age</dt>
                   <dd className="font-medium">{patient.age ? `${patient.age} yrs` : "—"}</dd>
                 </div>
+                <div className="flex justify-between">
+                  <dt className="text-text-secondary">OP No.</dt>
+                  <dd className="font-medium">{patient.op_no || "—"}</dd>
+                </div>
               </dl>
             </Card>
 
@@ -830,6 +885,19 @@ export default function PatientDetail() {
               </dl>
             </Card>
 
+            <Card className="p-6 border-border shadow-card md:col-span-2">
+              <h3 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
+                <Activity className="h-5 w-5 text-primary" />
+                Vitals
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+                <div><span className="text-sm text-text-secondary">Height</span><p className="font-semibold">{patient.height ? `${patient.height} cm` : "—"}</p></div>
+                <div><span className="text-sm text-text-secondary">Weight</span><p className="font-semibold">{patient.weight ? `${patient.weight} kg` : "—"}</p></div>
+                <div><span className="text-sm text-text-secondary">BP</span><p className="font-semibold">{patient.bp || "—"}</p></div>
+                <div><span className="text-sm text-text-secondary">Sugar</span><p className="font-semibold">{patient.sugar || "—"}</p></div>
+                <div><span className="text-sm text-text-secondary">SpO2</span><p className="font-semibold">{patient.spo2 || "—"}</p></div>
+              </div>
+            </Card>
             {patient.diagnosis && (
               <Card className="p-6 border-border shadow-card md:col-span-2">
                 <h3 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
@@ -839,15 +907,17 @@ export default function PatientDetail() {
                 <p className="text-text-secondary whitespace-pre-wrap">{patient.diagnosis}</p>
               </Card>
             )}
-            {patient.medical_history && (
-              <Card className="p-6 border-border shadow-card md:col-span-2">
-                <h3 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
-                  <Activity className="h-5 w-5 text-primary" />
-                  Medical History
-                </h3>
+            <Card className="p-6 border-border shadow-card md:col-span-2">
+              <h3 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
+                <Activity className="h-5 w-5 text-primary" />
+                Medical History
+              </h3>
+              {patient.medical_history ? (
                 <p className="text-text-secondary whitespace-pre-wrap">{patient.medical_history}</p>
-              </Card>
-            )}
+              ) : (
+                <p className="text-text-secondary italic">No medical history recorded</p>
+              )}
+            </Card>
           </div>
         </TabsContent>
 

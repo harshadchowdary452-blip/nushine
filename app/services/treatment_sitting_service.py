@@ -58,8 +58,10 @@ class TreatmentSittingService:
         self.db.add(appt)
         await self.db.flush()
         try:
-            cnt = await self.db.execute(select(func.count(Appointment.id)))
-            appt.appointment_number = f"APPT-{cnt.scalar():04d}"
+            max_num = await self.db.execute(select(func.max(Appointment.appointment_number)))
+            max_val = max_num.scalar()
+            next_num = (int(max_val.split("-")[1]) + 1) if max_val else 1
+            appt.appointment_number = f"APPT-{next_num:04d}"
             await self.db.flush()
         except Exception:
             pass
@@ -94,7 +96,7 @@ class TreatmentSittingService:
             if sitting.status == TreatmentSittingStatus.COMPLETED.value:
                 from app.services.treatment_enquiry_service import TreatmentEnquiryService
                 enquiry_svc = TreatmentEnquiryService(self.db)
-                await enquiry_svc.on_sitting_completed(treatment_plan_id)
+                await enquiry_svc.on_sitting_completed(treatment_plan_id, sitting.sitting_number)
                 plan = await self.db.get(TreatmentPlan, treatment_plan_id)
                 if plan and plan.remaining_sittings <= 0:
                     await enquiry_svc.on_treatment_plan_completed(treatment_plan_id)
@@ -145,7 +147,7 @@ class TreatmentSittingService:
                 if now_completed and not was_completed:
                     from app.services.treatment_enquiry_service import TreatmentEnquiryService
                     enquiry_svc = TreatmentEnquiryService(self.db)
-                    await enquiry_svc.on_sitting_completed(sitting.treatment_plan_id)
+                    await enquiry_svc.on_sitting_completed(sitting.treatment_plan_id, sitting.sitting_number)
                 plan = await self.db.get(TreatmentPlan, sitting.treatment_plan_id)
                 if plan and plan.remaining_sittings <= 0:
                     from app.services.treatment_enquiry_service import TreatmentEnquiryService

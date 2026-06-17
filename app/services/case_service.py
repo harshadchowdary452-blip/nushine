@@ -6,7 +6,7 @@ from sqlalchemy import select, func, delete as sa_delete
 from fastapi import HTTPException, status
 from app.repositories.case_repository import CaseRepository
 from app.repositories.audit_log_repository import AuditLogRepository
-from app.models.case import Case, CaseStatus
+from app.models.case import Case, CaseStatus, ClinicalFinding
 from app.models.patient import Patient
 from app.models.user import User
 from app.models.appointment import Appointment, AppointmentStatus
@@ -65,6 +65,8 @@ class CaseService:
             if "status" not in data or not data.get("status"):
                 data["status"] = CaseStatus.OPEN
 
+            findings_data = data.pop("findings", None)
+
             case = await self.repo.create(**data)
             try:
                 cnt = await self.db.execute(select(func.count(Case.id)))
@@ -72,6 +74,13 @@ class CaseService:
                 await self.db.flush()
             except Exception:
                 pass
+
+            if findings_data:
+                for f in findings_data:
+                    finding = ClinicalFinding(case_id=case.id, **f)
+                    self.db.add(finding)
+                await self.db.flush()
+
             logger.info("CREATE_CASE - Success: %s", case.id)
             await self.audit_log_repo.create(user_id=user_id, action="CREATE_CASE", entity_type="CASE", entity_id=str(case.id), details="Case created")
             return case
@@ -112,7 +121,14 @@ class CaseService:
         try:
             if "status" in data:
                 data["status"] = CaseStatus(data["status"])
+            findings_data = data.pop("findings", None)
             case = await self.repo.update(case_id, **data)
+            if findings_data is not None:
+                await self.db.execute(sa_delete(ClinicalFinding).where(ClinicalFinding.case_id == case_id))
+                for f in findings_data:
+                    finding = ClinicalFinding(case_id=case_id, **f)
+                    self.db.add(finding)
+                await self.db.flush()
             if case:
                 await self.audit_log_repo.create(user_id=user_id, action="UPDATE_CASE", entity_type="CASE", entity_id=case_id, details="Case updated")
             return case
@@ -153,6 +169,7 @@ class CaseService:
 
     async def delete(self, case_id: str, user_id: str = None) -> bool:
         try:
+            await self.db.execute(sa_delete(ClinicalFinding).where(ClinicalFinding.case_id == case_id))
             await self.db.execute(sa_delete(PreOp).where(PreOp.case_id == case_id))
             await self.db.execute(sa_delete(PostOp).where(PostOp.case_id == case_id))
             await self.db.execute(sa_delete(ConsultantNote).where(ConsultantNote.case_id == case_id))

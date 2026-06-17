@@ -41,7 +41,12 @@ async def get_patients(skip: int = Query(0, ge=0), limit: int = Query(100, ge=1,
     if status_filter:
         filters["status"] = status_filter
     role = current_user.get("role")
-    if role in (Role.DOCTOR.value, Role.HOSPITAL_ADMIN.value):
+    if role == Role.DOCTOR.value:
+        if current_user.get("sub"):
+            filters["doctor_id"] = current_user.get("sub")
+        if current_user.get("hospital_id"):
+            filters["hospital_id"] = current_user.get("hospital_id")
+    elif role == Role.HOSPITAL_ADMIN.value:
         if current_user.get("hospital_id"):
             filters["hospital_id"] = current_user.get("hospital_id")
     elif role == Role.GROUP_ADMIN.value:
@@ -68,7 +73,11 @@ async def search_patients(q: str = Query(..., min_length=1), hospital_id: Option
     role = current_user.get("role")
     effective_hospital_id = hospital_id
     effective_doctor_id = doctor_id
-    if role in (Role.DOCTOR.value, Role.HOSPITAL_ADMIN.value):
+    if role == Role.DOCTOR.value:
+        effective_doctor_id = current_user.get("sub")
+        if not effective_hospital_id and current_user.get("hospital_id"):
+            effective_hospital_id = current_user.get("hospital_id")
+    elif role == Role.HOSPITAL_ADMIN.value:
         if not effective_hospital_id and current_user.get("hospital_id"):
             effective_hospital_id = current_user.get("hospital_id")
     elif role == Role.GROUP_ADMIN.value:
