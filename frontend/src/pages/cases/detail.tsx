@@ -1,10 +1,13 @@
 import { useParams, useNavigate, Link } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { useState, useRef } from "react"
-import { casesApi, treatmentApi, billingApi } from "@/services/endpoints"
+import { useState, useRef, useMemo } from "react"
+import { casesApi, treatmentApi, billingApi, consentFormsApi } from "@/services/endpoints"
 import api from "@/services/api"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
@@ -25,6 +28,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/components/ui/toast"
 import { formatIndianRupees } from "@/lib/currency"
+import { useAuthStore } from "@/store/authStore"
 import {
   ArrowLeft,
   Camera,
@@ -37,6 +41,9 @@ import {
   ZoomOut,
   RotateCcw,
   Download,
+  Pencil,
+  Clock,
+  Trash2,
 } from "lucide-react"
 
 function StatusBadge({ status }: { status: string }) {
@@ -58,6 +65,11 @@ export default function CaseDetail() {
   const [uploadingPreOpXray, setUploadingPreOpXray] = useState(false)
   const [uploadingPostOp, setUploadingPostOp] = useState(false)
   const [completionDialog, setCompletionDialog] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [editForm, setEditForm] = useState<Record<string, any>>({})
+  const [editFindings, setEditFindings] = useState<any[]>([])
+  const [editDoctorId, setEditDoctorId] = useState("")
+  const currentUser = useAuthStore((s) => s.user)
 
   const { data: caseData, isLoading } = useQuery({
     queryKey: ["case", id],
@@ -75,6 +87,18 @@ export default function CaseDetail() {
     queryKey: ["case-billings", id],
     queryFn: () => billingApi.list({ case_id: id }),
     enabled: !!id,
+  })
+
+  const { data: timelineData } = useQuery({
+    queryKey: ["case-timeline", id],
+    queryFn: () => casesApi.getTimeline(id!),
+    enabled: !!id,
+  })
+
+  const { data: doctorsData } = useQuery({
+    queryKey: ["doctors", "edit-case"],
+    queryFn: () => api.get("/doctors", { params: { limit: 200, admin_group_id: currentUser?.admin_group_id || undefined } }).then((r) => r.data),
+    enabled: editOpen,
   })
 
   const { data: preOps } = useQuery({
@@ -107,6 +131,54 @@ export default function CaseDetail() {
     },
   })
 
+  const editMutation = useMutation({
+    mutationFn: (data: any) => casesApi.update(id!, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["case", id] })
+      queryClient.invalidateQueries({ queryKey: ["case-timeline", id] })
+      addToast({ title: "Success", description: "Case updated" })
+      setEditOpen(false)
+    },
+    onError: (err: any) => {
+      addToast({ title: "Error", description: err?.response?.data?.detail || "Update failed", variant: "destructive" })
+    },
+  })
+
+  const openEditDialog = () => {
+    if (!caseData) return
+    setEditForm({
+      chief_complaint: caseData.chief_complaint || "",
+      diagnosis: caseData.diagnosis || "",
+      initial_treatment_plan: caseData.initial_treatment_plan || "",
+      notes: caseData.notes || "",
+      status: caseData.status,
+    })
+    setEditFindings((caseData.findings || []).map((f: any) => ({
+      finding_type: f.finding_type,
+      tooth_number: f.tooth_number || "",
+      notes: f.notes || "",
+    })))
+    setEditDoctorId(caseData.doctor_id || "")
+    setEditOpen(true)
+  }
+
+  const handleEditSubmit = () => {
+    const payload: Record<string, any> = {}
+    for (const [key, value] of Object.entries(editForm)) {
+      if (value !== "" && value !== undefined) payload[key] = value
+    }
+    if (editDoctorId) payload.doctor_id = editDoctorId
+    if (editFindings.length > 0) payload.findings = editFindings
+    editMutation.mutate(payload)
+  }
+
+  const doctors = useMemo(() => {
+    const d = Array.isArray(doctorsData) ? doctorsData : (doctorsData as any)?.items || []
+    return d
+  }, [doctorsData])
+
+  const timeline = useMemo(() => Array.isArray(timelineData) ? timelineData : [], [timelineData])
+
   const preOpPhotos = preOps?.photo_urls
     ? preOps.photo_urls.split(",").filter(Boolean)
     : []
@@ -128,14 +200,19 @@ export default function CaseDetail() {
   const downloadPdf = async () => {
     try {
       const r = await api.get(`/cases/${id}/pdf`, { responseType: "blob" })
-      const url = window.URL.createObjectURL(new Blob([r.data]))
+      const url = window.URL.createObjectURL(r.data)
       const a = document.createElement("a")
       a.href = url
       a.download = `case_${id}.pdf`
+      document.body.appendChild(a)
       a.click()
-      window.URL.revokeObjectURL(url)
-    } catch {
-      addToast({ title: "Error", description: "Failed to download PDF", variant: "destructive" })
+      setTimeout(() => {
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(url)
+      }, 100)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to download PDF"
+      addToast({ title: "Error", description: msg, variant: "destructive" })
     }
   }
 
@@ -186,6 +263,10 @@ export default function CaseDetail() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={openEditDialog}>
+              <Pencil className="h-4 w-4 mr-1" />
+              Edit
+            </Button>
             <Button variant="outline" size="sm" onClick={downloadPdf}>
               <Download className="h-4 w-4 mr-1" />
               PDF
@@ -218,62 +299,20 @@ export default function CaseDetail() {
           <TabsTrigger value="postop">Post-Op Images</TabsTrigger>
           <TabsTrigger value="treatments">Treatments</TabsTrigger>
           <TabsTrigger value="billing">Billing</TabsTrigger>
+          <TabsTrigger value="consent-forms">Consent Forms</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-6">
             <Card className="p-6 border-border shadow-card">
               <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <FileText className="h-5 w-5 text-primary" />
-                Case Information
+                Chief Complaint
               </h3>
-              <dl className="space-y-3">
-                <div className="flex justify-between">
-                  <dt className="text-text-secondary">Chief Complaint</dt>
-                  <dd className="font-medium text-right max-w-[60%]">{caseData.chief_complaint}</dd>
-                </div>
-                {caseData.diagnosis && (
-                  <div className="flex justify-between">
-                    <dt className="text-text-secondary">Diagnosis</dt>
-                    <dd className="font-medium text-right max-w-[60%]">{caseData.diagnosis}</dd>
-                  </div>
-                )}
-                <div className="flex justify-between">
-                  <dt className="text-text-secondary">Status</dt>
-                  <dd><StatusBadge status={caseData.status} /></dd>
-                </div>
-              </dl>
+              <p className="text-text-secondary">{caseData.chief_complaint}</p>
             </Card>
 
             <Card className="p-6 border-border shadow-card">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <User className="h-5 w-5 text-primary" />
-                People
-              </h3>
-              <dl className="space-y-3">
-                {caseData.doctor_name && (
-                  <div className="flex justify-between">
-                    <dt className="text-text-secondary flex items-center gap-2"><Stethoscope className="h-4 w-4" /> Doctor</dt>
-                    <dd className="font-medium">{caseData.doctor_name}</dd>
-                  </div>
-                )}
-                {caseData.patient_name && (
-                  <div className="flex justify-between">
-                    <dt className="text-text-secondary flex items-center gap-2"><User className="h-4 w-4" /> Patient</dt>
-                    <dd className="font-medium">{caseData.patient_name}</dd>
-                  </div>
-                )}
-              </dl>
-            </Card>
-
-            {caseData.initial_treatment_plan && (
-              <Card className="p-6 border-border shadow-card md:col-span-2">
-                <h3 className="text-lg font-semibold mb-4">Initial Treatment Plan</h3>
-                <p className="text-text-secondary whitespace-pre-wrap">{caseData.initial_treatment_plan}</p>
-              </Card>
-            )}
-
-            <Card className="p-6 border-border shadow-card md:col-span-2">
               <h3 className="text-lg font-semibold mb-4">Clinical Findings</h3>
               {(!caseData.findings || caseData.findings.length === 0) ? (
                 <p className="text-text-secondary">No clinical findings recorded.</p>
@@ -285,7 +324,6 @@ export default function CaseDetail() {
                         <tr className="bg-gray-50 border-b">
                           <th className="px-4 py-2 text-left font-medium text-gray-500">Tooth</th>
                           <th className="px-4 py-2 text-left font-medium text-gray-500">Finding</th>
-                          <th className="px-4 py-2 text-left font-medium text-gray-500">Severity</th>
                           <th className="px-4 py-2 text-left font-medium text-gray-500">Notes</th>
                         </tr>
                       </thead>
@@ -294,7 +332,6 @@ export default function CaseDetail() {
                           <tr key={f.id} className="border-b last:border-b-0 hover:bg-gray-50">
                             <td className="px-4 py-2 font-medium">{f.tooth_number || "—"}</td>
                             <td className="px-4 py-2">{f.finding_type}</td>
-                            <td className="px-4 py-2">{f.severity || "—"}</td>
                             <td className="px-4 py-2 text-gray-500">{f.notes || "—"}</td>
                           </tr>
                         ))}
@@ -316,12 +353,88 @@ export default function CaseDetail() {
               )}
             </Card>
 
+            {caseData.diagnosis && (
+              <Card className="p-6 border-border shadow-card">
+                <h3 className="text-lg font-semibold mb-4">Diagnosis</h3>
+                <p className="text-text-secondary whitespace-pre-wrap">{caseData.diagnosis}</p>
+              </Card>
+            )}
+
+            {caseData.initial_treatment_plan && (
+              <Card className="p-6 border-border shadow-card">
+                <h3 className="text-lg font-semibold mb-4">Initial Treatment Plan</h3>
+                <p className="text-text-secondary whitespace-pre-wrap">{caseData.initial_treatment_plan}</p>
+              </Card>
+            )}
+
             {caseData.notes && (
-              <Card className="p-6 border-border shadow-card md:col-span-2">
+              <Card className="p-6 border-border shadow-card">
                 <h3 className="text-lg font-semibold mb-4">Doctor Notes</h3>
                 <p className="text-text-secondary whitespace-pre-wrap">{caseData.notes}</p>
               </Card>
             )}
+
+            <Card className="p-6 border-border shadow-card">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <User className="h-5 w-5 text-primary" />
+                Case Info
+              </h3>
+              <dl className="space-y-3">
+                <div className="flex justify-between">
+                  <dt className="text-text-secondary">Status</dt>
+                  <dd><StatusBadge status={caseData.status} /></dd>
+                </div>
+                {caseData.doctor_name && (
+                  <div className="flex justify-between">
+                    <dt className="text-text-secondary flex items-center gap-2"><Stethoscope className="h-4 w-4" /> Doctor</dt>
+                    <dd className="font-medium">{caseData.doctor_name}</dd>
+                  </div>
+                )}
+                {caseData.patient_name && (
+                  <div className="flex justify-between">
+                    <dt className="text-text-secondary flex items-center gap-2"><User className="h-4 w-4" /> Patient</dt>
+                    <dd className="font-medium">{caseData.patient_name}</dd>
+                  </div>
+                )}
+              </dl>
+            </Card>
+
+            <Card className="p-6 border-border shadow-card">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Clock className="h-5 w-5 text-primary" />
+                Case Timeline
+              </h3>
+              {timeline.length === 0 ? (
+                <p className="text-text-secondary text-sm">No timeline entries yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {timeline.map((entry: any) => (
+                    <div key={entry.id} className="flex gap-3 pb-3 border-b last:border-b-0">
+                      <div className="flex flex-col items-center gap-1">
+                        <div className="h-2.5 w-2.5 rounded-full bg-primary shrink-0 mt-1.5" />
+                        <div className="w-px flex-1 bg-border" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 text-xs text-text-muted">
+                          <span>{entry.created_at ? new Date(entry.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : ""}</span>
+                          {entry.performer_name && <span className="font-medium text-text-primary">by {entry.performer_name}</span>}
+                        </div>
+                        <p className="text-sm font-medium mt-0.5">{entry.action}</p>
+                        {entry.old_value && entry.new_value && (
+                          <div className="mt-1 text-xs space-y-0.5 bg-muted rounded p-2">
+                            <p><span className="text-muted-foreground">Old:</span> <span className="line-through text-destructive">{entry.old_value}</span></p>
+                            <p><span className="text-muted-foreground">New:</span> <span className="text-green-600 font-medium">{entry.new_value}</span></p>
+                          </div>
+                        )}
+                        {entry.new_value && !entry.old_value && (
+                          <p className="text-xs text-text-muted mt-0.5">{entry.new_value}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
           </div>
         </TabsContent>
 
@@ -345,9 +458,9 @@ export default function CaseDetail() {
                   try {
                     const formData = new FormData()
                     for (const file of files) {
-                      formData.append("photos", file)
-                    }
-                    await api.post(`/pre-ops/${id}`, formData, {
+                        formData.append("xrays", file)
+                      }
+                      await api.post(`/pre-ops/${id}`, formData, {
                       headers: { "Content-Type": "multipart/form-data" },
                     })
                     queryClient.invalidateQueries({ queryKey: ["case-preops", id] })
@@ -645,7 +758,138 @@ export default function CaseDetail() {
             </div>
           )}
         </TabsContent>
+
+        <TabsContent value="consent-forms" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
+          {caseData?.patient_id ? (
+            <ConsentFormsSection patientId={caseData.patient_id} />
+          ) : (
+            <p className="text-center py-8 text-muted-foreground">No patient linked to this case</p>
+          )}
+        </TabsContent>
       </Tabs>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Case</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid gap-2">
+              <Label>Chief Complaint</Label>
+              <Textarea value={editForm.chief_complaint || ""}
+                onChange={(e) => setEditForm({ ...editForm, chief_complaint: e.target.value })}
+                placeholder="Describe the patient's primary complaint..." />
+            </div>
+            <div className="grid gap-2">
+              <div className="flex items-center justify-between">
+                <Label>Clinical Findings</Label>
+                <Button type="button" variant="outline" size="sm"
+                  onClick={() => setEditFindings([...editFindings, { finding_type: "", tooth_number: "", notes: "" }])}>
+                  + Add Finding
+                </Button>
+              </div>
+              {editFindings.length === 0 && <p className="text-xs text-muted-foreground">No findings</p>}
+              {editFindings.map((finding: any, i: number) => (
+                <div key={i} className="border rounded-lg p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground">Finding {i + 1}</span>
+                    <Button type="button" variant="ghost" size="icon-sm"
+                      onClick={() => setEditFindings(editFindings.filter((_: any, j: number) => j !== i))}>
+                      <Trash2 className="h-3 w-3 text-destructive" />
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="grid gap-1">
+                      <Label className="text-xs">Finding Type</Label>
+                      <Select value={finding.finding_type}
+                        onValueChange={(v: string) => {
+                          const updated = [...editFindings]
+                          updated[i] = { ...updated[i], finding_type: v }
+                          setEditFindings(updated)
+                        }}>
+                        <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                        <SelectContent>
+                          {["Stains", "Calculus", "Decay", "Missing Tooth", "Mobility", "Fracture", "Impaction", "Sensitivity", "Gingivitis", "Periodontitis", "Other"].map((ft) => (
+                            <SelectItem key={ft} value={ft}>{ft}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-1">
+                      <Label className="text-xs">Tooth #</Label>
+                      <Input value={finding.tooth_number}
+                        onChange={(e) => {
+                          const updated = [...editFindings]
+                          updated[i] = { ...updated[i], tooth_number: e.target.value }
+                          setEditFindings(updated)
+                        }}
+                        placeholder="e.g. 16, 46" />
+                    </div>
+                  </div>
+                  <div className="grid gap-1">
+                    <Label className="text-xs">Notes</Label>
+                    <Input value={finding.notes}
+                      onChange={(e) => {
+                        const updated = [...editFindings]
+                        updated[i] = { ...updated[i], notes: e.target.value }
+                        setEditFindings(updated)
+                      }}
+                      placeholder="e.g. Deep proximal decay" />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="grid gap-2">
+              <Label>Diagnosis</Label>
+              <Textarea value={editForm.diagnosis || ""}
+                onChange={(e) => setEditForm({ ...editForm, diagnosis: e.target.value })}
+                placeholder="Enter diagnosis..." />
+            </div>
+            <div className="grid gap-2">
+              <Label>Initial Treatment Plan</Label>
+              <Textarea value={editForm.initial_treatment_plan || ""}
+                onChange={(e) => setEditForm({ ...editForm, initial_treatment_plan: e.target.value })}
+                placeholder="Enter treatment plan..." rows={3} />
+            </div>
+            <div className="grid gap-2">
+              <Label>Notes</Label>
+              <Textarea value={editForm.notes || ""}
+                onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                placeholder="Additional notes..." />
+            </div>
+            <div className="grid gap-2">
+              <Label>Status</Label>
+              <Select value={editForm.status || caseData?.status}
+                onValueChange={(v: string) => setEditForm({ ...editForm, status: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {["NEW", "DIAGNOSIS_PENDING", "TREATMENT_PLANNED", "IN_PROGRESS", "FOLLOW_UP", "COMPLETED", "CANCELLED"].map((s) => (
+                    <SelectItem key={s} value={s}>{s.replace(/_/g, " ")}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label>Assigned Doctor</Label>
+              <Select value={editDoctorId}
+                onValueChange={(v: string) => setEditDoctorId(v)}>
+                <SelectTrigger><SelectValue placeholder="Select doctor" /></SelectTrigger>
+                <SelectContent>
+                  {doctors.map((d: any) => (
+                    <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
+            <Button onClick={handleEditSubmit} disabled={editMutation.isPending}>
+              {editMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!previewUrl} onOpenChange={() => { setPreviewUrl(null); setZoom(1) }}>
         <DialogContent className="max-w-4xl">
@@ -713,5 +957,55 @@ export default function CaseDetail() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+function ConsentFormsSection({ patientId }: { patientId: string }) {
+  const navigate = useNavigate()
+  const { addToast } = useToast()
+  const { data, isLoading } = useQuery({
+    queryKey: ["case-consent-forms", patientId],
+    queryFn: () => consentFormsApi.getByPatient(patientId),
+    enabled: !!patientId,
+  })
+
+  const handleView = (id: string) => navigate(`/consent-forms/view/${id}`)
+  const handleDownload = async (id: string) => {
+    try {
+      const blob = await consentFormsApi.downloadPdf(id)
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `consent_${id.slice(0, 8)}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+    } catch { addToast({ title: "Error", description: "Download failed", variant: "destructive" }) }
+  }
+
+  const items = Array.isArray(data) ? data : []
+  return (
+    <Card className="p-4">
+      {isLoading ? (
+        <p className="text-center py-4">Loading consent forms...</p>
+      ) : items.length === 0 ? (
+        <p className="text-center py-8 text-muted-foreground">No consent forms for this patient</p>
+      ) : (
+        <div className="space-y-2">
+          {items.map((cf: any) => (
+            <div key={cf.id} className="flex items-center justify-between rounded border p-3">
+              <div>
+                <p className="font-medium text-sm">{cf.consent_type}</p>
+                <p className="text-xs text-muted-foreground">{cf.created_at ? new Date(cf.created_at).toLocaleDateString() : ""} {cf.doctor_name ? `- ${cf.doctor_name}` : ""}</p>
+              </div>
+              <div className="flex gap-1">
+                <Button variant="ghost" size="sm" onClick={() => handleView(cf.id)}>View</Button>
+                <Button variant="ghost" size="sm" onClick={() => handleDownload(cf.id)}>Download</Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
   )
 }

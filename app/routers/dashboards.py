@@ -3,7 +3,7 @@ from typing import Optional
 import json
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, text, extract
+from sqlalchemy import select, func, text, extract, or_
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.core.permissions import Role
@@ -242,9 +242,13 @@ async def super_admin_dashboard(
         h_margin = round((h_profit / rev * 100), 2) if rev > 0 else 0
         h_patient_count = len(h_pids)
         h_case_count = len(h_cids)
-        h_doctor_count = (await db.execute(
-            select(func.count(User.id)).where(User.role == Role.DOCTOR.value, User.hospital_id == hid)
-        )).scalar() or 0
+        h_doctor_count = 0
+        if h_cids:
+            h_doctor_count = (await db.execute(
+                select(func.count(func.distinct(Case.doctor_id))).where(
+                    Case.id.in_(h_cids), Case.doctor_id.isnot(None)
+                )
+            )).scalar() or 0
         if rev >= 0:
             hospital_performance.append({
                 "id": hid, "name": hname, "revenue": rev,
@@ -253,20 +257,26 @@ async def super_admin_dashboard(
             })
     hospital_performance.sort(key=lambda x: x["revenue"], reverse=True)
 
-    # Doctor performance by revenue
-    doctors_r = await db.execute(select(User.id, User.full_name).where(User.role == Role.DOCTOR.value))
+    # Doctor performance by revenue (system-wide)
     doctor_performance = []
-    for did, dname in doctors_r.all():
-        d_cases_r = await db.execute(select(Case.id).where(Case.doctor_id == did))
-        d_cids = [row[0] for row in d_cases_r.all()]
-        if d_cids:
-            rev_r = await db.execute(
-                select(func.sum(Billing.paid_amount)).where(Billing.case_id.in_(d_cids))
-            )
-            rev = float(rev_r.scalar() or 0)
-            if rev >= 0:
-                doctor_performance.append({"id": did, "name": dname, "value": rev})
-    doctor_performance.sort(key=lambda x: x["value"], reverse=True)
+    doctor_rev_r = await db.execute(
+        select(
+            Case.doctor_id,
+            func.sum(Billing.paid_amount).label("revenue"),
+        )
+        .select_from(Billing)
+        .join(Case, Billing.case_id == Case.id)
+        .where(Case.doctor_id.isnot(None))
+        .group_by(Case.doctor_id)
+        .order_by(text("revenue DESC"))
+    )
+    for row in doctor_rev_r.all():
+        did = row[0]
+        rev = float(row[1] or 0)
+        if rev > 0:
+            dname_r = await db.execute(select(User.full_name).where(User.id == did))
+            dname = dname_r.scalar() or did
+            doctor_performance.append({"id": did, "name": dname, "value": rev})
 
     # Monthly growth trend with expenses (respect period)
     combined_trend = await revenue_trend_with_expenses(db, hospital_ids=None, period=period, start_date=start_date, end_date=end_date)
@@ -414,9 +424,13 @@ async def group_admin_dashboard(
         h_margin = round((h_profit / rev * 100), 2) if rev > 0 else 0
         h_patient_count = len(h_pids)
         h_case_count = len(h_cids)
-        h_doctor_count = (await db.execute(
-            select(func.count(User.id)).where(User.role == Role.DOCTOR.value, User.hospital_id == hid)
-        )).scalar() or 0
+        h_doctor_count = 0
+        if h_cids:
+            h_doctor_count = (await db.execute(
+                select(func.count(func.distinct(Case.doctor_id))).where(
+                    Case.id.in_(h_cids), Case.doctor_id.isnot(None)
+                )
+            )).scalar() or 0
         hospital_performance.append({
             "id": hid, "name": h_name or hid, "revenue": rev,
             "expenses": h_exp, "profit": h_profit, "profit_margin": h_margin,
@@ -424,23 +438,28 @@ async def group_admin_dashboard(
         })
     hospital_performance.sort(key=lambda x: x["revenue"], reverse=True)
 
-    # Doctor performance (filtered by hospital_ids if a specific hospital is selected)
+    # Doctor performance — revenue scoped to hospital(s)
     doctor_performance = []
-    doctor_query = select(User.id, User.full_name).where(User.role == Role.DOCTOR.value, User.admin_group_id == admin_group_id)
-    if hospital_id:
-        doctor_query = doctor_query.where(User.hospital_id == hospital_id)
-    doctor_rows = (await db.execute(doctor_query)).all()
-    filtered_doctor_count = len(doctor_rows)
-    for did, dname in doctor_rows:
-        d_cases_r = await db.execute(select(Case.id).where(Case.doctor_id == did))
-        d_cids = [row[0] for row in d_cases_r.all()]
-        if d_cids:
-            rev_r = await db.execute(
-                select(func.sum(Billing.paid_amount)).where(Billing.case_id.in_(d_cids))
+    if case_ids:
+        doctor_rev_r = await db.execute(
+            select(
+                Case.doctor_id,
+                func.sum(Billing.paid_amount).label("revenue"),
             )
-            rev = float(rev_r.scalar() or 0)
-            doctor_performance.append({"id": did, "name": dname, "value": rev})
-    doctor_performance.sort(key=lambda x: x["value"], reverse=True)
+            .select_from(Billing)
+            .join(Case, Billing.case_id == Case.id)
+            .where(Billing.case_id.in_(case_ids), Case.doctor_id.isnot(None))
+            .group_by(Case.doctor_id)
+            .order_by(text("revenue DESC"))
+        )
+        for row in doctor_rev_r.all():
+            did = row[0]
+            rev = float(row[1] or 0)
+            if rev > 0:
+                dname_r = await db.execute(select(User.full_name).where(User.id == did))
+                dname = dname_r.scalar() or did
+                doctor_performance.append({"id": did, "name": dname, "value": rev})
+    filtered_doctor_count = len(doctor_performance)
 
     # Monthly growth trend with expenses (respect period)
     combined_trend = await revenue_trend_with_expenses(db, case_ids if case_ids else [], hospital_ids, period=period, start_date=start_date, end_date=end_date)
@@ -561,21 +580,28 @@ async def hospital_admin_dashboard(
     revenue_trend = await _monthly_revenue_trend(db, case_ids if case_ids else [])
     patient_growth_trend = await _monthly_patient_trend(db, [hospital_id])
 
-    # Doctor performance
+    # Doctor performance — revenue only from this hospital's cases
     doctor_performance = []
-    doctors_r = await db.execute(
-        select(User.id, User.full_name).where(User.role == Role.DOCTOR.value, User.hospital_id == hospital_id)
-    )
-    for did, dname in doctors_r.all():
-        d_cases_r = await db.execute(select(Case.id).where(Case.doctor_id == did))
-        d_cids = [row[0] for row in d_cases_r.all()]
-        if d_cids:
-            rev_r = await db.execute(
-                select(func.sum(Billing.paid_amount)).where(Billing.case_id.in_(d_cids))
+    if case_ids:
+        # Single grouped query: sum billing paid_amount per doctor within this hospital's cases
+        doctor_rev_r = await db.execute(
+            select(
+                Case.doctor_id,
+                func.sum(Billing.paid_amount).label("revenue"),
             )
-            rev = float(rev_r.scalar() or 0)
-            doctor_performance.append({"id": did, "name": dname, "value": rev})
-    doctor_performance.sort(key=lambda x: x["value"], reverse=True)
+            .select_from(Billing)
+            .join(Case, Billing.case_id == Case.id)
+            .where(Billing.case_id.in_(case_ids), Case.doctor_id.isnot(None))
+            .group_by(Case.doctor_id)
+            .order_by(text("revenue DESC"))
+        )
+        for row in doctor_rev_r.all():
+            did = row[0]
+            rev = float(row[1] or 0)
+            if rev > 0:
+                dname_r = await db.execute(select(User.full_name).where(User.id == did))
+                dname = dname_r.scalar() or did
+                doctor_performance.append({"id": did, "name": dname, "value": rev})
 
     # Treatment performance
     treatment_performance = []
@@ -767,7 +793,13 @@ async def doctor_dashboard(db: AsyncSession = Depends(get_db), current_user: dic
     current_year_start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
 
     my_patients = (await db.execute(
-        select(func.count(Patient.id)).where(Patient.doctor_id == doctor_id)
+        select(func.count(func.distinct(Patient.id))).where(
+            or_(
+                Patient.doctor_id == doctor_id,
+                Patient.id.in_(select(Appointment.patient_id).where(Appointment.doctor_id == doctor_id, Appointment.is_active == True)),
+                Patient.id.in_(select(Case.patient_id).where(Case.doctor_id == doctor_id)),
+            )
+        )
     )).scalar() or 0
 
     today = date.today()
@@ -969,19 +1001,25 @@ async def quick_view_admin_group(
 
     # Top doctors
     top_doctors = []
-    doctors_r = await db.execute(
-        select(User.id, User.full_name).where(User.role == Role.DOCTOR.value, User.admin_group_id == group_id)
-    )
-    for did, dname in doctors_r.all():
-        d_cases_r = await db.execute(select(Case.id).where(Case.doctor_id == did))
-        d_cids = [row[0] for row in d_cases_r.all()]
-        if d_cids:
-            rev_r = await db.execute(
-                select(func.sum(Billing.paid_amount)).where(Billing.case_id.in_(d_cids))
+    if case_ids:
+        doctor_rev_r = await db.execute(
+            select(
+                Case.doctor_id,
+                func.sum(Billing.paid_amount).label("revenue"),
             )
-            rev = float(rev_r.scalar() or 0)
-            top_doctors.append({"id": did, "name": dname, "value": rev})
-    top_doctors.sort(key=lambda x: x["value"], reverse=True)
+            .select_from(Billing)
+            .join(Case, Billing.case_id == Case.id)
+            .where(Billing.case_id.in_(case_ids), Case.doctor_id.isnot(None))
+            .group_by(Case.doctor_id)
+            .order_by(text("revenue DESC"))
+        )
+        for row in doctor_rev_r.all():
+            did = row[0]
+            rev = float(row[1] or 0)
+            if rev > 0:
+                dname_r = await db.execute(select(User.full_name).where(User.id == did))
+                dname = dname_r.scalar() or did
+                top_doctors.append({"id": did, "name": dname, "value": rev})
 
     return {
         "id": group_id,
@@ -1024,9 +1062,13 @@ async def quick_view_hospital(
     patient_ids = await _get_patient_ids_for_hospitals(db, [hospital_id])
     case_ids = await _get_case_ids_for_patients(db, patient_ids)
 
-    total_doctors = (await db.execute(
-        select(func.count(User.id)).where(User.role == Role.DOCTOR.value, User.hospital_id == hospital_id)
-    )).scalar() or 0
+    total_doctors = 0
+    if case_ids:
+        total_doctors = (await db.execute(
+            select(func.count(func.distinct(Case.doctor_id))).where(
+                Case.id.in_(case_ids), Case.doctor_id.isnot(None)
+            )
+        )).scalar() or 0
     total_patients = len(patient_ids)
 
     total_revenue = 0.0
@@ -1135,23 +1177,67 @@ async def quick_view_doctor(
     if not doctor:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor not found")
 
-    if role == Role.HOSPITAL_ADMIN.value and doctor.hospital_id != current_user.get("hospital_id"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    if role == Role.HOSPITAL_ADMIN.value:
+        # Validate doctor shares the same admin_group as the admin's hospital
+        admin_hosp_id = current_user.get("hospital_id")
+        if admin_hosp_id:
+            admin_group_id_for_hosp = (
+                await db.execute(select(Hospital.admin_group_id).where(Hospital.id == admin_hosp_id))
+            ).scalar()
+            if not admin_group_id_for_hosp or doctor.admin_group_id != admin_group_id_for_hosp:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+        else:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     if role == Role.GROUP_ADMIN.value and doctor.admin_group_id != current_user.get("admin_group_id"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
-    my_patients = (await db.execute(
-        select(func.count(Patient.id)).where(Patient.doctor_id == doctor_id)
-    )).scalar() or 0
+    # Determine the hospital to scope data to
+    scope_hospital_id = None
+    if role == Role.HOSPITAL_ADMIN.value:
+        scope_hospital_id = current_user.get("hospital_id")
+    elif role == Role.GROUP_ADMIN.value:
+        scope_hospital_id = current_user.get("hospital_id")
+
+    # Hospital-scoped patient IDs and case IDs
+    scope_pids = []
+    scope_cids = []
+    if scope_hospital_id:
+        scope_pids = await _get_patient_ids_for_hospitals(db, [scope_hospital_id])
+        scope_cids = await _get_case_ids_for_patients(db, scope_pids)
+
+    if not scope_cids:
+        return {
+            "id": doctor_id, "name": doctor.full_name,
+            "total_patients": 0, "today_appointments": 0,
+            "total_cases": 0, "active_cases": 0, "completed_cases": 0,
+            "total_revenue": 0, "period_revenue": 0,
+            "active_patients": 0, "completed_patients": 0, "contribution_to_profit": 0,
+        }
+
+    # Patient count: distinct patients in scoped cases for this doctor
+    my_patient_ids_r = await db.execute(
+        select(func.distinct(Case.patient_id)).where(
+            Case.id.in_(scope_cids), Case.doctor_id == doctor_id
+        )
+    )
+    my_patient_ids = [r[0] for r in my_patient_ids_r.all()]
+    my_patients = len(my_patient_ids)
 
     today = date.today()
-    today_appointments = (await db.execute(
-        select(func.count(Appointment.id)).where(
-            Appointment.doctor_id == doctor_id, Appointment.appointment_date == today
-        )
-    )).scalar() or 0
+    today_appointments = 0
+    if my_patient_ids:
+        today_appointments = (await db.execute(
+            select(func.count(Appointment.id)).where(
+                Appointment.doctor_id == doctor_id,
+                Appointment.patient_id.in_(my_patient_ids),
+                Appointment.appointment_date == today,
+            )
+        )).scalar() or 0
 
-    my_cases_r = await db.execute(select(Case).where(Case.doctor_id == doctor_id))
+    # Cases for this doctor within the scoped hospital
+    my_cases_r = await db.execute(
+        select(Case).where(Case.id.in_(scope_cids), Case.doctor_id == doctor_id)
+    )
     my_cases = my_cases_r.scalars().all()
     my_case_ids = {c.id for c in my_cases}
 
@@ -1181,21 +1267,15 @@ async def quick_view_doctor(
     for c in my_cases:
         if c.status == CaseStatus.COMPLETED:
             completed_patient_ids.add(c.patient_id)
+    completed_patients = len(completed_patient_ids)
 
-    # Calculate hospital revenue for contribution
+    # Hospital revenue for contribution calculation
     hospital_revenue = 0.0
-    hospital_expenses = 0.0
-    hospital_id = doctor.hospital_id
-    if hospital_id and role in (Role.HOSPITAL_ADMIN.value, Role.GROUP_ADMIN.value, Role.SUPER_ADMIN.value):
-        h_pids = await _get_patient_ids_for_hospitals(db, [hospital_id])
-        h_cids = await _get_case_ids_for_patients(db, h_pids)
-        if h_cids:
-            h_rev_result = await db.execute(
-                select(func.sum(Billing.paid_amount)).where(Billing.case_id.in_(h_cids))
-            )
-            hospital_revenue = float(h_rev_result.scalar() or 0)
-        date_start, date_end = get_date_range(period, start_date, end_date)
-        hospital_expenses = await calculate_expenses_for_date_range(db, [hospital_id], date_start=date_start, date_end=date_end)
+    if scope_cids:
+        h_rev_result = await db.execute(
+            select(func.sum(Billing.paid_amount)).where(Billing.case_id.in_(scope_cids))
+        )
+        hospital_revenue = float(h_rev_result.scalar() or 0)
     contribution = round((period_revenue / hospital_revenue * 100), 2) if hospital_revenue > 0 else 0
 
     return {

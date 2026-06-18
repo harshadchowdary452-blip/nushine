@@ -71,7 +71,6 @@ const statusVariant: Record<string, "default" | "secondary" | "outline" | "destr
 interface ClinicalFindingForm {
   finding_type: string
   tooth_number: string
-  severity: string
   notes: string
 }
 
@@ -82,10 +81,8 @@ const FINDING_TYPES = [
   "Implant", "Other",
 ]
 
-const SEVERITIES = ["Mild", "Moderate", "Severe"]
-
 function getEmptyFinding(): ClinicalFindingForm {
-  return { finding_type: "", tooth_number: "", severity: "", notes: "" }
+  return { finding_type: "", tooth_number: "", notes: "" }
 }
 
 interface CaseForm {
@@ -493,23 +490,6 @@ export default function CaseList() {
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label>Diagnosis</Label>
-                  <Textarea
-                    value={form.diagnosis}
-                    onChange={(e) => setForm({ ...form, diagnosis: e.target.value })}
-                    placeholder="Enter initial diagnosis..."
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label>Initial Treatment Plan</Label>
-                  <Textarea
-                    value={form.initial_treatment_plan}
-                    onChange={(e) => setForm({ ...form, initial_treatment_plan: e.target.value })}
-                    placeholder={`Scaling & Root Planing\nRCT on Tooth 46\nComposite Filling on Tooth 16\nExtraction of Tooth 28`}
-                    rows={4}
-                  />
-                </div>
-                <div className="grid gap-2">
                   <div className="flex items-center justify-between">
                     <Label>Clinical Findings</Label>
                     <Button type="button" variant="outline" size="sm"
@@ -560,26 +540,9 @@ export default function CaseList() {
                             placeholder="e.g. 16, 46" />
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="grid gap-1">
-                          <Label className="text-xs">Severity</Label>
-                          <Select value={finding.severity}
-                            onValueChange={(v) => {
-                              const updated = [...form.findings]
-                              updated[i] = { ...updated[i], severity: v }
-                              setForm({ ...form, findings: updated })
-                            }}>
-                            <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                            <SelectContent>
-                              {SEVERITIES.map((s) => (
-                                <SelectItem key={s} value={s}>{s}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="grid gap-1">
-                          <Label className="text-xs">Notes</Label>
-                          <Input value={finding.notes}
+                      <div className="grid gap-1">
+                        <Label className="text-xs">Notes</Label>
+                        <Input value={finding.notes}
                             onChange={(e) => {
                               const updated = [...form.findings]
                               updated[i] = { ...updated[i], notes: e.target.value }
@@ -587,9 +550,25 @@ export default function CaseList() {
                             }}
                             placeholder="e.g. Deep proximal decay" />
                         </div>
-                      </div>
                     </div>
                   ))}
+                </div>
+                <div className="grid gap-2">
+                  <Label>Diagnosis</Label>
+                  <Textarea
+                    value={form.diagnosis}
+                    onChange={(e) => setForm({ ...form, diagnosis: e.target.value })}
+                    placeholder="Enter initial diagnosis..."
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Initial Treatment Plan</Label>
+                  <Textarea
+                    value={form.initial_treatment_plan}
+                    onChange={(e) => setForm({ ...form, initial_treatment_plan: e.target.value })}
+                    placeholder={`Scaling & Root Planing\nRCT on Tooth 46\nComposite Filling on Tooth 16\nExtraction of Tooth 28`}
+                    rows={4}
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label>Notes</Label>

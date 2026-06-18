@@ -61,7 +61,7 @@ interface TreatmentForm {
 }
 
 function getEmptyTreatmentForm(): TreatmentForm {
-  return { case_id: "", treatment_name: "", description: "", cost: null, total_sittings: 1, start_date: "", expected_completion_date: "", notes: "" }
+  return { case_id: "", treatment_name: "", description: "", cost: null, total_sittings: null, start_date: "", expected_completion_date: "", notes: "" }
 }
 
 export default function TreatmentList() {
@@ -415,7 +415,7 @@ export default function TreatmentList() {
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="sittings">Total Sittings</Label>
-                  <Input id="sittings" type="number" min={1} value={form.total_sittings ?? 1} onChange={(e) => setForm({ ...form, total_sittings: e.target.value ? Number(e.target.value) : 1 })} />
+                  <Input id="sittings" type="number" min={0} value={form.total_sittings ?? ""} onChange={(e) => setForm({ ...form, total_sittings: e.target.value ? Number(e.target.value) : null })} placeholder="0" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -465,7 +465,7 @@ export default function TreatmentList() {
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="edit-sittings">Total Sittings</Label>
-                  <Input id="edit-sittings" type="number" min={1} value={form.total_sittings ?? 1} onChange={(e) => setForm({ ...form, total_sittings: e.target.value ? Number(e.target.value) : 1 })} />
+                  <Input id="edit-sittings" type="number" min={0} value={form.total_sittings ?? ""} onChange={(e) => setForm({ ...form, total_sittings: e.target.value ? Number(e.target.value) : null })} placeholder="0" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">

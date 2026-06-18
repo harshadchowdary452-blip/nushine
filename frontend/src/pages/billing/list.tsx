@@ -12,7 +12,7 @@ import {
   type SortingState,
 } from "@tanstack/react-table"
 import { motion } from "framer-motion"
-import { Plus, Search, Eye, Trash2, Receipt, DollarSign, CreditCard, AlertCircle, Download, History } from "lucide-react"
+import { Plus, Search, Eye, Trash2, Receipt, DollarSign, CreditCard, AlertCircle, Download } from "lucide-react"
 import { format } from "date-fns"
 import PageHeader from "@/components/layout/page-header"
 import KpiCard from "@/components/layout/kpi-card"
@@ -80,12 +80,6 @@ export default function BillingList() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deletingBilling, setDeletingBilling] = useState<Billing | null>(null)
   const [form, setForm] = useState<InvoiceForm>(getEmptyInvoiceForm)
-  const [historyBilling, setHistoryBilling] = useState<Billing | null>(null)
-  const { data: transactions } = useQuery({
-    queryKey: ["billing", historyBilling?.id, "transactions"],
-    queryFn: () => billingApi.getTransactions(historyBilling!.id),
-    enabled: !!historyBilling,
-  })
 
   const { data, isLoading } = useQuery<PaginatedResponse<Billing>>({
     queryKey: ["billings"],
@@ -276,9 +270,6 @@ export default function BillingList() {
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="icon" onClick={() => navigate(`/billing/${row.original.id}`)} title="View Invoice">
               <Eye className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={() => setHistoryBilling(row.original)} title="Payment History">
-              <History className="h-4 w-4" />
             </Button>
             <Button variant="ghost" size="icon" onClick={() => downloadPdf(row.original.id)} title="Download PDF">
               <Download className="h-4 w-4" />
@@ -602,37 +593,6 @@ export default function BillingList() {
               </Button>
             </DialogFooter>
           </form>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!historyBilling} onOpenChange={(o) => { if (!o) setHistoryBilling(null) }}>
-        <DialogContent className="sm:max-w-[550px]">
-          <DialogHeader>
-            <DialogTitle>Payment History — #{historyBilling?.id.slice(0, 8)}</DialogTitle>
-            <DialogDescription>
-              {historyBilling?.patient_name} · {formatIndianRupees(historyBilling?.total_amount ?? 0)}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="max-h-[400px] overflow-y-auto space-y-3 py-4">
-            {!transactions || transactions.length === 0 ? (
-              <p className="text-center text-sm text-muted-foreground py-8">No payment transactions recorded yet.</p>
-            ) : (
-              transactions.map((txn: any) => (
-                <div key={txn.id} className="flex items-center justify-between rounded-lg border p-4">
-                  <div>
-                    <p className="font-semibold text-green-700">{formatIndianRupees(txn.amount)}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {txn.payment_method || "—"}
-                      {txn.notes ? ` · ${txn.notes}` : ""}
-                    </p>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {format(new Date(txn.created_at), "MMM dd, yyyy h:mm a")}
-                  </p>
-                </div>
-              ))
-            )}
-          </div>
         </DialogContent>
       </Dialog>
 

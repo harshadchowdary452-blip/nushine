@@ -34,3 +34,4 @@ class User(Base):
     availability_overrides = relationship("DoctorAvailability", back_populates="doctor", cascade="all, delete-orphan")
     leaves = relationship("DoctorLeave", back_populates="doctor", cascade="all, delete-orphan")
     blocked_slots = relationship("DoctorBlockedSlot", back_populates="doctor", cascade="all, delete-orphan")
+    consent_forms = relationship("ConsentForm", foreign_keys="ConsentForm.doctor_id", back_populates="doctor")

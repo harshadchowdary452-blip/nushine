@@ -323,8 +323,7 @@ class AppointmentService:
             if not doctor:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor not found")
 
-            if doctor.hospital_id and patient.hospital_id and doctor.hospital_id != patient.hospital_id:
-                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Doctor and Patient must belong to the same hospital")
+            # Patient-hospital and doctor-admin-group validation handled in router tenant isolation
 
             if doctor.role not in ("DOCTOR", "CONSULTANT"):
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"User {doctor_id} is not a doctor")

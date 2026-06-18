@@ -319,6 +319,7 @@ export default function AppointmentList() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["appointments"], refetchType: "all" })
       queryClient.invalidateQueries({ queryKey: ["doctor-slots"], refetchType: "all" })
+      queryClient.invalidateQueries({ queryKey: ["patients"], refetchType: "all" })
       queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" })
       addToast({ title: "Success", description: "Appointment deleted successfully", variant: "success" })
       setDeleteDialogOpen(false)
@@ -346,6 +347,7 @@ export default function AppointmentList() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["appointments"], refetchType: "all" })
       queryClient.invalidateQueries({ queryKey: ["doctor-slots"], refetchType: "all" })
+      queryClient.invalidateQueries({ queryKey: ["patients"], refetchType: "all" })
       queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" })
       addToast({ title: "Success", description: "Appointment created successfully", variant: "success" })
       resetForm()

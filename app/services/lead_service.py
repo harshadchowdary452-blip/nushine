@@ -95,7 +95,6 @@ class LeadService:
     async def convert(self, lead_id: str, data: dict, user_id: str = None) -> dict:
         from datetime import datetime, timezone
         from app.models.patient import Patient
-        from app.models.case import Case
         from app.models.lead import LeadStatus, Lead
         from sqlalchemy import select
         lead = await self.repo.get(lead_id)
@@ -129,13 +128,6 @@ class LeadService:
                 )
                 self.db.add(patient)
                 await self.db.flush()
-            case = Case(
-                patient_id=patient.id,
-                doctor_id=data.get("doctor_id") or lead.assigned_doctor_id,
-                chief_complaint=f"Converted from lead: {lead.lead_name}",
-            )
-            self.db.add(case)
-            await self.db.flush()
             lead.converted_patient_id = patient.id
             lead.status = LeadStatus.CONVERTED.value
             lead.last_contacted_at = datetime.now(timezone.utc)

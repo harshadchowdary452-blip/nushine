@@ -120,7 +120,7 @@ async def create_appointment(data: AppointmentCreate, db: AsyncSession = Depends
             )
         logger.warning(f"✓ Patient hospital matches: {patient_hospital_id}")
 
-        # Verify doctor belongs to admin's admin group (group-level doctor sharing)
+        # Verify doctor is in admin's admin group (group-level doctor sharing)
         doctor_result = await db.execute(select(User.admin_group_id).where(User.id == data.doctor_id))
         doctor_row = doctor_result.one_or_none()
         if not doctor_row:
@@ -128,18 +128,18 @@ async def create_appointment(data: AppointmentCreate, db: AsyncSession = Depends
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor not found")
 
         doctor_admin_group_id = doctor_row[0]
-        # Get admin's admin_group_id from their hospital
+        # Resolve admin_group_id: prefer hospital's, fall back to user's
         admin_hosp_result = await db.execute(select(Hospital.admin_group_id).where(Hospital.id == current_user_hospital_id))
         admin_hosp_row = admin_hosp_result.one_or_none()
-        admin_group_id_from_hospital = admin_hosp_row[0] if admin_hosp_row else None
+        admin_group_id = admin_hosp_row[0] if admin_hosp_row else current_user.get("admin_group_id")
 
-        if not admin_group_id_from_hospital or doctor_admin_group_id != admin_group_id_from_hospital:
-            logger.warning(f"FAIL: Doctor admin_group {doctor_admin_group_id} != Admin's hospital admin_group {admin_group_id_from_hospital}")
+        if not admin_group_id or doctor_admin_group_id != admin_group_id:
+            logger.warning(f"FAIL: Doctor admin_group {doctor_admin_group_id} != expected {admin_group_id}")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Doctor not in your admin group"
             )
-        logger.warning(f"✓ Doctor in same admin group: {admin_group_id_from_hospital}")
+        logger.warning(f"✓ Doctor in same admin group: {admin_group_id}")
 
     # ===== GROUP_ADMIN TENANT ISOLATION =====
     elif role == Role.GROUP_ADMIN.value:
@@ -195,16 +195,7 @@ async def create_appointment(data: AppointmentCreate, db: AsyncSession = Depends
     
     service = AppointmentService(db)
     appointment = await service.create(data.model_dump(), user_id=current_user.get("sub"))
-    
-    # Auto-create case if patient has no active case
-    from app.models.case import Case
-    existing = await db.execute(
-        select(Case).where(Case.patient_id == data.patient_id, Case.is_active == True).limit(1)
-    )
-    if not existing.scalar_one_or_none():
-        svc = StatusAutomationService(db)
-        await svc._auto_create_case_from_appointment(appointment)
-    
+
     return appointment
 
 

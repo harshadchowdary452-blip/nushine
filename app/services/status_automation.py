@@ -199,7 +199,6 @@ class StatusAutomationService:
 
         if new_status == AppointmentStatus.COMPLETED:
             await self._on_appointment_completed(appt)
-            await self._auto_create_case_from_appointment(appt)
         elif new_status == AppointmentStatus.NO_SHOW:
             await self._on_appointment_no_show(appt)
         elif new_status == AppointmentStatus.CONFIRMED:

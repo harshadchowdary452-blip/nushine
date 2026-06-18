@@ -122,6 +122,8 @@ export default function PatientList() {
   const { data, isLoading } = useQuery<Patient[]>({
     queryKey: ["patients", { search: globalFilter }],
     queryFn: () => patientsApi.list({ search: globalFilter, page_size: 100, hospital_id: currentUser?.hospital_id || undefined }),
+    refetchOnMount: true,
+    staleTime: 0,
   })
 
   const deleteMutation = useMutation({

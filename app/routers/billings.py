@@ -132,7 +132,7 @@ async def get_billing_pdf(billing_id: str, db: AsyncSession = Depends(get_db), c
     verify_permission(current_user, Permission.MANAGE_BILLING)
     await _check_billing_hospital(billing_id, current_user, db)
     service = BillingService(db)
-    pdf_path, error = await service.get_pdf_path(billing_id)
+    pdf_path, error = await service.get_pdf_path(billing_id, user_id=current_user.get("sub"))
     if not pdf_path:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND if error == "Billing not found" else status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -147,7 +147,7 @@ async def regenerate_billing_pdf(billing_id: str, db: AsyncSession = Depends(get
     verify_permission(current_user, Permission.MANAGE_BILLING)
     await _check_billing_hospital(billing_id, current_user, db)
     service = BillingService(db)
-    pdf_path, error = await service.regenerate_pdf(billing_id)
+    pdf_path, error = await service.regenerate_pdf(billing_id, user_id=current_user.get("sub"))
     if not pdf_path:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"PDF generation failed: {error}")
     filename = f"invoice_{billing_id[:8]}.pdf"
@@ -208,6 +208,7 @@ async def apply_discount(billing_id: str, data: BillingDiscountUpdate, db: Async
         discount_percent=data.discount_percent,
         discount_amount=data.discount_amount,
         discount_reason=data.discount_reason,
+        user_id=current_user.get("sub"),
     )
     return billing
 

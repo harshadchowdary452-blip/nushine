@@ -97,7 +97,7 @@ ROLE_PERMISSIONS = {
     ],
     Role.DOCTOR: [
         Permission.MANAGE_PATIENTS,
-        Permission.MANAGE_APPOINTMENTS,
+        Permission.MANAGE_APPOINTMENTS, Permission.CREATE_APPOINTMENT,
         Permission.CREATE_CASE, Permission.MANAGE_CASES,
         Permission.CREATE_TREATMENT_PLAN, Permission.CREATE_CONSULTANT,
         Permission.ADD_PRE_OP, Permission.ADD_POST_OP,

@@ -72,6 +72,8 @@ export const casesApi = {
   create: (data: any) => api.post("/cases", data).then((r) => r.data),
   update: (id: string, data: any) => api.put(`/cases/${id}`, data).then((r) => r.data),
   delete: (id: string) => api.delete(`/cases/${id}`).then((r) => r.data),
+  getTimeline: (id: string, params?: Record<string, unknown>) =>
+    api.get(`/cases/${id}/timeline`, { params }).then((r) => r.data),
 };
 
 export const appointmentsApi = {
@@ -368,6 +370,36 @@ export const crmApi = {
       api.get("/crm/quick-view/lead-sources", { params }).then((r) => r.data),
   },
   revenueByDoctor: () => api.get("/crm/analytics/revenue-by-doctor").then((r) => r.data),
+};
+
+export const consentFormsApi = {
+  list: (params?: Record<string, unknown>) =>
+    api.get("/consent-forms", { params }).then((r) => r.data),
+  get: (id: string) =>
+    api.get(`/consent-forms/${id}`).then((r) => r.data),
+  create: (data: FormData) =>
+    api.post("/consent-forms", data, { headers: { "Content-Type": "multipart/form-data" } }).then((r) => r.data),
+  update: (id: string, data: Record<string, unknown>) =>
+    api.put(`/consent-forms/${id}`, data).then((r) => r.data),
+  replacePdf: (id: string, data: FormData) =>
+    api.post(`/consent-forms/${id}/replace-pdf`, data, { headers: { "Content-Type": "multipart/form-data" } }).then((r) => r.data),
+  delete: (id: string) =>
+    api.delete(`/consent-forms/${id}`).then((r) => r.data),
+  restore: (id: string) =>
+    api.post(`/consent-forms/${id}/restore`).then((r) => r.data),
+  getPdf: (id: string) =>
+    api.get(`/consent-forms/${id}/pdf`, { responseType: "blob" }).then((r) => r.data),
+  getPdfUrl: (id: string) => `/api/v1/consent-forms/${id}/pdf`,
+  downloadPdf: (id: string) =>
+    api.get(`/consent-forms/${id}/download`, { responseType: "blob" }).then((r) => r.data),
+  getByPatient: (patientId: string) =>
+    api.get(`/consent-forms/patient/${patientId}`).then((r) => r.data),
+  getByCase: (caseId: string) =>
+    api.get(`/consent-forms/by-case/${caseId}`).then((r) => r.data),
+  getByTreatment: (treatmentPlanId: string) =>
+    api.get(`/consent-forms/by-treatment/${treatmentPlanId}`).then((r) => r.data),
+  getStats: (hospitalId: string) =>
+    api.get(`/consent-forms/stats/hospital/${hospitalId}`).then((r) => r.data),
 };
 
 

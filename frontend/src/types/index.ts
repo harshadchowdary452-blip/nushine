@@ -147,6 +147,18 @@ export interface Case {
   consultant?: Consultant;
 }
 
+export interface CaseTimeline {
+  id: string;
+  case_id: string;
+  action: string;
+  field_name: string | null;
+  old_value: string | null;
+  new_value: string | null;
+  performed_by: string | null;
+  performer_name: string | null;
+  created_at: string;
+}
+
 export interface Consultant {
   id: string;
   hospital_id: string;
@@ -689,4 +701,25 @@ export interface QuickViewPatient {
   pre_ops: QuickViewPatientPreOp[];
   post_ops: QuickViewPatientPostOp[];
   treatment_progress: { total: number; completed: number };
+}
+
+export interface ConsentForm {
+  id: string;
+  patient_id: string | null;
+  patient_name: string;
+  op_number: string | null;
+  phone: string | null;
+  doctor_id: string | null;
+  doctor_name: string | null;
+  consent_type: string;
+  remarks: string | null;
+  pdf_path: string | null;
+  hospital_id: string;
+  uploaded_by: string | null;
+  uploader_name: string | null;
+  case_id: string | null;
+  treatment_plan_id: string | null;
+  is_deleted: boolean;
+  created_at: string;
+  updated_at: string;
 }

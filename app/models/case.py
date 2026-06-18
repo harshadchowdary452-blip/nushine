@@ -53,3 +53,4 @@ class Case(Base):
     post_ops = relationship("PostOp", back_populates="case", cascade="all, delete-orphan")
     consultant_notes = relationship("ConsultantNote", back_populates="case", cascade="all, delete-orphan")
     findings = relationship("ClinicalFinding", back_populates="case", cascade="all, delete-orphan", order_by="ClinicalFinding.created_at")
+    timeline_entries = relationship("CaseTimeline", back_populates="case", cascade="all, delete-orphan", order_by="CaseTimeline.created_at")

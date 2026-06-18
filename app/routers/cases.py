@@ -4,20 +4,32 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from typing import List, Optional
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.core.permissions import verify_permission, verify_tenant_access, Permission, Role
+from app.config import settings
+from fpdf import FPDF
+
 
 logger = logging.getLogger(__name__)
 from app.services.case_service import CaseService
-from app.schemas.case import CaseCreate, CaseUpdate, CaseResponse
+from app.schemas.case import CaseCreate, CaseUpdate, CaseResponse, CaseTimelineResponse
 from app.schemas.common import MessageResponse
+from app.models.case import Case
 from app.models.patient import Patient, PatientStatus
 from app.models.hospital import Hospital
 from app.services.status_automation import StatusAutomationService
 
 router = APIRouter(prefix="/cases", tags=["Cases"])
+
+
+async def _load_case_with_findings(db: AsyncSession, case_id: str) -> Case:
+    result = await db.execute(
+        select(Case).where(Case.id == case_id).options(selectinload(Case.findings))
+    )
+    return result.scalar_one_or_none()
 
 
 @router.post("/", response_model=CaseResponse, status_code=status.HTTP_201_CREATED)
@@ -28,6 +40,7 @@ async def create_case(data: CaseCreate, db: AsyncSession = Depends(get_db), curr
     svc = StatusAutomationService(db)
     await svc.update_patient_status(case.patient_id)
     await db.commit()
+    case = await _load_case_with_findings(db, case.id)
     return case
 
 
@@ -124,6 +137,7 @@ async def complete_case(case_id: str, db: AsyncSession = Depends(get_db), curren
     svc = StatusAutomationService(db)
     await svc.update_patient_status(case.patient_id)
     await db.commit()
+    case = await _load_case_with_findings(db, case.id)
     return case
 
 
@@ -151,15 +165,24 @@ async def update_case_status(case_id: str, status: str = Query(...), db: AsyncSe
     svc = StatusAutomationService(db)
     await svc.update_patient_status(case.patient_id)
     await db.commit()
+    case = await _load_case_with_findings(db, case.id)
     return case
+
+
+@router.get("/{case_id}/timeline")
+async def get_case_timeline(case_id: str, skip: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=200), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.MANAGE_CASES)
+    service = CaseService(db)
+    case = await service.get(case_id)
+    if not case:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
+    await verify_tenant_access(current_user, case, "case", db)
+    entries = await service.get_timeline(case_id, skip=skip, limit=limit)
+    return entries
 
 
 @router.get("/{case_id}/pdf")
 async def export_case_pdf(case_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    from app.config import settings
-    from fpdf import FPDF
-    from app.models.case import ClinicalFinding
-
     verify_permission(current_user, Permission.MANAGE_CASES)
     service = CaseService(db)
     case = await service.get(case_id)
@@ -169,10 +192,8 @@ async def export_case_pdf(case_id: str, db: AsyncSession = Depends(get_db), curr
 
     patient = case.patient
     doctor = case.doctor
-    findings_result = await db.execute(
-        select(ClinicalFinding).where(ClinicalFinding.case_id == case_id).order_by(ClinicalFinding.created_at)
-    )
-    findings = findings_result.scalars().all()
+    findings = case.findings or []
+    timeline = await service.get_timeline(case_id, limit=50)
 
     pdf_dir = os.path.join(settings.UPLOAD_DIR, "case_reports")
     os.makedirs(pdf_dir, exist_ok=True)
@@ -200,6 +221,24 @@ async def export_case_pdf(case_id: str, db: AsyncSession = Depends(get_db), curr
     pdf.multi_cell(0, 6, case.chief_complaint)
     pdf.ln(3)
 
+    if findings:
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, "Clinical Findings", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(2)
+        col_w = [20, 50, 110]
+        headers = ["Tooth", "Finding", "Notes"]
+        pdf.set_font("Helvetica", "B", 9)
+        for i, h in enumerate(headers):
+            pdf.cell(col_w[i], 7, h, border=1, align="C")
+        pdf.ln()
+        pdf.set_font("Helvetica", "", 9)
+        for f in findings:
+            row = [f.tooth_number or "-", f.finding_type, f.notes or "-"]
+            for i, val in enumerate(row):
+                pdf.cell(col_w[i], 6, val, border=1)
+            pdf.ln()
+        pdf.ln(3)
+
     if case.diagnosis:
         pdf.set_font("Helvetica", "B", 12)
         pdf.cell(0, 8, "Diagnosis", new_x="LMARGIN", new_y="NEXT")
@@ -214,29 +253,32 @@ async def export_case_pdf(case_id: str, db: AsyncSession = Depends(get_db), curr
         pdf.multi_cell(0, 6, case.initial_treatment_plan)
         pdf.ln(3)
 
-    if findings:
-        pdf.set_font("Helvetica", "B", 12)
-        pdf.cell(0, 8, "Clinical Findings", new_x="LMARGIN", new_y="NEXT")
-        pdf.ln(2)
-        col_w = [20, 50, 30, 80]
-        headers = ["Tooth", "Finding", "Severity", "Notes"]
-        pdf.set_font("Helvetica", "B", 9)
-        for i, h in enumerate(headers):
-            pdf.cell(col_w[i], 7, h, border=1, align="C")
-        pdf.ln()
-        pdf.set_font("Helvetica", "", 9)
-        for f in findings:
-            row = [f.tooth_number or "-", f.finding_type, f.severity or "-", f.notes or "-"]
-            for i, val in enumerate(row):
-                pdf.cell(col_w[i], 6, val, border=1)
-            pdf.ln()
-        pdf.ln(3)
-
     if case.notes:
         pdf.set_font("Helvetica", "B", 12)
         pdf.cell(0, 8, "Doctor Notes", new_x="LMARGIN", new_y="NEXT")
         pdf.set_font("Helvetica", "", 10)
         pdf.multi_cell(0, 6, case.notes)
+        pdf.ln(3)
+
+    if timeline:
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, "Case Timeline", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(1)
+        pdf.set_font("Helvetica", "", 8)
+        for entry in timeline:
+            date_str = entry.created_at.strftime("%d-%b-%Y %H:%M") if entry.created_at else ""
+            name = entry.performer_name or ""
+            action = entry.action
+            detail = ""
+            if entry.old_value and entry.new_value:
+                detail = f"Old: {entry.old_value} | New: {entry.new_value}"
+            elif entry.new_value:
+                detail = entry.new_value
+            line = f"{date_str} | {name} | {action}"
+            if detail:
+                line += f" | {detail}"
+            pdf.multi_cell(0, 4, line)
+        pdf.ln(3)
 
     pdf.output(pdf_path)
     return FileResponse(pdf_path, media_type="application/pdf", filename=f"case_{case_id}.pdf")

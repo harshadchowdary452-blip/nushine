@@ -50,3 +50,4 @@ class Patient(Base):
     doctor = relationship("User", back_populates="patients")
     cases = relationship("Case", back_populates="patient", cascade="all, delete-orphan")
     appointments = relationship("Appointment", back_populates="patient", cascade="all, delete-orphan")
+    consent_forms = relationship("ConsentForm", back_populates="patient")

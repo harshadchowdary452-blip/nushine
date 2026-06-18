@@ -1,10 +1,10 @@
 import { useState, useMemo } from "react"
 import { motion } from "framer-motion"
 import { useQuery } from "@tanstack/react-query"
-import { Calendar, DollarSign, Users, FolderOpen, TrendingUp, Award, Activity, BarChart3, IndianRupee, PieChart, Sparkles } from "lucide-react"
+import { Calendar, DollarSign, Users, FolderOpen, TrendingUp, Award, Activity, BarChart3, IndianRupee, PieChart, Sparkles, FileText } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar } from "recharts"
 import { useAuthStore } from "@/store/authStore"
-import { dashboardApi } from "@/services/endpoints"
+import { dashboardApi, consentFormsApi } from "@/services/endpoints"
 import { Skeleton } from "@/components/ui/skeleton"
 import KpiCard from "@/components/layout/kpi-card"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -64,6 +64,12 @@ export default function HospitalAdminDashboard() {
     staleTime: 10000,
     gcTime: 60000,
     refetchInterval: 30000,
+  })
+
+  const { data: consentStats } = useQuery({
+    queryKey: ["consent-form-stats", user?.hospital_id],
+    queryFn: () => consentFormsApi.getStats(user?.hospital_id || ""),
+    enabled: !!user?.hospital_id,
   })
 
   if (!user) return null
@@ -133,6 +139,7 @@ export default function HospitalAdminDashboard() {
         <KpiCard icon={BarChart3} title="Yearly Revenue" value={formatIndianRupees(stats?.yearly_revenue ?? 0)} color="warning" delay={0.08} onClick={() => setDrawerMetric("yearly-revenue")} />
         <KpiCard icon={TrendingUp} title="Net Profit" value={formatIndianRupees(stats?.net_profit ?? 0)} color={(stats?.net_profit ?? 0) >= 0 ? "success" : "danger"} delay={0.12} onClick={() => setDrawerMetric("profit")} />
         <KpiCard icon={PieChart} title="Profit Margin" value={stats?.profit_margin != null ? `${stats.profit_margin.toFixed(1)}%` : "0%"} color="primary" delay={0.16} onClick={() => setDrawerMetric("margin")} />
+        <KpiCard icon={FileText} title="Consent Forms" value={formatIndianNumber(consentStats?.total ?? 0)} description={`${formatIndianNumber(consentStats?.this_month ?? 0)} this month`} color="info" delay={0.2} />
       </div>
 
       {hasData && (
@@ -240,6 +247,26 @@ export default function HospitalAdminDashboard() {
               }))}
             />
           </motion.div>
+
+          {consentStats?.recent?.length > 0 && (
+            <motion.div variants={item}>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base"><FileText className="h-4 w-4" /> Recent Consent Uploads</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {consentStats.recent.slice(0, 5).map((r: any) => (
+                      <div key={r.id} className="flex items-center justify-between text-sm">
+                        <span className="font-medium">{r.patient_name}</span>
+                        <span className="text-muted-foreground">{r.consent_type} - {r.created_at ? new Date(r.created_at).toLocaleDateString() : ""}</span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
         </>
       )}
 

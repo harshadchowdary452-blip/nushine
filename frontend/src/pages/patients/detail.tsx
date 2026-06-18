@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { patientsApi, casesApi, appointmentsApi, billingApi, treatmentApi, campaignsApi, crmApi, usersApi } from "@/services/endpoints";
+import { patientsApi, casesApi, appointmentsApi, billingApi, treatmentApi, campaignsApi, crmApi, usersApi, consentFormsApi } from "@/services/endpoints";
 import api from "@/services/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -808,6 +808,7 @@ export default function PatientDetail() {
           <TabsTrigger value="follow-ups">Follow-Ups ({followUpHistory?.length || 0})</TabsTrigger>
           <TabsTrigger value="timeline">Timeline</TabsTrigger>
           <TabsTrigger value="images">Images</TabsTrigger>
+          <TabsTrigger value="consent-forms">Consent Forms</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
@@ -1170,9 +1171,63 @@ export default function PatientDetail() {
           </div>
         </TabsContent>
 
+        <TabsContent value="consent-forms" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
+          <ConsentFormsSection patientId={patient.id} />
+        </TabsContent>
+
       </Tabs>
     </div>
   );
+}
+
+function ConsentFormsSection({ patientId }: { patientId: string }) {
+  const navigate = useNavigate()
+  const { addToast } = useToast()
+  const { data, isLoading } = useQuery({
+    queryKey: ["patient-consent-forms", patientId],
+    queryFn: () => consentFormsApi.getByPatient(patientId),
+    enabled: !!patientId,
+  })
+
+  const handleView = (id: string) => navigate(`/consent-forms/view/${id}`)
+  const handleDownload = async (id: string) => {
+    try {
+      const blob = await consentFormsApi.downloadPdf(id)
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `consent_${id.slice(0, 8)}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+    } catch { addToast({ title: "Error", description: "Download failed", variant: "destructive" }) }
+  }
+
+  const items = Array.isArray(data) ? data : []
+  return (
+    <Card className="p-4">
+      {isLoading ? (
+        <p className="text-center py-4">Loading consent forms...</p>
+      ) : items.length === 0 ? (
+        <p className="text-center py-8 text-muted-foreground">No consent forms for this patient</p>
+      ) : (
+        <div className="space-y-2">
+          {items.map((cf: any) => (
+            <div key={cf.id} className="flex items-center justify-between rounded border p-3">
+              <div>
+                <p className="font-medium text-sm">{cf.consent_type}</p>
+                <p className="text-xs text-muted-foreground">{cf.created_at ? new Date(cf.created_at).toLocaleDateString() : ""} {cf.doctor_name ? `- ${cf.doctor_name}` : ""}</p>
+              </div>
+              <div className="flex gap-1">
+                <Button variant="ghost" size="sm" onClick={() => handleView(cf.id)}>View</Button>
+                <Button variant="ghost" size="sm" onClick={() => handleDownload(cf.id)}>Download</Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  )
 }
 
 function CaseImages({ caseId, caseName }: { caseId: string; caseName: string }) {

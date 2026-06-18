@@ -43,6 +43,7 @@ const roleNav: Record<string, NavSection[]> = {
       { label: "Cases", icon: FolderOpen, path: "/cases" },
       { label: "Treatments", icon: Activity, path: "/treatments" },
       { label: "Billing", icon: Receipt, path: "/billing" },
+      { label: "Consent Forms", icon: FileText, path: "/consent-forms" },
     ]},
     { label: "CRM", items: [
       { label: "CRM Dashboard", icon: LayoutDashboard, path: "/crm/dashboard2" },
@@ -71,6 +72,7 @@ const roleNav: Record<string, NavSection[]> = {
       { label: "Cases", icon: FolderOpen, path: "/cases" },
       { label: "Treatments", icon: Activity, path: "/treatments" },
       { label: "Billing", icon: Receipt, path: "/billing" },
+      { label: "Consent Forms", icon: FileText, path: "/consent-forms" },
     ]},
     { label: "Settings", items: [{ label: "Settings", icon: Settings, path: "/settings" }] },
   ],

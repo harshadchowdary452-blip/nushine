@@ -40,17 +40,14 @@ class BillingService:
         return billing
 
     async def _record_history(self, billing_id: str, action: str, previous_data: dict = None, new_data: dict = None, changes_summary: str = None, user_id: str = None):
-        try:
-            await self.history_repo.create(
-                billing_id=billing_id,
-                action=action,
-                previous_data=json.dumps(previous_data) if previous_data else None,
-                new_data=json.dumps(new_data) if new_data else None,
-                changes_summary=changes_summary,
-                performed_by=user_id,
-            )
-        except Exception as e:
-            logger.warning("BILLING_HISTORY - Failed to record %s for billing %s: %s", action, billing_id, str(e))
+        await self.history_repo.create(
+            billing_id=billing_id,
+            action=action,
+            previous_data=json.dumps(previous_data) if previous_data else None,
+            new_data=json.dumps(new_data) if new_data else None,
+            changes_summary=changes_summary,
+            performed_by=user_id,
+        )
 
     async def _generate_invoice_pdf(self, billing: Billing) -> str:
         from fpdf import FPDF
@@ -540,7 +537,7 @@ class BillingService:
             logger.exception("UPDATE_BILLING_PAYMENT - Error: %s", str(e))
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update payment: {str(e)}")
 
-    async def apply_discount(self, billing_id: str, discount_type: str, discount_percent: float, discount_amount: float, discount_reason: Optional[str] = None) -> Optional[Billing]:
+    async def apply_discount(self, billing_id: str, discount_type: str, discount_percent: float, discount_amount: float, discount_reason: Optional[str] = None, user_id: str = None) -> Optional[Billing]:
         billing = await self.repo.get(billing_id)
         if not billing:
             return None
@@ -569,7 +566,7 @@ class BillingService:
         await self.db.refresh(billing)
         await self._attach_names(billing)
         new_vals = {"discount_type": billing.discount_type, "discount_percent": billing.discount_percent, "discount_amount": billing.discount_amount, "total_amount": billing.total_amount}
-        await self._record_history(billing.id, "DISCOUNT_APPLIED", previous_data=prev_data, new_data=new_vals, changes_summary=f"Discount applied: {calc_discount_percent}% / Rs.{calc_discount_amount:.2f}", user_id=None)
+        await self._record_history(billing.id, "DISCOUNT_APPLIED", previous_data=prev_data, new_data=new_vals, changes_summary=f"Discount applied: {calc_discount_percent}% / Rs.{calc_discount_amount:.2f}", user_id=user_id)
         await self._sync_treatment_plan_paid_amounts(billing.case_id)
         return billing
 
@@ -620,7 +617,7 @@ class BillingService:
         )
         return r.scalars().all()
 
-    async def get_pdf_path(self, billing_id: str) -> tuple:
+    async def get_pdf_path(self, billing_id: str, user_id: str = None) -> tuple:
         billing = await self.repo.get(billing_id)
         if not billing:
             return None, "Billing not found"
@@ -631,6 +628,7 @@ class BillingService:
             pdf_path = await self._generate_invoice_pdf(billing)
             try:
                 await self.repo.update(billing.id, pdf_path=pdf_path)
+                await self._record_history(billing.id, "INVOICE_GENERATED", changes_summary="Invoice PDF generated", user_id=user_id)
             except Exception as db_err:
                 logger.warning("PDF path DB update failed: %s", db_err)
             return pdf_path, None
@@ -649,7 +647,7 @@ class BillingService:
             logger.exception("DELETE_BILLING - Error: %s", str(e))
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to delete billing: {str(e)}")
 
-    async def regenerate_pdf(self, billing_id: str) -> tuple:
+    async def regenerate_pdf(self, billing_id: str, user_id: str = None) -> tuple:
         billing = await self.repo.get(billing_id)
         if not billing:
             return None, "Billing not found"
@@ -658,6 +656,7 @@ class BillingService:
             pdf_path = await self._generate_invoice_pdf(billing)
             try:
                 await self.repo.update(billing.id, pdf_path=pdf_path)
+                await self._record_history(billing.id, "INVOICE_REGENERATED", changes_summary="Invoice PDF regenerated", user_id=user_id)
             except Exception as db_err:
                 logger.warning("PDF path DB update failed: %s", db_err)
             return pdf_path, None

@@ -398,18 +398,15 @@ function PatientContent({ id, onClose }: QuickViewContentProps) {
                 <p className="text-sm font-bold text-danger">{formatIndianRupees(data.total_pending)}</p>
               </div>
             </div>
-            {data.billings.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-4">No billing records</p>
+            {data.timeline.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-4">No billing activity</p>
             ) : (
-              data.billings.map((b) => (
-                <div key={b.id} className="rounded-xl bg-gray-50 px-3 py-2.5">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-gray-700">{formatIndianRupees(b.total_amount)}</p>
-                    <Badge variant={b.payment_status === "PAID" ? "success" : b.payment_status === "PARTIAL" ? "warning" : "danger"} className="shrink-0">{b.payment_status}</Badge>
-                  </div>
-                  <div className="flex gap-3 mt-1 text-xs text-gray-400">
-                    <span>Paid: {formatIndianRupees(b.paid_amount)}</span>
-                    <span>Pending: {formatIndianRupees(b.pending_amount)}</span>
+              data.timeline.map((t, i) => (
+                <div key={i} className="flex items-start gap-3 rounded-xl bg-gray-50 px-3 py-2">
+                  <div className="mt-0.5 h-2 w-2 rounded-full bg-primary shrink-0" />
+                  <div>
+                    <p className="text-xs text-gray-400">{new Date(t.date).toLocaleDateString("en-IN")}</p>
+                    <p className="text-sm text-gray-700">{t.event}</p>
                   </div>
                 </div>
               ))

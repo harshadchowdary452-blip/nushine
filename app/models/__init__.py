@@ -4,6 +4,7 @@ from app.models.user import User
 from app.models.patient import Patient
 from app.models.consultant import Consultant
 from app.models.case import Case, ClinicalFinding
+from app.models.case_timeline import CaseTimeline
 from app.models.consultant_note import ConsultantNote
 from app.models.treatment_plan import TreatmentPlan
 from app.models.treatment_sitting import TreatmentSitting
@@ -32,6 +33,7 @@ from app.models.whatsapp_template import WhatsAppTemplate
 from app.models.lead import Lead, LeadCommunication, LeadCall, LeadSource, LeadStatus, LeadCallOutcome
 from app.models.billing_history import BillingHistory
 from app.models.whatsapp_config import WhatsAppConfig
+from app.models.consent_form import ConsentForm
 
 __all__ = [
     "AdminGroup", "Hospital", "User", "Patient", "Consultant",
@@ -49,4 +51,6 @@ __all__ = [
     "DoctorWorkingHour", "DoctorAvailability", "DoctorLeave", "LeaveStatus", "DoctorBlockedSlot", "WEEKDAYS", "TREATMENT_DURATIONS",
     "Lead", "LeadCommunication", "LeadCall", "LeadSource", "LeadStatus", "LeadCallOutcome",
     "BillingHistory",
+    "ConsentForm",
+    "CaseTimeline",
 ]

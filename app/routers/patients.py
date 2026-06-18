@@ -1,10 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from typing import List, Optional
 import os, shutil, uuid
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.core.permissions import verify_permission, verify_tenant_access, Permission, Role
+from app.models.appointment import Appointment
+from app.models.case import Case
+from app.models.patient import Patient
 from app.services.patient_service import PatientService
 from app.schemas.patient import PatientCreate, PatientUpdate, PatientResponse
 from app.schemas.common import MessageResponse
@@ -43,15 +47,24 @@ async def get_patients(skip: int = Query(0, ge=0), limit: int = Query(100, ge=1,
     role = current_user.get("role")
     if role == Role.DOCTOR.value:
         if current_user.get("sub"):
-            filters["doctor_id"] = current_user.get("sub")
-        if current_user.get("hospital_id"):
+            did = current_user.get("sub")
+            direct_ids = select(Patient.id).where(Patient.doctor_id == did)
+            appt_ids = select(Appointment.patient_id).where(Appointment.doctor_id == did, Appointment.is_active == True)
+            case_ids = select(Case.patient_id).where(Case.doctor_id == did)
+            union_query = direct_ids.union(appt_ids, case_ids)
+            result = await db.execute(union_query)
+            pids = [row[0] for row in result.all()]
+            if pids:
+                filters["id__in"] = pids
+            else:
+                return []
+        elif current_user.get("hospital_id"):
             filters["hospital_id"] = current_user.get("hospital_id")
     elif role == Role.HOSPITAL_ADMIN.value:
         if current_user.get("hospital_id"):
             filters["hospital_id"] = current_user.get("hospital_id")
     elif role == Role.GROUP_ADMIN.value:
         from app.models.hospital import Hospital
-        from sqlalchemy import select
         agid = current_user.get("admin_group_id")
         if agid:
             hospital_result = await db.execute(select(Hospital.id).where(Hospital.admin_group_id == agid))
@@ -82,7 +95,6 @@ async def search_patients(q: str = Query(..., min_length=1), hospital_id: Option
             effective_hospital_id = current_user.get("hospital_id")
     elif role == Role.GROUP_ADMIN.value:
         from app.models.hospital import Hospital
-        from sqlalchemy import select
         agid = current_user.get("admin_group_id")
         if agid:
             hospital_result = await db.execute(select(Hospital.id).where(Hospital.admin_group_id == agid))

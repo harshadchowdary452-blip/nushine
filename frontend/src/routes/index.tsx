@@ -42,6 +42,8 @@ const WhatsAppTemplates = lazy(() => import("@/pages/whatsapp/templates"));
 const WhatsAppBroadcast = lazy(() => import("@/pages/whatsapp/broadcast"));
 const DoctorAvailability = lazy(() => import("@/pages/doctors/availability"));
 const CrmDashboard = lazy(() => import("@/pages/dashboard/crm-dashboard"));
+const ConsentFormList = lazy(() => import("@/pages/consent-forms/list"));
+const ConsentFormView = lazy(() => import("@/pages/consent-forms/view"));
 
 const dashboardByRole: Record<Role, string> = {
   SUPER_ADMIN: "/super-admin",
@@ -159,6 +161,8 @@ export const router = createBrowserRouter([
       { path: "/cases/:id", element: withRoles(<CaseDetail />, CARE_ROLES) },
       { path: "/treatments", element: withRoles(<TreatmentList />, CARE_ROLES) },
       { path: "/treatments/:id", element: withRoles(<TreatmentDetail />, CARE_ROLES) },
+      { path: "/consent-forms", element: withRoles(<ConsentFormList />, CARE_ROLES) },
+      { path: "/consent-forms/view/:id", element: withRoles(<ConsentFormView />, CARE_ROLES) },
       { path: "/settings", element: withRoles(<Settings />, [...ADMIN_ROLES, "DOCTOR"]) },
       { path: "/settings/whatsapp", element: withRoles(<WhatsAppConfigPage />, ADMIN_ROLES) },
       { path: "/whatsapp/templates", element: withRoles(<WhatsAppTemplates />, ADMIN_ROLES) },

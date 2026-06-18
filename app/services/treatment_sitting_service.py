@@ -1,6 +1,6 @@
 import logging
 from typing import Optional, List
-from datetime import date, time
+from datetime import date, time, datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from fastapi import HTTPException, status
@@ -46,11 +46,15 @@ class TreatmentSittingService:
         if existing.scalar_one_or_none():
             logger.info("Appointment already exists for patient %s on %s at %s, skipping", case.patient_id, appt_date, appt_time)
             return None
+        duration = 30
+        end_time = (datetime.combine(date.min, appt_time) + timedelta(minutes=duration)).time()
         appt = Appointment(
             patient_id=case.patient_id,
             doctor_id=case.doctor_id or "",
             appointment_date=appt_date,
             appointment_time=appt_time,
+            duration_minutes=duration,
+            end_time=end_time,
             status=AppointmentStatus.SCHEDULED,
             appointment_type=AppointmentType.TREATMENT,
             notes=f"Auto-created from treatment sitting #{sitting.sitting_number}",

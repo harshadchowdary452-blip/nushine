@@ -25,3 +25,4 @@ class Hospital(Base):
     patients = relationship("Patient", back_populates="hospital")
     consultants = relationship("Consultant", back_populates="hospital")
     expenses = relationship("HospitalMonthlyExpense", back_populates="hospital")
+    consent_forms = relationship("ConsentForm", back_populates="hospital")

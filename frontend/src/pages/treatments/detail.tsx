@@ -33,7 +33,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { treatmentApi, treatmentSittingsApi, patientsApi, crmApi, billingApi } from "@/services/endpoints"
+import { treatmentApi, treatmentSittingsApi, patientsApi, crmApi, billingApi, consentFormsApi } from "@/services/endpoints"
 import api from "@/services/api"
 import { useToast } from "@/components/ui/toast"
 import { formatIndianRupees } from "@/lib/currency"
@@ -242,6 +242,7 @@ export default function TreatmentDetail() {
           <TabsTrigger value="photos">Photos ({preOpPhotos.length + preOpXrays.length + postOpPhotos.length})</TabsTrigger>
           <TabsTrigger value="enquiries">Enquiries</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
+          <TabsTrigger value="consent-forms">Consent Forms</TabsTrigger>
         </TabsList>
 
         <TabsContent value="details" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
@@ -604,6 +605,13 @@ export default function TreatmentDetail() {
         <TabsContent value="history" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
           <TreatmentHistory plan={plan} />
         </TabsContent>
+        <TabsContent value="consent-forms" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
+          {plan?.patient_id ? (
+            <ConsentFormsSection patientId={plan.patient_id} treatmentPlanId={id!} />
+          ) : (
+            <p className="text-center py-8 text-muted-foreground">No patient linked to this treatment</p>
+          )}
+        </TabsContent>
       </Tabs>
 
       {/* Edit dialog */}
@@ -959,6 +967,56 @@ function TreatmentHistory({ plan }: { plan: any }) {
                 <p className="text-sm font-medium text-text-primary">{ev.label}</p>
                 <p className="text-xs text-text-secondary">{ev.detail}</p>
                 <p className="text-xs text-text-muted mt-0.5">{ev.date ? format(new Date(ev.date), "dd MMM yyyy") : ""}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  )
+}
+
+function ConsentFormsSection({ patientId, treatmentPlanId }: { patientId: string; treatmentPlanId?: string }) {
+  const navigate = useNavigate()
+  const { addToast } = useToast()
+  const { data, isLoading } = useQuery({
+    queryKey: ["treatment-consent-forms", patientId, treatmentPlanId],
+    queryFn: () => consentFormsApi.getByPatient(patientId),
+    enabled: !!patientId,
+  })
+
+  const handleView = (id: string) => navigate(`/consent-forms/view/${id}`)
+  const handleDownload = async (id: string) => {
+    try {
+      const blob = await consentFormsApi.downloadPdf(id)
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `consent_${id.slice(0, 8)}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+    } catch { addToast({ title: "Error", description: "Download failed", variant: "destructive" }) }
+  }
+
+  const items = Array.isArray(data) ? data : []
+  return (
+    <Card className="p-4">
+      {isLoading ? (
+        <p className="text-center py-4">Loading consent forms...</p>
+      ) : items.length === 0 ? (
+        <p className="text-center py-8 text-muted-foreground">No consent forms for this patient</p>
+      ) : (
+        <div className="space-y-2">
+          {items.filter((cf: any) => !treatmentPlanId || !cf.treatment_plan_id || cf.treatment_plan_id === treatmentPlanId).map((cf: any) => (
+            <div key={cf.id} className="flex items-center justify-between rounded border p-3">
+              <div>
+                <p className="font-medium text-sm">{cf.consent_type}</p>
+                <p className="text-xs text-muted-foreground">{cf.created_at ? new Date(cf.created_at).toLocaleDateString() : ""} {cf.doctor_name ? `- ${cf.doctor_name}` : ""}</p>
+              </div>
+              <div className="flex gap-1">
+                <Button variant="ghost" size="sm" onClick={() => handleView(cf.id)}>View</Button>
+                <Button variant="ghost" size="sm" onClick={() => handleDownload(cf.id)}>Download</Button>
               </div>
             </div>
           ))}
