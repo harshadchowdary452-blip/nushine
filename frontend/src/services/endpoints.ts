@@ -217,6 +217,25 @@ export const whatsappApi = {
     api.post("/whatsapp/broadcast", data).then((r) => r.data),
 };
 
+export const whatsappV2Api = {
+  preview: (data: { patient_id: string; message: string; message_type?: string }) =>
+    api.post("/whatsapp/preview", data).then((r) => r.data),
+  send: (data: { patient_id: string; message: string; message_type?: string; send_mode?: string; template_id?: string; template_name?: string; rendered_variables?: Record<string, string> }) =>
+    api.post("/whatsapp/send", data).then((r) => r.data),
+  bulkPreview: (data: { patient_ids: string[]; message: string; message_type?: string }) =>
+    api.post("/whatsapp/bulk-preview", data).then((r) => r.data),
+  bulkSend: (data: { items: any[] }) =>
+    api.post("/whatsapp/bulk-send", data).then((r) => r.data),
+  history: (params?: { patient_id?: string; message_type?: string; status?: string; sent_via?: string; start_date?: string; end_date?: string; page?: number; page_size?: number }) =>
+    api.get("/whatsapp/history", { params }).then((r) => r.data),
+  getMessage: (id: string) =>
+    api.get(`/whatsapp/history/${id}`).then((r) => r.data),
+  messageTypes: () =>
+    api.get("/whatsapp/message-types").then((r) => r.data),
+  confirmDelivery: (id: string) =>
+    api.post(`/whatsapp/confirm-delivery/${id}`).then((r) => r.data),
+};
+
 export const campaignsApi = {
   list: (params?: { skip?: number; limit?: number }) =>
     api.get("/campaigns", { params }).then((r) => r.data),
@@ -372,6 +391,57 @@ export const crmApi = {
   revenueByDoctor: () => api.get("/crm/analytics/revenue-by-doctor").then((r) => r.data),
 };
 
+export const enquiriesApi = {
+  list: (params?: { status?: string; patient_id?: string }) =>
+    api.get("/crm/enquiries", { params }).then((r) => r.data),
+  get: (id: string) => api.get(`/crm/enquiries/${id}`).then((r) => r.data),
+  create: (data: { patient_id: string; treatment_interest?: string; notes?: string; assigned_staff_id?: string; next_follow_up_date?: string }) =>
+    api.post("/crm/enquiries", data).then((r) => r.data),
+  update: (id: string, data: { treatment_interest?: string; status?: string; notes?: string; assigned_staff_id?: string; next_follow_up_date?: string }) =>
+    api.put(`/crm/enquiries/${id}`, data).then((r) => r.data),
+  delete: (id: string) => api.delete(`/crm/enquiries/${id}`).then((r) => r.data),
+  createFollowUp: (id: string, data: { action: string; notes?: string; next_follow_up_date?: string }) =>
+    api.post(`/crm/enquiries/${id}/follow-ups`, data).then((r) => r.data),
+  listFollowUps: (id: string) => api.get(`/crm/enquiries/${id}/follow-ups`).then((r) => r.data),
+  calendar: (params: { start_date: string; end_date: string; status?: string }) =>
+    api.get("/crm/enquiries/calendar", { params }).then((r) => r.data),
+};
+
+export const treatmentFollowUpsApi = {
+  list: (params?: { type?: string; status?: string; doctor_id?: string }) =>
+    api.get("/crm/treatment-follow-ups", { params }).then((r) => r.data),
+  autoCreate: (treatmentId: string) =>
+    api.post(`/crm/treatment-follow-ups/auto-create/${treatmentId}`).then((r) => r.data),
+  complete: (id: string, data: { outcome: string; notes?: string }) =>
+    api.put(`/crm/treatment-follow-ups/${id}/complete`, data).then((r) => r.data),
+  doctorFollowUps: () => api.get("/crm/treatment-follow-ups/doctor").then((r) => r.data),
+  doctorRecallPatients: () => api.get("/crm/treatment-follow-ups/doctor/recall-patients").then((r) => r.data),
+  stats: () => api.get("/crm/treatment-follow-ups/stats").then((r) => r.data),
+};
+
+export const recallsApi = {
+  list: (params?: { type?: string; status?: string; overdue_only?: boolean }) =>
+    api.get("/crm/recalls", { params }).then((r) => r.data),
+  complete: (id: string, data: { outcome: string; notes?: string; next_recall_date?: string }) =>
+    api.put(`/crm/recalls/${id}/complete`, data).then((r) => r.data),
+  stats: () => api.get("/crm/recalls/stats").then((r) => r.data),
+  calendar: (params: { start_date: string; end_date: string }) =>
+    api.get("/crm/recalls/calendar", { params }).then((r) => r.data),
+  generate: () => api.post("/crm/recalls/generate").then((r) => r.data),
+};
+
+export const crmSettingsApi = {
+  rules: {
+    list: () => api.get("/crm/settings/rules").then((r) => r.data),
+    create: (data: { treatment_name: string; follow_up_1_day?: boolean; follow_up_7_day?: boolean; recall_6_month?: boolean; recall_12_month?: boolean; custom_recall_days?: number }) =>
+      api.post("/crm/settings/rules", data).then((r) => r.data),
+    update: (id: string, data: { treatment_name?: string; follow_up_1_day?: boolean; follow_up_7_day?: boolean; recall_6_month?: boolean; recall_12_month?: boolean; custom_recall_days?: number; is_active?: boolean }) =>
+      api.put(`/crm/settings/rules/${id}`, data).then((r) => r.data),
+    delete: (id: string) => api.delete(`/crm/settings/rules/${id}`).then((r) => r.data),
+  },
+  summary: () => api.get("/crm/settings/summary").then((r) => r.data),
+};
+
 export const consentFormsApi = {
   list: (params?: Record<string, unknown>) =>
     api.get("/consent-forms", { params }).then((r) => r.data),
@@ -400,6 +470,23 @@ export const consentFormsApi = {
     api.get(`/consent-forms/by-treatment/${treatmentPlanId}`).then((r) => r.data),
   getStats: (hospitalId: string) =>
     api.get(`/consent-forms/stats/hospital/${hospitalId}`).then((r) => r.data),
+};
+
+export const exportsApi = {
+  listModules: () => api.get("/exports/modules").then((r) => r.data),
+  exportData: (module: string, format: string, params?: Record<string, string>) =>
+    api.get(`/exports/${module}`, { params: { format, ...params }, responseType: "blob" }).then((r) => r.data),
+  exportBackground: (module: string, format: string, params?: Record<string, string>) =>
+    api.get(`/exports/${module}`, { params: { format, background: "true", ...params } }).then((r) => r.data),
+  getJob: (jobId: string) => api.get(`/exports/jobs/${jobId}`).then((r) => r.data),
+  downloadJob: (jobId: string) =>
+    api.post(`/exports/jobs/${jobId}/download`, {}, { responseType: "blob" }).then((r) => r.data),
+  exportDashboardPdf: (params?: Record<string, string>) =>
+    api.get("/exports/dashboard/pdf", { params, responseType: "blob" }).then((r) => r.data),
+  exportFinancialPdf: (params?: Record<string, string>) =>
+    api.get("/exports/financial/pdf", { params, responseType: "blob" }).then((r) => r.data),
+  exportMonthlyPdf: (params?: Record<string, string>) =>
+    api.get("/exports/monthly/pdf", { params, responseType: "blob" }).then((r) => r.data),
 };
 
 

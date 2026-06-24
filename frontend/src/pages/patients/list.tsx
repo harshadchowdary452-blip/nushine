@@ -13,7 +13,7 @@ import {
   type ColumnFiltersState,
 } from "@tanstack/react-table"
 import { motion } from "framer-motion"
-import { Plus, Search, Eye, Edit, Trash2, Users, UserPlus } from "lucide-react"
+import { Plus, Search, Eye, Edit, Trash2, Users, UserPlus, Download, FileSpreadsheet, File as FilePdf } from "lucide-react"
 import { format } from "date-fns"
 import PageHeader from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
@@ -42,6 +42,7 @@ import SearchableSelect from "@/components/ui/searchable-select"
 import { patientsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
 import DentalEmptyState from "@/components/ui/dental-empty-state"
+import QuickExport from "@/components/ui/quick-export"
 import type { Patient, PatientStatus } from "@/types"
 import { useAuthStore } from "@/store/authStore"
 
@@ -304,6 +305,7 @@ export default function PatientList() {
             <Plus className="h-4 w-4" /> Add Patient
           </Button>
         )}
+        <QuickExport module="patients" label="patients" />
       </PageHeader>
 
       <Card>

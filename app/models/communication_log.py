@@ -48,3 +48,21 @@ class CommunicationLog(Base):
     sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     attachment_url: Mapped[str] = mapped_column(String(500), nullable=True)
+    template_id: Mapped[str] = mapped_column(String(36), nullable=True)
+    template_name: Mapped[str] = mapped_column(String(255), nullable=True)
+    rendered_variables: Mapped[str] = mapped_column(Text, nullable=True)
+    sent_via: Mapped[str] = mapped_column(String(20), nullable=True)
+    approved_by: Mapped[str] = mapped_column(String(36), nullable=True)
+    approved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class MessageAudit(Base):
+    __tablename__ = "message_audits"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    communication_log_id: Mapped[str] = mapped_column(String(36), ForeignKey("communication_logs.id"), nullable=False)
+    patient_id: Mapped[str] = mapped_column(String(36), ForeignKey("patients.id"), nullable=False)
+    hospital_id: Mapped[str] = mapped_column(String(36), ForeignKey("hospitals.id"), nullable=True)
+    action: Mapped[str] = mapped_column(String(30), nullable=False)
+    details: Mapped[str] = mapped_column(Text, nullable=True)
+    created_by: Mapped[str] = mapped_column(String(36), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

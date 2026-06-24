@@ -16,7 +16,7 @@ from app.database import engine
 from app.core.security import hash_password
 from app.core.permissions import Role
 from app.utils.scheduler import check_appointment_reminders, check_same_day_appointments, check_missed_appointments
-from app.routers import auth, admin_groups, hospitals, doctors, consultants, patients, cases, consultant_notes, treatment_plans, treatment_sittings, appointments, billings, pre_ops, post_ops, dashboards, whatsapp_messaging, whatsapp_config, notifications, hospital_monthly_expenses, reports, crm, calendar, status_audit, campaigns, leads, doctor_working_hours, doctor_availability, doctor_leaves, doctor_blocked_slots, consent_forms
+from app.routers import auth, admin_groups, hospitals, doctors, consultants, patients, cases, consultant_notes, treatment_plans, treatment_sittings, appointments, billings, pre_ops, post_ops, dashboards, whatsapp_messaging, whatsapp_config, notifications, hospital_monthly_expenses, reports, crm, calendar, status_audit, campaigns, leads, doctor_working_hours, doctor_availability, doctor_leaves, doctor_blocked_slots, consent_forms, enquiries, treatment_follow_ups, recalls, crm_settings, exports
 
 logger = logging.getLogger("app")
 fh = logging.FileHandler("server_errors.log", mode="a")
@@ -144,6 +144,11 @@ app.include_router(doctor_availability.router, prefix="/api/v1")
 app.include_router(doctor_leaves.router, prefix="/api/v1")
 app.include_router(doctor_blocked_slots.router, prefix="/api/v1")
 app.include_router(consent_forms.router, prefix="/api/v1")
+app.include_router(enquiries.router, prefix="/api/v1")
+app.include_router(treatment_follow_ups.router, prefix="/api/v1")
+app.include_router(recalls.router, prefix="/api/v1")
+app.include_router(crm_settings.router, prefix="/api/v1")
+app.include_router(exports.router, prefix="/api/v1")
 
 
 @app.get("/")

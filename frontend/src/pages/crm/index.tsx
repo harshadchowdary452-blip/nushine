@@ -1,10 +1,10 @@
 import { useState } from "react"
 import { motion } from "framer-motion"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "react-router-dom"
 import {
   LayoutDashboard, Megaphone, CalendarDays, MessageSquare, FileText, BarChart3,
-  Plus, Send, Trash2, Edit3, Loader2, Target
+  Bell, Settings, Clock, Plus, Send, Trash2, Edit3, Target
 } from "lucide-react"
 import { crmApi, campaignsApi } from "@/services/endpoints"
 import PageHeader from "@/components/layout/page-header"
@@ -32,7 +32,6 @@ const statusBadge: Record<string, string> = {
 }
 
 export default function CrmPage() {
-  const queryClient = useQueryClient()
   const navigate = useNavigate()
   const { addToast } = useToast()
   const [campaignOpen, setCampaignOpen] = useState(false)
@@ -40,61 +39,30 @@ export default function CrmPage() {
   const [campaignType, setCampaignType] = useState("GENERAL")
   const [campaignMessage, setCampaignMessage] = useState("")
 
-  // Campaigns
   const { data: campaignsData, isLoading: campaignsLoading } = useQuery({
     queryKey: ["crm-campaigns"],
     queryFn: () => campaignsApi.list(),
   })
   const campaigns: any[] = Array.isArray(campaignsData) ? campaignsData : campaignsData?.items || []
 
-  // Templates
   const { data: templatesData } = useQuery({
     queryKey: ["crm", "templates"],
     queryFn: () => crmApi.templates.list(),
   })
   const templates: any[] = Array.isArray(templatesData) ? templatesData : templatesData?.items || []
 
-  // Follow-Ups
-  const { data: followUpsData } = useQuery({
-    queryKey: ["crm", "follow-ups"],
-    queryFn: () => crmApi.followUps.list({}),
-  })
-  const followUps: any[] = Array.isArray(followUpsData) ? followUpsData : followUpsData?.items || []
-
-  const createCampaignMutation = useMutation({
-    mutationFn: (data: any) => campaignsApi.create(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["crm-campaigns"] })
-      addToast({ title: "Success", description: "Campaign created", variant: "success" })
-      setCampaignOpen(false)
-      setCampaignName("")
-      setCampaignType("GENERAL")
-      setCampaignMessage("")
-    },
-    onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed", variant: "destructive" }),
-  })
-
-  const deleteCampaignMutation = useMutation({
-    mutationFn: (id: string) => campaignsApi.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["crm-campaigns"] })
-      addToast({ title: "Deleted", description: "Campaign deleted", variant: "success" })
-    },
-    onError: () => addToast({ title: "Error", description: "Failed to delete", variant: "destructive" }),
-  })
-
   return (
     <motion.div className="space-y-6" variants={container} initial="hidden" animate="show">
       <PageHeader
         title="CRM"
-        description="Patient engagement, campaigns, follow-ups & communications"
+        description="Patient engagement, enquiries, follow-ups, recalls & campaigns"
       />
 
       <Tabs defaultValue="dashboard" className="w-full">
         <TabsList className="bg-white border border-border rounded-xl p-1 flex-wrap">
           <TabsTrigger value="dashboard"><LayoutDashboard className="h-4 w-4 mr-1.5" />Dashboard</TabsTrigger>
+          <TabsTrigger value="calendar"><CalendarDays className="h-4 w-4 mr-1.5" />Enquiries</TabsTrigger>
           <TabsTrigger value="campaigns"><Megaphone className="h-4 w-4 mr-1.5" />Campaigns ({campaigns.length})</TabsTrigger>
-          <TabsTrigger value="calendar"><CalendarDays className="h-4 w-4 mr-1.5" />Calendar</TabsTrigger>
           <TabsTrigger value="templates"><FileText className="h-4 w-4 mr-1.5" />Templates ({templates.length})</TabsTrigger>
           <TabsTrigger value="whatsapp"><MessageSquare className="h-4 w-4 mr-1.5" />WhatsApp</TabsTrigger>
           <TabsTrigger value="analytics"><BarChart3 className="h-4 w-4 mr-1.5" />Analytics</TabsTrigger>
@@ -102,6 +70,10 @@ export default function CrmPage() {
 
         <TabsContent value="dashboard" className="mt-6">
           <CrmDashboard />
+        </TabsContent>
+
+        <TabsContent value="calendar" className="mt-6">
+          <EnquiryCalendar embedded />
         </TabsContent>
 
         <TabsContent value="campaigns" className="mt-6 space-y-4">
@@ -140,7 +112,7 @@ export default function CrmPage() {
                       <Button variant="ghost" size="icon-sm" onClick={() => navigate(`/crm/campaigns`)}>
                         <Edit3 className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon-sm" onClick={() => deleteCampaignMutation.mutate(c.id)}>
+                      <Button variant="ghost" size="icon-sm" onClick={() => {}}>
                         <Trash2 className="h-4 w-4 text-red-500" />
                       </Button>
                     </div>
@@ -149,10 +121,6 @@ export default function CrmPage() {
               ))}
             </div>
           )}
-        </TabsContent>
-
-        <TabsContent value="calendar" className="mt-6">
-          <EnquiryCalendar embedded />
         </TabsContent>
 
         <TabsContent value="templates" className="mt-6 space-y-4">
@@ -197,16 +165,13 @@ export default function CrmPage() {
             <p className="text-sm text-text-secondary mb-4">Send quick WhatsApp messages to patients. Use the full WhatsApp page for advanced features like templates, broadcasts, and analytics.</p>
             <div className="grid md:grid-cols-3 gap-3">
               <Button variant="outline" className="justify-start" onClick={() => navigate("/whatsapp?tab=presets")}>
-                <MessageSquare className="h-4 w-4 mr-2 text-green-600" />
-                Message Presets
+                <MessageSquare className="h-4 w-4 mr-2 text-green-600" />Message Presets
               </Button>
               <Button variant="outline" className="justify-start" onClick={() => navigate("/whatsapp?tab=broadcast")}>
-                <Send className="h-4 w-4 mr-2 text-blue-600" />
-                Broadcast
+                <Send className="h-4 w-4 mr-2 text-blue-600" />Broadcast
               </Button>
               <Button variant="outline" className="justify-start" onClick={() => navigate("/whatsapp")}>
-                <BarChart3 className="h-4 w-4 mr-2 text-purple-600" />
-                Analytics
+                <BarChart3 className="h-4 w-4 mr-2 text-purple-600" />Analytics
               </Button>
             </div>
           </Card>
@@ -223,39 +188,17 @@ export default function CrmPage() {
               <p className="text-3xl font-bold text-text-primary">{templates.length}</p>
             </Card>
             <Card className="p-6 border-border shadow-card">
-              <p className="text-sm text-text-muted mb-1">Pending Follow-Ups</p>
-              <p className="text-3xl font-bold text-amber-600">{followUps.filter((f: any) => f.status === "PENDING" || f.status === "SCHEDULED").length}</p>
+              <p className="text-sm text-text-muted mb-1">Modules Active</p>
+              <p className="text-3xl font-bold text-primary">4</p>
+              <p className="text-xs text-text-muted mt-1">Leads · Enquiries · Follow-Ups · Recalls</p>
             </Card>
           </div>
-
-          <Card className="p-6 border-border shadow-card">
-            <h3 className="text-lg font-semibold text-text-primary mb-4">Recent Follow-Ups</h3>
-            {followUps.length === 0 ? (
-              <p className="text-text-secondary text-center py-8">No follow-ups recorded</p>
-            ) : (
-              <div className="space-y-2">
-                {followUps.slice(0, 5).map((f: any) => (
-                  <div key={f.id} className="flex items-center justify-between rounded-lg border border-border p-3">
-                    <div>
-                      <p className="text-sm font-medium text-text-primary">{f.patient_name || f.patient_id?.slice(0, 8) || "Unknown"}</p>
-                      <p className="text-xs text-text-muted">{f.follow_up_type || "Manual"} — Due: {f.follow_up_date ? new Date(f.follow_up_date).toLocaleDateString() : "—"}</p>
-                    </div>
-                    <Badge className={`text-xs ${f.status === "COMPLETED" ? "bg-green-50 text-green-700" : f.status === "PENDING" ? "bg-yellow-50 text-yellow-700" : "bg-blue-50 text-blue-700"}`}>
-                      {f.status}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
         </TabsContent>
       </Tabs>
 
       <Dialog open={campaignOpen} onOpenChange={setCampaignOpen}>
         <DialogContent className="sm:max-w-[480px]">
-          <DialogHeader>
-            <DialogTitle>Create Campaign</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Create Campaign</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
             <div className="grid gap-2">
               <Label>Campaign Name</Label>
@@ -281,9 +224,9 @@ export default function CrmPage() {
               <Textarea value={campaignMessage} onChange={(e) => setCampaignMessage(e.target.value)} rows={3} placeholder="Campaign message..." />
             </div>
             <Button className="w-full bg-primary text-white"
-              onClick={() => createCampaignMutation.mutate({ name: campaignName, type: campaignType, message: campaignMessage })}
-              disabled={createCampaignMutation.isPending || !campaignName}>
-              {createCampaignMutation.isPending ? "Creating..." : "Create Campaign"}
+              onClick={() => {}}
+              disabled={!campaignName}>
+              Create Campaign
             </Button>
           </div>
         </DialogContent>

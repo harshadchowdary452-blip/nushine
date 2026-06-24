@@ -72,12 +72,7 @@ class CaseService:
             findings_data = data.pop("findings", None)
 
             case = await self.repo.create(**data)
-            try:
-                cnt = await self.db.execute(select(func.count(Case.id)))
-                case.case_number = f"CASE-{cnt.scalar():04d}"
-                await self.db.flush()
-            except Exception:
-                pass
+            case.case_number = f"CASE-{case.id[:8].upper()}"
 
             if findings_data:
                 for f in findings_data:

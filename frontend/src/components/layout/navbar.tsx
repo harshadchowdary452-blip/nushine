@@ -10,6 +10,7 @@ import { useSidebarStore } from "@/store/sidebarStore"
 import { useAuthStore } from "@/store/authStore"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { ToothLogo, BrandText } from "@/components/ui/brand-logo"
 import { notificationsApi } from "@/services/endpoints"
 import { queryClient } from "@/lib/queryClient"
 import { format } from "date-fns"
@@ -19,12 +20,12 @@ interface NotificationItem {
 }
 
 const iconMap: Record<string, { icon: React.ElementType; color: string }> = {
-  appointment: { icon: Calendar, color: "text-indigo-600" },
+  appointment: { icon: Calendar, color: "text-[#2563EB]" },
   alert: { icon: AlertCircle, color: "text-red-500" },
   message: { icon: MessageSquare, color: "text-emerald-500" },
   reminder: { icon: Clock, color: "text-amber-500" },
   billing: { icon: AlertCircle, color: "text-amber-500" },
-  crm: { icon: MessageSquare, color: "text-indigo-600" },
+  crm: { icon: MessageSquare, color: "text-[#2563EB]" },
   followup: { icon: Clock, color: "text-cyan-500" },
   system: { icon: AlertCircle, color: "text-gray-400" },
 }
@@ -98,30 +99,26 @@ export default function Navbar() {
   const initials = user?.full_name?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "U"
 
   return (
-    <header role="banner" className="sticky top-0 z-20 flex h-14 items-center border-b border-gray-200 bg-white/95 backdrop-blur-sm px-4 transition-all">
+    <header role="banner" className="sticky top-0 z-20 flex h-14 items-center border-b border-gray-200 bg-white/95 backdrop-blur-sm px-4 transition-all font-['Poppins','Inter',sans-serif]">
       <div className="flex w-full items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon-sm" onClick={toggle}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             className="hidden lg:flex text-gray-400 hover:text-gray-600 h-8 w-8">
-            <PanelLeftOpen className={cn("h-[18px] w-[18px] transition-transform", collapsed && "rotate-180")} />
+            <PanelLeftOpen className={cn("h-[22px] w-[22px] transition-transform", collapsed && "rotate-180")} strokeWidth={1.5} />
           </Button>
           <Button variant="ghost" size="icon-sm" onClick={() => setMobileOpen(true)}
             aria-label="Open mobile menu"
             title="Open mobile menu"
             className="flex md:hidden text-gray-400 h-8 w-8">
-            <PanelLeftOpen className="h-[18px] w-[18px]" />
+            <PanelLeftOpen className="h-[22px] w-[22px]" strokeWidth={1.5} />
           </Button>
-          <Link to="/" className="hidden sm:flex items-center gap-2.5">
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-indigo-600">
-              <svg width="14" height="14" viewBox="0 0 48 48" fill="none">
-                <path d="M24 10c-3 0-5.5 2-6.5 5.5C16.5 18 16 22 16 26s.5 7 1.5 8.5c.8 1.2 2 2 3.5 2.5.8.2 1.5.6 2 1.2l1 1.3c.5.7 1.5.7 2 0l1-1.3c.5-.6 1.2-1 2-1.2 1.5-.5 2.7-1.3 3.5-2.5 1-1.5 1.5-4.5 1.5-8.5s-.5-8-1.5-10.5C29.5 12 27 10 24 10z" fill="white" />
-              </svg>
-            </div>
+          <Link to="/" className="hidden sm:flex items-center gap-2">
+            <ToothLogo size={22} showSparkle={false} />
             <div>
-              <p className="text-sm font-bold text-gray-900 leading-tight">NUSHINE</p>
-              <p className="text-[10px] text-gray-400 leading-tight tracking-wider">Dental</p>
+              <p className="text-sm font-bold text-gray-900 leading-tight"><BrandText size="sm" /></p>
+              <p className="text-[10px] text-[#94A3B8] font-medium tracking-[0.25em] uppercase -mt-px">Dental Management System</p>
             </div>
           </Link>
         </div>
@@ -137,7 +134,7 @@ export default function Navbar() {
               <Bell className="h-[18px] w-[18px]" />
               {notifCount > 0 && (
                 <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }}
-                  className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-indigo-600 px-1 text-[8px] font-bold text-white">
+                  className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-[#2563EB] px-1 text-[8px] font-bold text-white">
                   {notifCount > 9 ? "9+" : notifCount}
                 </motion.span>
               )}
@@ -179,7 +176,7 @@ export default function Navbar() {
                           aria-selected={activeFilter === f.key}
                           className={cn(
                             "shrink-0 rounded-lg px-2.5 py-1 text-xs font-medium transition-all whitespace-nowrap",
-                            activeFilter === f.key ? "bg-indigo-600 text-white shadow-sm" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                            activeFilter === f.key ? "bg-[#2563EB] text-white shadow-sm" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
                           )}>
                           {f.label}
                         </button>
@@ -201,7 +198,7 @@ export default function Navbar() {
                                 role="listitem"
                                 className={cn(
                                   "flex gap-2.5 rounded-lg px-4 py-2.5 transition-colors group",
-                                  !n.is_read ? "bg-indigo-50/30" : "hover:bg-gray-50"
+                                  !n.is_read ? "bg-[#2563EB]/5" : "hover:bg-gray-50"
                                 )}>
                                 <div className={cn("mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gray-50", mapped.color)}>
                                   <Icon className="h-3.5 w-3.5" />
@@ -238,7 +235,7 @@ export default function Navbar() {
               title={user?.full_name ?? "User"}
               className="flex items-center gap-2 rounded-lg pl-1.5 pr-2.5 py-1 transition-colors hover:bg-gray-100">
               <Avatar className="h-7 w-7 ring-2 ring-gray-100">
-                <AvatarFallback className="bg-indigo-600 text-xs font-medium text-white">{initials}</AvatarFallback>
+                <AvatarFallback className="bg-gradient-to-br from-[#16D3C5] to-[#2563EB] text-xs font-medium text-white">{initials}</AvatarFallback>
               </Avatar>
               <div className="hidden lg:block text-left">
                 <p className="text-sm font-medium text-gray-900 leading-tight">{user?.full_name ?? "User"}</p>

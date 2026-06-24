@@ -27,6 +27,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { treatmentApi, casesApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
+import QuickExport from "@/components/ui/quick-export"
 import type { TreatmentPlan, Case } from "@/types"
 import { useAuthStore } from "@/store/authStore"
 import { formatIndianRupees } from "@/lib/currency"
@@ -230,6 +231,7 @@ export default function TreatmentList() {
           <Button onClick={openCreateDialog} size="sm">
             <Plus className="h-4 w-4" /> New Plan
           </Button>
+          <QuickExport module="treatments" label="treatments" />
         </div>
       </PageHeader>
 

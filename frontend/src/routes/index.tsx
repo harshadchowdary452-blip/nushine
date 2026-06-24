@@ -42,8 +42,11 @@ const WhatsAppTemplates = lazy(() => import("@/pages/whatsapp/templates"));
 const WhatsAppBroadcast = lazy(() => import("@/pages/whatsapp/broadcast"));
 const DoctorAvailability = lazy(() => import("@/pages/doctors/availability"));
 const CrmDashboard = lazy(() => import("@/pages/dashboard/crm-dashboard"));
+const Recalls = lazy(() => import("@/pages/crm/recalls"));
+const CrmSettings = lazy(() => import("@/pages/crm/crm-settings"));
 const ConsentFormList = lazy(() => import("@/pages/consent-forms/list"));
 const ConsentFormView = lazy(() => import("@/pages/consent-forms/view"));
+const ExportCenter = lazy(() => import("@/pages/exports/export-center"));
 
 const dashboardByRole: Record<Role, string> = {
   SUPER_ADMIN: "/super-admin",
@@ -137,6 +140,7 @@ export const router = createBrowserRouter([
       { path: "/admin/hospitals", element: withRoles(<AdminHospitals />, ["SUPER_ADMIN", "GROUP_ADMIN"]) },
       { path: "/admin/doctors", element: withRoles(<AdminDoctors />, ["SUPER_ADMIN", "GROUP_ADMIN", "HOSPITAL_ADMIN"]) },
       { path: "/admin/expenses", element: withRoles(<AdminExpenses />, ["SUPER_ADMIN", "GROUP_ADMIN", "HOSPITAL_ADMIN"]) },
+      { path: "/exports", element: withRoles(<ExportCenter />, ["SUPER_ADMIN", "GROUP_ADMIN", "HOSPITAL_ADMIN"]) },
       { path: "/patients", element: withRoles(<PatientList />, CARE_ROLES) },
       { path: "/patients/:id", element: withRoles(<PatientDetail />, CARE_ROLES) },
       { path: "/appointments", element: withRoles(<AppointmentList />, CARE_ROLES) },
@@ -151,6 +155,8 @@ export const router = createBrowserRouter([
       { path: "/crm/dashboard", element: withRoles(<CrmDashboard />, ADMIN_ROLES) },
       { path: "/crm/dashboard2", element: withRoles(<CrmDashboard />, ADMIN_ROLES) },
       { path: "/crm/follow-ups", element: withRoles(<FollowUps />, ["HOSPITAL_ADMIN"]) },
+      { path: "/crm/recalls", element: withRoles(<Recalls />, ["HOSPITAL_ADMIN"]) },
+      { path: "/crm/settings", element: withRoles(<CrmSettings />, ["HOSPITAL_ADMIN"]) },
       { path: "/crm/campaigns", element: withRoles(<Campaigns />, ["HOSPITAL_ADMIN"]) },
       { path: "/crm/enquiry-calendar", element: withRoles(<EnquiryCalendar />, ["HOSPITAL_ADMIN"]) },
       { path: "/crm/lead-analytics", element: withRoles(<LeadAnalytics />, ADMIN_ROLES) },

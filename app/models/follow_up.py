@@ -15,8 +15,23 @@ class FollowUpStatus(str, Enum):
 
 class FollowUpType(str, Enum):
     ONE_DAY_POST_TREATMENT = "1_DAY_POST_TREATMENT"
+    SEVEN_DAY_POST_TREATMENT = "7_DAY_POST_TREATMENT"
     SIX_MONTH_RECALL = "6_MONTH_RECALL"
+    TWELVE_MONTH_RECALL = "12_MONTH_RECALL"
+    CUSTOM_RECALL = "CUSTOM_RECALL"
+    TREATMENT_FOLLOW_UP = "TREATMENT_FOLLOW_UP"
+    ENQUIRY = "ENQUIRY"
     MANUAL = "MANUAL"
+
+
+class FollowUpOutcome(str, Enum):
+    DOING_WELL = "DOING_WELL"
+    MINOR_PAIN = "MINOR_PAIN"
+    MAJOR_PAIN = "MAJOR_PAIN"
+    NEEDS_REVIEW = "NEEDS_REVIEW"
+    NEEDS_APPOINTMENT = "NEEDS_APPOINTMENT"
+    TREATMENT_SUCCESSFUL = "TREATMENT_SUCCESSFUL"
+    NO_RESPONSE = "NO_RESPONSE"
 
 
 class FollowUp(Base):
@@ -31,7 +46,8 @@ class FollowUp(Base):
     treatment_id: Mapped[str] = mapped_column(String(36), nullable=True)
     follow_up_date: Mapped[date] = mapped_column(Date, nullable=False)
     follow_up_time: Mapped[time] = mapped_column(Time, nullable=True)
-    follow_up_type: Mapped[str] = mapped_column(String(20), default=FollowUpType.MANUAL.value, server_default=FollowUpType.MANUAL.value)
+    follow_up_type: Mapped[str] = mapped_column(String(30), default=FollowUpType.MANUAL.value, server_default=FollowUpType.MANUAL.value)
+    outcome: Mapped[str] = mapped_column(String(30), nullable=True)
     treatment_name: Mapped[str] = mapped_column(String(255), nullable=True)
     treatment_completed_date: Mapped[date] = mapped_column(Date, nullable=True)
     notes: Mapped[str] = mapped_column(Text, nullable=True)

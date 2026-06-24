@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/select"
 import { billingApi, casesApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
+import QuickExport from "@/components/ui/quick-export"
 import { formatIndianRupees } from "@/lib/currency"
 import type { Billing, Case, PaginatedResponse } from "@/types"
 import { useAuthStore } from "@/store/authStore"
@@ -303,6 +304,7 @@ export default function BillingList() {
         <Button onClick={openDialog}>
           <Plus className="h-4 w-4" /> New Invoice
         </Button>
+        <QuickExport module="billings" label="billings" />
       </PageHeader>
 
       <div className="grid gap-4 sm:grid-cols-3">

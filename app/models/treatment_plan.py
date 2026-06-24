@@ -21,6 +21,7 @@ class TreatmentPlan(Base):
     treatment_number: Mapped[str] = mapped_column(String(20), nullable=True, unique=True)
     case_id: Mapped[str] = mapped_column(String(36), ForeignKey("cases.id"), nullable=False)
     treatment_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    treatment_template_id: Mapped[str] = mapped_column(String(36), ForeignKey("treatment_templates.id"), nullable=True)
     description: Mapped[str] = mapped_column(Text, nullable=True)
     cost: Mapped[float] = mapped_column(Float, nullable=False)
     paid_amount: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)

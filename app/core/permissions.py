@@ -67,7 +67,8 @@ ROLE_PERMISSIONS = {
         Permission.UPDATE_BILLING,         Permission.COMPLETE_TREATMENT,
         Permission.MANAGE_EXPENSES, Permission.VIEW_EXPENSES, Permission.DELETE_EXPENSE,
         Permission.MANAGE_LEADS, Permission.VIEW_LEADS,
-        Permission.VIEW_CRM_DASHBOARD,
+        Permission.VIEW_CRM_DASHBOARD, Permission.VIEW_REVENUE_ANALYTICS,
+        Permission.VIEW_DOCTOR_PERFORMANCE, Permission.VIEW_HOSPITAL_PERFORMANCE,
     ],
     Role.GROUP_ADMIN: [
         Permission.CREATE_HOSPITAL, Permission.CREATE_HOSPITAL_ADMIN,

@@ -22,6 +22,7 @@ import {
 import { leadsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
 import DentalEmptyState from "@/components/ui/dental-empty-state"
+import QuickExport from "@/components/ui/quick-export"
 import { useAuthStore } from "@/store/authStore"
 import type { Lead, LeadSource, LeadStatus } from "@/types"
 
@@ -153,6 +154,7 @@ export default function LeadList() {
         <Button onClick={() => setCreateOpen(true)}>
           <Plus className="h-4 w-4 mr-1.5" /> Add Lead
         </Button>
+        <QuickExport module="leads" label="leads" />
       </PageHeader>
 
       <Card>

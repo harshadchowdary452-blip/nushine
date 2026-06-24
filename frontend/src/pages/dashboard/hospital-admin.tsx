@@ -7,6 +7,8 @@ import { useAuthStore } from "@/store/authStore"
 import { dashboardApi, consentFormsApi } from "@/services/endpoints"
 import { Skeleton } from "@/components/ui/skeleton"
 import KpiCard from "@/components/layout/kpi-card"
+import { Button } from "@/components/ui/button"
+import { useToast } from "@/components/ui/toast"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import Leaderboard from "@/components/ui/leaderboard"
 import QuickViewDrawer from "@/components/ui/quick-view-drawer"
@@ -50,6 +52,7 @@ export default function HospitalAdminDashboard() {
   const [period, setPeriod] = useState("this_month")
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
+  const { addToast } = useToast()
 
   const dashParams = useMemo(() => {
     const p: Record<string, string> = { period }

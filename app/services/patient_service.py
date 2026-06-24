@@ -23,6 +23,8 @@ from app.models.lead import Lead
 from app.models.pre_op import PreOp
 from app.models.post_op import PostOp
 from app.models.consultant_note import ConsultantNote
+from app.models.billing_history import BillingHistory
+from app.models.payment_transaction import PaymentTransaction
 
 logger = logging.getLogger(__name__)
 
@@ -136,6 +138,10 @@ class PatientService:
                 for tp in tps:
                     await self.db.execute(sa_delete(TreatmentSitting).where(TreatmentSitting.treatment_plan_id == tp.id))
                 await self.db.execute(sa_delete(TreatmentPlan).where(TreatmentPlan.case_id == c.id))
+                billing_ids = (await self.db.execute(select(Billing.id).where(Billing.case_id == c.id))).scalars().all()
+                for bid in billing_ids:
+                    await self.db.execute(sa_delete(BillingHistory).where(BillingHistory.billing_id == bid))
+                    await self.db.execute(sa_delete(PaymentTransaction).where(PaymentTransaction.billing_id == bid))
                 await self.db.execute(sa_delete(Billing).where(Billing.case_id == c.id))
             await self.db.execute(sa_delete(Case).where(Case.patient_id == patient_id))
             result = await self.repo.delete(patient_id)

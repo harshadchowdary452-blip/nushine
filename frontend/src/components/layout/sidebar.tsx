@@ -6,12 +6,13 @@ import {
   UserCog, Settings, ChevronLeft, X, Building2, Shield, MessageSquare,
   Activity, Menu, IndianRupee, TrendingUp, Bell, Mail, BarChart3, FileText,
   Phone, ClipboardList, Calendar, Megaphone, Clock, UserPlus, Send,
-  Search, Star, ChevronRight, LogOut,
+  Search, Star, ChevronRight, LogOut, Download,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useSidebarStore } from "@/store/sidebarStore"
 import { useAuthStore } from "@/store/authStore"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { ToothLogo, BrandText } from "@/components/ui/brand-logo"
 
 interface NavItem { label: string; icon: React.ElementType; path: string; }
 interface NavSection { label: string; items: NavItem[]; }
@@ -32,7 +33,9 @@ const roleNav: Record<string, NavSection[]> = {
       { label: "Hospitals", icon: Building2, path: "/admin/hospitals" },
       { label: "Doctors", icon: Stethoscope, path: "/admin/doctors" },
     ]},
-    { label: "Finance", items: [{ label: "Expenses", icon: IndianRupee, path: "/admin/expenses" }] },
+    { label: "Finance", items: [
+      { label: "Expenses", icon: IndianRupee, path: "/admin/expenses" },
+    ]},
     { label: "Settings", items: [{ label: "Settings", icon: Settings, path: "/settings" }] },
   ],
   HOSPITAL_ADMIN: [
@@ -48,14 +51,18 @@ const roleNav: Record<string, NavSection[]> = {
     { label: "CRM", items: [
       { label: "CRM Dashboard", icon: LayoutDashboard, path: "/crm/dashboard2" },
       { label: "Leads", icon: UserPlus, path: "/leads" },
-      { label: "Campaigns", icon: Megaphone, path: "/crm/campaigns" },
-      { label: "Enquiry Calendar", icon: CalendarDays, path: "/crm/enquiry-calendar" },
+      { label: "Enquiries", icon: CalendarDays, path: "/crm/enquiry-calendar" },
       { label: "Follow-Ups", icon: Clock, path: "/crm/follow-ups" },
+      { label: "Recalls", icon: Bell, path: "/crm/recalls" },
+      { label: "Campaigns", icon: Megaphone, path: "/crm/campaigns" },
       { label: "WhatsApp", icon: MessageSquare, path: "/whatsapp" },
       { label: "Communications", icon: Mail, path: "/crm/communications" },
+      { label: "CRM Settings", icon: Settings, path: "/crm/settings" },
     ]},
-    { label: "Management", items: [{ label: "Doctors", icon: Stethoscope, path: "/admin/doctors" }] },
-    { label: "Finance", items: [{ label: "Expenses", icon: IndianRupee, path: "/admin/expenses" }] },
+    { label: "Finance", items: [
+      { label: "Expenses", icon: IndianRupee, path: "/admin/expenses" },
+      { label: "Export Center", icon: Download, path: "/exports" },
+    ]},
     { label: "Settings", items: [
       { label: "Settings", icon: Settings, path: "/settings" },
       { label: "WhatsApp Config", icon: MessageSquare, path: "/settings/whatsapp" },
@@ -124,25 +131,21 @@ export default function Sidebar() {
 
   const sidebarClass = cn(
     "hidden lg:flex flex-col shrink-0 transition-[width] duration-200 ease-out will-change-transform bg-white border-r border-sidebar-border",
-    isCollapsed && !hovered ? "w-[72px]" : "w-[260px]"
+    isCollapsed && !hovered ? "w-[80px]" : "w-[280px]"
   )
 
   const sidebarContent = (
-    <div className="flex h-full flex-col bg-white">
+    <div className="flex h-full flex-col bg-white font-['Poppins','Inter',sans-serif]">
       {/* Logo area */}
       <div className={cn(
         "flex items-center border-b border-sidebar-border transition-all duration-200 overflow-hidden",
-        isExpanded ? "h-[56px] px-4" : "h-[56px] px-0 justify-center"
+        isExpanded ? "h-[60px] px-5" : "h-[60px] px-0 justify-center"
       )}>
         <Link to="/" className={cn("flex items-center overflow-hidden transition-all duration-200", isExpanded ? "gap-2.5" : "gap-0")} onClick={() => setMobileOpen(false)}>
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-600" aria-label="NUSHINE Dental" role="img">
-            <svg width="18" height="18" viewBox="0 0 48 48" fill="none">
-              <path d="M24 10c-3 0-5.5 2-6.5 5.5C16.5 18 16 22 16 26s.5 7 1.5 8.5c.8 1.2 2 2 3.5 2.5.8.2 1.5.6 2 1.2l1 1.3c.5.7 1.5.7 2 0l1-1.3c.5-.6 1.2-1 2-1.2 1.5-.5 2.7-1.3 3.5-2.5 1-1.5 1.5-4.5 1.5-8.5s-.5-8-1.5-10.5C29.5 12 27 10 24 10z" fill="white" />
-            </svg>
-          </div>
+          <ToothLogo size={isExpanded ? 27 : 24} showSparkle={false} />
           <div className={cn("transition-all duration-200", !isExpanded ? "opacity-0 w-0" : "opacity-100")}>
-            <p className="text-sm font-bold text-gray-900 leading-tight">NUSHINE</p>
-            <p className="text-[10px] text-gray-400 leading-tight tracking-wider">Dental</p>
+            <p className="text-sm font-bold leading-tight"><BrandText size="sm" /></p>
+            <p className="text-[10px] text-[#94A3B8] font-medium tracking-[0.25em] uppercase -mt-px">Dental Management System</p>
           </div>
         </Link>
         <div className="flex-1" />
@@ -153,14 +156,14 @@ export default function Sidebar() {
             "hidden lg:flex items-center justify-center h-7 w-7 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all duration-200",
             isExpanded ? "opacity-100" : "opacity-0 pointer-events-none"
           )}>
-          <ChevronLeft className={cn("h-3.5 w-3.5 transition-transform duration-200", isCollapsed && "rotate-180")} />
+          <ChevronLeft className={cn("h-3.5 w-3.5 transition-transform duration-200", isCollapsed && "rotate-180")} strokeWidth={2} />
         </button>
       </div>
 
       {/* Search */}
       <div className={cn("px-3 pt-3 transition-all duration-200 overflow-hidden", !isExpanded ? "opacity-0 h-0 py-0" : "opacity-100")}>
         <div className="relative mb-1">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" strokeWidth={2} />
           <input
             ref={searchRef}
             id="sidebar-search"
@@ -169,11 +172,10 @@ export default function Sidebar() {
             aria-label="Search navigation"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-8 w-full rounded-lg border border-gray-200 bg-gray-50 pl-8 pr-2 text-xs text-gray-900 outline-none placeholder:text-gray-400 focus:border-indigo-300 focus:bg-white focus:ring-1 focus:ring-indigo-500/20 transition-all"
+            className="h-8 w-full rounded-lg border border-gray-200 bg-gray-50 pl-8 pr-2 text-xs text-gray-900 outline-none placeholder:text-gray-400 focus:border-[#2563EB] focus:bg-white focus:ring-2 focus:ring-[#2563EB]/10 transition-all"
           />
           <kbd className="absolute right-2 top-1/2 -translate-y-1/2 hidden sm:inline-flex h-4 items-center px-1.5 rounded border border-gray-200 bg-white text-[10px] font-medium text-gray-400">⌘K</kbd>
         </div>
-        {/* Search results */}
         {searchQuery && filteredItems.length > 0 && (
           <div className="absolute left-3 right-3 z-50 mt-1 rounded-xl border border-gray-200 bg-white py-1 shadow-dropdown">
             {filteredItems.slice(0, 8).map((item) => {
@@ -181,7 +183,7 @@ export default function Sidebar() {
               return (
                 <Link key={item.path} to={item.path} onClick={() => { setSearchQuery(""); setMobileOpen(false) }}
                   className="flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-                  <Icon className="h-4 w-4 text-gray-400" />
+                  <Icon className="h-4 w-4 text-gray-400" strokeWidth={2} />
                   {item.label}
                 </Link>
               )
@@ -191,14 +193,14 @@ export default function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav aria-label="Main navigation" className="flex-1 overflow-y-auto px-2 py-3 scrollbar-hide space-y-1">
+      <nav aria-label="Main navigation" className="min-h-0 flex-1 overflow-y-auto px-2.5 py-3 scrollbar-hide space-y-1">
         {searchQuery && filteredItems.length === 0 && (
           <p className="px-2 text-xs text-gray-400 py-4 text-center">No results found</p>
         )}
         {!searchQuery && sections.map((section) => (
           <div key={section.label}>
             <p className={cn(
-              "px-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-0.5 overflow-hidden transition-all duration-200",
+              "px-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1 overflow-hidden transition-all duration-200",
               !isExpanded ? "max-h-0 opacity-0" : "max-h-5 opacity-100"
             )}>
               {section.label}
@@ -211,19 +213,19 @@ export default function Sidebar() {
                   onClick={() => setMobileOpen(false)}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-all duration-150 group relative",
+                    "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 group relative",
                     active
-                      ? "bg-indigo-50 text-indigo-700 font-semibold"
+                      ? "bg-gradient-to-r from-[#16D3C5]/10 to-[#2563EB]/10 text-[#0B1D3A] font-semibold"
                       : "text-gray-500 hover:bg-gray-50 hover:text-gray-700"
                   )}
                   title={!isExpanded ? item.label : undefined}>
-                  {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-indigo-600" />}
-                  <span className={cn("flex items-center justify-center shrink-0", active ? "text-indigo-600" : "text-gray-400 group-hover:text-gray-600")}>
-                    <Icon className="h-[18px] w-[18px]" />
+                  {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3.5px] h-5 rounded-r-full bg-gradient-to-b from-[#16D3C5] to-[#2563EB]" />}
+                  <span className={cn("flex items-center justify-center shrink-0", active ? "text-[#2563EB]" : "text-gray-400 group-hover:text-gray-600")}>
+                    <Icon className="h-[22px] w-[22px]" strokeWidth={1.5} />
                   </span>
                   <span className={cn(
                     "overflow-hidden transition-all duration-200 whitespace-nowrap text-sm",
-                    !isExpanded ? "max-w-0 opacity-0" : "max-w-40 opacity-100"
+                    !isExpanded ? "max-w-0 opacity-0" : "max-w-44 opacity-100"
                   )}>{item.label}</span>
                 </Link>
               )
@@ -233,15 +235,15 @@ export default function Sidebar() {
       </nav>
 
       {/* User */}
-      <div className="border-t border-sidebar-border p-2">
+      <div className="border-t border-sidebar-border p-2.5">
         <div className={cn(
-          "flex items-center gap-2.5 rounded-lg px-2.5 py-2 overflow-hidden transition-all duration-200",
+          "flex items-center gap-3 rounded-xl px-3 py-2 overflow-hidden transition-all duration-200",
           !isExpanded ? "justify-center" : ""
         )}>
-          <Avatar className="h-7 w-7 shrink-0 ring-1.5 ring-gray-100">
-            <AvatarFallback className="bg-indigo-50 text-[11px] font-semibold text-indigo-600">{initials}</AvatarFallback>
+          <Avatar className="h-8 w-8 shrink-0 ring-2 ring-gray-100">
+            <AvatarFallback className="bg-gradient-to-br from-[#16D3C5]/20 to-[#2563EB]/20 text-xs font-semibold text-[#2563EB]">{initials}</AvatarFallback>
           </Avatar>
-          <div className={cn("overflow-hidden transition-all duration-200", !isExpanded ? "max-w-0 opacity-0" : "max-w-32 opacity-100")}>
+          <div className={cn("overflow-hidden transition-all duration-200", !isExpanded ? "max-w-0 opacity-0" : "max-w-36 opacity-100")}>
             <p className="text-sm font-medium text-gray-900 truncate leading-tight">{user?.full_name ?? "User"}</p>
             <p className="text-[11px] text-gray-400 truncate capitalize">{user?.role?.replace("_", " ").toLowerCase() ?? ""}</p>
           </div>
@@ -259,16 +261,12 @@ export default function Sidebar() {
       </aside>
 
       {/* Tablet icon-only sidebar */}
-      <aside aria-label="Sidebar" className="hidden md:flex lg:hidden flex-col shrink-0 w-[72px]">
-        <div className="sticky top-0 h-screen flex flex-col bg-white border-r border-sidebar-border">
-          <div className="flex h-[56px] items-center justify-center border-b border-sidebar-border">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600" aria-label="NUSHINE Dental" role="img">
-              <svg width="18" height="18" viewBox="0 0 48 48" fill="none">
-                <path d="M24 10c-3 0-5.5 2-6.5 5.5C16.5 18 16 22 16 26s.5 7 1.5 8.5c.8 1.2 2 2 3.5 2.5.8.2 1.5.6 2 1.2l1 1.3c.5.7 1.5.7 2 0l1-1.3c.5-.6 1.2-1 2-1.2 1.5-.5 2.7-1.3 3.5-2.5 1-1.5 1.5-4.5 1.5-8.5s-.5-8-1.5-10.5C29.5 12 27 10 24 10z" fill="white" />
-              </svg>
-            </div>
+      <aside aria-label="Sidebar" className="hidden md:flex lg:hidden flex-col shrink-0 w-[80px]">
+        <div className="sticky top-0 h-screen flex flex-col bg-white border-r border-sidebar-border font-['Poppins','Inter',sans-serif]">
+          <div className="flex h-[60px] items-center justify-center border-b border-sidebar-border">
+            <ToothLogo size={24} showSparkle={false} />
           </div>
-          <nav aria-label="Main navigation" className="flex-1 overflow-y-auto px-1.5 py-3 scrollbar-hide space-y-1">
+          <nav aria-label="Main navigation" className="min-h-0 flex-1 overflow-y-auto px-1.5 py-3 scrollbar-hide space-y-1">
             {sections.map((section) =>
               section.items.map((item) => {
                 const Icon = item.icon
@@ -277,20 +275,20 @@ export default function Sidebar() {
                   <Link key={item.path} to={item.path}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "flex items-center justify-center rounded-lg p-2 transition-all duration-150 relative",
-                      active ? "bg-indigo-50 text-indigo-600" : "text-gray-400 hover:bg-gray-50 hover:text-gray-600"
+                      "flex items-center justify-center rounded-lg p-2.5 transition-all duration-150 relative",
+                      active ? "bg-gradient-to-r from-[#16D3C5]/10 to-[#2563EB]/10 text-[#2563EB]" : "text-gray-400 hover:bg-gray-50 hover:text-gray-600"
                     )}
                     title={item.label}>
-                    {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-indigo-600" />}
-                    <Icon className="h-[18px] w-[18px]" />
+                    {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3.5px] h-5 rounded-r-full bg-gradient-to-b from-[#16D3C5] to-[#2563EB]" />}
+                    <Icon className="h-[22px] w-[22px]" strokeWidth={1.5} />
                   </Link>
                 )
               })
             )}
           </nav>
           <div className="border-t border-sidebar-border p-2 flex justify-center">
-            <Avatar className="h-7 w-7 shrink-0 ring-1.5 ring-gray-100">
-              <AvatarFallback className="bg-indigo-50 text-[11px] font-semibold text-indigo-600">{initials}</AvatarFallback>
+            <Avatar className="h-8 w-8 shrink-0 ring-2 ring-gray-100">
+              <AvatarFallback className="bg-gradient-to-br from-[#16D3C5]/20 to-[#2563EB]/20 text-xs font-semibold text-[#2563EB]">{initials}</AvatarFallback>
             </Avatar>
           </div>
         </div>
@@ -309,9 +307,9 @@ export default function Sidebar() {
               role="dialog"
               aria-modal="true"
               aria-label="Mobile navigation"
-              initial={{ x: -280 }} animate={{ x: 0 }} exit={{ x: -280 }}
+              initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="fixed inset-y-0 left-0 z-50 w-[260px] md:hidden shadow-xl">
+              className="fixed inset-y-0 left-0 z-50 w-[280px] md:hidden shadow-xl">
               {sidebarContent}
             </motion.aside>
           </>
@@ -319,7 +317,7 @@ export default function Sidebar() {
       </AnimatePresence>
 
       {/* Mobile bottom nav */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 flex h-14 items-center justify-around border-t border-gray-200 bg-white md:hidden safe-area-bottom">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 flex h-14 items-center justify-around border-t border-gray-200 bg-white md:hidden safe-area-bottom font-['Poppins','Inter',sans-serif]">
         {mainItems.slice(0, 5).map((item) => {
           const Icon = item.icon
           const active = isActive(item.path)
@@ -327,9 +325,9 @@ export default function Sidebar() {
             <Link key={item.path} to={item.path}
               className={cn(
                 "flex flex-col items-center justify-center gap-0.5 min-w-[56px] py-1 px-2 transition-colors",
-                active ? "text-indigo-600" : "text-gray-400 hover:text-gray-600"
+                active ? "text-[#2563EB]" : "text-gray-400 hover:text-gray-600"
               )}>
-              <Icon className={cn("h-[20px] w-[20px]", active && "scale-105")} />
+              <Icon className={cn("h-[22px] w-[22px]", active && "scale-105")} strokeWidth={1.5} />
               <span className="text-[10px] font-medium leading-tight text-center truncate w-full">{item.label}</span>
             </Link>
           )
@@ -338,7 +336,7 @@ export default function Sidebar() {
           aria-label="More navigation items"
           aria-expanded={bottomNavOpen}
           className="flex flex-col items-center justify-center gap-0.5 min-w-[56px] py-1 px-2 text-gray-400 hover:text-gray-600">
-          <Menu className="h-[20px] w-[20px]" />
+          <Menu className="h-[22px] w-[22px]" strokeWidth={1.5} />
           <span className="text-[10px] font-medium">More</span>
         </button>
       </nav>
@@ -357,7 +355,7 @@ export default function Sidebar() {
               aria-label="More navigation"
               initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl bg-white pb-8 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] md:hidden safe-area-bottom">
+              className="fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl bg-white pb-8 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] md:hidden safe-area-bottom font-['Poppins','Inter',sans-serif]">
               <div className="mx-auto my-3 h-1 w-10 rounded-full bg-gray-300" />
               <div className="grid grid-cols-4 gap-1 px-4">
                 {mainItems.slice(5).map((item) => {
@@ -367,9 +365,9 @@ export default function Sidebar() {
                     <Link key={item.path} to={item.path} onClick={() => setBottomNavOpen(false)}
                       className={cn(
                         "flex flex-col items-center justify-center gap-1 rounded-xl p-3 transition-colors",
-                        active ? "bg-indigo-50 text-indigo-600" : "text-gray-500 hover:bg-gray-50"
+                        active ? "bg-gradient-to-r from-[#16D3C5]/10 to-[#2563EB]/10 text-[#2563EB]" : "text-gray-500 hover:bg-gray-50"
                       )}>
-                      <Icon className="h-[20px] w-[20px]" />
+                      <Icon className="h-[22px] w-[22px]" strokeWidth={1.5} />
                       <span className="text-[10px] font-medium text-center">{item.label}</span>
                     </Link>
                   )

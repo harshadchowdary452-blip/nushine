@@ -53,6 +53,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { appointmentsApi, patientsApi, doctorsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
+import QuickExport from "@/components/ui/quick-export"
 import type { Appointment, Patient, User, PaginatedResponse, TimeSlot, DoctorSlotResponse } from "@/types"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/store/authStore"
@@ -492,6 +493,7 @@ export default function AppointmentList() {
             <Plus className="h-4 w-4" /> New Appointment
           </Button>
         )}
+        <QuickExport module="appointments" label="appointments" />
       </PageHeader>
 
       <Card>

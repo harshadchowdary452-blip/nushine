@@ -20,7 +20,7 @@ from app.models.refresh_token import RefreshToken
 from app.models.audit_log import AuditLog
 from app.models.payment_transaction import PaymentTransaction
 from app.models.hospital_monthly_expense import HospitalMonthlyExpense
-from app.models.communication_log import CommunicationLog, CommunicationChannel, CommunicationStatus, MessageType
+from app.models.communication_log import CommunicationLog, CommunicationChannel, CommunicationStatus, MessageType, MessageAudit
 from app.models.notification import Notification
 from app.models.patient_feedback import PatientFeedback
 from app.models.follow_up import FollowUp, FollowUpStatus, FollowUpType
@@ -34,6 +34,10 @@ from app.models.lead import Lead, LeadCommunication, LeadCall, LeadSource, LeadS
 from app.models.billing_history import BillingHistory
 from app.models.whatsapp_config import WhatsAppConfig
 from app.models.consent_form import ConsentForm
+from app.models.enquiry import Enquiry, EnquiryStatus, TreatmentInterest, EnquiryFollowUp
+from app.models.treatment_follow_up_rule import TreatmentFollowUpRule
+from app.models.treatment_template import TreatmentTemplate
+from app.models.export_job import ExportJob
 
 __all__ = [
     "AdminGroup", "Hospital", "User", "Patient", "Consultant",
@@ -53,4 +57,7 @@ __all__ = [
     "BillingHistory",
     "ConsentForm",
     "CaseTimeline",
+    "Enquiry", "EnquiryStatus", "TreatmentInterest", "EnquiryFollowUp",
+    "TreatmentFollowUpRule",
+    "TreatmentTemplate",
 ]

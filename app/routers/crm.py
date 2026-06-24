@@ -26,6 +26,7 @@ from app.models.communication_log import CommunicationLog, CommunicationChannel,
 from app.models.notification import Notification
 from app.models.patient_feedback import PatientFeedback
 from app.models.follow_up import FollowUp, FollowUpStatus, FollowUpType
+from app.models.enquiry import Enquiry
 from app.models.follow_up_response import FollowUpResponse, FollowUpResponseStatus
 from app.models.whatsapp_template import WhatsAppTemplate
 from app.services.status_automation import StatusAutomationService
@@ -1866,29 +1867,46 @@ async def get_crm_dashboard(
     today_q = base.where(FollowUp.follow_up_date == today)
     today_fus = (await db.execute(today_q.order_by(FollowUp.follow_up_time).limit(50))).scalars().all()
 
-    # Metrics
-    all_q = base
-    total = (await db.execute(select(func.count()).select_from(all_q.subquery()))).scalar() or 0
-    pending_q = base.where(FollowUp.status.in_(["SCHEDULED", "PENDING", "CONTACTED", "NO_RESPONSE"]))
-    pending = (await db.execute(select(func.count()).select_from(pending_q.subquery()))).scalar() or 0
-    completed_q = base.where(FollowUp.status == "COMPLETED")
-    completed = (await db.execute(select(func.count()).select_from(completed_q.subquery()))).scalar() or 0
-    overdue_q = base.where(FollowUp.follow_up_date < today, FollowUp.status.in_(["SCHEDULED", "PENDING", "CONTACTED", "NO_RESPONSE"]))
-    overdue = (await db.execute(select(func.count()).select_from(overdue_q.subquery()))).scalar() or 0
-    one_day_q = base.where(FollowUp.follow_up_type == "1_DAY_POST_TREATMENT", FollowUp.follow_up_date == today)
-    one_day_due = (await db.execute(select(func.count()).select_from(one_day_q.subquery()))).scalar() or 0
-    six_month_q = base.where(FollowUp.follow_up_type == "6_MONTH_RECALL", FollowUp.follow_up_date == today)
-    six_month_due = (await db.execute(select(func.count()).select_from(six_month_q.subquery()))).scalar() or 0
+    # Separate treatment follow-up types vs recall types
+    treatment_fu_types = ["1_DAY_POST_TREATMENT", "7_DAY_POST_TREATMENT", "TREATMENT_FOLLOW_UP"]
+    recall_types = ["6_MONTH_RECALL", "12_MONTH_RECALL", "CUSTOM_RECALL"]
 
-    # Response rate
-    responded_q = base.where(FollowUp.status.in_(["RESPONDED", "APPOINTMENT_BOOKED", "COMPLETED"]))
-    responded = (await db.execute(select(func.count()).select_from(responded_q.subquery()))).scalar() or 0
-    # WhatsApp messages sent from follow-ups
-    whatsapp_q = base.where(FollowUp.whatsapp_sent_at.isnot(None))
-    whatsapp_sent = (await db.execute(select(func.count()).select_from(whatsapp_q.subquery()))).scalar() or 0
-    # WhatsApp response rate
-    whatsapp_responded_q = base.where(FollowUp.whatsapp_sent_at.isnot(None), FollowUp.status.in_(["RESPONDED", "APPOINTMENT_BOOKED", "COMPLETED"]))
-    whatsapp_responded = (await db.execute(select(func.count()).select_from(whatsapp_responded_q.subquery()))).scalar() or 0
+    async def _count(extra_filters):
+        q = base.where(*extra_filters)
+        result = await db.execute(select(func.count()).select_from(q.subquery()))
+        return result.scalar() or 0
+
+    # Follow-up metrics (treatment follow-ups only)
+    total_fu = await _count([FollowUp.follow_up_type.in_(treatment_fu_types)])
+    pending_fu = await _count([FollowUp.follow_up_type.in_(treatment_fu_types), FollowUp.status.in_(["SCHEDULED", "PENDING", "CONTACTED", "NO_RESPONSE"])])
+    completed_fu = await _count([FollowUp.follow_up_type.in_(treatment_fu_types), FollowUp.status == "COMPLETED"])
+    overdue_fu = await _count([FollowUp.follow_up_type.in_(treatment_fu_types), FollowUp.follow_up_date < today, FollowUp.status.in_(["SCHEDULED", "PENDING", "CONTACTED", "NO_RESPONSE"])])
+    one_day_due = await _count([FollowUp.follow_up_type == "1_DAY_POST_TREATMENT", FollowUp.follow_up_date == today])
+
+    # Recall metrics (recalls only)
+    total_rec = await _count([FollowUp.follow_up_type.in_(recall_types)])
+    pending_rec = await _count([FollowUp.follow_up_type.in_(recall_types), FollowUp.status.in_(["SCHEDULED", "PENDING", "CONTACTED", "NO_RESPONSE"])])
+    completed_rec = await _count([FollowUp.follow_up_type.in_(recall_types), FollowUp.status == "COMPLETED"])
+    overdue_rec = await _count([FollowUp.follow_up_type.in_(recall_types), FollowUp.follow_up_date < today, FollowUp.status.in_(["SCHEDULED", "PENDING", "CONTACTED", "NO_RESPONSE"])])
+    six_month_due = await _count([FollowUp.follow_up_type == "6_MONTH_RECALL", FollowUp.follow_up_date == today])
+    twelve_month_due = await _count([FollowUp.follow_up_type == "12_MONTH_RECALL", FollowUp.follow_up_date == today])
+
+    # Enquiry metrics
+    enq_base = select(func.count(Enquiry.id))
+    if hospital_id:
+        enq_base = enq_base.where(Enquiry.hospital_id == hospital_id)
+    total_enquiries = (await db.execute(enq_base)).scalar() or 0
+    new_enquiries = (await db.execute(enq_base.where(Enquiry.status == "NEW"))).scalar() or 0
+    contacted_enquiries = (await db.execute(enq_base.where(Enquiry.status == "CONTACTED"))).scalar() or 0
+    interested_enquiries = (await db.execute(enq_base.where(Enquiry.status == "INTERESTED"))).scalar() or 0
+    converted_enquiries = (await db.execute(enq_base.where(Enquiry.status == "CONVERTED"))).scalar() or 0
+    lost_enquiries = (await db.execute(enq_base.where(Enquiry.status.in_(["NOT_INTERESTED", "LOST"])))).scalar() or 0
+
+    # Response rate (treatment follow-ups only)
+    responded = await _count([FollowUp.follow_up_type.in_(treatment_fu_types), FollowUp.status.in_(["RESPONDED", "APPOINTMENT_BOOKED", "COMPLETED"])])
+    # WhatsApp messages sent (treatment follow-ups only)
+    whatsapp_sent = await _count([FollowUp.follow_up_type.in_(treatment_fu_types), FollowUp.whatsapp_sent_at.isnot(None)])
+    whatsapp_responded = await _count([FollowUp.follow_up_type.in_(treatment_fu_types), FollowUp.whatsapp_sent_at.isnot(None), FollowUp.status.in_(["RESPONDED", "APPOINTMENT_BOOKED", "COMPLETED"])])
 
     # Patient source analytics
     patient_base = select(Patient)
@@ -2022,16 +2040,30 @@ async def get_crm_dashboard(
         "todays_follow_ups": enriched,
         "metrics": {
             "todays_follow_ups_count": len(enriched),
-            "total_follow_ups": total,
-            "pending_follow_ups": pending,
-            "completed_follow_ups": completed,
-            "overdue_follow_ups": overdue,
+            "total_follow_ups": total_fu,
+            "pending_follow_ups": pending_fu,
+            "completed_follow_ups": completed_fu,
+            "overdue_follow_ups": overdue_fu,
             "one_day_follow_ups_due": one_day_due,
             "six_month_recalls_due": six_month_due,
-            "response_rate": round(responded / total * 100, 1) if total else 0,
+            # Separated recall metrics
+            "total_recalls": total_rec,
+            "pending_recalls": pending_rec,
+            "completed_recalls": completed_rec,
+            "overdue_recalls": overdue_rec,
+            "twelve_month_recalls_due": twelve_month_due,
+            "response_rate": round(responded / total_fu * 100, 1) if total_fu else 0,
             "recall_success_rate": round(six_month_due / (six_month_due or 1) * 100, 1) if six_month_due else 0,
             "whatsapp_messages_sent": whatsapp_sent,
             "whatsapp_response_rate": round(whatsapp_responded / (whatsapp_sent or 1) * 100, 1) if whatsapp_sent else 0,
+            # Enquiry metrics
+            "total_enquiries": total_enquiries,
+            "new_enquiries": new_enquiries,
+            "contacted_enquiries": contacted_enquiries,
+            "interested_enquiries": interested_enquiries,
+            "converted_enquiries": converted_enquiries,
+            "lost_enquiries": lost_enquiries,
+            "enquiry_conversion_rate": round(converted_enquiries / (total_enquiries or 1) * 100, 1) if total_enquiries else 0,
         },
         "source_analytics": {
             "patients_by_source": patients_by_source,
@@ -2438,8 +2470,8 @@ async def create_follow_up_from_enquiry(
 
 # --- 6-Month Recall Dashboard ---
 
-@router.get("/recalls")
-async def get_recall_list(
+@router.get("/recalls/due-today")
+async def get_recalls_due_today(
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user)):
     hospital_id = current_user.get("hospital_id")

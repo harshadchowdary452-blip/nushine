@@ -41,6 +41,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { casesApi, patientsApi, doctorsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
+import QuickExport from "@/components/ui/quick-export"
 import type { Case, Patient, User, PaginatedResponse } from "@/types"
 import { useAuthStore } from "@/store/authStore"
 
@@ -293,6 +294,7 @@ export default function CaseList() {
         <Button onClick={openDialog}>
           <Plus className="h-4 w-4" /> Add Case
         </Button>
+        <QuickExport module="cases" label="cases" />
       </PageHeader>
 
       <Card>

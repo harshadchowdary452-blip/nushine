@@ -2,40 +2,28 @@ import { useState, useEffect } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import { motion } from "framer-motion"
 import {
-  Mail, Lock, Eye, EyeOff, LogIn, ShieldCheck, Activity, CalendarRange,
-  Users, IndianRupee, MessageSquare, Building2, BarChart3, Sparkles,
-  CheckCircle, Star, Quote,
+  Mail, Lock, Eye, EyeOff, ArrowRight, ShieldCheck,
+  Users, CalendarDays, Receipt, BarChart3,
 } from "lucide-react"
 import { useAuthStore } from "@/store/authStore"
 import { authApi } from "@/services/endpoints"
-import { cn } from "@/lib/utils"
+import { ToothLogo, BrandText } from "@/components/ui/brand-logo"
 
 const features = [
-  { icon: Users, label: "Patient Management", desc: "Complete patient lifecycle management" },
-  { icon: CalendarRange, label: "Appointment Automation", desc: "Smart scheduling & reminders" },
-  { icon: IndianRupee, label: "Revenue & Billing", desc: "End-to-end payment tracking" },
-  { icon: MessageSquare, label: "CRM & Follow-Ups", desc: "Automated patient engagement" },
-  { icon: Building2, label: "Multi-Clinic Management", desc: "Centralized multi-branch control" },
-  { icon: BarChart3, label: "Advanced Analytics", desc: "Real-time business intelligence" },
-]
-
-const testimonials = [
-  { text: "Reduced our administrative workload by 60%. The automation is incredible.", name: "Dr. Priya Sharma", role: "Dental Surgeon, Mumbai" },
-  { text: "The CRM and follow-up system transformed how we engage with patients.", name: "Dr. Rajesh Kumar", role: "Clinic Owner, Delhi" },
-]
-
-const stats = [
-  { value: "10,000+", label: "Patients" },
-  { value: "500+", label: "Doctors" },
-  { value: "50+", label: "Clinics" },
-  { value: "99.9%", label: "Uptime" },
+  { icon: Users, title: "Patient Management", desc: "Centralized and secure patient records." },
+  { icon: CalendarDays, title: "Smart Appointments", desc: "Manage appointments and reminders easily." },
+  { icon: Receipt, title: "Billing & Invoices", desc: "Accurate billing with professional invoices." },
+  { icon: BarChart3, title: "Insights & Reports", desc: "Track performance and grow your practice." },
 ]
 
 function CapsLockIndicator({ active }: { active: boolean }) {
   if (!active) return null
   return (
-    <motion.span initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-      className="absolute right-10 top-1/2 -translate-y-1/2 text-[10px] font-semibold uppercase tracking-wider text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
+    <motion.span
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="absolute right-12 top-1/2 -translate-y-1/2 text-[9px] font-semibold uppercase tracking-wider text-amber-600 bg-amber-50 px-1 py-0.5 rounded"
+    >
       Caps
     </motion.span>
   )
@@ -55,7 +43,9 @@ export default function LoginPage() {
   const from = (location.state as { from?: string })?.from || "/"
 
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { try { setCapsLock(e.getModifierState("CapsLock")) } catch {} }
+    const handler = (e: KeyboardEvent) => {
+      try { setCapsLock(e.getModifierState("CapsLock")) } catch {}
+    }
     document.addEventListener("keydown", handler)
     document.addEventListener("keyup", handler)
     return () => {
@@ -84,123 +74,187 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#F8FAFC]">
-      {/* LEFT PANEL - Premium Branding */}
-      <div className="hidden lg:flex lg:w-[45%] relative overflow-hidden bg-gradient-to-br from-[#4F46E5] via-[#7C3AED] to-[#A855F7]">
-        {/* Floating shapes */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-20 -left-20 w-[400px] h-[400px] rounded-full bg-white/5 blur-[80px] animate-float" />
-          <div className="absolute top-1/3 -right-20 w-[300px] h-[300px] rounded-full bg-purple-300/10 blur-[60px] animate-float-delayed" />
-          <div className="absolute bottom-20 left-1/3 w-[200px] h-[200px] rounded-full bg-indigo-300/10 blur-[50px] animate-float" style={{ animationDelay: "2s" }} />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full border border-white/5" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full border border-white/5" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200px] h-[200px] rounded-full border border-white/10" />
+    <div className="flex min-h-screen bg-[#F8FAFC] font-['Poppins','Inter',sans-serif]">
+      {/* LEFT PANEL */}
+      <div className="hidden md:flex md:w-1/2 relative overflow-hidden bg-gradient-to-br from-[#071B4D] to-[#0B1D3A]">
+        {/* Gradient orbs */}
+        <div className="absolute inset-0">
+          <div className="absolute -top-24 -right-24 w-[600px] h-[600px] rounded-full bg-[#2563EB] opacity-20 blur-[140px]" />
+          <div className="absolute bottom-0 -left-24 w-[500px] h-[500px] rounded-full bg-[#16D3C5] opacity-12 blur-[120px]" />
+          <div className="absolute top-[30%] left-[30%] w-[350px] h-[350px] rounded-full bg-[#7C3AED] opacity-8 blur-[100px]" />
+          <div
+            className="absolute inset-0 opacity-[0.04]"
+            style={{
+              backgroundImage:
+                "linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px)",
+              backgroundSize: "64px 64px",
+            }}
+          />
         </div>
 
-        <div className="relative z-10 flex flex-col justify-between p-12 xl:p-16 w-full">
-          {/* Logo */}
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white shadow-lg">
-                <svg width="24" height="24" viewBox="0 0 48 48" fill="none">
-                  <path d="M24 10c-3 0-5.5 2-6.5 5.5C16.5 18 16 22 16 26s.5 7 1.5 8.5c.8 1.2 2 2 3.5 2.5.8.2 1.5.6 2 1.2l1 1.3c.5.7 1.5.7 2 0l1-1.3c.5-.6 1.2-1 2-1.2 1.5-.5 2.7-1.3 3.5-2.5 1-1.5 1.5-4.5 1.5-8.5s-.5-8-1.5-10.5C29.5 12 27 10 24 10z" fill="#4F46E5" />
-                  <path d="M22 18l-3 6h3l-1 6 5-7h-3l3-5h-4z" fill="white" />
-                </svg>
-              </div>
+        {/* Floating shapes */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-[15%] -left-12 w-80 h-80 rounded-full border border-white/[0.07]" />
+          <div className="absolute top-[50%] -right-8 w-60 h-60 rounded-full border border-white/[0.05]" />
+          <div className="absolute bottom-[25%] left-[20%] w-44 h-44 rounded-full border border-white/[0.04]" />
+        </div>
+
+        {/* Content */}
+        <div className="relative z-10 flex flex-col w-full px-10 xl:px-14 pt-7 pb-5">
+          {/* Brand header */}
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <div className="flex items-center gap-2.5">
+              <motion.div
+                animate={{ y: [0, -3, 0] }}
+                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+              >
+                <ToothLogo size={27} />
+              </motion.div>
               <div>
-                <h1 className="text-[28px] font-bold text-white leading-none tracking-tight">NUSHINE</h1>
-                <p className="text-indigo-200/80 text-xs font-medium tracking-widest uppercase -mt-0.5">Dental</p>
+                <h1 className="text-[18px] font-bold leading-none tracking-tight text-white">
+                  <span className="text-[#16D3C5]">Nu</span>Shine
+                </h1>
+                <p className="text-[9px] text-[#94A3B8] font-medium tracking-[0.25em] uppercase mt-0.5">
+                  Dental Management System
+                </p>
               </div>
             </div>
           </motion.div>
 
-          {/* Hero Content */}
-          <div className="flex-1 flex flex-col justify-center py-8">
-            <motion.h2 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.15 }}
-              className="text-[32px] font-bold text-white leading-tight max-w-lg">
-              Enterprise Dental Practice<br />Management Platform
+          {/* Hero */}
+          <div className="flex-1 flex flex-col justify-center">
+            <motion.h2
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className="text-[30px] leading-[1.15] font-extrabold text-white tracking-[-0.02em]"
+            >
+              Smarter Dental Care.
+              <br />
+              <span className="bg-gradient-to-r from-[#16D3C5] via-[#2563EB] to-[#7C3AED] bg-clip-text text-transparent">
+                Stronger Practice.
+              </span>
             </motion.h2>
-            <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2 }}
-              className="mt-3 text-sm text-indigo-200/70 max-w-md leading-relaxed">
-              Streamline operations, enhance patient care, and grow your practice with our all-in-one healthcare SaaS platform.
+
+            <motion.p
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.18 }}
+              className="mt-4 text-[11px] text-[#CBD5E1] max-w-[480px] leading-relaxed"
+            >
+              NuShine helps dental clinics manage patients, appointments, treatments, billing, CRM, reports and operations in one intelligent platform.
             </motion.p>
 
-            {/* Feature Grid */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.25 }}
-              className="mt-8 grid grid-cols-2 gap-2.5">
+            {/* Feature cards */}
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.25 }}
+              className="mt-10 grid grid-cols-2 gap-3"
+            >
               {features.map((f) => (
-                <div key={f.label} className="flex items-start gap-2.5 rounded-xl border border-white/10 bg-white/5 p-3 backdrop-blur-sm">
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/10 text-indigo-200">
-                    <f.icon className="h-3.5 w-3.5" />
+                <div
+                  key={f.title}
+                  className="group rounded-xl border border-white/10 bg-white/[0.04] p-3 backdrop-blur-xl transition-all duration-300 hover:bg-white/[0.08] hover:border-white/[0.18]"
+                >
+                  <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-[#16D3C5]/20 to-[#2563EB]/20 mb-2">
+                    <f.icon className="w-[14px] h-[14px] text-[#16D3C5]" strokeWidth={1.5} />
                   </div>
-                  <div>
-                    <p className="text-xs font-semibold text-white">{f.label}</p>
-                    <p className="text-[10px] text-indigo-200/50 mt-0.5">{f.desc}</p>
-                  </div>
+                  <h3 className="text-xs font-semibold text-white mb-0.5">{f.title}</h3>
+                  <p className="text-[10px] text-white/45 leading-relaxed">{f.desc}</p>
                 </div>
               ))}
             </motion.div>
-
-            {/* Testimonial */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.3 }}
-              className="mt-8 rounded-xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
-              <Quote className="h-5 w-5 text-indigo-300/50 mb-2" />
-              <p className="text-sm text-indigo-100 leading-relaxed italic">"{testimonials[0].text}"</p>
-              <div className="mt-2 flex items-center gap-2">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-300/20 text-[10px] font-bold text-white">PS</div>
-                <div>
-                  <p className="text-xs font-medium text-white">{testimonials[0].name}</p>
-                  <p className="text-[10px] text-indigo-200/50">{testimonials[0].role}</p>
-                </div>
-              </div>
-            </motion.div>
           </div>
 
-          {/* Bottom Stats */}
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5, delay: 0.5 }}
-            className="flex items-center justify-between border-t border-white/10 pt-4">
-            {stats.map((s) => (
-              <div key={s.label} className="text-center">
-                <p className="text-base font-bold text-white">{s.value}</p>
-                <p className="text-[10px] text-indigo-200/50 uppercase tracking-wider">{s.label}</p>
-              </div>
-            ))}
-          </motion.div>
+          {/* Bottom wave */}
+          <div className="mt-6">
+            <svg className="w-full h-auto" viewBox="0 0 560 32" fill="none" preserveAspectRatio="none" aria-hidden="true">
+              <path
+                d="M0 24c40-5 80-5 120 0s80 10 120 5 80-10 120-5 80 10 120 5 80-5 80-5v8H0V24z"
+                fill="url(#wave-grad-login)"
+                opacity="0.1"
+              />
+              <defs>
+                <linearGradient id="wave-grad-login" x1="0" y1="0" x2="560" y2="0">
+                  <stop offset="0%" stopColor="#16D3C5" />
+                  <stop offset="50%" stopColor="#2563EB" />
+                  <stop offset="100%" stopColor="#7C3AED" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
         </div>
       </div>
 
-      {/* RIGHT PANEL - Login Form */}
-      <div className="flex w-full items-center justify-center lg:w-[55%] bg-[#F8FAFC] p-6 sm:p-8">
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
-          className="w-full max-w-[420px]">
-          {/* Mobile Logo */}
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-8 flex lg:hidden justify-center">
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600">
-                <svg width="18" height="18" viewBox="0 0 48 48" fill="none">
-                  <path d="M24 10c-3 0-5.5 2-6.5 5.5C16.5 18 16 22 16 26s.5 7 1.5 8.5c.8 1.2 2 2 3.5 2.5.8.2 1.5.6 2 1.2l1 1.3c.5.7 1.5.7 2 0l1-1.3c.5-.6 1.2-1 2-1.2 1.5-.5 2.7-1.3 3.5-2.5 1-1.5 1.5-4.5 1.5-8.5s-.5-8-1.5-10.5C29.5 12 27 10 24 10z" fill="white" />
-                </svg>
-              </div>
-              <span className="text-lg font-bold text-gray-900">NUSHINE</span>
+      {/* RIGHT SIDE */}
+      <div className="flex w-full md:w-1/2 items-center justify-center bg-[#F8FAFC] p-4 sm:p-5 lg:p-6 relative overflow-hidden">
+        {/* Subtle decor */}
+        <div className="absolute top-0 right-0 w-[450px] h-[450px] rounded-full bg-[#2563EB] opacity-[0.03] blur-[100px]" />
+        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full bg-[#16D3C5] opacity-[0.03] blur-[100px]" />
+
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="w-full max-w-[400px] relative z-10"
+        >
+          {/* Mobile / Tablet Logo */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="mb-6 flex md:hidden flex-col items-center gap-2"
+          >
+            <ToothLogo size={22} />
+            <div className="text-center">
+              <h1 className="text-base font-bold tracking-tight">
+                <BrandText size="sm" />
+              </h1>
+              <p className="text-[9px] text-[#94A3B8] font-medium tracking-[0.25em] uppercase mt-0.5">
+                Dental Management System
+              </p>
             </div>
           </motion.div>
 
           {/* Login Card */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }}
-            className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
-            <div className="mb-6">
-              <h1 className="text-page-title text-gray-900">Welcome back</h1>
-              <p className="text-sm text-text-secondary mt-1">Sign in to your account to continue.</p>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.1 }}
+            className="rounded-[20px] border border-gray-200/80 bg-white p-6 sm:p-8 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.08),0_2px_8px_-2px_rgba(0,0,0,0.03)]"
+          >
+            {/* Card header */}
+            <div className="flex flex-col items-center text-center mb-5">
+              <div className="mb-2">
+                <ToothLogo size={22} />
+              </div>
+              <h2 className="text-base font-bold tracking-tight">
+                <BrandText size="sm" />
+              </h2>
+              <p className="text-[9px] text-[#94A3B8] font-medium tracking-[0.25em] uppercase mt-0.5">
+                Dental Management System
+              </p>
+              <div className="mt-3">
+                <h3 className="text-base font-bold text-[#0B1D3A] tracking-tight">Welcome Back!</h3>
+                <p className="text-xs text-[#64748B] mt-1">Sign in to access your NuShine account</p>
+              </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-3">
               {/* Email */}
-              <div className="space-y-1.5">
-                <label htmlFor="email" className="text-sm font-medium text-gray-700">Email</label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
+              <div className="space-y-1">
+                <label htmlFor="email" className="text-[11px] font-medium text-[#475569]">
+                  Email Address
+                </label>
+                <div className="relative group">
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#94A3B8] group-focus-within:text-[#2563EB] transition-colors duration-200" strokeWidth={1.5} />
                   <input
                     id="email"
+                    name="email"
                     type="email"
                     placeholder="Enter your email"
                     value={email}
@@ -208,80 +262,115 @@ export default function LoginPage() {
                     required
                     autoFocus
                     autoComplete="email"
-                    className="h-11 w-full rounded-xl border border-gray-200 bg-white pl-10 pr-3 text-sm text-gray-900 outline-none transition-all placeholder:text-gray-400 hover:border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10"
+                    aria-label="Email address"
+                    className="h-10 w-full rounded-[10px] border border-gray-200 bg-[#F8FAFC] pl-9 pr-3.5 text-xs text-[#0B1D3A] outline-none transition-all duration-200 placeholder:text-[#94A3B8] hover:border-gray-300 focus:border-[#2563EB] focus:bg-white focus:ring-3 focus:ring-[#2563EB]/10"
                   />
                 </div>
               </div>
 
               {/* Password */}
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <label htmlFor="password" className="text-sm font-medium text-gray-700">Password</label>
-                  <button type="button" className="text-xs font-medium text-indigo-600 hover:text-indigo-700 transition-colors">
+                  <label htmlFor="password" className="text-[11px] font-medium text-[#475569]">
+                    Password
+                  </label>
+                  <button
+                    type="button"
+                    aria-label="Forgot password"
+                    title="Forgot password"
+                    className="text-[11px] font-medium text-[#16D3C5] transition-all duration-200 hover:text-[#2563EB]"
+                  >
                     Forgot password?
                   </button>
                 </div>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
+                <div className="relative group">
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#94A3B8] group-focus-within:text-[#2563EB] transition-colors duration-200" strokeWidth={1.5} />
                   <input
                     id="password"
+                    name="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     autoComplete="current-password"
-                    className="h-11 w-full rounded-xl border border-gray-200 bg-white pl-10 pr-10 text-sm text-gray-900 outline-none transition-all placeholder:text-gray-400 hover:border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10"
+                    aria-label="Password"
+                    className="h-10 w-full rounded-[10px] border border-gray-200 bg-[#F8FAFC] pl-9 pr-11 text-xs text-[#0B1D3A] outline-none transition-all duration-200 placeholder:text-[#94A3B8] hover:border-gray-300 focus:border-[#2563EB] focus:bg-white focus:ring-3 focus:ring-[#2563EB]/10"
                   />
                   <CapsLockIndicator active={capsLock} />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)}
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
                     aria-label={showPassword ? "Hide password" : "Show password"}
                     title={showPassword ? "Hide password" : "Show password"}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-secondary transition-colors">
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-[#475569] transition-colors duration-200"
+                  >
+                    {showPassword ? <EyeOff className="h-3.5 w-3.5" strokeWidth={1.5} /> : <Eye className="h-3.5 w-3.5" strokeWidth={1.5} />}
                   </button>
                 </div>
               </div>
 
               {/* Remember me */}
               <div className="flex items-center">
-                <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
-                  <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/20" />
-                  Remember me
+                <label className="flex items-center gap-2 text-xs text-[#64748B] cursor-pointer select-none group">
+                  <input
+                    type="checkbox"
+                    checked={remember}
+                    onChange={(e) => setRemember(e.target.checked)}
+                    className="h-3.5 w-3.5 rounded border-gray-300 text-[#2563EB] focus:ring-[#2563EB]/20 transition-all"
+                  />
+                  <span className="group-hover:text-[#0B1D3A] transition-colors">Remember me</span>
                 </label>
               </div>
 
               {/* Error */}
               {error && (
-                <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
-                  className="flex items-center gap-2 rounded-xl bg-red-50 px-3.5 py-2.5 text-sm text-red-600 border border-red-100">
-                  <ShieldCheck className="h-4 w-4 shrink-0" />
+                <motion.div
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-2 rounded-[10px] bg-red-50 px-3 py-2 text-xs text-red-600 border border-red-100"
+                >
+                  <ShieldCheck className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
                   {error}
                 </motion.div>
               )}
 
               {/* Submit */}
               {loading ? (
-                <button disabled aria-label="Signing in"
-                  className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 text-white text-sm font-semibold shadow-sm cursor-not-allowed">
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" aria-hidden="true" />
+                <button
+                  disabled
+                  aria-label="Signing in"
+                  className="relative flex h-10 w-full items-center justify-center gap-2 rounded-[10px] bg-gradient-to-r from-[#16D3C5] via-[#2563EB] to-[#7C3AED] text-white text-xs font-semibold shadow-md shadow-[#2563EB]/25 cursor-not-allowed overflow-hidden"
+                >
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" aria-hidden="true" />
                   Signing In...
                 </button>
               ) : (
-                <motion.button type="submit" whileHover={{ scale: 1.005 }} whileTap={{ scale: 0.995 }}
-                  className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 text-white text-sm font-semibold shadow-sm transition-all hover:bg-indigo-700 active:shadow-none">
-                  <LogIn className="h-4 w-4" />
-                  Sign In
+                <motion.button
+                  type="submit"
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.98 }}
+                  aria-label="Sign in"
+                  title="Sign in to your account"
+                  className="relative flex h-10 w-full items-center justify-center gap-2 rounded-[10px] bg-gradient-to-r from-[#16D3C5] via-[#2563EB] to-[#7C3AED] text-white text-xs font-semibold shadow-md shadow-[#2563EB]/25 transition-all duration-300 hover:shadow-lg hover:shadow-[#2563EB]/30 overflow-hidden group"
+                >
+                  <span className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-all duration-300" />
+                  <span className="relative flex items-center gap-1.5">
+                    Sign In
+                    <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-0.5" strokeWidth={2} />
+                  </span>
                 </motion.button>
               )}
             </form>
 
-            <div className="mt-6 text-center">
-              <p className="text-xs text-text-muted flex items-center justify-center gap-1.5">
-                <ShieldCheck className="h-3 w-3" />
-                Protected by enterprise-grade security
-              </p>
+            {/* Security */}
+            <div className="mt-5 pt-4 border-t border-gray-100">
+              <div className="flex items-center justify-center gap-2 text-center">
+                <ShieldCheck className="h-3.5 w-3.5 text-[#16D3C5]" strokeWidth={1.5} />
+                <p className="text-[11px] text-[#94A3B8]">
+                  Secure. Reliable. Trusted by dental professionals.
+                </p>
+              </div>
             </div>
           </motion.div>
         </motion.div>
