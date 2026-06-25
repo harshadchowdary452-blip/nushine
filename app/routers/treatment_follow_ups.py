@@ -93,17 +93,36 @@ async def auto_create_treatment_follow_ups(treatment_id: str, db: AsyncSession =
     patient_id = case.patient_id
     doctor_id = case.doctor_id
     case_id = case.id
+    # Resolve treatment_type_id from treatment_name if needed
+    if not plan.treatment_type_id and treatment_name:
+        from app.models.treatment_type import TreatmentType as TT
+        tt_q = select(TT.id).where(TT.name == treatment_name, TT.hospital_id.is_(None))
+        tt_result = await db.execute(tt_q.limit(1))
+        resolved_tt_id = tt_result.scalar_one_or_none()
+        if not resolved_tt_id and hospital_id:
+            tt_result = await db.execute(
+                select(TT.id).where(TT.name == treatment_name, TT.hospital_id == hospital_id).limit(1)
+            )
+            resolved_tt_id = tt_result.scalar_one_or_none()
+        if resolved_tt_id:
+            plan.treatment_type_id = resolved_tt_id
+            await db.flush()
     q_rules = select(TreatmentFollowUpRule).where(
-        TreatmentFollowUpRule.hospital_id == hospital_id,
+        TreatmentFollowUpRule.hospital_id.in_([hospital_id, None]),
         TreatmentFollowUpRule.is_active == True,
     )
+    filters = []
     if plan.treatment_template_id:
-        q_rules = q_rules.where(or_(
-            TreatmentFollowUpRule.treatment_template_id == plan.treatment_template_id,
-            TreatmentFollowUpRule.treatment_name == treatment_name,
-        ))
-    else:
-        q_rules = q_rules.where(TreatmentFollowUpRule.treatment_name == treatment_name)
+        filters.append(TreatmentFollowUpRule.treatment_template_id == plan.treatment_template_id)
+    if plan.treatment_type_id:
+        filters.append(TreatmentFollowUpRule.treatment_type_id == plan.treatment_type_id)
+        filters.append(
+            TreatmentFollowUpRule.treatment_type_id.in_(
+                select(TT.id).where(TT.name == plan.treatment_name)
+            )
+        )
+    if filters:
+        q_rules = q_rules.where(or_(*filters))
     rules = (await db.execute(q_rules)).scalars().all()
     if not rules:
         raise HTTPException(status_code=400, detail="No active follow-up rules found for this treatment. Configure rules in CRM settings.")
@@ -117,8 +136,8 @@ async def auto_create_treatment_follow_ups(treatment_id: str, db: AsyncSession =
                 doctor_id=doctor_id, case_id=case_id,
                 treatment_id=treatment_id, treatment_name=treatment_name,
                 treatment_completed_date=completed_date, follow_up_date=fu_date_1,
-                follow_up_type=FollowUpType.ONE_DAY_POST_TREATMENT.value,
-                status=FollowUpStatus.OPEN.value,
+                follow_up_type=FollowUpType.ONE_DAY_FOLLOW_UP.value,
+                status=FollowUpStatus.PENDING.value,
             )
             db.add(fu); created.append(fu)
         if rule.follow_up_7_day:
@@ -128,8 +147,8 @@ async def auto_create_treatment_follow_ups(treatment_id: str, db: AsyncSession =
                 doctor_id=doctor_id, case_id=case_id,
                 treatment_id=treatment_id, treatment_name=treatment_name,
                 treatment_completed_date=completed_date, follow_up_date=fu_date_7,
-                follow_up_type=FollowUpType.SEVEN_DAY_POST_TREATMENT.value,
-                status=FollowUpStatus.OPEN.value,
+                follow_up_type=FollowUpType.SEVEN_DAY_FOLLOW_UP.value,
+                status=FollowUpStatus.PENDING.value,
             )
             db.add(fu); created.append(fu)
         if rule.recall_6_month:
@@ -140,7 +159,7 @@ async def auto_create_treatment_follow_ups(treatment_id: str, db: AsyncSession =
                 treatment_id=treatment_id, treatment_name=treatment_name,
                 treatment_completed_date=completed_date, follow_up_date=fu_date_6m,
                 follow_up_type=FollowUpType.SIX_MONTH_RECALL.value,
-                status=FollowUpStatus.OPEN.value,
+                status=FollowUpStatus.PENDING.value,
             )
             db.add(fu); created.append(fu)
         if rule.recall_12_month:
@@ -151,7 +170,7 @@ async def auto_create_treatment_follow_ups(treatment_id: str, db: AsyncSession =
                 treatment_id=treatment_id, treatment_name=treatment_name,
                 treatment_completed_date=completed_date, follow_up_date=fu_date_12m,
                 follow_up_type=FollowUpType.TWELVE_MONTH_RECALL.value,
-                status=FollowUpStatus.OPEN.value,
+                status=FollowUpStatus.PENDING.value,
             )
             db.add(fu); created.append(fu)
         if rule.custom_recall_days and rule.custom_recall_days > 0:
@@ -161,8 +180,8 @@ async def auto_create_treatment_follow_ups(treatment_id: str, db: AsyncSession =
                 doctor_id=doctor_id, case_id=case_id,
                 treatment_id=treatment_id, treatment_name=treatment_name,
                 treatment_completed_date=completed_date, follow_up_date=fu_date_custom,
-                follow_up_type=FollowUpType.CUSTOM_RECALL.value,
-                status=FollowUpStatus.OPEN.value,
+                follow_up_type=FollowUpType.CUSTOM_FOLLOW_UP.value,
+                status=FollowUpStatus.PENDING.value,
             )
             db.add(fu); created.append(fu)
     await db.commit()
@@ -179,9 +198,9 @@ async def list_treatment_follow_ups(
     db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.VIEW_CRM_DASHBOARD)
     hospital_id = current_user.get("hospital_id")
-    treatment_types = [FollowUpType.ONE_DAY_POST_TREATMENT.value, FollowUpType.SEVEN_DAY_POST_TREATMENT.value,
+    treatment_types = [FollowUpType.ONE_DAY_FOLLOW_UP.value, FollowUpType.SEVEN_DAY_FOLLOW_UP.value,
                        FollowUpType.SIX_MONTH_RECALL.value, FollowUpType.TWELVE_MONTH_RECALL.value,
-                       FollowUpType.CUSTOM_RECALL.value, FollowUpType.TREATMENT_FOLLOW_UP.value]
+                       FollowUpType.CUSTOM_FOLLOW_UP.value]
     q = select(FollowUp).where(FollowUp.follow_up_type.in_(treatment_types))
     if hospital_id:
         q = q.where(FollowUp.hospital_id == hospital_id)
@@ -240,7 +259,7 @@ async def get_doctor_follow_ups(db: AsyncSession = Depends(get_db), current_user
     verify_permission(current_user, Permission.MANAGE_CASES)
     doctor_id = current_user.get("sub")
     hospital_id = current_user.get("hospital_id")
-    treatment_types = [FollowUpType.ONE_DAY_POST_TREATMENT.value, FollowUpType.SEVEN_DAY_POST_TREATMENT.value]
+    treatment_types = [FollowUpType.ONE_DAY_FOLLOW_UP.value, FollowUpType.SEVEN_DAY_FOLLOW_UP.value]
     q = select(FollowUp).where(
         FollowUp.doctor_id == doctor_id,
         FollowUp.follow_up_type.in_(treatment_types),
@@ -262,11 +281,11 @@ async def get_doctor_recall_patients(db: AsyncSession = Depends(get_db), current
     verify_permission(current_user, Permission.MANAGE_CASES)
     doctor_id = current_user.get("sub")
     hospital_id = current_user.get("hospital_id")
-    recall_types = [FollowUpType.SIX_MONTH_RECALL.value, FollowUpType.TWELVE_MONTH_RECALL.value, FollowUpType.CUSTOM_RECALL.value]
+    recall_types = [FollowUpType.SIX_MONTH_RECALL.value, FollowUpType.TWELVE_MONTH_RECALL.value, FollowUpType.CUSTOM_FOLLOW_UP.value]
     q = select(FollowUp).where(
         FollowUp.doctor_id == doctor_id,
         FollowUp.follow_up_type.in_(recall_types),
-        FollowUp.status.in_([FollowUpStatus.OPEN.value, FollowUpStatus.SCHEDULED.value]),
+        FollowUp.status.in_([FollowUpStatus.PENDING.value]),
     )
     if hospital_id:
         q = q.where(FollowUp.hospital_id == hospital_id)
@@ -283,15 +302,15 @@ async def get_doctor_recall_patients(db: AsyncSession = Depends(get_db), current
 async def get_treatment_follow_up_stats(db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.VIEW_CRM_DASHBOARD)
     hospital_id = current_user.get("hospital_id")
-    treatment_types = [FollowUpType.ONE_DAY_POST_TREATMENT.value, FollowUpType.SEVEN_DAY_POST_TREATMENT.value,
+    treatment_types = [FollowUpType.ONE_DAY_FOLLOW_UP.value, FollowUpType.SEVEN_DAY_FOLLOW_UP.value,
                        FollowUpType.SIX_MONTH_RECALL.value, FollowUpType.TWELVE_MONTH_RECALL.value,
-                       FollowUpType.CUSTOM_RECALL.value, FollowUpType.TREATMENT_FOLLOW_UP.value]
+                       FollowUpType.CUSTOM_FOLLOW_UP.value]
     q = select(FollowUp).where(FollowUp.follow_up_type.in_(treatment_types))
     if hospital_id:
         q = q.where(FollowUp.hospital_id == hospital_id)
     rows = (await db.execute(q)).scalars().all()
     total = len(rows)
-    open_count = sum(1 for r in rows if r.status in (FollowUpStatus.OPEN.value, FollowUpStatus.SCHEDULED.value))
+    open_count = sum(1 for r in rows if r.status in (FollowUpStatus.PENDING.value))
     completed = sum(1 for r in rows if r.status == FollowUpStatus.COMPLETED.value)
-    overdue = sum(1 for r in rows if r.status in (FollowUpStatus.OPEN.value, FollowUpStatus.SCHEDULED.value) and r.follow_up_date < date.today())
+    overdue = sum(1 for r in rows if r.status in (FollowUpStatus.PENDING.value) and r.follow_up_date < date.today())
     return {"total": total, "open": open_count, "completed": completed, "overdue": overdue}

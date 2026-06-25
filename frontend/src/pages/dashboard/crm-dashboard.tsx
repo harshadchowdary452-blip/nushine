@@ -1,63 +1,104 @@
-import { useState, useMemo, useRef, useEffect } from "react"
+import { useState, useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "react-router-dom"
 import {
-  Users, UserPlus, CheckCircle2, TrendingUp, Clock, MessageSquare,
-  BarChart3, Activity, Send, Award, DollarSign, Target, Phone, Bell, Settings,
-  Plus, Megaphone, CalendarDays, Eye, List, Loader2,
+  CalendarDays, Phone, MessageCircle, CheckCircle, Clock, FileText, History,
+  RotateCcw, User, Stethoscope, Loader2, Activity, TrendingUp, Users,
+  BarChart3, PieChart, Target, Send, Award, DollarSign, ArrowRight,
+  ChevronRight, BookOpen, AlertCircle, ThumbsUp, ThumbsDown, Meh,
+  Frown, Smile, HeartPulse, Zap, UserPlus, Search, Filter, X,
 } from "lucide-react"
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line,
-  PieChart, Pie, Cell, Legend,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart as RePieChart, Pie, Cell, Legend, LineChart, Line,
 } from "recharts"
 import { cn } from "@/lib/utils"
 import { formatIndianRupees, formatIndianNumber } from "@/lib/currency"
-import { crmApi, doctorsApi, treatmentFollowUpsApi, recallsApi, crmSettingsApi, enquiriesApi } from "@/services/endpoints"
+import { crmApi, doctorsApi } from "@/services/endpoints"
 import DashboardDateFilter, { type DateRangePreset } from "@/components/ui/dashboard-date-filter"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import KpiCard from "@/components/layout/kpi-card"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import DentalEmptyState from "@/components/ui/dental-empty-state"
 import { useAuthStore } from "@/store/authStore"
 
-const COLORS = ["#4F46E5", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899", "#06B6D4", "#F97316"]
+const COLORS = ["#4F46E5", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899", "#06B6D4", "#F97316", "#14B8A6", "#84CC16"]
+const GLASS = "bg-white/80 backdrop-blur-xl border border-white/20 shadow-lg"
 
-const sections = [
-  { id: "leads", label: "Leads" },
-  { id: "enquiries", label: "Enquiries" },
-  { id: "followups", label: "Treatment Follow-Ups" },
-  { id: "recalls", label: "Recalls" },
-]
+const fuTypeLabels: Record<string, string> = {
+  "1_DAY_FOLLOW_UP": "1-Day FU", "7_DAY_FOLLOW_UP": "7-Day FU",
+  "6_MONTH_RECALL": "6-Month Recall", "12_MONTH_RECALL": "12-Month Recall",
+  CUSTOM_FOLLOW_UP: "Custom FU", ENQUIRY: "Enquiry", MANUAL: "Manual",
+}
+const fuTypeColors: Record<string, string> = {
+  "1_DAY_FOLLOW_UP": "bg-blue-50 text-blue-700 border-blue-200",
+  "7_DAY_FOLLOW_UP": "bg-purple-50 text-purple-700 border-purple-200",
+  "6_MONTH_RECALL": "bg-amber-50 text-amber-700 border-amber-200",
+  "12_MONTH_RECALL": "bg-green-50 text-green-700 border-green-200",
+  CUSTOM_FOLLOW_UP: "bg-gray-50 text-gray-700 border-gray-200",
+  ENQUIRY: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  MANUAL: "bg-rose-50 text-rose-700 border-rose-200",
+}
+const statusColors: Record<string, string> = {
+  PENDING: "bg-amber-100 text-amber-800", CONTACTED: "bg-blue-100 text-blue-800",
+  INTERESTED: "bg-emerald-100 text-emerald-800", APPOINTMENT_BOOKED: "bg-indigo-100 text-indigo-800",
+  COMPLETED: "bg-green-100 text-green-800", NO_RESPONSE: "bg-gray-100 text-gray-500",
+  LOST: "bg-red-100 text-red-700", APPOINTMENT_REQUIRED: "bg-purple-100 text-purple-800",
+}
 
-const enquiryStatusCounts = ["NEW", "CONTACTED", "INTERESTED", "NOT_INTERESTED", "CONVERTED", "LOST"]
+const COLORS_RESPONSE = ["#10B981", "#34D399", "#FBBF24", "#F59E0B", "#9CA3AF", "#EF4444"]
 
-function ChartTooltip({ active, payload, label, financial }: any) {
-  if (!active || !payload?.length) return null
+function KpiCard({ title, value, icon: Icon, color, onClick }: any) {
+  const colorMap: Record<string, string> = {
+    primary: "from-indigo-500 to-blue-600", info: "from-blue-500 to-cyan-600",
+    success: "from-emerald-500 to-green-600", warning: "from-amber-500 to-yellow-600",
+    danger: "from-red-500 to-rose-600", purple: "from-purple-500 to-violet-600",
+    pink: "from-pink-500 to-rose-600", teal: "from-teal-500 to-cyan-600",
+  }
   return (
-    <div className="rounded-xl border border-gray-100 bg-white p-3 shadow-lg">
-      <p className="text-sm font-semibold text-gray-900 mb-1">{label}</p>
-      {payload.map((p: any, i: number) => (
-        <p key={i} className="text-xs" style={{ color: p.color }}>
-          {p.name}: {financial ? formatIndianRupees(p.value ?? 0) : formatIndianNumber(p.value ?? 0)}
-        </p>
-      ))}
+    <div onClick={onClick} className={cn(GLASS, "rounded-2xl p-4 cursor-pointer hover:shadow-xl transition-all duration-300 group border", onClick ? "cursor-pointer" : "")}>
+      <div className="flex items-start justify-between">
+        <div className="space-y-1">
+          <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">{title}</p>
+          <p className="text-2xl font-bold text-gray-900">{value}</p>
+        </div>
+        <div className={cn("rounded-xl p-2.5 text-white bg-gradient-to-br shadow-sm", colorMap[color] || colorMap.primary)}>
+          <Icon className="h-4 w-4" />
+        </div>
+      </div>
     </div>
   )
 }
 
-function CrmDashboardPage() {
+function FunnelStep({ label, value, total, color, isLast }: any) {
+  const pct = total > 0 ? Math.round((value / total) * 100) : 0
+  return (
+    <div className="flex flex-col items-center gap-1.5 min-w-0 flex-1">
+      <div className={cn("w-full h-2 rounded-full", color)} style={{ opacity: Math.max(0.15, pct / 100) }} />
+      <p className="text-lg font-bold text-gray-900">{value}</p>
+      <p className="text-[10px] text-gray-500 text-center leading-tight">{label}</p>
+      <p className="text-[10px] font-semibold text-gray-400">{pct}%</p>
+      {!isLast && <ChevronRight className="h-3.5 w-3.5 text-gray-300 mt-0.5" />}
+    </div>
+  )
+}
+
+export default function CrmDashboardPage() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
-  const [period, setPeriod] = useState<DateRangePreset>("month")
+  const [period, setPeriod] = useState<DateRangePreset>("today")
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
-  const [activeSection, setActiveSection] = useState("leads")
-  const sectionRefs = useRef<Record<string, HTMLElement | null>>({})
+  const [doctorFilter, setDoctorFilter] = useState("")
+  const [typeFilter, setTypeFilter] = useState("")
+  const [statusFilter, setStatusFilter] = useState("")
+  const [upcomingTab, setUpcomingTab] = useState("tomorrow")
+  const [showFilters, setShowFilters] = useState(false)
 
   const { data: doctorsList } = useQuery({
     queryKey: ["dashboard-doctors"],
@@ -66,80 +107,53 @@ function CrmDashboardPage() {
   })
   const doctorOptions = Array.isArray(doctorsList) ? doctorsList : doctorsList?.items || []
 
-  useEffect(() => {
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          const id = entry.target.getAttribute("data-section")
-          if (id) setActiveSection(id)
-        }
-      })
-    }, { rootMargin: "-80px 0px -60% 0px", threshold: 0 })
-    sections.forEach((s) => {
-      const el = document.querySelector(`[data-section="${s.id}"]`)
-      if (el) observer.observe(el)
-    })
-    return () => observer.disconnect()
-  }, [])
-
   const params = useMemo(() => {
     const periodMap: Record<string, string> = {
-      today: "today", week: "this_week", month: "this_month",
+      today: "today", tomorrow: "tomorrow", week: "this_week", month: "this_month",
       last_month: "last_month", quarter: "this_quarter", year: "this_year", custom: "custom",
     }
     const p: Record<string, string> = { period: periodMap[period] || period }
     if (period === "custom" && startDate) p.start_date = startDate
     if (period === "custom" && endDate) p.end_date = endDate
+    if (doctorFilter) p.doctor = doctorFilter
+    if (typeFilter) p.type = typeFilter
+    if (statusFilter) p.status = statusFilter
     return p
-  }, [period, startDate, endDate])
+  }, [period, startDate, endDate, doctorFilter, typeFilter, statusFilter])
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["crm-dashboard2", period, startDate, endDate],
-    queryFn: () => crmApi.dashboard2(params),
+    queryKey: ["crm-enhanced-dashboard", params],
+    queryFn: () => crmApi.enhancedDashboard(params),
     staleTime: 30000,
   })
 
-  const { data: fuStats } = useQuery({
-    queryKey: ["crm", "treatment-fu-stats"],
-    queryFn: () => treatmentFollowUpsApi.stats(),
-  })
-
-  const { data: recallStats } = useQuery({
-    queryKey: ["crm", "recall-stats"],
-    queryFn: () => recallsApi.stats(),
-  })
-
-  const { data: settingsSummary } = useQuery({
-    queryKey: ["crm", "settings-summary"],
-    queryFn: () => crmSettingsApi.summary(),
-  })
-
-  const kpis = data?.kpis ?? {}
-  const leadAnalytics = data?.lead_analytics ?? {}
-  const enquiryDashboard = data?.enquiry_dashboard ?? {}
-  const followUpDashboard = data?.follow_up_dashboard ?? {}
-
-  const scrollTo = (id: string) => {
-    setActiveSection(id)
-    document.getElementById(`section-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" })
-  }
-
-  const quickActions = [
-    { label: "Add Lead", icon: Plus, onClick: () => navigate("/leads?action=create") },
-    { label: "Enquiry Calendar", icon: CalendarDays, onClick: () => navigate("/crm/enquiry-calendar") },
-    { label: "Follow-Ups", icon: Clock, onClick: () => navigate("/crm/follow-ups") },
-    { label: "Recalls", icon: Bell, onClick: () => navigate("/crm/recalls") },
-    { label: "Send WhatsApp", icon: Send, onClick: () => navigate("/whatsapp") },
-  ]
+  const overview = useMemo(() => data?.overview ?? {}, [data])
+  const workQueue = useMemo(() => data?.work_queue ?? [], [data])
+  const fuSummary = useMemo(() => data?.follow_up_summary ?? {}, [data])
+  const funnel = useMemo(() => data?.conversion_funnel ?? {}, [data])
+  const responses = useMemo(() => data?.patient_responses ?? [], [data])
+  const conditions = useMemo(() => data?.patient_conditions ?? [], [data])
+  const treatmentPerf = useMemo(() => data?.treatment_performance ?? [], [data])
+  const doctorEngagement = useMemo(() => data?.doctor_engagement ?? [], [data])
+  const acquisition = useMemo(() => data?.patient_acquisition ?? [], [data])
+  const revenueBySource = useMemo(() => data?.revenue_by_source ?? [], [data])
+  const timeline = useMemo(() => data?.timeline ?? [], [data])
+  const upcomingWork = useMemo(() => data?.upcoming_work ?? {}, [data])
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        <Skeleton className="h-8 w-60 rounded-lg" />
-        <Skeleton className="h-4 w-80 rounded-lg" />
-        <div className="flex gap-2">{sections.map((s) => <Skeleton key={s.id} className="h-8 w-24 rounded-lg" />)}</div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-[90px] rounded-xl" />)}
+      <div className="space-y-4 p-6">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-8 w-60 rounded-xl" />
+          <Skeleton className="h-9 w-36 rounded-xl" />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+          {[...Array(9)].map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
+        </div>
+        <Skeleton className="h-64 rounded-2xl" />
+        <div className="grid gap-4 md:grid-cols-2">
+          <Skeleton className="h-72 rounded-2xl" />
+          <Skeleton className="h-72 rounded-2xl" />
         </div>
       </div>
     )
@@ -147,364 +161,523 @@ function CrmDashboardPage() {
 
   if (error) {
     return (
-      <DentalEmptyState icon={Activity} title="Error Loading Dashboard"
-        description="Could not load CRM dashboard data. Try adjusting your filters or check back later." />
-    )
-  }
-
-  if (!data) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">CRM Dashboard</h1>
-            <p className="text-sm text-gray-500">Real-time CRM performance metrics</p>
-          </div>
-          <DashboardDateFilter value={period} onChange={setPeriod} />
-        </div>
-        <DentalEmptyState icon={MessageSquare} title="No Data" description="No CRM data available for this period." />
+      <div className="p-6">
+        <DentalEmptyState icon={AlertCircle} title="Error Loading Dashboard"
+          description="Could not load CRM dashboard data. Try adjusting filters or check back later." />
       </div>
     )
   }
 
+  function navToCalendar(filter?: string) {
+    navigate("/crm/enquiry-calendar")
+  }
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-5 p-6">
+      {/* ── HEADER ── */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
-          <h1 className="text-section-title text-gray-900">CRM Dashboard</h1>
-          <p className="text-sm text-text-secondary">Leads · Enquiries · Follow-Ups · Recalls</p>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">CRM Dashboard</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Patient Engagement & Retention · Real-time operational view</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <DashboardDateFilter value={period} onChange={setPeriod} />
+          <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)}
+            className={cn("h-9 gap-1.5 text-xs", showFilters && "bg-primary text-white border-primary")}>
+            <Filter className="h-3.5 w-3.5" /> Filters
+          </Button>
           {period === "custom" && (
             <>
-              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-9 w-[140px] rounded-xl text-xs" />
-              <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-9 w-[140px] rounded-xl text-xs" />
+              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
+                className="h-9 w-[130px] rounded-xl text-xs" />
+              <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
+                className="h-9 w-[130px] rounded-xl text-xs" />
             </>
           )}
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 p-3 bg-white rounded-xl border border-gray-100 shadow-sm">
-        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider mr-1">Quick Actions</span>
-        {quickActions.map((a) => (
-          <Button key={a.label} variant="outline" size="sm" onClick={a.onClick} className="h-8 text-xs gap-1.5">
+      {/* ── FILTERS ── */}
+      {showFilters && (
+        <div className={cn(GLASS, "rounded-2xl p-4 flex flex-wrap gap-3 items-end")}>
+          <div className="space-y-1">
+            <label className="text-[10px] font-semibold text-gray-500 uppercase">Doctor</label>
+            <Select value={doctorFilter} onValueChange={setDoctorFilter}>
+              <SelectTrigger className="h-8 w-40 text-xs rounded-xl"><SelectValue placeholder="All Doctors" /></SelectTrigger>
+              <SelectContent className="max-h-[200px]">
+                <SelectItem value="" className="text-xs">All Doctors</SelectItem>
+                {doctorOptions.map((d: any) => (
+                  <SelectItem key={d.id} value={d.id} className="text-xs">{d.full_name || d.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-semibold text-gray-500 uppercase">Follow-Up Type</label>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="h-8 w-36 text-xs rounded-xl"><SelectValue placeholder="All Types" /></SelectTrigger>
+              <SelectContent className="max-h-[200px]">
+                <SelectItem value="" className="text-xs">All Types</SelectItem>
+                {Object.entries(fuTypeLabels).map(([k, v]) => (
+                  <SelectItem key={k} value={k} className="text-xs">{v}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-semibold text-gray-500 uppercase">Status</label>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="h-8 w-36 text-xs rounded-xl"><SelectValue placeholder="All Status" /></SelectTrigger>
+              <SelectContent className="max-h-[200px]">
+                <SelectItem value="" className="text-xs">All Status</SelectItem>
+                {Object.entries(statusColors).map(([k]) => (
+                  <SelectItem key={k} value={k} className="text-xs">{k}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => { setDoctorFilter(""); setTypeFilter(""); setStatusFilter("") }}
+            className="h-8 text-xs">Clear</Button>
+        </div>
+      )}
+
+      {/* ── QUICK ACTIONS ── */}
+      <div className={cn(GLASS, "rounded-2xl p-3 flex flex-wrap items-center gap-2")}>
+        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mr-1">Quick</span>
+        {[
+          { label: "Enquiry Calendar", icon: CalendarDays, path: "/crm/enquiry-calendar" },
+          { label: "Add Lead", icon: UserPlus, path: "/leads?action=create" },
+          { label: "Send WhatsApp", icon: Send, path: "/whatsapp" },
+        ].map((a) => (
+          <Button key={a.label} variant="outline" size="sm" onClick={() => navigate(a.path)}
+            className="h-8 text-xs gap-1.5 rounded-xl">
             <a.icon className="h-3.5 w-3.5" />{a.label}
           </Button>
         ))}
       </div>
 
-      <div className="sticky top-0 z-20 -mx-6 px-6 py-2 bg-gray-50/90 backdrop-blur-sm border-b border-gray-100">
-        <div className="flex gap-1 overflow-x-auto scrollbar-none">
-          {sections.map((s) => (
-            <button key={s.id} onClick={() => scrollTo(s.id)}
-              className={cn("whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
-                activeSection === s.id ? "bg-primary text-white shadow-sm" : "text-gray-500 hover:bg-gray-100")}>
-              {s.label}
-            </button>
-          ))}
+      {/* ════════════════════════════════════
+         SECTION 1: TODAY'S CRM OVERVIEW
+         ════════════════════════════════════ */}
+      <div>
+        <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+          <Activity className="h-4 w-4 text-indigo-500" /> Today's CRM Overview
+        </h2>
+        <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9">
+          <KpiCard title="CRM Tasks" value={formatIndianNumber(overview.crm_tasks ?? 0)} icon={Target} color="primary" onClick={navToCalendar} />
+          <KpiCard title="Follow-Ups Today" value={formatIndianNumber(overview.follow_ups_today ?? 0)} icon={Clock} color="info" onClick={navToCalendar} />
+          <KpiCard title="6-Month Recalls" value={formatIndianNumber(overview.six_month_recalls ?? 0)} icon={CalendarDays} color="warning" onClick={navToCalendar} />
+          <KpiCard title="12-Month Recalls" value={formatIndianNumber(overview.twelve_month_recalls ?? 0)} icon={CalendarDays} color="purple" onClick={navToCalendar} />
+          <KpiCard title="Contacted Today" value={formatIndianNumber(overview.patients_contacted ?? 0)} icon={Phone} color="success" />
+          <KpiCard title="Appts Created" value={formatIndianNumber(overview.appointments_created_today ?? 0)} icon={BookOpen} color="teal" />
+          <KpiCard title="CRM Appointments" value={formatIndianNumber(overview.appointments_from_crm ?? 0)} icon={CalendarDays} color="pink" />
+          <KpiCard title="Pending Tasks" value={formatIndianNumber(overview.pending_tasks ?? 0)} icon={AlertCircle} color="warning" />
+          <KpiCard title="Overdue" value={formatIndianNumber(overview.overdue_tasks ?? 0)} icon={AlertCircle} color="danger" />
         </div>
       </div>
 
-      {/* ===== LEADS SECTION ===== */}
-      <div id="section-leads" data-section="leads" className="scroll-mt-16">
-        <h2 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
-          <Target className="h-4 w-4 text-primary" /> Leads
-        </h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <KpiCard title="Total Leads" value={formatIndianNumber(kpis.total_leads ?? 0)} icon={Users} color="primary" />
-          <KpiCard title="New Leads" value={formatIndianNumber(kpis.new_leads ?? 0)} icon={UserPlus} color="info" />
-          <KpiCard title="Converted" value={formatIndianNumber(kpis.converted_leads ?? 0)} icon={CheckCircle2} color="success" />
-          <KpiCard title="Conversion Rate" value={`${kpis.conversion_rate ?? 0}%`} icon={TrendingUp} color="success" />
+      {/* ════════════════════════════════════
+         SECTION 2: TODAY'S WORK QUEUE
+         ════════════════════════════════════ */}
+      <div className={cn(GLASS, "rounded-2xl overflow-hidden")}>
+        <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+          <h2 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+            <Clock className="h-4 w-4 text-amber-500" /> Today's Work Queue
+            <Badge variant="secondary" className="ml-2 text-[10px]">{workQueue.length}</Badge>
+          </h2>
+          <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={navToCalendar}>
+            View All <ChevronRight className="h-3 w-3" />
+          </Button>
         </div>
-        <div className="grid gap-4 md:grid-cols-2 mt-4">
-          <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700"><List className="h-4 w-4 text-primary" /> Recent Leads</CardTitle></CardHeader>
-            <CardContent>
-              {data?.lead_dashboard?.length > 0 ? (
-                <div className="max-h-72 overflow-y-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead><TableHead>Source</TableHead><TableHead>Status</TableHead><TableHead>Score</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {data.lead_dashboard.slice(0, 10).map((l: any) => (
-                        <TableRow key={l.id} className="cursor-pointer" onClick={() => navigate(`/leads/${l.id}`)}>
-                          <TableCell className="font-medium text-xs">{l.lead_name}</TableCell>
-                          <TableCell><Badge variant="outline" className="text-[10px]">{l.source}</Badge></TableCell>
-                          <TableCell><Badge className="text-[10px]">{l.status}</Badge></TableCell>
-                          <TableCell className="text-xs font-semibold">{l.lead_score ?? "-"}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              ) : <p className="text-sm text-gray-400 text-center py-10">No leads data</p>}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700"><BarChart3 className="h-4 w-4 text-primary" /> Lead Sources</CardTitle></CardHeader>
-            <CardContent>
-              {leadAnalytics.by_source?.length > 0 ? (
-                <ResponsiveContainer width="100%" height={250}>
-                  <PieChart>
-                    <Pie data={leadAnalytics.by_source.filter((s: any) => s.count > 0)} dataKey="count" nameKey="source" cx="50%" cy="50%" outerRadius={80}>
-                      {leadAnalytics.by_source.filter((s: any) => s.count > 0).map((_: any, i: number) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : <p className="text-sm text-gray-400 text-center py-10">No source data</p>}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* ===== ENQUIRIES SECTION ===== */}
-      <div id="section-enquiries" data-section="enquiries" className="scroll-mt-16">
-        <h2 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
-          <MessageSquare className="h-4 w-4 text-blue-500" /> Enquiries
-        </h2>
-        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          {enquiryStatusCounts.map((s) => (
-            <Card key={s}>
-              <CardContent className="p-3 text-center">
-                <p className="text-[10px] text-muted-foreground uppercase">{s.replace(/_/g, " ")}</p>
-                <p className="text-lg font-bold">{formatIndianNumber(enquiryDashboard[s.toLowerCase()] ?? 0)}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 mt-4">
-          <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700"><Clock className="h-4 w-4 text-primary" /> Today's Enquiries</CardTitle></CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-primary text-center py-4">{formatIndianNumber(enquiryDashboard.today ?? 0)}</div>
-              <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                <div><p className="text-muted-foreground">Tomorrow</p><p className="font-semibold">{formatIndianNumber(enquiryDashboard.tomorrow ?? 0)}</p></div>
-                <div><p className="text-muted-foreground">This Week</p><p className="font-semibold">{formatIndianNumber(enquiryDashboard.this_week ?? 0)}</p></div>
-                <div><p className="text-muted-foreground">Overdue</p><p className="font-semibold text-red-500">{formatIndianNumber(enquiryDashboard.overdue ?? 0)}</p></div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700"><Activity className="h-4 w-4 text-primary" /> Enquiry Follow-Up Detail</CardTitle></CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-xl bg-gray-50 p-3 text-center">
-                  <p className="text-[11px] text-gray-500">Pending</p>
-                  <p className="text-lg font-bold text-amber-600">{formatIndianNumber(followUpDashboard.pending ?? 0)}</p>
-                </div>
-                <div className="rounded-xl bg-gray-50 p-3 text-center">
-                  <p className="text-[11px] text-gray-500">Completed</p>
-                  <p className="text-lg font-bold text-green-600">{formatIndianNumber(followUpDashboard.completed ?? 0)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* ===== TREATMENT FOLLOW-UPS SECTION ===== */}
-      <div id="section-followups" data-section="followups" className="scroll-mt-16">
-        <h2 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
-          <Clock className="h-4 w-4 text-amber-500" /> Treatment Follow-Ups
-        </h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Card><CardContent className="p-4 text-center"><p className="text-xs text-muted-foreground">Total</p><p className="text-xl font-bold">{fuStats?.total ?? followUpDashboard.pending ?? 0}</p></CardContent></Card>
-          <Card><CardContent className="p-4 text-center"><p className="text-xs text-muted-foreground">Open</p><p className="text-xl font-bold text-amber-600">{fuStats?.open ?? 0}</p></CardContent></Card>
-          <Card><CardContent className="p-4 text-center"><p className="text-xs text-muted-foreground">Completed</p><p className="text-xl font-bold text-green-600">{fuStats?.completed ?? followUpDashboard.completed ?? 0}</p></CardContent></Card>
-          <Card><CardContent className="p-4 text-center"><p className="text-xs text-muted-foreground">Overdue</p><p className="text-xl font-bold text-red-600">{fuStats?.overdue ?? 0}</p></CardContent></Card>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 mt-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700"><Activity className="h-4 w-4 text-primary" /> Rules Summary</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-xl bg-gray-50 p-3 text-center">
-                  <p className="text-[11px] text-gray-500">Treatments with Rules</p>
-                  <p className="text-lg font-bold text-primary">{settingsSummary?.total_treatments_with_rules ?? 0}</p>
-                </div>
-                <div className="rounded-xl bg-gray-50 p-3 text-center">
-                  <p className="text-[11px] text-gray-500">Active Rules</p>
-                  <p className="text-lg font-bold text-green-600">{settingsSummary?.active_rules ?? 0}</p>
-                </div>
-                <div className="rounded-xl bg-gray-50 p-3 text-center">
-                  <p className="text-[11px] text-gray-500">With 1-Day FU</p>
-                  <p className="text-sm font-semibold">{settingsSummary?.treatments_with_1_day ?? 0}</p>
-                </div>
-                <div className="rounded-xl bg-gray-50 p-3 text-center">
-                  <p className="text-[11px] text-gray-500">With 7-Day FU</p>
-                  <p className="text-sm font-semibold">{settingsSummary?.treatments_with_7_day ?? 0}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700"><Clock className="h-4 w-4 text-primary" /> Recent Follow-Ups</CardTitle>
-              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => navigate("/crm/follow-ups")}>View All</Button>
-            </CardHeader>
-            <CardContent>
-              {followUpDashboard.recent?.length > 0 ? (
-                <div className="space-y-2 max-h-[280px] overflow-y-auto">
-                  {followUpDashboard.recent.slice(0, 6).map((fu: any) => (
-                    <div key={fu.id} className="rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-sm font-semibold text-gray-900">{fu.patient_name}</p>
-                        <Badge variant={fu.status === "COMPLETED" ? "default" : "outline"} className="text-[10px]">{fu.status}</Badge>
+        {workQueue.length > 0 ? (
+          <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
+            <Table>
+              <TableHeader className="sticky top-0 bg-white/95 backdrop-blur-sm z-10">
+                <TableRow>
+                  <TableHead className="text-[10px]">Patient</TableHead>
+                  <TableHead className="text-[10px]">OP No</TableHead>
+                  <TableHead className="text-[10px]">Doctor</TableHead>
+                  <TableHead className="text-[10px]">Type</TableHead>
+                  <TableHead className="text-[10px]">Time</TableHead>
+                  <TableHead className="text-[10px]">Status</TableHead>
+                  <TableHead className="text-[10px] text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {workQueue.map((item: any) => (
+                  <TableRow key={item.id} className="group hover:bg-gray-50/50">
+                    <TableCell className="font-medium text-xs">{item.patient_name}</TableCell>
+                    <TableCell className="text-xs text-gray-500">{item.op_number || "-"}</TableCell>
+                    <TableCell className="text-xs text-gray-500">{item.doctor_name || "-"}</TableCell>
+                    <TableCell>
+                      <Badge className={cn("text-[10px] font-medium", fuTypeColors[item.follow_up_type] || "bg-gray-50 text-gray-600")}>
+                        {fuTypeLabels[item.follow_up_type] || item.follow_up_type}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-xs text-gray-500">{item.due_time || "-"}</TableCell>
+                    <TableCell>
+                      <Badge className={cn("text-[10px]", statusColors[item.status] || "bg-gray-100 text-gray-600")}>{item.status}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1 justify-end opacity-60 group-hover:opacity-100 transition-opacity">
+                        {item.patient_phone && (
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 rounded-lg"
+                            onClick={() => window.open(`tel:${item.patient_phone}`, "_self")} title="Call">
+                            <Phone className="h-3.5 w-3.5 text-green-600" />
+                          </Button>
+                        )}
+                        {item.patient_phone && (
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 rounded-lg"
+                            onClick={() => window.open(`https://wa.me/${item.patient_phone.replace(/[^0-9]/g, "")}`, "_blank")} title="WhatsApp">
+                            <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 rounded-lg"
+                          onClick={() => navigate(`/crm/enquiry-calendar?focus=${item.id}`)} title="Record Feedback">
+                          <FileText className="h-3.5 w-3.5 text-blue-600" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 rounded-lg"
+                          onClick={() => navigate(`/crm/enquiry-calendar?focus=${item.id}`)} title="Create Appointment">
+                          <BookOpen className="h-3.5 w-3.5 text-indigo-600" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 rounded-lg"
+                          onClick={() => navigate(`/crm/enquiry-calendar?focus=${item.id}`)} title="View Timeline">
+                          <History className="h-3.5 w-3.5 text-purple-600" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 rounded-lg"
+                          onClick={() => navigate(`/crm/enquiry-calendar?focus=${item.id}`)} title="Mark Completed">
+                          <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+                        </Button>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] text-gray-400">Due: {fu.follow_up_date}</span>
-                        <div className="flex gap-1">
-                          {fu.patient_phone && (
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => window.open(`tel:${fu.patient_phone}`)} title="Call"><Phone className="h-3.5 w-3.5" /></Button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : <p className="text-sm text-gray-400 text-center py-10">No follow-ups</p>}
-            </CardContent>
-          </Card>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        ) : (
+          <div className="text-center py-10 text-sm text-gray-400">
+            <CheckCircle className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+            All caught up! No pending tasks for today.
+          </div>
+        )}
+      </div>
+
+      {/* ════════════════════════════════════
+         SECTIONS 3+4: FOLLOW-UP SUMMARY + FUNNEL (side by side)
+         ════════════════════════════════════ */}
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* SECTION 3: Follow-Up Summary */}
+        <div className={cn(GLASS, "rounded-2xl p-5")}>
+          <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+            <BarChart3 className="h-4 w-4 text-indigo-500" /> Follow-Up Summary
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {[
+              { label: "1-Day FU", value: fuSummary["1_day_due"] ?? 0, color: "text-blue-600", bg: "bg-blue-50" },
+              { label: "7-Day FU", value: fuSummary["7_day_due"] ?? 0, color: "text-purple-600", bg: "bg-purple-50" },
+              { label: "6-Month Recall", value: fuSummary["6_month_due"] ?? 0, color: "text-amber-600", bg: "bg-amber-50" },
+              { label: "12-Month Recall", value: fuSummary["12_month_due"] ?? 0, color: "text-green-600", bg: "bg-green-50" },
+              { label: "Custom FU", value: fuSummary["custom_due"] ?? 0, color: "text-gray-600", bg: "bg-gray-50" },
+              { label: "Completed Today", value: fuSummary["completed_today"] ?? 0, color: "text-emerald-600", bg: "bg-emerald-50" },
+              { label: "Overdue", value: fuSummary["overdue"] ?? 0, color: "text-red-600", bg: "bg-red-50" },
+            ].map((s) => (
+              <div key={s.label} className={cn("rounded-xl p-3 text-center", s.bg)}>
+                <p className="text-[10px] text-gray-500">{s.label}</p>
+                <p className={cn("text-lg font-bold", s.color)}>{s.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* SECTION 4: Appointment Conversion Funnel */}
+        <div className={cn(GLASS, "rounded-2xl p-5")}>
+          <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-emerald-500" /> Appointment Conversion
+          </h2>
+          <div className="flex items-start gap-1">
+            <FunnelStep label="CRM Tasks" value={funnel.total_due ?? 0} total={funnel.total_due || 1} color="bg-indigo-400" />
+            <FunnelStep label="Contacted" value={funnel.contacted ?? 0} total={funnel.total_due || 1} color="bg-blue-400" />
+            <FunnelStep label="Positive" value={funnel.positive ?? 0} total={funnel.total_due || 1} color="bg-emerald-400" />
+            <FunnelStep label="Booked" value={funnel.appointments_booked ?? 0} total={funnel.total_due || 1} color="bg-amber-400" />
+            <FunnelStep label="Completed" value={funnel.appointments_completed ?? 0} total={funnel.total_due || 1} color="bg-green-400" isLast />
+          </div>
+          <div className="grid grid-cols-4 gap-2 mt-3">
+            <div className="text-center"><p className="text-[10px] text-gray-400">Contact Rate</p><p className="text-sm font-bold text-blue-600">{funnel.contact_rate ?? 0}%</p></div>
+            <div className="text-center"><p className="text-[10px] text-gray-400">Positive Rate</p><p className="text-sm font-bold text-emerald-600">{funnel.positive_rate ?? 0}%</p></div>
+            <div className="text-center"><p className="text-[10px] text-gray-400">Booking Rate</p><p className="text-sm font-bold text-amber-600">{funnel.booking_rate ?? 0}%</p></div>
+            <div className="text-center"><p className="text-[10px] text-gray-400">Completion Rate</p><p className="text-sm font-bold text-green-600">{funnel.completion_rate ?? 0}%</p></div>
+          </div>
         </div>
       </div>
 
-      {/* ===== RECALLS SECTION ===== */}
-      <div id="section-recalls" data-section="recalls" className="scroll-mt-16">
-        <h2 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
-          <Bell className="h-4 w-4 text-purple-500" /> Recalls
-        </h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Card><CardContent className="p-4 text-center"><p className="text-xs text-muted-foreground">Total</p><p className="text-xl font-bold">{recallStats?.total ?? 0}</p></CardContent></Card>
-          <Card><CardContent className="p-4 text-center"><p className="text-xs text-muted-foreground">Open</p><p className="text-xl font-bold text-amber-600">{recallStats?.open ?? 0}</p></CardContent></Card>
-          <Card><CardContent className="p-4 text-center"><p className="text-xs text-muted-foreground">Overdue</p><p className="text-xl font-bold text-red-600">{recallStats?.overdue ?? 0}</p></CardContent></Card>
-          <Card><CardContent className="p-4 text-center"><p className="text-xs text-muted-foreground">Completed</p><p className="text-xl font-bold text-green-600">{recallStats?.completed ?? 0}</p></CardContent></Card>
+      {/* ════════════════════════════════════
+         SECTIONS 5+6: PATIENT RESPONSE + CONDITION (side by side)
+         ════════════════════════════════════ */}
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* SECTION 5: Patient Response Analytics */}
+        <div className={cn(GLASS, "rounded-2xl p-5")}>
+          <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+            <ThumbsUp className="h-4 w-4 text-emerald-500" /> Patient Response Analytics
+          </h2>
+          {responses.length > 0 ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <RePieChart>
+                <Pie data={responses} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                  {responses.map((_: any, i: number) => <Cell key={i} fill={COLORS_RESPONSE[i % COLORS_RESPONSE.length]} />)}
+                </Pie>
+                <Tooltip />
+              </RePieChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="text-sm text-gray-400 text-center py-12">No response data for this period</p>
+          )}
         </div>
-        <div className="grid gap-4 md:grid-cols-2 mt-4">
-          <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700"><BarChart3 className="h-4 w-4 text-primary" /> 6-Month vs 12-Month</CardTitle></CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl bg-amber-50 p-4 text-center border border-amber-200">
-                  <p className="text-xs text-amber-700">6-Month Recalls</p>
-                  <p className="text-2xl font-bold text-amber-800">{recallStats?.six_month ?? 0}</p>
-                </div>
-                <div className="rounded-xl bg-emerald-50 p-4 text-center border border-emerald-200">
-                  <p className="text-xs text-emerald-700">12-Month Recalls</p>
-                  <p className="text-2xl font-bold text-emerald-800">{recallStats?.twelve_month ?? 0}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700"><Settings className="h-4 w-4 text-primary" /> Recall Settings</CardTitle>
-              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => navigate("/crm/settings")}>Configure</Button>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-xl bg-gray-50 p-3 text-center">
-                  <p className="text-[11px] text-gray-500">6-Month Recall Enabled</p>
-                  <p className="text-lg font-bold">{settingsSummary?.treatments_with_6m_recall ?? 0} treatments</p>
-                </div>
-                <div className="rounded-xl bg-gray-50 p-3 text-center">
-                  <p className="text-[11px] text-gray-500">12-Month Recall Enabled</p>
-                  <p className="text-lg font-bold">{settingsSummary?.treatments_with_12m_recall ?? 0} treatments</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+
+        {/* SECTION 6: Patient Condition Analytics */}
+        <div className={cn(GLASS, "rounded-2xl p-5")}>
+          <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+            <HeartPulse className="h-4 w-4 text-rose-500" /> Patient Condition Analytics
+          </h2>
+          {conditions.length > 0 ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={conditions}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
+                <Tooltip />
+                <Bar dataKey="count" fill="#8B5CF6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="text-sm text-gray-400 text-center py-12">No condition data for this period</p>
+          )}
         </div>
       </div>
 
-      {/* ===== WHATSAPP MESSAGING WIDGET ===== */}
-      <div id="section-whatsapp" data-section="whatsapp" className="scroll-mt-16">
-        <h2 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
-          <Send className="h-4 w-4 text-green-500" /> WhatsApp Messaging
-        </h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardContent className="p-4 text-center">
-              <p className="text-xs text-muted-foreground">Messages Sent</p>
-              <p className="text-xl font-bold text-gray-900">{data?.whatsapp_analytics?.messages_sent ?? 0}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
-              <p className="text-xs text-muted-foreground">Appt Reminders</p>
-              <p className="text-xl font-bold text-blue-600">{data?.whatsapp_analytics?.appointment_reminders ?? 0}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
-              <p className="text-xs text-muted-foreground">Recall Msgs</p>
-              <p className="text-xl font-bold text-purple-600">{data?.whatsapp_analytics?.recall_messages ?? 0}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
-              <p className="text-xs text-muted-foreground">Broadcast</p>
-              <p className="text-xl font-bold text-amber-600">{data?.whatsapp_analytics?.broadcast_messages ?? 0}</p>
-            </CardContent>
-          </Card>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 mt-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700"><BarChart3 className="h-4 w-4 text-primary" /> Messages by Day</CardTitle>
-              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => navigate("/whatsapp")}>Send Message</Button>
-            </CardHeader>
-            <CardContent>
-              {data?.whatsapp_analytics?.messages_by_day?.length > 0 ? (
-                <div className="space-y-2 max-h-[220px] overflow-y-auto">
-                  {data.whatsapp_analytics.messages_by_day.slice(0, 10).map((d: any, i: number) => (
-                    <div key={i} className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">{d.day}</span>
-                      <span className="font-semibold text-gray-900">{d.count}</span>
+      {/* ════════════════════════════════════
+         SECTIONS 7+8: TREATMENT TYPE + DOCTOR (side by side)
+         ════════════════════════════════════ */}
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* SECTION 7: Treatment Type Performance */}
+        <div className={cn(GLASS, "rounded-2xl p-5")}>
+          <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+            <Activity className="h-4 w-4 text-indigo-500" /> Treatment Type Performance
+          </h2>
+          {treatmentPerf.length > 0 ? (
+            <div className="space-y-3">
+              {treatmentPerf.slice(0, 8).map((t: any, i: number) => {
+                const pct = Math.max(t.follow_ups, t.appointments, 1)
+                const fw = (t.follow_ups / pct) * 100
+                const aw = (t.appointments / pct) * 100
+                return (
+                  <div key={i}>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="font-medium text-gray-700">{t.name}</span>
+                      <span className="text-gray-400">{t.follow_ups} FU · {t.appointments} Appts</span>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-400 text-center py-6">No message data</p>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-700"><MessageSquare className="h-4 w-4 text-primary" /> Campaign Messages</CardTitle>
-              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => navigate("/whatsapp/templates")}>Templates</Button>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl bg-blue-50 p-3 text-center">
-                  <p className="text-[11px] text-gray-500">Campaign</p>
-                  <p className="text-lg font-bold text-blue-700">{data?.whatsapp_analytics?.campaign_messages ?? 0}</p>
-                </div>
-                <div className="rounded-xl bg-green-50 p-3 text-center">
-                  <p className="text-[11px] text-gray-500">Lead Msgs</p>
-                  <p className="text-lg font-bold text-green-700">{data?.whatsapp_analytics?.lead_messages ?? 0}</p>
-                </div>
-                <div className="rounded-xl bg-purple-50 p-3 text-center">
-                  <p className="text-[11px] text-gray-500">Enquiry Msgs</p>
-                  <p className="text-lg font-bold text-purple-700">{data?.whatsapp_analytics?.enquiry_messages ?? 0}</p>
-                </div>
-                <div className="rounded-xl bg-amber-50 p-3 text-center">
-                  <p className="text-[11px] text-gray-500">Enquiry FU</p>
-                  <p className="text-lg font-bold text-amber-700">{data?.whatsapp_analytics?.enquiry_messages ?? 0}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                    <div className="flex gap-0.5 h-2 rounded-full overflow-hidden bg-gray-100">
+                      <div style={{ width: `${fw}%` }} className="bg-indigo-400 transition-all" />
+                      <div style={{ width: `${aw}%` }} className="bg-emerald-400 transition-all" />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 text-center py-12">No treatment data</p>
+          )}
         </div>
+
+        {/* SECTION 8: Doctor Engagement Leaderboard */}
+        <div className={cn(GLASS, "rounded-2xl p-5")}>
+          <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+            <Award className="h-4 w-4 text-amber-500" /> Doctor Engagement Leaderboard
+          </h2>
+          {doctorEngagement.length > 0 ? (
+            <div className="space-y-2 max-h-[300px] overflow-y-auto">
+              {doctorEngagement.map((d: any, i: number) => (
+                <div key={d.doctor_id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 transition-colors">
+                  <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white",
+                    i === 0 ? "bg-amber-400" : i === 1 ? "bg-gray-400" : i === 2 ? "bg-amber-700" : "bg-gray-200 text-gray-500")}>
+                    {i + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-gray-800 truncate">{d.doctor_name}</p>
+                    <div className="flex gap-3 text-[10px] text-gray-400">
+                      <span>{d.patients_contacted} contacted</span>
+                      <span>{d.appointments_generated} appts</span>
+                      <span>{d.follow_ups_completed} done</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs font-bold text-indigo-600">{d.positive_feedback}</p>
+                    <p className="text-[9px] text-gray-400">positive</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 text-center py-12">No doctor engagement data</p>
+          )}
+        </div>
+      </div>
+
+      {/* ════════════════════════════════════
+         SECTION 9: PATIENT ACQUISITION & REVENUE
+         ════════════════════════════════════ */}
+      <div className={cn(GLASS, "rounded-2xl p-5")}>
+        <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+          <Users className="h-4 w-4 text-indigo-500" /> Patient Acquisition & Revenue by Source
+        </h2>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <p className="text-[10px] font-semibold text-gray-500 uppercase mb-2">Acquisition Source</p>
+            {acquisition.length > 0 ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <RePieChart>
+                  <Pie data={acquisition} dataKey="patients" nameKey="source" cx="50%" cy="50%" outerRadius={80} label={({ source, percent }) => `${source} ${(percent * 100).toFixed(0)}%`}>
+                    {acquisition.map((_: any, i: number) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip />
+                </RePieChart>
+              </ResponsiveContainer>
+            ) : <p className="text-sm text-gray-400 text-center py-10">No acquisition data</p>}
+          </div>
+          <div>
+            <p className="text-[10px] font-semibold text-gray-500 uppercase mb-2">Revenue by Source</p>
+            {revenueBySource.length > 0 ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={revenueBySource}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="source" tick={{ fontSize: 9 }} />
+                  <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+                  <Tooltip formatter={(v: any) => formatIndianRupees(v)} />
+                  <Bar dataKey="revenue" fill="#4F46E5" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : <p className="text-sm text-gray-400 text-center py-10">No revenue data</p>}
+          </div>
+        </div>
+        {acquisition.length > 0 && (
+          <div className="overflow-x-auto mt-3">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-[10px]">Source</TableHead>
+                  <TableHead className="text-[10px] text-right">Patients</TableHead>
+                  <TableHead className="text-[10px] text-right">Conversion Rate</TableHead>
+                  <TableHead className="text-[10px] text-right">Revenue</TableHead>
+                  <TableHead className="text-[10px] text-right">Avg/Patient</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {acquisition.slice(0, 6).map((s: any) => (
+                  <TableRow key={s.source}>
+                    <TableCell className="text-xs font-medium">{s.source}</TableCell>
+                    <TableCell className="text-xs text-right">{s.patients}</TableCell>
+                    <TableCell className="text-xs text-right">{s.conversion_rate}%</TableCell>
+                    <TableCell className="text-xs text-right font-semibold">{formatIndianRupees(s.revenue)}</TableCell>
+                    <TableCell className="text-xs text-right">{formatIndianRupees(s.avg_revenue)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
+
+      {/* ════════════════════════════════════
+         SECTION 10: CRM TIMELINE
+         ════════════════════════════════════ */}
+      <div className={cn(GLASS, "rounded-2xl p-5")}>
+        <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+          <Activity className="h-4 w-4 text-blue-500" /> CRM Activity Timeline
+          <Badge variant="secondary" className="ml-1 text-[10px]">{timeline.length}</Badge>
+        </h2>
+        {timeline.length > 0 ? (
+          <div className="space-y-1 max-h-[350px] overflow-y-auto">
+            {timeline.slice(0, 25).map((entry: any) => {
+              const iconMap: Record<string, any> = {
+                CALL: { icon: Phone, color: "text-green-500 bg-green-50" },
+                WHATSAPP: { icon: MessageCircle, color: "text-emerald-500 bg-emerald-50" },
+                SMS: { icon: MessageCircle, color: "text-blue-500 bg-blue-50" },
+                EMAIL: { icon: Send, color: "text-purple-500 bg-purple-50" },
+                IN_PERSON: { icon: User, color: "text-amber-500 bg-amber-50" },
+                STATUS_UPDATE: { icon: Activity, color: "text-gray-500 bg-gray-50" },
+                APPOINTMENT_BOOKED: { icon: CalendarDays, color: "text-indigo-500 bg-indigo-50" },
+                COMPLETED: { icon: CheckCircle, color: "text-green-500 bg-green-50" },
+              }
+              const meta = iconMap[entry.activity] || iconMap.STATUS_UPDATE
+              const Icon = meta.icon
+              return (
+                <div key={entry.id} className="flex items-start gap-3 p-2 rounded-xl hover:bg-gray-50 transition-colors">
+                  <div className={cn("rounded-lg p-1.5 mt-0.5", meta.color)}>
+                    <Icon className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-gray-800">{entry.patient_name}</p>
+                    <p className="text-[10px] text-gray-500">{entry.description}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <Badge className={cn("text-[9px]", statusColors[entry.status] || "bg-gray-100")}>{entry.status}</Badge>
+                    <p className="text-[9px] text-gray-400 mt-0.5">
+                      {entry.timestamp ? new Date(entry.timestamp).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}
+                    </p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400 text-center py-10">No activity for this period</p>
+        )}
+      </div>
+
+      {/* ════════════════════════════════════
+         SECTION 11: UPCOMING WORK
+         ════════════════════════════════════ */}
+      <div className={cn(GLASS, "rounded-2xl p-5")}>
+        <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+          <Clock className="h-4 w-4 text-amber-500" /> Upcoming Work
+        </h2>
+        <Tabs value={upcomingTab} onValueChange={setUpcomingTab}>
+          <TabsList className="mb-3">
+            <TabsTrigger value="tomorrow" className="text-xs">Tomorrow</TabsTrigger>
+            <TabsTrigger value="next_7_days" className="text-xs">Next 7 Days</TabsTrigger>
+            <TabsTrigger value="next_30_days" className="text-xs">Next 30 Days</TabsTrigger>
+          </TabsList>
+          {["tomorrow", "next_7_days", "next_30_days"].map((tab) => {
+            const uw = upcomingWork[tab] ?? {}
+            return (
+              <TabsContent key={tab} value={tab}>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  <div className="rounded-xl bg-indigo-50 p-3 text-center">
+                    <p className="text-[10px] text-gray-500">Total</p>
+                    <p className="text-xl font-bold text-indigo-600">{uw.total ?? 0}</p>
+                  </div>
+                  <div className="rounded-xl bg-blue-50 p-3 text-center">
+                    <p className="text-[10px] text-gray-500">1-Day FU</p>
+                    <p className="text-xl font-bold text-blue-600">{uw["1_day"] ?? 0}</p>
+                  </div>
+                  <div className="rounded-xl bg-purple-50 p-3 text-center">
+                    <p className="text-[10px] text-gray-500">7-Day FU</p>
+                    <p className="text-xl font-bold text-purple-600">{uw["7_day"] ?? 0}</p>
+                  </div>
+                  <div className="rounded-xl bg-amber-50 p-3 text-center">
+                    <p className="text-[10px] text-gray-500">6-Month Recall</p>
+                    <p className="text-xl font-bold text-amber-600">{uw["6_month"] ?? 0}</p>
+                  </div>
+                  <div className="rounded-xl bg-green-50 p-3 text-center">
+                    <p className="text-[10px] text-gray-500">12-Month Recall</p>
+                    <p className="text-xl font-bold text-green-600">{uw["12_month"] ?? 0}</p>
+                  </div>
+                </div>
+              </TabsContent>
+            )
+          })}
+        </Tabs>
       </div>
     </div>
   )
 }
-
-export default CrmDashboardPage

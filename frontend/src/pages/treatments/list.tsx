@@ -25,7 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
-import { treatmentApi, casesApi } from "@/services/endpoints"
+import { treatmentApi, casesApi, treatmentTypesApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
 import QuickExport from "@/components/ui/quick-export"
 import type { TreatmentPlan, Case } from "@/types"
@@ -53,6 +53,7 @@ function ProgressBar({ value, className }: { value: number; className?: string }
 interface TreatmentForm {
   case_id: string
   treatment_name: string
+  treatment_type_id: string
   description: string
   cost: number | null
   total_sittings: number | null
@@ -62,7 +63,7 @@ interface TreatmentForm {
 }
 
 function getEmptyTreatmentForm(): TreatmentForm {
-  return { case_id: "", treatment_name: "", description: "", cost: null, total_sittings: null, start_date: "", expected_completion_date: "", notes: "" }
+  return { case_id: "", treatment_name: "", treatment_type_id: "", description: "", cost: null, total_sittings: null, start_date: "", expected_completion_date: "", notes: "" }
 }
 
 export default function TreatmentList() {
@@ -86,6 +87,12 @@ export default function TreatmentList() {
     queryKey: ["cases", "dropdown"],
     queryFn: () => casesApi.list({ page_size: 200, hospital_id: currentUser?.hospital_id || undefined }),
   })
+
+  const { data: treatmentTypes } = useQuery({
+    queryKey: ["treatment-types"],
+    queryFn: () => treatmentTypesApi.list(),
+  })
+  const treatmentTypesList: any[] = treatmentTypes || []
 
   const cases: Case[] = useMemo(() => {
     if (Array.isArray(casesData)) return casesData
@@ -169,6 +176,7 @@ export default function TreatmentList() {
     setForm({
       case_id: plan.case_id,
       treatment_name: plan.treatment_name,
+      treatment_type_id: (plan as any).treatment_type_id || "",
       description: plan.description || "",
       cost: plan.cost,
       total_sittings: plan.total_sittings,
@@ -407,6 +415,17 @@ export default function TreatmentList() {
                 <Input id="name" value={form.treatment_name} onChange={(e) => setForm({ ...form, treatment_name: e.target.value })} required />
               </div>
               <div className="grid gap-2">
+                <Label htmlFor="type">Treatment Type</Label>
+                <Select value={form.treatment_type_id} onValueChange={(v) => setForm({ ...form, treatment_type_id: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select treatment type" /></SelectTrigger>
+                  <SelectContent position="popper" className="max-h-[200px] overflow-y-auto">
+                    {treatmentTypesList.map((tt: any) => (
+                      <SelectItem key={tt.id} value={tt.id}>{tt.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
                 <Label htmlFor="description">Description</Label>
                 <Input id="description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
               </div>
@@ -455,6 +474,17 @@ export default function TreatmentList() {
               <div className="grid gap-2">
                 <Label htmlFor="edit-name">Treatment Name</Label>
                 <Input id="edit-name" value={form.treatment_name} onChange={(e) => setForm({ ...form, treatment_name: e.target.value })} required />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-type">Treatment Type</Label>
+                <Select value={form.treatment_type_id} onValueChange={(v) => setForm({ ...form, treatment_type_id: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select treatment type" /></SelectTrigger>
+                  <SelectContent position="popper" className="max-h-[200px] overflow-y-auto">
+                    {treatmentTypesList.map((tt: any) => (
+                      <SelectItem key={tt.id} value={tt.id}>{tt.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="edit-description">Description</Label>

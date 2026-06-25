@@ -26,14 +26,13 @@ const iconMap: Record<string, { icon: React.ElementType; color: string }> = {
   reminder: { icon: Clock, color: "text-amber-500" },
   billing: { icon: AlertCircle, color: "text-amber-500" },
   crm: { icon: MessageSquare, color: "text-[#2563EB]" },
-  followup: { icon: Clock, color: "text-cyan-500" },
   system: { icon: AlertCircle, color: "text-gray-400" },
 }
 
 const filters = [
   { key: "all", label: "All" }, { key: "unread", label: "Unread" }, { key: "read", label: "Read" },
   { key: "appointment", label: "Appointments" }, { key: "billing", label: "Billing" },
-  { key: "crm", label: "CRM" }, { key: "followup", label: "Follow‑Ups" }, { key: "system", label: "System" },
+  { key: "crm", label: "CRM" }, { key: "system", label: "System" },
 ] as const
 type FilterKey = (typeof filters)[number]["key"]
 

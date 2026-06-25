@@ -7,6 +7,7 @@ from enum import Enum
 class TreatmentPlanCreate(BaseModel):
     case_id: str
     treatment_name: str = Field(..., min_length=1, max_length=255)
+    treatment_type_id: Optional[str] = None
     description: Optional[str] = None
     cost: float = Field(default=0.0, ge=0)
     paid_amount: Optional[float] = Field(default=0.0, ge=0)
@@ -21,6 +22,7 @@ class TreatmentPlanCreate(BaseModel):
 
 class TreatmentPlanUpdate(BaseModel):
     treatment_name: Optional[str] = None
+    treatment_type_id: Optional[str] = None
     description: Optional[str] = None
     cost: Optional[float] = None
     paid_amount: Optional[float] = None
@@ -38,6 +40,8 @@ class TreatmentPlanResponse(BaseModel):
     treatment_number: Optional[str] = None
     case_id: str
     treatment_name: str
+    treatment_type_id: Optional[str] = None
+    treatment_type_name: Optional[str] = None
     description: Optional[str]
     cost: float
     paid_amount: float = 0.0

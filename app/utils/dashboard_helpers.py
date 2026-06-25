@@ -94,10 +94,9 @@ async def calculate_expenses(db: AsyncSession, hospital_ids: list[str] = None, p
             HospitalMonthlyExpense.expense_year == expense_year,
         )
     else:
-        base_date = date_start
         query = select(func.sum(HospitalMonthlyExpense.amount)).where(
-            HospitalMonthlyExpense.expense_year == base_date.year,
-            HospitalMonthlyExpense.expense_month == base_date.month,
+            HospitalMonthlyExpense.expense_date >= date_start.date() if hasattr(date_start, 'date') else date_start,
+            HospitalMonthlyExpense.expense_date < date_end.date() if hasattr(date_end, 'date') else date_end,
         )
 
     if hospital_ids is not None:
@@ -109,7 +108,6 @@ async def calculate_expenses(db: AsyncSession, hospital_ids: list[str] = None, p
 async def calculate_expenses_for_date_range(db: AsyncSession, hospital_ids: list[str] = None,
                                             date_start: Optional[datetime] = None,
                                             date_end: Optional[datetime] = None) -> float:
-    """Calculate expenses between two dates by matching expense_month/expense_year to the range."""
     if not date_start:
         now = datetime.now(timezone.utc)
         date_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -117,27 +115,12 @@ async def calculate_expenses_for_date_range(db: AsyncSession, hospital_ids: list
         next_month = date_start.replace(month=date_start.month % 12 + 1, day=1) if date_start.month < 12 else date_start.replace(year=date_start.year + 1, month=1, day=1)
         date_end = next_month
 
-    months = set()
-    d = date_start.replace(day=1)
-    while d < date_end:
-        months.add((d.year, d.month))
-        if d.month == 12:
-            d = d.replace(year=d.year + 1, month=1)
-        else:
-            d = d.replace(month=d.month + 1)
-
-    if not months:
-        return 0.0
-
-    conditions = []
-    for year, month in months:
-        conditions.append(
-            (HospitalMonthlyExpense.expense_year == year) &
-            (HospitalMonthlyExpense.expense_month == month)
-        )
-
-    from sqlalchemy import or_
-    query = select(func.sum(HospitalMonthlyExpense.amount)).where(or_(*conditions))
+    sd = date_start.date() if hasattr(date_start, 'date') else date_start
+    ed = date_end.date() if hasattr(date_end, 'date') else date_end
+    query = select(func.sum(HospitalMonthlyExpense.amount)).where(
+        HospitalMonthlyExpense.expense_date >= sd,
+        HospitalMonthlyExpense.expense_date < ed,
+    )
     if hospital_ids is not None:
         query = query.where(HospitalMonthlyExpense.hospital_id.in_(hospital_ids))
     result = await db.execute(query)
@@ -194,10 +177,9 @@ async def revenue_trend_with_expenses(db: AsyncSession, case_ids: list[str] = No
         while cursor < date_end:
             key = cursor.strftime(date_format)
             rev = revenue_map.get(key, 0)
-            month_start = cursor.replace(day=1)
             exp_query = select(func.sum(HospitalMonthlyExpense.amount)).where(
-                HospitalMonthlyExpense.expense_year == cursor.year,
-                HospitalMonthlyExpense.expense_month == cursor.month,
+                HospitalMonthlyExpense.expense_date >= cursor.date(),
+                HospitalMonthlyExpense.expense_date < (cursor + timedelta(hours=1)).date(),
             )
             if hospital_ids is not None:
                 exp_query = exp_query.where(HospitalMonthlyExpense.hospital_id.in_(hospital_ids))
@@ -212,10 +194,9 @@ async def revenue_trend_with_expenses(db: AsyncSession, case_ids: list[str] = No
         while cursor < date_end:
             key = cursor.strftime(date_format)
             rev = revenue_map.get(key, 0)
-            month_start = cursor.replace(day=1)
             exp_query = select(func.sum(HospitalMonthlyExpense.amount)).where(
-                HospitalMonthlyExpense.expense_year == cursor.year,
-                HospitalMonthlyExpense.expense_month == cursor.month,
+                HospitalMonthlyExpense.expense_date >= cursor.date(),
+                HospitalMonthlyExpense.expense_date < (cursor + timedelta(days=1)).date(),
             )
             if hospital_ids is not None:
                 exp_query = exp_query.where(HospitalMonthlyExpense.hospital_id.in_(hospital_ids))
@@ -230,9 +211,10 @@ async def revenue_trend_with_expenses(db: AsyncSession, case_ids: list[str] = No
         while cursor < date_end:
             key = cursor.strftime(date_format)
             rev = revenue_map.get(key, 0)
+            month_end = cursor.replace(month=cursor.month % 12 + 1, day=1) if cursor.month < 12 else cursor.replace(year=cursor.year + 1, month=1, day=1)
             exp_query = select(func.sum(HospitalMonthlyExpense.amount)).where(
-                HospitalMonthlyExpense.expense_year == cursor.year,
-                HospitalMonthlyExpense.expense_month == cursor.month,
+                HospitalMonthlyExpense.expense_date >= cursor.date(),
+                HospitalMonthlyExpense.expense_date < month_end.date(),
             )
             if hospital_ids is not None:
                 exp_query = exp_query.where(HospitalMonthlyExpense.hospital_id.in_(hospital_ids))

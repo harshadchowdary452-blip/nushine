@@ -223,7 +223,7 @@ async def create_lead_follow_up(lead_id: str, data: LeadFollowUpCreate, db: Asyn
         follow_up_date=follow_up_date,
         follow_up_time=follow_up_time,
         follow_up_type=FollowUpType.MANUAL.value,
-        status=FollowUpStatus.SCHEDULED.value,
+        status=FollowUpStatus.PENDING.value,
         notes=data.notes or data.reason or "",
     )
     db.add(fu)

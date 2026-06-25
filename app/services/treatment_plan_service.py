@@ -8,6 +8,7 @@ from fastapi import HTTPException, status
 from app.repositories.treatment_plan_repository import TreatmentPlanRepository
 from app.repositories.audit_log_repository import AuditLogRepository
 from app.models.treatment_plan import TreatmentPlan
+from app.models.treatment_type import TreatmentType
 from app.models.case import Case
 from app.models.patient import Patient
 from app.models.user import User
@@ -30,6 +31,8 @@ def _enrich_plan(plan: TreatmentPlan):
     }
     for k, v in sittings_data.items():
         setattr(plan, k, v)
+
+    setattr(plan, "treatment_type_name", plan.treatment_type.name if plan.treatment_type else None)
 
     case = plan.case
     if case:

@@ -192,7 +192,7 @@ async def resolve_variables(db: AsyncSession, patient_id: str, hospital_id: Opti
         select(FollowUp).where(
             FollowUp.patient_id == patient_id,
             FollowUp.status.in_(["OPEN", "SCHEDULED"]),
-            FollowUp.follow_up_type.in_(["6_MONTH_RECALL", "12_MONTH_RECALL", "CUSTOM_RECALL"]),
+            FollowUp.follow_up_type.in_(["6_MONTH_RECALL", "12_MONTH_RECALL", "CUSTOM_RECALL", "CUSTOM_FOLLOW_UP"]),
             FollowUp.follow_up_date >= date.today()
         ).order_by(FollowUp.follow_up_date.asc()).limit(1)
     )

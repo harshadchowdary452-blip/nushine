@@ -116,13 +116,14 @@ async def _csv_patients(db, hospital_ids, date_start, date_end):
 
 
 async def _csv_appointments(db, hospital_ids, date_start, date_end):
+    pids = await _get_patient_ids(db, hospital_ids)
     q = select(
         Appointment.appointment_number, Appointment.patient_id, Appointment.doctor_id,
         Appointment.appointment_date, Appointment.appointment_time, Appointment.status,
     ).where(Appointment.appointment_date >= date_start.date() if hasattr(date_start, 'date') else date_start,
              Appointment.appointment_date < date_end.date() if hasattr(date_end, 'date') else date_end)
-    if hospital_ids is not None:
-        q = q.where(Appointment.hospital_id.in_(hospital_ids))
+    if pids is not None:
+        q = q.where(Appointment.patient_id.in_(pids))
     q = q.order_by(Appointment.appointment_date.desc())
     rows = (await db.execute(q)).all()
     pids = set(r[1] for r in rows if r[1])
@@ -235,38 +236,32 @@ async def _csv_billings(db, hospital_ids, date_start, date_end):
 
 
 async def _csv_expenses(db, hospital_ids, date_start, date_end):
-    months = set()
-    d = date_start.replace(day=1)
-    while d < date_end:
-        months.add((d.year, d.month))
-        if d.month == 12:
-            d = d.replace(year=d.year + 1, month=1)
-        else:
-            d = d.replace(month=d.month + 1)
-    conditions = []
-    for year, month in months:
-        conditions.append(
-            (HospitalMonthlyExpense.expense_year == year) &
-            (HospitalMonthlyExpense.expense_month == month)
-        )
+    sd = date_start.date() if hasattr(date_start, 'date') else date_start
+    ed = date_end.date() if hasattr(date_end, 'date') else date_end
     q = select(
-        HospitalMonthlyExpense.expense_name, HospitalMonthlyExpense.expense_category,
-        HospitalMonthlyExpense.amount, HospitalMonthlyExpense.expense_month,
-        HospitalMonthlyExpense.expense_year, HospitalMonthlyExpense.created_by,
-    )
-    if conditions:
-        q = q.where(or_(*conditions))
+        HospitalMonthlyExpense.expense_date, HospitalMonthlyExpense.expense_category,
+        HospitalMonthlyExpense.expense_name, HospitalMonthlyExpense.amount,
+        HospitalMonthlyExpense.payment_method, HospitalMonthlyExpense.vendor,
+        HospitalMonthlyExpense.created_by,
+    ).where(HospitalMonthlyExpense.expense_date >= sd, HospitalMonthlyExpense.expense_date < ed)
     if hospital_ids is not None:
         q = q.where(HospitalMonthlyExpense.hospital_id.in_(hospital_ids))
-    q = q.order_by(HospitalMonthlyExpense.expense_year.desc(), HospitalMonthlyExpense.expense_month.desc())
+    q = q.order_by(HospitalMonthlyExpense.expense_date.desc())
     rows = (await db.execute(q)).all()
-    uids = set(r[5] for r in rows if r[5])
+    uids = set(r[6] for r in rows if r[6])
     unames = await _name_dict(db, User, uids)
-    headers = ["Expense Name", "Category", "Amount", "Month", "Year", "Created By"]
+    headers = ["Expense Date", "Category", "Expense Name", "Amount", "Payment Method", "Vendor", "Created By"]
     data = []
     for r in rows:
-        month_name = datetime(r[4], r[3], 1).strftime("%B") if r[3] and r[4] else ""
-        data.append([r[0], r[2] or "", float(r[2] or 0), month_name, str(r[4] or ""), unames.get(r[5], "")])
+        data.append([
+            str(r[0]) if r[0] else "",
+            r[1] or "",
+            r[2] or "",
+            float(r[3] or 0),
+            r[4] or "",
+            r[5] or "",
+            unames.get(r[6], ""),
+        ])
     return data, headers, len(rows)
 
 
@@ -336,7 +331,7 @@ async def _csv_follow_ups(db, hospital_ids, date_start, date_end):
 
 
 async def _csv_recalls(db, hospital_ids, date_start, date_end):
-    recall_types = ("6_MONTH_RECALL", "12_MONTH_RECALL", "CUSTOM_RECALL")
+    recall_types = ("6_MONTH_RECALL", "12_MONTH_RECALL", "CUSTOM_RECALL", "CUSTOM_FOLLOW_UP")
     q = select(
         FollowUp.patient_id, FollowUp.doctor_id, FollowUp.follow_up_date,
         FollowUp.follow_up_type, FollowUp.outcome, FollowUp.status,
@@ -359,7 +354,8 @@ async def _csv_recalls(db, hospital_ids, date_start, date_end):
     headers = ["Patient Name", "OP Number", "Doctor Name", "Recall Type", "Recall Date", "Status"]
     rtype_labels = {
         "6_MONTH_RECALL": "6-Month Recall", "12_MONTH_RECALL": "12-Month Recall",
-        "CUSTOM_RECALL": "Custom Recall",
+        "CUSTOM_RECALL": "Custom Follow-Up",
+        "CUSTOM_FOLLOW_UP": "Custom Follow-Up",
     }
     data = [[pnames.get(r[0], ""), op_map.get(r[0], ""), dnames.get(r[1], ""), rtype_labels.get(r[3], r[3] or ""), str(r[2]) if r[2] else "", r[5]] for r in rows]
     return data, headers, len(rows)
@@ -585,6 +581,7 @@ async def _revenue_trend_chart(db, hospital_ids, date_start, date_end, filename)
 
 
 async def _appointment_trend_chart(db, hospital_ids, date_start, date_end, filename):
+    pids = await _get_patient_ids(db, hospital_ids)
     range_days = (date_end - date_start).days
     fmt_sql = "YYYY-MM-DD" if range_days <= 31 else "YYYY-MM"
     q = select(
@@ -592,8 +589,8 @@ async def _appointment_trend_chart(db, hospital_ids, date_start, date_end, filen
         func.count(Appointment.id).label("count"),
     ).where(Appointment.appointment_date >= date_start.date() if hasattr(date_start, 'date') else date_start,
              Appointment.appointment_date < date_end.date() if hasattr(date_end, 'date') else date_end)
-    if hospital_ids is not None:
-        q = q.where(Appointment.hospital_id.in_(hospital_ids))
+    if pids is not None:
+        q = q.where(Appointment.patient_id.in_(pids))
     q = q.group_by("period").order_by("period")
     rows = (await db.execute(q)).all()
     periods = [r[0] for r in rows]
@@ -750,7 +747,7 @@ async def generate_dashboard_pdf(
     r = await db.execute(select(func.count(Appointment.id)).where(
         Appointment.appointment_date >= date_start.date() if hasattr(date_start, 'date') else date_start,
         Appointment.appointment_date < date_end.date() if hasattr(date_end, 'date') else date_end,
-        *((Appointment.hospital_id.in_(hospital_ids)) if hospital_ids is not None else ())
+        *((Appointment.patient_id.in_(pids)) if pids is not None else ())
     ))
     total_appointments = int(r.scalar() or 0)
 
@@ -992,7 +989,7 @@ async def generate_monthly_report_pdf(
     r = await db.execute(select(func.count(Appointment.id)).where(
         Appointment.appointment_date >= date_start.date() if hasattr(date_start, 'date') else date_start,
         Appointment.appointment_date < date_end.date() if hasattr(date_end, 'date') else date_end,
-        *((Appointment.hospital_id.in_(hospital_ids)) if hospital_ids is not None else ())
+        *((Appointment.patient_id.in_(pids)) if pids is not None else ())
     ))
     total_appointments = int(r.scalar() or 0)
 
@@ -1018,7 +1015,7 @@ async def generate_monthly_report_pdf(
     ))
     total_followups = int(r.scalar() or 0)
 
-    recall_types = ("6_MONTH_RECALL", "12_MONTH_RECALL", "CUSTOM_RECALL")
+    recall_types = ("6_MONTH_RECALL", "12_MONTH_RECALL", "CUSTOM_RECALL", "CUSTOM_FOLLOW_UP")
     r = await db.execute(select(func.count(FollowUp.id)).where(
         FollowUp.follow_up_type.in_(recall_types),
         FollowUp.created_at >= date_start, FollowUp.created_at < date_end,

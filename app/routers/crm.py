@@ -1,3 +1,4 @@
+import asyncio
 import traceback
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -40,6 +41,7 @@ from app.models.case import Case
 from app.models.treatment_plan import TreatmentPlan, TreatmentPlanStatus
 from app.models.billing import Billing
 from app.models.appointment import Appointment, AppointmentStatus, AppointmentType
+from app.models.communication_log import CommunicationLog, CommunicationChannel, CommunicationStatus
 from app.utils.whatsapp import WhatsAppProvider
 from app.utils.pdf import generate_invoice_pdf
 from app.utils.template_engine import TemplateEngine
@@ -102,6 +104,33 @@ class FollowUpCreate(BaseModel):
 class FollowUpUpdate(BaseModel):
     status: Optional[str] = None
     notes: Optional[str] = None
+    patient_feedback: Optional[str] = None
+    staff_notes: Optional[str] = None
+    response_summary: Optional[str] = None
+    response_status: Optional[str] = None
+    next_action: Optional[str] = None
+    contact_channel: Optional[str] = None
+    follow_up_date: Optional[str] = None
+    follow_up_time: Optional[str] = None
+    appointment_id: Optional[str] = None
+
+class FollowUpFeedbackCreate(BaseModel):
+    response_status: str  # INTERESTED, NOT_INTERESTED, NEEDS_MORE_TIME, REQUESTED_CALLBACK, BUSY, NO_RESPONSE, WRONG_NUMBER, TREATMENT_COMPLETED, NEEDS_REVIEW
+    patient_feedback: Optional[str] = None
+    staff_notes: Optional[str] = None
+    response_summary: Optional[str] = None
+    next_action: Optional[str] = None  # CALL_AGAIN, CREATE_FOLLOW_UP, BOOK_APPOINTMENT, CLOSE_ENQUIRY
+    contact_channel: Optional[str] = None  # CALL, WHATSAPP, SMS, EMAIL, IN_PERSON
+
+class CreateAppointmentFromFu(BaseModel):
+    doctor_id: str
+    appointment_date: str
+    appointment_time: str
+    appointment_type: Optional[str] = "FOLLOW_UP"
+
+class RescheduleFollowUp(BaseModel):
+    follow_up_date: str
+    follow_up_time: Optional[str] = None
 
 class DeliveryCallbackRequest(BaseModel):
     log_id: str
@@ -567,7 +596,7 @@ async def create_follow_up(
         patient_id=req.patient_id, hospital_id=hospital_id,
         doctor_id=doctor_id, case_id=req.case_id,
         follow_up_date=follow_up_date, follow_up_time=follow_up_time,
-        notes=req.notes, status=FollowUpStatus.SCHEDULED.value)
+        notes=req.notes, status=FollowUpStatus.PENDING.value)
     db.add(fu)
     await db.flush()
 
@@ -691,23 +720,131 @@ async def update_follow_up(
     _verify_hospital_access(fu, current_user)
     if req.status is not None: fu.status = req.status
     if req.notes is not None: fu.notes = req.notes
+    if req.patient_feedback is not None: fu.patient_feedback = req.patient_feedback
+    if req.staff_notes is not None: fu.staff_notes = req.staff_notes
+    if req.response_summary is not None: fu.response_summary = req.response_summary
+    if req.response_status is not None: fu.response_status = req.response_status
+    if req.next_action is not None: fu.next_action = req.next_action
+    if req.contact_channel is not None: fu.contact_channel = req.contact_channel
+    if req.status is not None or req.patient_feedback is not None:
+        fu.last_contact_date = datetime.now(timezone.utc)
+    if req.follow_up_date is not None: fu.follow_up_date = date.fromisoformat(req.follow_up_date)
+    if req.follow_up_time is not None: fu.follow_up_time = time.fromisoformat(req.follow_up_time)
+    if req.appointment_id is not None: fu.appointment_id = req.appointment_id
     # Sync linked appointment status
     if req.status is not None and fu.appointment_id:
         appt = await db.get(Appointment, fu.appointment_id)
         if appt:
-            if req.status == "SCHEDULED":
+            if req.status == "APPOINTMENT_BOOKED":
                 appt.status = AppointmentStatus.SCHEDULED
             elif req.status == "COMPLETED":
                 appt.status = AppointmentStatus.COMPLETED
-            elif req.status == "MISSED":
-                appt.status = AppointmentStatus.NO_SHOW
-            elif req.status == "CANCELLED":
+            elif req.status == "LOST":
                 appt.status = AppointmentStatus.CANCELLED
     await db.commit()
     if req.status is not None:
         svc = StatusAutomationService(db)
         await svc.update_followup_status(follow_up_id, FollowUpStatus(req.status))
         await db.commit()
+    return {"success": True}
+
+
+# --- Follow-Up Feedback ---
+
+@router.post("/follow-ups/{follow_up_id}/feedback")
+async def record_follow_up_feedback(
+    follow_up_id: str, req: FollowUpFeedbackCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.MANAGE_PATIENTS)
+    fu = await db.get(FollowUp, follow_up_id)
+    if not fu: raise HTTPException(status_code=404, detail="Follow-up not found")
+    _verify_hospital_access(fu, current_user)
+    now = datetime.now(timezone.utc)
+    fu.response_status = req.response_status
+    if req.patient_feedback is not None: fu.patient_feedback = req.patient_feedback
+    if req.staff_notes is not None: fu.staff_notes = req.staff_notes
+    if req.response_summary is not None: fu.response_summary = req.response_summary
+    if req.next_action is not None: fu.next_action = req.next_action
+    if req.contact_channel is not None: fu.contact_channel = req.contact_channel
+    fu.last_contact_date = now
+    # Update status based on response
+    if req.response_status in ("NO_RESPONSE", "BUSY", "WRONG_NUMBER"):
+        fu.status = FollowUpStatus.NO_RESPONSE.value
+    elif req.response_status in ("NOT_INTERESTED",):
+        fu.status = FollowUpStatus.LOST.value
+    elif req.response_status in ("INTERESTED", "NEEDS_MORE_TIME", "REQUESTED_CALLBACK", "NEEDS_REVIEW"):
+        fu.status = FollowUpStatus.CONTACTED.value
+    elif req.response_status == "TREATMENT_COMPLETED":
+        fu.status = FollowUpStatus.COMPLETED.value
+    await db.commit()
+    # Log to timeline
+    svc = StatusAutomationService(db)
+    await svc.update_followup_status(follow_up_id, FollowUpStatus(fu.status))
+    await db.commit()
+    return {"success": True}
+
+
+@router.post("/follow-ups/{follow_up_id}/create-appointment")
+async def create_appointment_from_follow_up(
+    follow_up_id: str, req: CreateAppointmentFromFu,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.MANAGE_PATIENTS)
+    fu = await db.get(FollowUp, follow_up_id)
+    if not fu: raise HTTPException(status_code=404, detail="Follow-up not found")
+    _verify_hospital_access(fu, current_user)
+    patient = await db.get(Patient, fu.patient_id)
+    if not patient: raise HTTPException(status_code=404, detail="Patient not found")
+    appt_date = date.fromisoformat(req.appointment_date)
+    appt_time = time.fromisoformat(req.appointment_time)
+    from app.models.appointment import Appointment
+    appt = Appointment(
+        patient_id=fu.patient_id, doctor_id=req.doctor_id,
+        appointment_date=appt_date, appointment_time=appt_time,
+        appointment_type=req.appointment_type,
+    )
+    db.add(appt)
+    await db.flush()
+    fu.appointment_id = appt.id
+    fu.status = FollowUpStatus.APPOINTMENT_BOOKED.value
+    fu.next_action = "BOOK_APPOINTMENT"
+    fu.last_contact_date = datetime.now(timezone.utc)
+    await db.commit()
+    return {"success": True, "appointment_id": str(appt.id)}
+
+
+@router.post("/follow-ups/{follow_up_id}/reschedule")
+async def reschedule_follow_up(
+    follow_up_id: str, req: RescheduleFollowUp,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.MANAGE_PATIENTS)
+    fu = await db.get(FollowUp, follow_up_id)
+    if not fu: raise HTTPException(status_code=404, detail="Follow-up not found")
+    _verify_hospital_access(fu, current_user)
+    fu.follow_up_date = date.fromisoformat(req.follow_up_date)
+    if req.follow_up_time:
+        fu.follow_up_time = time.fromisoformat(req.follow_up_time)
+    fu.status = FollowUpStatus.PENDING.value
+    await db.commit()
+    return {"success": True, "new_date": req.follow_up_date}
+
+
+@router.post("/follow-ups/{follow_up_id}/mark-completed")
+async def mark_follow_up_completed(
+    follow_up_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.MANAGE_PATIENTS)
+    fu = await db.get(FollowUp, follow_up_id)
+    if not fu: raise HTTPException(status_code=404, detail="Follow-up not found")
+    _verify_hospital_access(fu, current_user)
+    fu.status = FollowUpStatus.COMPLETED.value
+    fu.completed_date = datetime.now(timezone.utc)
+    fu.completed_by = current_user.get("id")
+    fu.last_contact_date = datetime.now(timezone.utc)
+    await db.commit()
     return {"success": True}
 
 
@@ -1232,7 +1369,7 @@ async def get_comprehensive_crm_dashboard(
     this_week_enquiries_count = (await db.execute(select(func.count()).select_from(this_week_enquiries_q.subquery()))).scalar() or 0
     overdue_enquiries_q = fu_base.where(
         FollowUp.follow_up_date < today,
-        FollowUp.status.notin_(["COMPLETED", "CANCELLED", "MISSED"]))
+        FollowUp.status.notin_(["COMPLETED", "LOST"]))
     overdue_enquiries_count = (await db.execute(select(func.count()).select_from(overdue_enquiries_q.subquery()))).scalar() or 0
     completed_enquiries_q = fu_base.where(FollowUp.status == "COMPLETED")
     completed_enquiries_count = (await db.execute(select(func.count()).select_from(completed_enquiries_q.subquery()))).scalar() or 0
@@ -1315,7 +1452,7 @@ async def get_comprehensive_crm_dashboard(
     # Follow-up analytics
     successful_follow_ups_q = fu_base.where(FollowUp.status == "COMPLETED")
     successful_follow_ups = (await db.execute(select(func.count()).select_from(successful_follow_ups_q.subquery()))).scalar() or 0
-    failed_follow_ups_q = fu_base.where(FollowUp.status.in_(["CANCELLED", "MISSED"]))
+    failed_follow_ups_q = fu_base.where(FollowUp.status == "LOST")
     failed_follow_ups = (await db.execute(select(func.count()).select_from(failed_follow_ups_q.subquery()))).scalar() or 0
 
     # Follow-ups by staff
@@ -1868,8 +2005,8 @@ async def get_crm_dashboard(
     today_fus = (await db.execute(today_q.order_by(FollowUp.follow_up_time).limit(50))).scalars().all()
 
     # Separate treatment follow-up types vs recall types
-    treatment_fu_types = ["1_DAY_POST_TREATMENT", "7_DAY_POST_TREATMENT", "TREATMENT_FOLLOW_UP"]
-    recall_types = ["6_MONTH_RECALL", "12_MONTH_RECALL", "CUSTOM_RECALL"]
+    treatment_fu_types = ["1_DAY_FOLLOW_UP", "7_DAY_FOLLOW_UP"]
+    recall_types = ["6_MONTH_RECALL", "12_MONTH_RECALL", "CUSTOM_FOLLOW_UP"]
 
     async def _count(extra_filters):
         q = base.where(*extra_filters)
@@ -1878,16 +2015,16 @@ async def get_crm_dashboard(
 
     # Follow-up metrics (treatment follow-ups only)
     total_fu = await _count([FollowUp.follow_up_type.in_(treatment_fu_types)])
-    pending_fu = await _count([FollowUp.follow_up_type.in_(treatment_fu_types), FollowUp.status.in_(["SCHEDULED", "PENDING", "CONTACTED", "NO_RESPONSE"])])
+    pending_fu = await _count([FollowUp.follow_up_type.in_(treatment_fu_types), FollowUp.status.in_(["PENDING", "CONTACTED", "NO_RESPONSE"])])
     completed_fu = await _count([FollowUp.follow_up_type.in_(treatment_fu_types), FollowUp.status == "COMPLETED"])
-    overdue_fu = await _count([FollowUp.follow_up_type.in_(treatment_fu_types), FollowUp.follow_up_date < today, FollowUp.status.in_(["SCHEDULED", "PENDING", "CONTACTED", "NO_RESPONSE"])])
-    one_day_due = await _count([FollowUp.follow_up_type == "1_DAY_POST_TREATMENT", FollowUp.follow_up_date == today])
+    overdue_fu = await _count([FollowUp.follow_up_type.in_(treatment_fu_types), FollowUp.follow_up_date < today, FollowUp.status.in_(["PENDING", "CONTACTED", "NO_RESPONSE"])])
+    one_day_due = await _count([FollowUp.follow_up_type == "1_DAY_FOLLOW_UP", FollowUp.follow_up_date == today])
 
     # Recall metrics (recalls only)
     total_rec = await _count([FollowUp.follow_up_type.in_(recall_types)])
-    pending_rec = await _count([FollowUp.follow_up_type.in_(recall_types), FollowUp.status.in_(["SCHEDULED", "PENDING", "CONTACTED", "NO_RESPONSE"])])
+    pending_rec = await _count([FollowUp.follow_up_type.in_(recall_types), FollowUp.status.in_(["PENDING", "CONTACTED", "NO_RESPONSE"])])
     completed_rec = await _count([FollowUp.follow_up_type.in_(recall_types), FollowUp.status == "COMPLETED"])
-    overdue_rec = await _count([FollowUp.follow_up_type.in_(recall_types), FollowUp.follow_up_date < today, FollowUp.status.in_(["SCHEDULED", "PENDING", "CONTACTED", "NO_RESPONSE"])])
+    overdue_rec = await _count([FollowUp.follow_up_type.in_(recall_types), FollowUp.follow_up_date < today, FollowUp.status.in_(["PENDING", "CONTACTED", "NO_RESPONSE"])])
     six_month_due = await _count([FollowUp.follow_up_type == "6_MONTH_RECALL", FollowUp.follow_up_date == today])
     twelve_month_due = await _count([FollowUp.follow_up_type == "12_MONTH_RECALL", FollowUp.follow_up_date == today])
 
@@ -2312,13 +2449,13 @@ async def log_follow_up_communication(
             raise HTTPException(status_code=500, detail="Failed to send WhatsApp")
         fu.whatsapp_message = req.message
         fu.whatsapp_sent_at = datetime.now(timezone.utc)
-        fu.status = FollowUpStatus.OPEN.value
+        fu.status = FollowUpStatus.PENDING.value
         comm_status = CommunicationStatus.SENT.value
     elif req.channel == "CALL":
         fu.call_made_at = datetime.now(timezone.utc)
         if req.notes:
             fu.call_notes = (fu.call_notes or "") + "\n" + req.notes
-        fu.status = FollowUpStatus.OPEN.value
+        fu.status = FollowUpStatus.PENDING.value
         comm_status = CommunicationStatus.SENT.value
     else:
         raise HTTPException(status_code=400, detail="Invalid channel. Use WHATSAPP or CALL")
@@ -2381,7 +2518,7 @@ async def record_follow_up_response_crm(
     if req.response_status == "POSITIVE":
         fu.status = FollowUpStatus.COMPLETED.value
     elif req.response_status in ("NEEDS_ATTENTION", "COMPLAINT", "EMERGENCY"):
-        fu.status = FollowUpStatus.OPEN.value
+        fu.status = FollowUpStatus.PENDING.value
     else:
         fu.status = FollowUpStatus.COMPLETED.value
 
@@ -2448,7 +2585,7 @@ async def create_follow_up_from_enquiry(
         follow_up_type=FollowUpType.MANUAL.value,
         notes=req.notes or req.follow_up_reason,
         appointment_id=str(appt.id),
-        status=FollowUpStatus.SCHEDULED.value,
+        status=FollowUpStatus.PENDING.value,
         created_at=now)
     db.add(follow_up)
     await db.flush()
@@ -2519,13 +2656,6 @@ async def get_patient_follow_up_history(
     enriched = []
     for fu in items:
         doctor = await db.get(User, fu.doctor_id) if fu.doctor_id else None
-        comms_q = select(CommunicationLog).where(CommunicationLog.follow_up_id == fu.id).order_by(CommunicationLog.created_at.desc()).limit(10)
-        comms_result = await db.execute(comms_q)
-        comms = [{
-            "id": str(c.id), "channel": c.channel,
-            "message": c.message, "status": c.status,
-            "sent_at": c.sent_at.isoformat() if c.sent_at else None,
-        } for c in comms_result.scalars().all()]
         enriched.append({
             "id": str(fu.id), "follow_up_type": fu.follow_up_type,
             "treatment_name": fu.treatment_name,
@@ -2537,7 +2667,6 @@ async def get_patient_follow_up_history(
             "whatsapp_sent_at": fu.whatsapp_sent_at.isoformat() if fu.whatsapp_sent_at else None,
             "call_made_at": fu.call_made_at.isoformat() if fu.call_made_at else None,
             "created_at": fu.created_at.isoformat(),
-            "communications": comms,
         })
     return enriched
 
@@ -2593,7 +2722,7 @@ async def get_enquiry_dashboard(
 
     pending_6month_q = base.where(
         FollowUp.follow_up_type == "6_MONTH_RECALL",
-        FollowUp.status.notin_(["COMPLETED", "CANCELLED"]))
+        FollowUp.status.notin_(["COMPLETED", "CANCELLED", "LOST"]))
     pending_6month_recalls = (await db.execute(select(func.count()).select_from(pending_6month_q.subquery()))).scalar() or 0
 
     follow_ups_q = base.where(FollowUp.follow_up_type == "MANUAL")
@@ -2645,11 +2774,11 @@ async def get_todays_enquiries(
     elif tab == "overdue":
         q = q.where(
             FollowUp.follow_up_date < today,
-            FollowUp.status.notin_(["COMPLETED", "CANCELLED", "MISSED"]))
+            FollowUp.status.notin_(["COMPLETED", "LOST"]))
     elif tab == "recalls":
         q = q.where(
             FollowUp.follow_up_type == "6_MONTH_RECALL",
-            FollowUp.status.notin_(["COMPLETED", "CANCELLED"])).order_by(FollowUp.follow_up_date)
+            FollowUp.status.notin_(["COMPLETED", "CANCELLED", "LOST"])).order_by(FollowUp.follow_up_date)
     elif tab == "completed":
         q = q.where(FollowUp.status == "COMPLETED")
     elif tab == "calendar" and calendar_date:
@@ -3249,6 +3378,392 @@ async def crm_quick_view_lead_sources(
         growth.append({"month": m_start.strftime("%b %Y"), "count": m_count})
 
     return {"sources": sources, "growth_trend": growth}
+
+
+@router.get("/enhanced-dashboard")
+async def get_enhanced_crm_dashboard(
+    period: str = Query("today", description="today, tomorrow, this_week, this_month, custom"),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    doctor_id: Optional[str] = Query(None, alias="doctor"),
+    follow_up_type: Optional[str] = Query(None, alias="type"),
+    status_filter: Optional[str] = Query(None, alias="status"),
+    source_filter: Optional[str] = Query(None, alias="source"),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.VIEW_CRM_DASHBOARD)
+    hospital_id = current_user.get("hospital_id")
+    today = date.today()
+
+    # Date range
+    if period == "today":
+        d_start = today; d_end = today
+    elif period == "tomorrow":
+        d_start = today + timedelta(days=1); d_end = d_start
+    elif period == "this_week":
+        d_start = today - timedelta(days=today.weekday()); d_end = d_start + timedelta(days=6)
+    elif period == "this_month":
+        d_start = today.replace(day=1); d_end = today
+    elif period == "custom" and start_date and end_date:
+        d_start = date.fromisoformat(start_date); d_end = date.fromisoformat(end_date)
+    else:
+        d_start = today; d_end = today
+
+    def hid(q):
+        if hospital_id: return q.where(FollowUp.hospital_id == hospital_id)
+        return q
+
+    # ─────────────────────────────────────────────────
+    # SECTION 1: Today's Overview
+    # ─────────────────────────────────────────────────
+    fu_base = hid(select(FollowUp))
+    if doctor_id: fu_base = fu_base.where(FollowUp.doctor_id == doctor_id)
+    if follow_up_type: fu_base = fu_base.where(FollowUp.follow_up_type == follow_up_type)
+    if status_filter: fu_base = fu_base.where(FollowUp.status == status_filter)
+
+    today_fu = fu_base.where(FollowUp.follow_up_date == today)
+    today_count = (await db.execute(select(func.count()).select_from(today_fu.subquery()))).scalar() or 0
+
+    six_month = (await db.execute(
+        select(func.count()).select_from(today_fu.where(FollowUp.follow_up_type == "6_MONTH_RECALL").subquery())
+    )).scalar() or 0
+    twelve_month = (await db.execute(
+        select(func.count()).select_from(today_fu.where(FollowUp.follow_up_type == "12_MONTH_RECALL").subquery())
+    )).scalar() or 0
+
+    contacted_today = (await db.execute(
+        select(func.count()).select_from(fu_base.where(
+            FollowUp.last_contact_date >= datetime.combine(today, datetime.min.time()),
+            FollowUp.last_contact_date <= datetime.combine(today, datetime.max.time())
+        ).subquery())
+    )).scalar() or 0
+
+    appt_q = select(Appointment).where(Appointment.appointment_date == today)
+    if hospital_id: appt_q = appt_q.where(Appointment.patient.has(Patient.hospital_id == hospital_id))
+    appts_today = (await db.execute(select(func.count()).select_from(appt_q.subquery()))).scalar() or 0
+
+    crm_appt_q = select(Appointment).where(Appointment.appointment_date >= d_start, Appointment.appointment_date <= d_end, Appointment.appointment_type == AppointmentType.FOLLOW_UP.value)
+    if hospital_id: crm_appt_q = crm_appt_q.where(Appointment.patient.has(Patient.hospital_id == hospital_id))
+    crm_appts = (await db.execute(select(func.count()).select_from(crm_appt_q.subquery()))).scalar() or 0
+
+    overdue = (await db.execute(
+        select(func.count()).select_from(fu_base.where(
+            FollowUp.follow_up_date < today,
+            FollowUp.status.in_(["PENDING", "CONTACTED", "NO_RESPONSE", "SCHEDULED", "OPEN"])
+        ).subquery())
+    )).scalar() or 0
+
+    overview = {
+        "crm_tasks": today_count, "follow_ups_today": today_count,
+        "six_month_recalls": six_month, "twelve_month_recalls": twelve_month,
+        "patients_contacted": contacted_today,
+        "appointments_created_today": appts_today,
+        "appointments_from_crm": crm_appts,
+        "pending_tasks": (await db.execute(
+            select(func.count()).select_from(fu_base.where(
+                FollowUp.follow_up_date >= today,
+                FollowUp.status.in_(["PENDING", "SCHEDULED"])
+            ).subquery())
+        )).scalar() or 0,
+        "overdue_tasks": overdue,
+    }
+
+    # ─────────────────────────────────────────────────
+    # SECTION 2: Today's Work Queue
+    # ─────────────────────────────────────────────────
+    work_q = fu_base.where(
+        FollowUp.follow_up_date == today,
+        FollowUp.status.in_(["PENDING", "CONTACTED", "NO_RESPONSE", "SCHEDULED", "OPEN"])
+    ).order_by(FollowUp.follow_up_time).limit(50)
+    work_rows = (await db.execute(work_q)).scalars().all()
+    work_queue = []
+    for fu in work_rows:
+        pat = await db.get(Patient, fu.patient_id) if fu.patient_id else None
+        doc = await db.get(User, fu.doctor_id) if fu.doctor_id else None
+        tt_name = None
+        if fu.treatment_type_id:
+            tt = await db.get(TreatmentType, fu.treatment_type_id)
+            tt_name = tt.name if tt else None
+        work_queue.append({
+            "id": str(fu.id), "patient_id": str(fu.patient_id) if fu.patient_id else None,
+            "patient_name": pat.full_name if pat else "Unknown",
+            "op_number": pat.op_no if pat else None,
+            "patient_phone": pat.phone if pat else None,
+            "doctor_name": doc.full_name if doc else None,
+            "doctor_id": str(fu.doctor_id) if fu.doctor_id else None,
+            "treatment_type": tt_name,
+            "treatment_name": fu.treatment_name,
+            "follow_up_type": fu.follow_up_type,
+            "due_time": fu.follow_up_time.strftime("%H:%M") if fu.follow_up_time else None,
+            "status": fu.status,
+            "response_status": fu.response_status,
+            "contact_channel": fu.contact_channel,
+            "last_contact_date": fu.last_contact_date.isoformat() if fu.last_contact_date else None,
+        })
+
+    # ─────────────────────────────────────────────────
+    # SECTION 3: Follow-Up Summary by type
+    # ─────────────────────────────────────────────────
+    type_counts = {}
+    for ft in ["1_DAY_FOLLOW_UP", "7_DAY_FOLLOW_UP", "6_MONTH_RECALL", "12_MONTH_RECALL", "CUSTOM_FOLLOW_UP", "ENQUIRY", "MANUAL"]:
+        cnt = (await db.execute(
+            select(func.count()).select_from(
+                fu_base.where(FollowUp.follow_up_type == ft, FollowUp.follow_up_date == today).subquery())
+        )).scalar() or 0
+        type_counts[ft] = cnt
+    completed_today = (await db.execute(
+        select(func.count()).select_from(
+            fu_base.where(FollowUp.status == "COMPLETED", FollowUp.completed_date >= datetime.combine(today, datetime.min.time())).subquery())
+    )).scalar() or 0
+
+    follow_up_summary = {
+        "1_day_due": type_counts.get("1_DAY_FOLLOW_UP", 0),
+        "7_day_due": type_counts.get("7_DAY_FOLLOW_UP", 0),
+        "6_month_due": type_counts.get("6_MONTH_RECALL", 0),
+        "12_month_due": type_counts.get("12_MONTH_RECALL", 0),
+        "custom_due": type_counts.get("CUSTOM_FOLLOW_UP", 0) + type_counts.get("ENQUIRY", 0) + type_counts.get("MANUAL", 0),
+        "completed_today": completed_today,
+        "overdue": overdue,
+    }
+
+    # ─────────────────────────────────────────────────
+    # SECTION 4: Appointment Conversion Funnel
+    # ─────────────────────────────────────────────────
+    period_fu = fu_base.where(FollowUp.follow_up_date >= d_start, FollowUp.follow_up_date <= d_end)
+    total_fu = (await db.execute(select(func.count()).select_from(period_fu.subquery()))).scalar() or 0
+    contacted_fu = (await db.execute(
+        select(func.count()).select_from(period_fu.where(
+            FollowUp.status.in_(["CONTACTED", "INTERESTED", "APPOINTMENT_REQUIRED", "APPOINTMENT_BOOKED", "COMPLETED"])
+        ).subquery())
+    )).scalar() or 0
+    positive_fu = (await db.execute(
+        select(func.count()).select_from(period_fu.where(
+            FollowUp.response_status.in_(["INTERESTED", "TREATMENT_COMPLETED", "NEEDS_REVIEW"])
+        ).subquery())
+    )).scalar() or 0
+    booked_fu = (await db.execute(
+        select(func.count()).select_from(period_fu.where(FollowUp.status == "APPOINTMENT_BOOKED").subquery())
+    )).scalar() or 0
+    completed_fu = (await db.execute(
+        select(func.count()).select_from(period_fu.where(FollowUp.status == "COMPLETED").subquery())
+    )).scalar() or 0
+
+    funnel = {
+        "total_due": total_fu, "contacted": contacted_fu, "positive": positive_fu,
+        "appointments_booked": booked_fu, "appointments_completed": completed_fu,
+        "contact_rate": round(contacted_fu / total_fu * 100, 1) if total_fu else 0,
+        "positive_rate": round(positive_fu / contacted_fu * 100, 1) if contacted_fu else 0,
+        "booking_rate": round(booked_fu / positive_fu * 100, 1) if positive_fu else 0,
+        "completion_rate": round(completed_fu / booked_fu * 100, 1) if booked_fu else 0,
+    }
+
+    # ─────────────────────────────────────────────────
+    # SECTION 5: Patient Response Analytics
+    # ─────────────────────────────────────────────────
+    response_labels = {
+        "INTERESTED": "Interested", "APPOINTMENT_REQUIRED": "Appointment Requested",
+        "NOT_INTERESTED": "Not Interested", "NEEDS_MORE_TIME": "Needs More Time",
+        "REQUESTED_CALLBACK": "Requested Callback", "NO_RESPONSE": "No Response",
+        "WRONG_NUMBER": "Wrong Number", "TREATMENT_COMPLETED": "Treatment Successful",
+        "NEEDS_REVIEW": "Needs Review", "BUSY": "Busy",
+    }
+    patient_responses = []
+    for rs, label in response_labels.items():
+        cnt = (await db.execute(
+            select(func.count()).select_from(
+                fu_base.where(FollowUp.response_status == rs, FollowUp.follow_up_date >= d_start, FollowUp.follow_up_date <= d_end).subquery())
+        )).scalar() or 0
+        if cnt > 0:
+            patient_responses.append({"name": label, "value": cnt, "key": rs})
+
+    # ─────────────────────────────────────────────────
+    # SECTION 6: Patient Condition Analytics (from outcome)
+    # ─────────────────────────────────────────────────
+    outcome_labels = {
+        "DOING_WELL": "Recovered", "MINOR_SENSITIVITY": "Minor Pain",
+        "NEEDS_CLEANING": "Needs Cleaning", "INTERESTED_IN_CROWN": "Interested in Crown",
+        "NEEDS_REVIEW": "Needs Clinical Review", "NEEDS_APPOINTMENT": "Needs Appointment",
+        "TREATMENT_SUCCESSFUL": "Recovered", "NO_RESPONSE": "No Response",
+    }
+    conditions = []
+    for oc, label in outcome_labels.items():
+        cnt = (await db.execute(
+            select(func.count()).select_from(
+                fu_base.where(FollowUp.outcome == oc, FollowUp.follow_up_date >= d_start, FollowUp.follow_up_date <= d_end).subquery())
+        )).scalar() or 0
+        if cnt > 0:
+            conditions.append({"name": label, "count": cnt, "key": oc})
+
+    # ─────────────────────────────────────────────────
+    # SECTION 7: Treatment Type Performance
+    # ─────────────────────────────────────────────────
+    tt_raw = select(FollowUp.treatment_name, func.count(FollowUp.id).label("follow_ups"))
+    if hospital_id: tt_raw = tt_raw.where(FollowUp.hospital_id == hospital_id)
+    tt_raw = tt_raw.where(FollowUp.treatment_name.isnot(None)).group_by(FollowUp.treatment_name).order_by(func.count(FollowUp.id).desc()).limit(10)
+    tt_rows = (await db.execute(tt_raw)).all()
+    treatment_performance = []
+    for tname, fcnt in tt_rows:
+        acnt_q = select(func.count(Appointment.id)).select_from(Appointment).join(Patient, Appointment.patient_id == Patient.id)
+        if hospital_id: acnt_q = acnt_q.where(Patient.hospital_id == hospital_id)
+        acnt = (await db.execute(acnt_q.where(Appointment.created_at >= datetime.combine(d_start, datetime.min.time()), Appointment.appointment_type == AppointmentType.FOLLOW_UP.value))).scalar() or 0
+        treatment_performance.append({"name": tname or "Other", "follow_ups": fcnt, "appointments": acnt})
+
+    # ─────────────────────────────────────────────────
+    # SECTION 8: Doctor Engagement Leaderboard
+    # ─────────────────────────────────────────────────
+    doc_ids_q = select(FollowUp.doctor_id).where(FollowUp.doctor_id.isnot(None))
+    if hospital_id: doc_ids_q = doc_ids_q.where(FollowUp.hospital_id == hospital_id)
+    doc_ids = list(set(r[0] for r in (await db.execute(doc_ids_q)).all()))
+    doctor_engagement = []
+    for did in doc_ids:
+        d = await db.get(User, did) if did else None
+        if not d: continue
+        d_contacted = (await db.execute(
+            select(func.count()).select_from(hid(select(FollowUp)).where(
+                FollowUp.doctor_id == did, FollowUp.contact_channel.isnot(None),
+                FollowUp.follow_up_date >= d_start, FollowUp.follow_up_date <= d_end).subquery())
+        )).scalar() or 0
+        d_appt_q = select(Appointment).where(Appointment.doctor_id == did, Appointment.created_at >= datetime.combine(d_start, datetime.min.time()))
+        if hospital_id: d_appt_q = d_appt_q.where(Appointment.patient.has(Patient.hospital_id == hospital_id))
+        d_appts = (await db.execute(select(func.count()).select_from(d_appt_q.subquery()))).scalar() or 0
+        d_completed = (await db.execute(
+            select(func.count()).select_from(hid(select(FollowUp)).where(
+                FollowUp.doctor_id == did, FollowUp.status == "COMPLETED",
+                FollowUp.follow_up_date >= d_start, FollowUp.follow_up_date <= d_end).subquery())
+        )).scalar() or 0
+        d_positive = (await db.execute(
+            select(func.count()).select_from(hid(select(FollowUp)).where(
+                FollowUp.doctor_id == did,
+                FollowUp.response_status.in_(["INTERESTED", "TREATMENT_COMPLETED"]),
+                FollowUp.follow_up_date >= d_start, FollowUp.follow_up_date <= d_end).subquery())
+        )).scalar() or 0
+        doctor_engagement.append({
+            "doctor_id": did, "doctor_name": d.full_name or "Unknown",
+            "patients_contacted": d_contacted, "appointments_generated": d_appts,
+            "follow_ups_completed": d_completed, "positive_feedback": d_positive,
+            "score": d_contacted + d_appts * 2 + d_completed * 3 + d_positive * 4,
+        })
+    doctor_engagement.sort(key=lambda x: x["score"], reverse=True)
+
+    # ─────────────────────────────────────────────────
+    # SECTION 9: Patient Acquisition & Revenue by Source
+    # ─────────────────────────────────────────────────
+    src_q = select(Patient.patient_source, func.count(Patient.id).label("patients")).where(Patient.patient_source.isnot(None))
+    if hospital_id: src_q = src_q.where(Patient.hospital_id == hospital_id)
+    src_rows = (await db.execute(src_q.group_by(Patient.patient_source).order_by(func.count(Patient.id).desc()))).all()
+    acquisition = []
+    for src, pcnt in src_rows:
+        rev_q = select(func.coalesce(func.sum(Billing.paid_amount), 0)).select_from(Billing).join(Case, Billing.case_id == Case.id).join(Patient, Case.patient_id == Patient.id).where(Patient.patient_source == src)
+        if hospital_id: rev_q = rev_q.where(Patient.hospital_id == hospital_id)
+        rev = float((await db.execute(rev_q)).scalar() or 0)
+        conv_q = select(func.count(func.distinct(Patient.id))).where(Patient.patient_source == src, Patient.status != "NEW")
+        if hospital_id: conv_q = conv_q.where(Patient.hospital_id == hospital_id)
+        conv_cnt = (await db.execute(conv_q)).scalar() or 0
+        acquisition.append({
+            "source": src or "Unknown", "patients": pcnt,
+            "revenue": rev, "converted": conv_cnt,
+            "conversion_rate": round(conv_cnt / pcnt * 100, 1) if pcnt > 0 else 0,
+            "avg_revenue": round(rev / pcnt, 2) if pcnt > 0 else 0,
+        })
+    acquisition.sort(key=lambda x: x["patients"], reverse=True)
+    revenue_by_source = [{"source": a["source"], "revenue": a["revenue"]} for a in acquisition]
+
+    # ─────────────────────────────────────────────────
+    # SECTION 10: CRM Timeline / Activity Feed
+    # ─────────────────────────────────────────────────
+    timeline = []
+    recent_fus = (await db.execute(
+        fu_base.order_by(FollowUp.last_contact_date.desc().nullslast()).limit(30)
+    )).scalars().all()
+    for fu in recent_fus:
+        if not fu.last_contact_date and fu.status == "PENDING":
+            continue
+        pat = await db.get(Patient, fu.patient_id) if fu.patient_id else None
+        activity = fu.contact_channel or "STATUS_UPDATE"
+        desc = f"Status changed to {fu.status}"
+        if fu.contact_channel == "CALL": desc = "Call completed"
+        elif fu.contact_channel == "WHATSAPP": desc = "WhatsApp sent"
+        elif fu.contact_channel == "SMS": desc = "SMS sent"
+        elif fu.contact_channel == "EMAIL": desc = "Email sent"
+        elif fu.contact_channel == "IN_PERSON": desc = "In-person visit"
+        elif fu.status == "COMPLETED": desc = "Follow-up completed"
+        elif fu.status == "APPOINTMENT_BOOKED": desc = "Appointment booked"
+        elif fu.response_status: desc = f"Feedback: {response_labels.get(fu.response_status, fu.response_status)}"
+        timeline.append({
+            "id": str(fu.id), "patient_name": pat.full_name if pat else "Unknown",
+            "patient_id": str(fu.patient_id) if fu.patient_id else None,
+            "activity": activity, "description": desc,
+            "status": fu.status, "response_status": fu.response_status,
+            "timestamp": fu.last_contact_date.isoformat() if fu.last_contact_date else fu.created_at.isoformat() if fu.created_at else None,
+        })
+    timeline.sort(key=lambda x: x["timestamp"] or "", reverse=True)
+
+    # ─────────────────────────────────────────────────
+    # SECTION 11: Upcoming Work
+    # ─────────────────────────────────────────────────
+    tomorrow = today + timedelta(days=1)
+    next7 = today + timedelta(days=7)
+    next30 = today + timedelta(days=30)
+
+    async def count_fu_type_range(start, end, fu_type=None):
+        q = fu_base.where(FollowUp.follow_up_date >= start, FollowUp.follow_up_date <= end,
+                          FollowUp.status.in_(["PENDING", "SCHEDULED", "CONTACTED", "NO_RESPONSE"]))
+        if fu_type: q = q.where(FollowUp.follow_up_type == fu_type)
+        return (await db.execute(select(func.count()).select_from(q.subquery()))).scalar() or 0
+
+    tom_total, tom_1d, tom_7d, tom_6m, tom_12m = await asyncio.gather(
+        count_fu_type_range(tomorrow, tomorrow),
+        count_fu_type_range(tomorrow, tomorrow, "1_DAY_FOLLOW_UP"),
+        count_fu_type_range(tomorrow, tomorrow, "7_DAY_FOLLOW_UP"),
+        count_fu_type_range(tomorrow, tomorrow, "6_MONTH_RECALL"),
+        count_fu_type_range(tomorrow, tomorrow, "12_MONTH_RECALL"),
+    )
+    n7_total, n7_1d, n7_7d, n7_6m, n7_12m = await asyncio.gather(
+        count_fu_type_range(today + timedelta(days=2), next7),
+        count_fu_type_range(today + timedelta(days=2), next7, "1_DAY_FOLLOW_UP"),
+        count_fu_type_range(today + timedelta(days=2), next7, "7_DAY_FOLLOW_UP"),
+        count_fu_type_range(today + timedelta(days=2), next7, "6_MONTH_RECALL"),
+        count_fu_type_range(today + timedelta(days=2), next7, "12_MONTH_RECALL"),
+    )
+    n30_total, n30_1d, n30_7d, n30_6m, n30_12m = await asyncio.gather(
+        count_fu_type_range(today + timedelta(days=8), next30),
+        count_fu_type_range(today + timedelta(days=8), next30, "1_DAY_FOLLOW_UP"),
+        count_fu_type_range(today + timedelta(days=8), next30, "7_DAY_FOLLOW_UP"),
+        count_fu_type_range(today + timedelta(days=8), next30, "6_MONTH_RECALL"),
+        count_fu_type_range(today + timedelta(days=8), next30, "12_MONTH_RECALL"),
+    )
+    upcoming_work = {
+        "tomorrow": {
+            "total": tom_total,
+            "1_day": tom_1d, "7_day": tom_7d,
+            "6_month": tom_6m, "12_month": tom_12m,
+        },
+        "next_7_days": {
+            "total": n7_total,
+            "1_day": n7_1d, "7_day": n7_7d,
+            "6_month": n7_6m, "12_month": n7_12m,
+        },
+        "next_30_days": {
+            "total": n30_total,
+            "1_day": n30_1d, "7_day": n30_7d,
+            "6_month": n30_6m, "12_month": n30_12m,
+        },
+    }
+
+    return {
+        "overview": overview,
+        "work_queue": work_queue,
+        "follow_up_summary": follow_up_summary,
+        "conversion_funnel": funnel,
+        "patient_responses": patient_responses,
+        "patient_conditions": conditions,
+        "treatment_performance": treatment_performance,
+        "doctor_engagement": doctor_engagement,
+        "patient_acquisition": acquisition,
+        "revenue_by_source": revenue_by_source,
+        "timeline": timeline,
+        "upcoming_work": upcoming_work,
+    }
 
 
 @router.get("/analytics/revenue-by-doctor")

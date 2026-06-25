@@ -64,10 +64,27 @@ def main():
         log("  ERROR: No hospital ID available")
         return
 
+    # Look up treatment type ID for rule creation
+    log("  Fetching treatment types...")
+    tt_r = client.get("/treatment-types")
+    tt_id = None
+    if tt_r.status_code == 200:
+        tts = tt_r.json()
+        for tt in tts if isinstance(tts, list) else (tts if isinstance(tts, dict) and "treatment_types" in tts else []):
+            if isinstance(tt, dict) and tt.get("name") == "Root Canal Treatment (RCT)":
+                tt_id = tt.get("id")
+                break
+        if not tt_id:
+            for tt in tts if isinstance(tts, list) else []:
+                if isinstance(tt, dict) and "Root Canal" in tt.get("name", ""):
+                    tt_id = tt.get("id")
+                    break
+    log(f"  Treatment type ID: {tt_id}")
     # Ensure rule exists for treatment_name matching the plan
     log("  Ensuring CRM rule for 'Root Canal' exists...")
     rule_data = {
-        "treatment_name": "Root Canal",
+        "treatment_type_id": tt_id,
+        "treatment_name": "Root Canal Treatment (RCT)",
         "follow_up_1_day": True,
         "follow_up_7_day": True,
         "recall_6_month": True,
@@ -81,6 +98,11 @@ def main():
         log("  Rule for 'Root Canal' created")
     else:
         log(f"  Rule creation: {r.status_code} {r.text[:200]}")
+    # Update plan data to use the right treatment name
+    if tt_id:
+        plan_extra = {"treatment_type_id": tt_id, "treatment_name": "Root Canal Treatment (RCT)"}
+    else:
+        plan_extra = {"treatment_name": "Root Canal Treatment (RCT)"}
 
     # Create patient
     log("  Creating patient...")
@@ -146,13 +168,15 @@ def main():
     log("  Creating treatment plan (Root Canal, 5 sittings)...")
     plan_data = {
         "case_id": c_id,
-        "treatment_name": "Root Canal",
+        "treatment_name": "Root Canal Treatment (RCT)",
         "treatment_template_id": None,
         "description": "Root Canal Treatment - 5 sittings",
         "cost": 15000.0,
         "total_sittings": 5,
         "status": "IN_PROGRESS",
     }
+    if tt_id:
+        plan_data["treatment_type_id"] = tt_id
     r = client.post("/treatment-plans", json=plan_data)
     if r.status_code == 200 or r.status_code == 201:
         plan = r.json()
@@ -219,8 +243,7 @@ def main():
     log(f"  Total treatment follow-ups: {len(r.json()) if r.status_code == 200 else '?'}")
 
     # Check our patient's follow-ups by type
-    for ftype in ["1_DAY_POST_TREATMENT", "7_DAY_POST_TREATMENT"]:
-        r = client.get(f"/crm/treatment-follow-ups?type={ftype}&patient_id={p_id}")
+    for ftype in ["1_DAY_FOLLOW_UP", "7_DAY_FOLLOW_UP"]:
         if r.status_code == 200:
             fus = r.json()
             log(f"  Our {ftype}: {len(fus)} record(s)")
@@ -362,9 +385,9 @@ def main():
             log(f"[FAIL] STEP 3-6: Plan not completed - status={plan.get('status')}")
 
     # Check follow-ups
-    r = client.get("/crm/treatment-follow-ups?type=1_DAY_POST_TREATMENT")
+    r = client.get("/crm/treatment-follow-ups", params={"type": "1_DAY_FOLLOW_UP"})
     fus1d = r.json() if r.status_code == 200 else []
-    r = client.get("/crm/treatment-follow-ups?type=7_DAY_POST_TREATMENT")
+    r = client.get("/crm/treatment-follow-ups", params={"type": "7_DAY_FOLLOW_UP"})
     fus7d = r.json() if r.status_code == 200 else []
     if len(fus1d) >= 1:
         log(f"[PASS] STEP 4: 1-day follow-up exists: {len(fus1d)} record(s)")

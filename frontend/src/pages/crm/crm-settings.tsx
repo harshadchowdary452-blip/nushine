@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Settings, Plus, Trash2, Loader2, ToggleLeft, ToggleRight } from "lucide-react"
-import { crmSettingsApi } from "@/services/endpoints"
+import { Settings, Plus, Trash2, Loader2, ToggleLeft, ToggleRight, Database } from "lucide-react"
+import { crmSettingsApi, treatmentTypesApi } from "@/services/endpoints"
 import PageHeader from "@/components/layout/page-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -10,13 +10,14 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/components/ui/toast"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 
 export default function CrmSettings() {
   const queryClient = useQueryClient()
   const { addToast } = useToast()
   const [open, setOpen] = useState(false)
-  const [treatmentName, setTreatmentName] = useState("")
+  const [selectedTypeId, setSelectedTypeId] = useState("")
   const [fu1Day, setFu1Day] = useState(true)
   const [fu7Day, setFu7Day] = useState(true)
   const [recall6m, setRecall6m] = useState(true)
@@ -29,12 +30,18 @@ export default function CrmSettings() {
   })
   const rulesList: any[] = rules || []
 
+  const { data: treatmentTypes } = useQuery({
+    queryKey: ["treatment-types"],
+    queryFn: () => treatmentTypesApi.list(),
+  })
+  const treatmentTypesList: any[] = treatmentTypes || []
+
   const createMutation = useMutation({
     mutationFn: (data: any) => crmSettingsApi.rules.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["crm-settings"] })
       addToast({ title: "Rule Created", variant: "success" })
-      setOpen(false); setTreatmentName(""); setFu1Day(true); setFu7Day(true); setRecall6m(true); setRecall12m(true); setCustomDays("")
+      setOpen(false); setSelectedTypeId(""); setFu1Day(true); setFu7Day(true); setRecall6m(true); setRecall12m(true); setCustomDays("")
     },
     onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed", variant: "destructive" }),
   })
@@ -55,6 +62,15 @@ export default function CrmSettings() {
     },
   })
 
+  const seedMutation = useMutation({
+    mutationFn: () => treatmentTypesApi.seed(),
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["treatment-types"] })
+      addToast({ title: "Seeded", description: `Created ${data.seeded?.length || 0} treatment types`, variant: "success" })
+    },
+    onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Seed failed", variant: "destructive" }),
+  })
+
   return (
     <div className="space-y-6">
       <PageHeader title="CRM Settings" description="Configure treatment follow-up rules & recall periods">
@@ -72,6 +88,12 @@ export default function CrmSettings() {
         <CardContent>
           {isLoading ? (
             <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
+          ) : treatmentTypesList.length === 0 ? (
+            <div className="py-12 text-center text-muted-foreground">
+              <Database className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p>No treatment types found in the database.</p>
+              <p className="text-xs mt-1">Click "Add Rule" and then "Seed Default Types" to populate.</p>
+            </div>
           ) : rulesList.length === 0 ? (
             <div className="py-12 text-center text-muted-foreground">
               No rules configured. Add rules to auto-create follow-ups and recalls when treatments are completed.
@@ -82,7 +104,7 @@ export default function CrmSettings() {
                 <div key={r.id} className="flex items-center justify-between rounded-lg border p-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="font-semibold">{r.treatment_name}</span>
+                      <span className="font-semibold">{r.treatment_type_name || r.treatment_name}</span>
                       <Badge className={`text-[10px] ${r.is_active ? "bg-green-50 text-green-700" : "bg-gray-50 text-gray-500"}`}>
                         {r.is_active ? "Active" : "Inactive"}
                       </Badge>
@@ -111,12 +133,31 @@ export default function CrmSettings() {
       </Card>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Add Treatment Rule</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Treatment Name</Label>
-              <Input value={treatmentName} onChange={(e) => setTreatmentName(e.target.value)} placeholder="e.g. ROOT_CANAL, DENTAL_IMPLANT" />
+              <Label>Treatment Type</Label>
+              {treatmentTypesList.length === 0 ? (
+                <div className="rounded-md border border-dashed p-4 text-center">
+                  <p className="text-sm text-muted-foreground mb-2">No treatment types found</p>
+                  <Button variant="outline" size="sm" onClick={() => seedMutation.mutate()} disabled={seedMutation.isPending}>
+                    {seedMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Database className="h-4 w-4 mr-1" />}
+                    Seed Default Types
+                  </Button>
+                </div>
+              ) : (
+                <Select value={selectedTypeId} onValueChange={setSelectedTypeId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select treatment type" />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="max-h-[200px] overflow-y-auto">
+                    {treatmentTypesList.map((tt: any) => (
+                      <SelectItem key={tt.id} value={tt.id}>{tt.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -141,11 +182,11 @@ export default function CrmSettings() {
               </div>
             </div>
             <Button className="w-full" onClick={() => createMutation.mutate({
-              treatment_name: treatmentName,
+              treatment_type_id: selectedTypeId,
               follow_up_1_day: fu1Day, follow_up_7_day: fu7Day,
               recall_6_month: recall6m, recall_12_month: recall12m,
               custom_recall_days: customDays ? parseInt(customDays) : undefined,
-            })} disabled={!treatmentName || createMutation.isPending}>
+            })} disabled={!selectedTypeId || createMutation.isPending}>
               {createMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Create Rule
             </Button>

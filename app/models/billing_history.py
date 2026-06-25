@@ -8,7 +8,7 @@ from app.database import Base
 class BillingHistory(Base):
     __tablename__ = "billing_histories"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    billing_id: Mapped[str] = mapped_column(String(36), ForeignKey("billings.id"), nullable=False, index=True)
+    billing_id: Mapped[str] = mapped_column(String(36), ForeignKey("billings.id", ondelete="SET NULL"), nullable=True, index=True)
     action: Mapped[str] = mapped_column(String(50), nullable=False)
     previous_data: Mapped[str] = mapped_column(Text, nullable=True)
     new_data: Mapped[str] = mapped_column(Text, nullable=True)

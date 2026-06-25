@@ -184,6 +184,9 @@ export const expensesApi = {
   create: (data: any) => api.post("/expenses", data).then((r) => r.data),
   update: (id: string, data: any) => api.put(`/expenses/${id}`, data).then((r) => r.data),
   delete: (id: string) => api.delete(`/expenses/${id}`).then((r) => r.data),
+  analytics: () => api.get("/expenses/analytics").then((r) => r.data),
+  calendar: (params?: { month?: number; year?: number; hospital_id?: string }) => api.get("/expenses/calendar", { params }).then((r) => r.data),
+  calendarDay: (date: string) => api.get(`/expenses/calendar/${date}`).then((r) => r.data),
 };
 
 export const reportsApi = {
@@ -312,9 +315,26 @@ export const crmApi = {
       api.get("/crm/follow-ups", { params }).then((r) => r.data),
     create: (data: { patient_id: string; follow_up_date: string; notes?: string; doctor_id?: string; case_id?: string }) =>
       api.post("/crm/follow-ups", data).then((r) => r.data),
-    update: (id: string, data: { status?: string; notes?: string }) =>
-      api.put(`/crm/follow-ups/${id}`, data).then((r) => r.data),
+    update: (id: string, data: {
+      status?: string; notes?: string; patient_feedback?: string;
+      staff_notes?: string; response_summary?: string; response_status?: string;
+      next_action?: string; contact_channel?: string;
+      follow_up_date?: string; follow_up_time?: string;
+      appointment_id?: string;
+    }) => api.put(`/crm/follow-ups/${id}`, data).then((r) => r.data),
     delete: (id: string) => api.delete(`/crm/follow-ups/${id}`).then((r) => r.data),
+    feedback: (id: string, data: {
+      response_status: string; patient_feedback?: string; staff_notes?: string;
+      response_summary?: string; next_action?: string; contact_channel?: string;
+    }) => api.post(`/crm/follow-ups/${id}/feedback`, data).then((r) => r.data),
+    createAppointment: (id: string, data: {
+      doctor_id: string; appointment_date: string; appointment_time: string;
+      appointment_type?: string;
+    }) => api.post(`/crm/follow-ups/${id}/create-appointment`, data).then((r) => r.data),
+    reschedule: (id: string, data: { follow_up_date: string; follow_up_time?: string }) =>
+      api.post(`/crm/follow-ups/${id}/reschedule`, data).then((r) => r.data),
+    markCompleted: (id: string) =>
+      api.post(`/crm/follow-ups/${id}/mark-completed`).then((r) => r.data),
   },
   followUpsFiltered: (params?: {
     filter?: string; follow_up_type?: string; status?: string; patient_id?: string;
@@ -389,6 +409,10 @@ export const crmApi = {
       api.get("/crm/quick-view/lead-sources", { params }).then((r) => r.data),
   },
   revenueByDoctor: () => api.get("/crm/analytics/revenue-by-doctor").then((r) => r.data),
+  enhancedDashboard: (params?: {
+    period?: string; start_date?: string; end_date?: string;
+    doctor?: string; type?: string; status?: string; source?: string;
+  }) => api.get("/crm/enhanced-dashboard", { params }).then((r) => r.data),
 };
 
 export const enquiriesApi = {
@@ -403,7 +427,7 @@ export const enquiriesApi = {
   createFollowUp: (id: string, data: { action: string; notes?: string; next_follow_up_date?: string }) =>
     api.post(`/crm/enquiries/${id}/follow-ups`, data).then((r) => r.data),
   listFollowUps: (id: string) => api.get(`/crm/enquiries/${id}/follow-ups`).then((r) => r.data),
-  calendar: (params: { start_date: string; end_date: string; status?: string }) =>
+  calendar: (params: { start_date: string; end_date: string; status?: string; type?: string }) =>
     api.get("/crm/enquiries/calendar", { params }).then((r) => r.data),
 };
 
@@ -430,12 +454,23 @@ export const recallsApi = {
   generate: () => api.post("/crm/recalls/generate").then((r) => r.data),
 };
 
+export const treatmentTypesApi = {
+  list: (hospitalId?: string) => api.get("/treatment-types", { params: hospitalId ? { hospital_id: hospitalId } : {} }).then((r) => r.data),
+  get: (id: string) => api.get(`/treatment-types/${id}`).then((r) => r.data),
+  create: (data: { name: string; description?: string; hospital_id?: string }) =>
+    api.post("/treatment-types", data).then((r) => r.data),
+  update: (id: string, data: { name?: string; description?: string; is_active?: boolean }) =>
+    api.put(`/treatment-types/${id}`, data).then((r) => r.data),
+  delete: (id: string) => api.delete(`/treatment-types/${id}`).then((r) => r.data),
+  seed: (hospitalId?: string) => api.post("/treatment-types/seed", {}, { params: hospitalId ? { hospital_id: hospitalId } : {} }).then((r) => r.data),
+};
+
 export const crmSettingsApi = {
   rules: {
     list: () => api.get("/crm/settings/rules").then((r) => r.data),
-    create: (data: { treatment_name: string; follow_up_1_day?: boolean; follow_up_7_day?: boolean; recall_6_month?: boolean; recall_12_month?: boolean; custom_recall_days?: number }) =>
+    create: (data: { treatment_type_id: string; treatment_name?: string; follow_up_1_day?: boolean; follow_up_7_day?: boolean; recall_6_month?: boolean; recall_12_month?: boolean; custom_recall_days?: number }) =>
       api.post("/crm/settings/rules", data).then((r) => r.data),
-    update: (id: string, data: { treatment_name?: string; follow_up_1_day?: boolean; follow_up_7_day?: boolean; recall_6_month?: boolean; recall_12_month?: boolean; custom_recall_days?: number; is_active?: boolean }) =>
+    update: (id: string, data: { treatment_type_id?: string; treatment_name?: string; follow_up_1_day?: boolean; follow_up_7_day?: boolean; recall_6_month?: boolean; recall_12_month?: boolean; custom_recall_days?: number; is_active?: boolean }) =>
       api.put(`/crm/settings/rules/${id}`, data).then((r) => r.data),
     delete: (id: string) => api.delete(`/crm/settings/rules/${id}`).then((r) => r.data),
   },

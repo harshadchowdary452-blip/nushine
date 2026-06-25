@@ -73,7 +73,7 @@ export default function CrmPage() {
         </TabsContent>
 
         <TabsContent value="calendar" className="mt-6">
-          <EnquiryCalendar embedded />
+          <EnquiryCalendar />
         </TabsContent>
 
         <TabsContent value="campaigns" className="mt-6 space-y-4">

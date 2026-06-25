@@ -37,6 +37,7 @@ from app.models.consent_form import ConsentForm
 from app.models.enquiry import Enquiry, EnquiryStatus, TreatmentInterest, EnquiryFollowUp
 from app.models.treatment_follow_up_rule import TreatmentFollowUpRule
 from app.models.treatment_template import TreatmentTemplate
+from app.models.treatment_type import TreatmentType
 from app.models.export_job import ExportJob
 
 __all__ = [
@@ -60,4 +61,5 @@ __all__ = [
     "Enquiry", "EnquiryStatus", "TreatmentInterest", "EnquiryFollowUp",
     "TreatmentFollowUpRule",
     "TreatmentTemplate",
+    "TreatmentType",
 ]

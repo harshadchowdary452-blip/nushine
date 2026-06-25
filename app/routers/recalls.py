@@ -70,7 +70,7 @@ async def list_recalls(
     if status_filter:
         q = q.where(FollowUp.status == status_filter)
     else:
-        q = q.where(FollowUp.status.in_([FollowUpStatus.OPEN.value, FollowUpStatus.SCHEDULED.value]))
+        q = q.where(FollowUp.status.in_([FollowUpStatus.PENDING.value]))
     if overdue_only:
         q = q.where(FollowUp.follow_up_date < date.today())
     if patient_id:
@@ -108,7 +108,7 @@ async def complete_recall(recall_id: str, data: CompleteRecallRequest, db: Async
             treatment_completed_date=fu.treatment_completed_date,
             follow_up_date=next_date,
             follow_up_type=fu.follow_up_type,
-            status=FollowUpStatus.OPEN.value,
+            status=FollowUpStatus.PENDING.value,
         )
         db.add(new_recall)
         await db.flush()
@@ -140,9 +140,9 @@ async def get_recall_stats(db: AsyncSession = Depends(get_db), current_user: dic
         q = q.where(FollowUp.hospital_id == hospital_id)
     rows = (await db.execute(q)).scalars().all()
     total = len(rows)
-    open_count = sum(1 for r in rows if r.status in (FollowUpStatus.OPEN.value, FollowUpStatus.SCHEDULED.value))
+    open_count = sum(1 for r in rows if r.status in (FollowUpStatus.PENDING.value))
     completed = sum(1 for r in rows if r.status == FollowUpStatus.COMPLETED.value)
-    overdue = sum(1 for r in rows if r.status in (FollowUpStatus.OPEN.value, FollowUpStatus.SCHEDULED.value) and r.follow_up_date < date.today())
+    overdue = sum(1 for r in rows if r.status in (FollowUpStatus.PENDING.value) and r.follow_up_date < date.today())
     six_month = sum(1 for r in rows if r.follow_up_type == FollowUpType.SIX_MONTH_RECALL.value)
     twelve_month = sum(1 for r in rows if r.follow_up_type == FollowUpType.TWELVE_MONTH_RECALL.value)
     return {
@@ -208,7 +208,7 @@ async def generate_recalls(db: AsyncSession = Depends(get_db), current_user: dic
     existing_q = select(FollowUp.treatment_id).where(
         FollowUp.hospital_id == hospital_id,
         FollowUp.follow_up_type.in_(existing_types),
-        FollowUp.status != FollowUpStatus.CANCELLED.value,
+        FollowUp.status != FollowUpStatus.LOST.value,
     )
     existing_ids = set((await db.execute(existing_q)).scalars().all())
     sittings_q = select(
@@ -238,7 +238,17 @@ async def generate_recalls(db: AsyncSession = Depends(get_db), current_user: dic
         for rule in rules:
             if rule.treatment_template_id and tx_template_id and str(rule.treatment_template_id) == str(tx_template_id):
                 pass
-            elif rule.treatment_name != tx_name:
+            elif rule.treatment_type_id:
+                # Match by treatment_type_id — resolve from plan if needed
+                from app.models.treatment_type import TreatmentType as TT
+                tt_result = await db.execute(
+                    select(TT.id).where(TT.id == rule.treatment_type_id, TT.name == tx_name).limit(1)
+                )
+                if not tt_result.scalar_one_or_none():
+                    continue
+            elif rule.treatment_name and rule.treatment_name != tx_name:
+                continue
+            else:
                 continue
             completed_date = sitting.sitting_date
             if not completed_date:
@@ -250,7 +260,7 @@ async def generate_recalls(db: AsyncSession = Depends(get_db), current_user: dic
                     treatment_id=sitting.id, treatment_name=tx_name,
                     treatment_completed_date=completed_date, follow_up_date=today,
                     follow_up_type=FollowUpType.SIX_MONTH_RECALL.value,
-                    status=FollowUpStatus.OPEN.value,
+                    status=FollowUpStatus.PENDING.value,
                 )
                 db.add(fu); created.append(fu)
             if rule.recall_12_month and completed_date <= twelve_months_ago:
@@ -260,7 +270,7 @@ async def generate_recalls(db: AsyncSession = Depends(get_db), current_user: dic
                     treatment_id=sitting.id, treatment_name=tx_name,
                     treatment_completed_date=completed_date, follow_up_date=today,
                     follow_up_type=FollowUpType.TWELVE_MONTH_RECALL.value,
-                    status=FollowUpStatus.OPEN.value,
+                    status=FollowUpStatus.PENDING.value,
                 )
                 db.add(fu); created.append(fu)
             if rule.custom_recall_days and rule.custom_recall_days > 0:
@@ -272,7 +282,7 @@ async def generate_recalls(db: AsyncSession = Depends(get_db), current_user: dic
                         treatment_id=sitting.id, treatment_name=tx_name,
                         treatment_completed_date=completed_date, follow_up_date=today,
                         follow_up_type=FollowUpType.CUSTOM_RECALL.value,
-                        status=FollowUpStatus.OPEN.value,
+                        status=FollowUpStatus.PENDING.value,
                     )
                     db.add(fu); created.append(fu)
     await db.commit()

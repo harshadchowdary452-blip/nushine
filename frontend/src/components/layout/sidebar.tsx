@@ -51,9 +51,7 @@ const roleNav: Record<string, NavSection[]> = {
     { label: "CRM", items: [
       { label: "CRM Dashboard", icon: LayoutDashboard, path: "/crm/dashboard2" },
       { label: "Leads", icon: UserPlus, path: "/leads" },
-      { label: "Enquiries", icon: CalendarDays, path: "/crm/enquiry-calendar" },
-      { label: "Follow-Ups", icon: Clock, path: "/crm/follow-ups" },
-      { label: "Recalls", icon: Bell, path: "/crm/recalls" },
+      { label: "Enquiry Calendar", icon: CalendarDays, path: "/crm/enquiry-calendar" },
       { label: "Campaigns", icon: Megaphone, path: "/crm/campaigns" },
       { label: "WhatsApp", icon: MessageSquare, path: "/whatsapp" },
       { label: "Communications", icon: Mail, path: "/crm/communications" },

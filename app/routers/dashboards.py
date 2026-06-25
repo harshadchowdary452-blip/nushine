@@ -19,6 +19,7 @@ from app.models.treatment_plan import TreatmentPlan
 from app.models.pre_op import PreOp
 from app.models.post_op import PostOp
 from app.models.treatment_sitting import TreatmentSitting
+from app.models.hospital_monthly_expense import HospitalMonthlyExpense
 from app.utils.dashboard_helpers import (
     get_date_range, get_previous_date_range, calculate_revenue, calculate_expenses_for_date_range,
     calculate_profit, calculate_profit_margin, revenue_trend_with_expenses
@@ -577,6 +578,15 @@ async def hospital_admin_dashboard(
     net_profit = await calculate_profit(period_revenue, total_expenses)
     profit_margin = await calculate_profit_margin(period_revenue, net_profit)
 
+    sd = date_start.date() if hasattr(date_start, 'date') else date_start
+    ed = date_end.date() if hasattr(date_end, 'date') else date_end
+    cat_r = await db.execute(
+        select(HospitalMonthlyExpense.expense_category, func.coalesce(func.sum(HospitalMonthlyExpense.amount), 0).label("total"))
+        .where(HospitalMonthlyExpense.hospital_id == hospital_id, HospitalMonthlyExpense.expense_date >= sd, HospitalMonthlyExpense.expense_date < ed)
+        .group_by(HospitalMonthlyExpense.expense_category).order_by(text("total DESC"))
+    )
+    expense_breakdown = [{"category": row[0], "amount": float(row[1])} for row in cat_r.all()]
+
     revenue_trend = await _monthly_revenue_trend(db, case_ids if case_ids else [])
     patient_growth_trend = await _monthly_patient_trend(db, [hospital_id])
 
@@ -676,7 +686,7 @@ async def hospital_admin_dashboard(
     pending_follow_ups = (await db.execute(
         select(func.count(FollowUp.id)).where(
             FollowUp.hospital_id == hospital_id,
-            FollowUp.status == FollowUpStatus.SCHEDULED.value,
+            FollowUp.status == FollowUpStatus.PENDING.value,
         )
     )).scalar() or 0
     completed_follow_ups = (await db.execute(
@@ -688,7 +698,7 @@ async def hospital_admin_dashboard(
     missed_follow_ups = (await db.execute(
         select(func.count(FollowUp.id)).where(
             FollowUp.hospital_id == hospital_id,
-            FollowUp.status == FollowUpStatus.CANCELLED.value,
+            FollowUp.status == FollowUpStatus.LOST.value,
         )
     )).scalar() or 0
 
@@ -721,7 +731,7 @@ async def hospital_admin_dashboard(
         "profit_trend": [{"month": t["month"], "profit": t["profit"], "profit_margin": t["profit_margin"]} for t in combined_trend],
         "doctor_performance": doctor_performance[:5],
         "treatment_performance": treatment_performance[:5],
-        "expense_breakdown": [],
+        "expense_breakdown": expense_breakdown,
         "total_pending_billing": total_pending_billing,
         "capacity_most_booked_doctors": await _get_most_booked_doctors(db, hospital_id, today),
         "capacity_peak_hours": await _get_peak_hours(db, hospital_id, today),
@@ -848,7 +858,7 @@ async def doctor_dashboard(db: AsyncSession = Depends(get_db), current_user: dic
     upcoming_follow_ups = (await db.execute(
         select(func.count(FollowUp.id)).where(
             FollowUp.doctor_id == doctor_id,
-            FollowUp.status == FollowUpStatus.SCHEDULED.value,
+            FollowUp.status == FollowUpStatus.PENDING.value,
             FollowUp.follow_up_date >= today,
         )
     )).scalar() or 0
@@ -861,7 +871,7 @@ async def doctor_dashboard(db: AsyncSession = Depends(get_db), current_user: dic
     missed_follow_ups = (await db.execute(
         select(func.count(FollowUp.id)).where(
             FollowUp.doctor_id == doctor_id,
-            FollowUp.status == FollowUpStatus.CANCELLED.value,
+            FollowUp.status == FollowUpStatus.LOST.value,
         )
     )).scalar() or 0
     follow_up_success_rate = round(
@@ -1357,7 +1367,7 @@ async def quick_view_patient(patient_id: str, db: AsyncSession = Depends(get_db)
 
     next_follow_up = None
     for fu in follow_ups:
-        if fu.status == FollowUpStatus.SCHEDULED.value:
+        if fu.status == FollowUpStatus.PENDING.value:
             next_follow_up = {
                 "id": str(fu.id),
                 "date": fu.follow_up_date.isoformat(),

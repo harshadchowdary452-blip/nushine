@@ -2,6 +2,7 @@ import logging
 from datetime import date, timedelta, time, datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
+from app.models.treatment_type import TreatmentType
 from app.models.follow_up import FollowUp, FollowUpType, FollowUpStatus
 from app.models.treatment_plan import TreatmentPlan
 from app.models.case import Case
@@ -18,12 +19,12 @@ from app.utils.template_engine import TemplateEngine
 logger = logging.getLogger(__name__)
 
 TEMPLATES = {
-    FollowUpType.ONE_DAY_POST_TREATMENT.value: (
-        "1-Day Post Treatment Check",
+    FollowUpType.ONE_DAY_FOLLOW_UP.value: (
+        "1-Day Follow-Up Check",
         "Dear {{patient_name}}, we hope you are recovering well after your treatment '{{treatment_name}}' at {{hospital_name}}. Please let us know how you are feeling.",
     ),
-    FollowUpType.SEVEN_DAY_POST_TREATMENT.value: (
-        "7-Day Post Treatment Check",
+    FollowUpType.SEVEN_DAY_FOLLOW_UP.value: (
+        "7-Day Follow-Up Check",
         "Dear {{patient_name}}, it has been a week since your treatment '{{treatment_name}}' at {{hospital_name}}. We hope you are doing well. Please contact us if you need anything.",
     ),
     FollowUpType.SIX_MONTH_RECALL.value: (
@@ -63,24 +64,49 @@ class TreatmentEnquiryService:
             "hospital_id": hospital_id,
         }
 
+    async def _ensure_treatment_type_id(self, plan: TreatmentPlan, hospital_id: str = None) -> None:
+        if plan.treatment_type_id or not plan.treatment_name:
+            return
+        # Prefer global (canonical) TreatmentType, then fall back to hospital-specific
+        q = select(TreatmentType.id).where(
+            TreatmentType.name == plan.treatment_name,
+            TreatmentType.hospital_id.is_(None),
+        )
+        result = await self.db.execute(q.limit(1))
+        tt_id = result.scalar_one_or_none()
+        if not tt_id and hospital_id:
+            result = await self.db.execute(
+                select(TreatmentType.id).where(
+                    TreatmentType.name == plan.treatment_name,
+                    TreatmentType.hospital_id == hospital_id,
+                ).limit(1)
+            )
+            tt_id = result.scalar_one_or_none()
+        if tt_id:
+            plan.treatment_type_id = tt_id
+            await self.db.flush()
+
     async def _find_matching_rule(self, plan: TreatmentPlan, hospital_id: str) -> TreatmentFollowUpRule | None:
-        # Prefer hospital-specific rule, fall back to global rule (hospital_id IS NULL)
-        for scope_hid in (hospital_id, None):
+        await self._ensure_treatment_type_id(plan, hospital_id)
+        for scope_hid in (None, hospital_id):
+            clauses = []
+            if plan.treatment_type_id:
+                clauses.append(TreatmentFollowUpRule.treatment_type_id == plan.treatment_type_id)
+                clauses.append(
+                    TreatmentFollowUpRule.treatment_type_id.in_(
+                        select(TreatmentType.id).where(TreatmentType.name == plan.treatment_name)
+                    )
+                )
+            if plan.treatment_template_id:
+                clauses.append(TreatmentFollowUpRule.treatment_template_id == plan.treatment_template_id)
+            if not clauses:
+                continue
             q = select(TreatmentFollowUpRule).where(
                 TreatmentFollowUpRule.hospital_id == scope_hid,
                 TreatmentFollowUpRule.is_active == True,
+                or_(*clauses),
             )
-            if plan.treatment_template_id:
-                q = q.where(
-                    or_(
-                        TreatmentFollowUpRule.treatment_template_id == plan.treatment_template_id,
-                        TreatmentFollowUpRule.treatment_name == plan.treatment_name,
-                    )
-                )
-            else:
-                q = q.where(TreatmentFollowUpRule.treatment_name == plan.treatment_name)
-            q = q.limit(1)
-            result = await self.db.execute(q)
+            result = await self.db.execute(q.limit(1))
             rule = result.scalar_one_or_none()
             if rule:
                 return rule
@@ -199,10 +225,11 @@ class TreatmentEnquiryService:
                 patient_id=ctx["patient_id"], hospital_id=ctx["hospital_id"],
                 doctor_id=ctx["doctor_id"], case_id=plan.case_id,
                 treatment_id=plan_id, treatment_name=treatment_name,
+                treatment_type_id=plan.treatment_type_id,
                 follow_up_date=today + timedelta(days=1),
                 follow_up_time=time(10, 0),
-                follow_up_type=FollowUpType.ONE_DAY_POST_TREATMENT.value,
-                status=FollowUpStatus.SCHEDULED.value,
+                follow_up_type=FollowUpType.ONE_DAY_FOLLOW_UP.value,
+                status=FollowUpStatus.PENDING.value,
                 treatment_completed_date=today,
                 notes=f"Auto-generated: 1-day post treatment check for '{treatment_name}' (sitting #{sitting_number})",
             )
@@ -212,10 +239,11 @@ class TreatmentEnquiryService:
                 patient_id=ctx["patient_id"], hospital_id=ctx["hospital_id"],
                 doctor_id=ctx["doctor_id"], case_id=plan.case_id,
                 treatment_id=plan_id, treatment_name=treatment_name,
+                treatment_type_id=plan.treatment_type_id,
                 follow_up_date=today + timedelta(days=7),
                 follow_up_time=time(10, 0),
-                follow_up_type=FollowUpType.SEVEN_DAY_POST_TREATMENT.value,
-                status=FollowUpStatus.SCHEDULED.value,
+                follow_up_type=FollowUpType.SEVEN_DAY_FOLLOW_UP.value,
+                status=FollowUpStatus.PENDING.value,
                 treatment_completed_date=today,
                 notes=f"Auto-generated: 7-day post treatment check for '{treatment_name}' (sitting #{sitting_number})",
             )
@@ -252,7 +280,7 @@ class TreatmentEnquiryService:
                 select(FollowUp).where(
                     FollowUp.treatment_id == plan_id,
                     FollowUp.follow_up_type == FollowUpType.SIX_MONTH_RECALL.value,
-                    FollowUp.status != FollowUpStatus.CANCELLED.value,
+                    FollowUp.status != FollowUpStatus.LOST.value,
                 )
             )
             if existing.scalar_one_or_none():
@@ -262,10 +290,11 @@ class TreatmentEnquiryService:
                     patient_id=ctx["patient_id"], hospital_id=ctx["hospital_id"],
                     doctor_id=ctx["doctor_id"], case_id=plan.case_id,
                     treatment_id=plan_id, treatment_name=treatment_name,
+                    treatment_type_id=plan.treatment_type_id,
                     follow_up_date=today + timedelta(days=180),
                     follow_up_time=time(10, 0),
                     follow_up_type=FollowUpType.SIX_MONTH_RECALL.value,
-                    status=FollowUpStatus.SCHEDULED.value,
+                    status=FollowUpStatus.PENDING.value,
                     treatment_completed_date=today,
                     notes=f"Auto-generated: 6-month recall for treatment '{treatment_name}'",
                 )
@@ -275,7 +304,7 @@ class TreatmentEnquiryService:
                 select(FollowUp).where(
                     FollowUp.treatment_id == plan_id,
                     FollowUp.follow_up_type == FollowUpType.TWELVE_MONTH_RECALL.value,
-                    FollowUp.status != FollowUpStatus.CANCELLED.value,
+                    FollowUp.status != FollowUpStatus.LOST.value,
                 )
             )
             if existing.scalar_one_or_none():
@@ -285,10 +314,11 @@ class TreatmentEnquiryService:
                     patient_id=ctx["patient_id"], hospital_id=ctx["hospital_id"],
                     doctor_id=ctx["doctor_id"], case_id=plan.case_id,
                     treatment_id=plan_id, treatment_name=treatment_name,
+                    treatment_type_id=plan.treatment_type_id,
                     follow_up_date=today + timedelta(days=365),
                     follow_up_time=time(10, 0),
                     follow_up_type=FollowUpType.TWELVE_MONTH_RECALL.value,
-                    status=FollowUpStatus.SCHEDULED.value,
+                    status=FollowUpStatus.PENDING.value,
                     treatment_completed_date=today,
                     notes=f"Auto-generated: 12-month recall for treatment '{treatment_name}'",
                 )
@@ -297,8 +327,8 @@ class TreatmentEnquiryService:
             existing = await self.db.execute(
                 select(FollowUp).where(
                     FollowUp.treatment_id == plan_id,
-                    FollowUp.follow_up_type == FollowUpType.CUSTOM_RECALL.value,
-                    FollowUp.status != FollowUpStatus.CANCELLED.value,
+                    FollowUp.follow_up_type == FollowUpType.CUSTOM_FOLLOW_UP.value,
+                    FollowUp.status != FollowUpStatus.LOST.value,
                 )
             )
             if existing.scalar_one_or_none():
@@ -308,12 +338,13 @@ class TreatmentEnquiryService:
                     patient_id=ctx["patient_id"], hospital_id=ctx["hospital_id"],
                     doctor_id=ctx["doctor_id"], case_id=plan.case_id,
                     treatment_id=plan_id, treatment_name=treatment_name,
+                    treatment_type_id=plan.treatment_type_id,
                     follow_up_date=today + timedelta(days=rule.custom_recall_days),
                     follow_up_time=time(10, 0),
-                    follow_up_type=FollowUpType.CUSTOM_RECALL.value,
-                    status=FollowUpStatus.SCHEDULED.value,
+                    follow_up_type=FollowUpType.CUSTOM_FOLLOW_UP.value,
+                    status=FollowUpStatus.PENDING.value,
                     treatment_completed_date=today,
-                    notes=f"Auto-generated: {rule.custom_recall_days}-day recall for treatment '{treatment_name}'",
+                    notes=f"Auto-generated: {rule.custom_recall_days}-day follow-up for treatment '{treatment_name}'",
                 )
                 self.db.add(fu); created.append(fu)
         await self.db.flush()

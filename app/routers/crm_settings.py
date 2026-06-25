@@ -8,6 +8,7 @@ from app.dependencies import get_current_user
 from app.core.permissions import verify_permission, Permission
 from app.models.treatment_follow_up_rule import TreatmentFollowUpRule
 from app.models.treatment_template import TreatmentTemplate
+from app.models.treatment_type import TreatmentType
 
 router = APIRouter(prefix="/crm/settings", tags=["CRM Settings"])
 
@@ -23,7 +24,8 @@ def _verify_hospital_access(current_user):
 
 
 class RuleCreate(BaseModel):
-    treatment_name: str
+    treatment_type_id: str
+    treatment_name: Optional[str] = None
     treatment_template_id: Optional[str] = None
     follow_up_1_day: bool = True
     follow_up_7_day: bool = True
@@ -36,6 +38,7 @@ class RuleCreate(BaseModel):
 
 
 class RuleUpdate(BaseModel):
+    treatment_type_id: Optional[str] = None
     treatment_name: Optional[str] = None
     treatment_template_id: Optional[str] = None
     follow_up_1_day: Optional[bool] = None
@@ -59,9 +62,16 @@ async def list_rules(db: AsyncSession = Depends(get_db), current_user: dict = De
     else:
         q = select(TreatmentFollowUpRule).where(TreatmentFollowUpRule.hospital_id.is_(None))
     rows = (await db.execute(q)).scalars().all()
-    return [
-        {
+    result = []
+    for r in rows:
+        tt_name = None
+        if r.treatment_type_id:
+            tt = await db.get(TreatmentType, r.treatment_type_id)
+            tt_name = tt.name if tt else None
+        result.append({
             "id": str(r.id), "treatment_name": r.treatment_name,
+            "treatment_type_id": str(r.treatment_type_id) if r.treatment_type_id else None,
+            "treatment_type_name": tt_name,
             "treatment_template_id": str(r.treatment_template_id) if r.treatment_template_id else None,
             "follow_up_1_day": r.follow_up_1_day, "follow_up_7_day": r.follow_up_7_day,
             "recall_6_month": r.recall_6_month, "recall_12_month": r.recall_12_month,
@@ -69,9 +79,8 @@ async def list_rules(db: AsyncSession = Depends(get_db), current_user: dict = De
             "enquiry_enabled": r.enquiry_enabled, "auto_appointment_enabled": r.auto_appointment_enabled,
             "assigned_doctor_id": str(r.assigned_doctor_id) if r.assigned_doctor_id else None,
             "is_active": r.is_active,
-        }
-        for r in rows
-    ]
+        })
+    return result
 
 
 # --- Create a new rule ---
@@ -82,18 +91,24 @@ async def create_rule(data: RuleCreate, db: AsyncSession = Depends(get_db), curr
     if hospital_id:
         dup_filter = select(TreatmentFollowUpRule).where(
             TreatmentFollowUpRule.hospital_id == hospital_id,
-            TreatmentFollowUpRule.treatment_name == data.treatment_name,
+            TreatmentFollowUpRule.treatment_type_id == data.treatment_type_id,
         )
     else:
         dup_filter = select(TreatmentFollowUpRule).where(
             TreatmentFollowUpRule.hospital_id.is_(None),
-            TreatmentFollowUpRule.treatment_name == data.treatment_name,
+            TreatmentFollowUpRule.treatment_type_id == data.treatment_type_id,
         )
     existing = (await db.execute(dup_filter)).scalar_one_or_none()
     if existing:
-        raise HTTPException(status_code=409, detail=f"Rule for treatment '{data.treatment_name}' already exists")
+        raise HTTPException(status_code=409, detail=f"Rule for this treatment type already exists")
+    treatment_name = data.treatment_name
+    if not treatment_name and data.treatment_type_id:
+        tt = await db.get(TreatmentType, data.treatment_type_id)
+        if tt:
+            treatment_name = tt.name
     rule = TreatmentFollowUpRule(
-        hospital_id=hospital_id, treatment_name=data.treatment_name,
+        hospital_id=hospital_id, treatment_type_id=data.treatment_type_id,
+        treatment_name=treatment_name,
         treatment_template_id=data.treatment_template_id,
         follow_up_1_day=data.follow_up_1_day, follow_up_7_day=data.follow_up_7_day,
         recall_6_month=data.recall_6_month, recall_12_month=data.recall_12_month,
@@ -103,7 +118,7 @@ async def create_rule(data: RuleCreate, db: AsyncSession = Depends(get_db), curr
     )
     db.add(rule)
     await db.commit()
-    return {"id": str(rule.id), "treatment_name": rule.treatment_name, "treatment_template_id": rule.treatment_template_id}
+    return {"id": str(rule.id), "treatment_type_id": rule.treatment_type_id}
 
 
 # --- Update a rule ---
@@ -116,6 +131,12 @@ async def update_rule(rule_id: str, data: RuleUpdate, db: AsyncSession = Depends
         raise HTTPException(status_code=404, detail="Rule not found")
     if str(rule.hospital_id or "") != str(hospital_id or ""):
         raise HTTPException(status_code=403, detail="Access denied")
+    if data.treatment_type_id is not None:
+        rule.treatment_type_id = data.treatment_type_id
+        if not data.treatment_name:
+            tt = await db.get(TreatmentType, data.treatment_type_id)
+            if tt:
+                rule.treatment_name = tt.name
     if data.treatment_name is not None: rule.treatment_name = data.treatment_name
     if data.treatment_template_id is not None: rule.treatment_template_id = data.treatment_template_id
     if data.follow_up_1_day is not None: rule.follow_up_1_day = data.follow_up_1_day

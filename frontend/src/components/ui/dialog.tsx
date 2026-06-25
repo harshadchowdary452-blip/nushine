@@ -31,6 +31,7 @@ const DialogContent = React.forwardRef<
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
+      aria-describedby={undefined}
       onCloseAutoFocus={(e) => e.preventDefault()}
       className={cn(
         "fixed left-[50%] top-[50%] z-50 grid w-full translate-x-[-50%] translate-y-[-50%] border border-gray-200 bg-white shadow-modal duration-200 data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",

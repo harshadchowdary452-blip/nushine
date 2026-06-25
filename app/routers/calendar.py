@@ -37,7 +37,7 @@ async def get_calendar_appointments(
     elif doctor_id:
         query = query.where(Appointment.doctor_id == doctor_id)
     elif hospital_id:
-        query = query.where(Appointment.hospital_id == hospital_id)
+        query = query.join(Appointment.patient).where(Patient.hospital_id == hospital_id)
     query = query.order_by(Appointment.appointment_date, Appointment.appointment_time)
     result = await db.execute(query)
     items = result.scalars().all()
@@ -92,9 +92,9 @@ async def get_calendar_stats(
         Appointment.appointment_date >= month_start,
         Appointment.appointment_date <= month_end,
     )
-    if hospital_id: query = query.where(Appointment.hospital_id == hospital_id)
+    if hospital_id: query = query.join(Appointment.patient).where(Patient.hospital_id == hospital_id)
     total = (await db.execute(query)).scalar() or 0
     today_q = select(func.count(Appointment.id)).where(Appointment.appointment_date == today)
-    if hospital_id: today_q = today_q.where(Appointment.hospital_id == hospital_id)
+    if hospital_id: today_q = today_q.join(Appointment.patient).where(Patient.hospital_id == hospital_id)
     today_count = (await db.execute(today_q)).scalar() or 0
     return {"total_month": total, "today": today_count}

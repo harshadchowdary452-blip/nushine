@@ -183,9 +183,9 @@ class CampaignService:
         if hospital_id:
             fq = fq.where(FollowUp.hospital_id == hospital_id)
         follow_ups = (await self.db.execute(fq)).scalars().all()
-        scheduled_fu = sum(1 for f in follow_ups if f.status == "SCHEDULED")
+        scheduled_fu = sum(1 for f in follow_ups if f.status in ("SCHEDULED", "PENDING"))
         completed_fu = sum(1 for f in follow_ups if f.status == "COMPLETED")
-        missed_fu = sum(1 for f in follow_ups if f.status in ("MISSED", "CANCELLED"))
+        missed_fu = sum(1 for f in follow_ups if f.status == "LOST")
         return {
             "total_patients": total,
             "active_patients": active,

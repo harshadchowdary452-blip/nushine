@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete as sa_delete, func, desc
+from sqlalchemy import select, delete as sa_delete, func, desc, case as sa_case
 from typing import Optional
 from datetime import datetime, timezone, date
 from pydantic import BaseModel, Field
@@ -11,6 +11,7 @@ from app.models.enquiry import Enquiry, EnquiryStatus, TreatmentInterest, Enquir
 from app.models.patient import Patient
 from app.models.user import User
 from app.models.follow_up import FollowUp, FollowUpStatus, FollowUpType
+from app.models.treatment_type import TreatmentType
 
 router = APIRouter(prefix="/crm/enquiries", tags=["CRM Enquiries"])
 
@@ -108,30 +109,94 @@ async def list_enquiries(
 async def get_enquiry_calendar(
     start_date: str = Query(...), end_date: str = Query(...),
     status_filter: Optional[str] = Query(None, alias="status"),
+    type_filter: Optional[str] = Query(None, alias="type"),
     db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.VIEW_CRM_DASHBOARD)
     hospital_id = current_user.get("hospital_id")
     start = date.fromisoformat(start_date)
     end = date.fromisoformat(end_date)
-    q = select(Enquiry).where(Enquiry.created_at >= datetime.combine(start, datetime.min.time()), Enquiry.created_at <= datetime.combine(end, datetime.max.time()))
-    if hospital_id:
-        q = q.where(Enquiry.hospital_id == hospital_id)
-    if status_filter:
-        q = q.where(Enquiry.status == status_filter)
-    q = q.order_by(desc(Enquiry.created_at))
-    rows = (await db.execute(q)).scalars().all()
     result = []
-    for e in rows:
+
+    # Fetch follow-ups in date range
+    fu_q = select(FollowUp).where(
+        FollowUp.follow_up_date >= start,
+        FollowUp.follow_up_date <= end,
+    )
+    if hospital_id:
+        fu_q = fu_q.where(FollowUp.hospital_id == hospital_id)
+    if status_filter:
+        fu_q = fu_q.where(FollowUp.status == status_filter)
+    if type_filter:
+        fu_q = fu_q.where(FollowUp.follow_up_type == type_filter)
+    fu_q = fu_q.order_by(FollowUp.follow_up_date)
+    fu_rows = (await db.execute(fu_q)).scalars().all()
+
+    for fu in fu_rows:
+        patient = await db.get(Patient, fu.patient_id)
+        doctor = await db.get(User, fu.doctor_id) if fu.doctor_id else None
+        tt_name = None
+        if fu.treatment_type_id:
+            tt = await db.get(TreatmentType, fu.treatment_type_id)
+            tt_name = tt.name if tt else None
+        result.append({
+            "id": str(fu.id),
+            "source": "follow_up",
+            "patient_id": str(fu.patient_id),
+            "patient_name": patient.full_name if patient else "Unknown",
+            "op_number": patient.op_no if patient else None,
+            "doctor_name": doctor.full_name if doctor else None,
+            "doctor_id": str(fu.doctor_id) if fu.doctor_id else None,
+            "treatment_type": tt_name,
+            "treatment_name": fu.treatment_name,
+            "follow_up_type": fu.follow_up_type,
+            "due_date": fu.follow_up_date.isoformat(),
+            "status": fu.status,
+            "response": fu.response_summary,
+            "feedback": fu.patient_feedback,
+            "staff_notes": fu.staff_notes,
+            "action_required": fu.outcome,
+            "response_status": fu.response_status,
+            "next_action": fu.next_action,
+            "contact_channel": fu.contact_channel,
+            "last_contact_date": fu.last_contact_date.isoformat() if fu.last_contact_date else None,
+            "patient_phone": patient.phone if patient else None,
+        })
+
+    # Fetch enquiries in date range (by next_follow_up_date)
+    enq_q = select(Enquiry).where(
+        Enquiry.next_follow_up_date >= start,
+        Enquiry.next_follow_up_date <= end,
+    )
+    if hospital_id:
+        enq_q = enq_q.where(Enquiry.hospital_id == hospital_id)
+    if status_filter:
+        enq_q = enq_q.where(Enquiry.status == status_filter)
+    enq_q = enq_q.order_by(Enquiry.next_follow_up_date)
+    enq_rows = (await db.execute(enq_q)).scalars().all()
+
+    for e in enq_rows:
         patient = await db.get(Patient, e.patient_id)
         staff = await db.get(User, e.assigned_staff_id) if e.assigned_staff_id else None
         result.append({
-            "id": str(e.id), "patient_name": patient.full_name if patient else "Unknown",
-            "treatment_interest": e.treatment_interest,
-            "enquiry_date": e.created_at.date().isoformat() if e.created_at else None,
-            "assigned_staff": staff.full_name if staff else None,
-            "next_follow_up_date": e.next_follow_up_date.isoformat() if e.next_follow_up_date else None,
+            "id": str(e.id),
+            "source": "enquiry",
+            "patient_id": str(e.patient_id),
+            "patient_name": patient.full_name if patient else "Unknown",
+            "op_number": patient.op_no if patient else None,
+            "doctor_name": staff.full_name if staff else None,
+            "treatment_type": None,
+            "treatment_name": e.treatment_interest,
+            "follow_up_type": "ENQUIRY",
+            "due_date": e.next_follow_up_date.isoformat() if e.next_follow_up_date else e.created_at.date().isoformat(),
             "status": e.status,
+            "response": None,
+            "feedback": e.notes,
+            "staff_notes": None,
+            "action_required": None,
         })
+
+    # Sort by due_date
+    result.sort(key=lambda x: x["due_date"])
     return result
 
 

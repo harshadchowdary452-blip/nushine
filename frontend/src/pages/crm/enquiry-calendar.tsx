@@ -1,10 +1,14 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { CalendarDays, Phone, MessageCircle, CheckCircle, Clock, Loader2, Plus } from "lucide-react"
+import {
+  Phone, MessageCircle, CheckCircle, Loader2,
+  Search, ChevronLeft, ChevronRight, ChevronsLeft, Calendar,
+  FileText, History, RotateCcw, User, Stethoscope, X,
+} from "lucide-react"
 import { format, addDays, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addWeeks, subWeeks, addMonths, subMonths } from "date-fns"
-import { enquiriesApi } from "@/services/endpoints"
+import { enquiriesApi, crmApi, appointmentsApi, doctorsApi } from "@/services/endpoints"
 import PageHeader from "@/components/layout/page-header"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -12,228 +16,745 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/toast"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
-const statusColors: Record<string, string> = {
-  NEW: "bg-blue-50 border-blue-200 text-blue-700",
-  CONTACTED: "bg-purple-50 border-purple-200 text-purple-700",
+const followUpStatusColors: Record<string, string> = {
+  PENDING: "bg-amber-50 border-amber-200 text-amber-700",
+  CONTACTED: "bg-blue-50 border-blue-200 text-blue-700",
   INTERESTED: "bg-emerald-50 border-emerald-200 text-emerald-700",
+  APPOINTMENT_REQUIRED: "bg-purple-50 border-purple-200 text-purple-700",
+  APPOINTMENT_BOOKED: "bg-indigo-50 border-indigo-200 text-indigo-700",
+  COMPLETED: "bg-green-50 border-green-200 text-green-700",
+  NO_RESPONSE: "bg-gray-50 border-gray-200 text-gray-500",
+  LOST: "bg-red-50 border-red-200 text-red-600",
+  NEW: "bg-blue-50 border-blue-200 text-blue-700",
   NOT_INTERESTED: "bg-gray-50 border-gray-200 text-gray-500",
   CONVERTED: "bg-green-50 border-green-200 text-green-700",
-  LOST: "bg-red-50 border-red-200 text-red-600",
 }
 
-const treatmentLabels: Record<string, string> = {
-  IMPLANT: "Implant", BRACES: "Braces", SMILE_DESIGN: "Smile Design",
-  CROWN: "Crown", BRIDGE: "Bridge", VENEER: "Veneer", RCT: "RCT",
-  EXTRACTION: "Extraction", DENTURE: "Denture", SCALING: "Scaling",
-  FILLING: "Filling", BUDGET_APPROVAL: "Budget Approval", OTHER: "Other",
+const followUpTypeLabels: Record<string, string> = {
+  "1_DAY_FOLLOW_UP": "1-Day FU",
+  "7_DAY_FOLLOW_UP": "7-Day FU",
+  "6_MONTH_RECALL": "6-Month Recall",
+  "12_MONTH_RECALL": "12-Month Recall",
+  CUSTOM_FOLLOW_UP: "Custom FU",
+  ENQUIRY: "Enquiry",
+  MANUAL: "Manual",
 }
 
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
+const responseStatusOptions = [
+  { value: "INTERESTED", label: "Interested" },
+  { value: "APPOINTMENT_REQUIRED", label: "Appointment Requested" },
+  { value: "NOT_INTERESTED", label: "Not Interested" },
+  { value: "NEEDS_MORE_TIME", label: "Needs Callback" },
+  { value: "REQUESTED_CALLBACK", label: "Requested Callback" },
+  { value: "BUSY", label: "Busy" },
+  { value: "NO_RESPONSE", label: "No Response" },
+  { value: "WRONG_NUMBER", label: "Wrong Number" },
+  { value: "TREATMENT_COMPLETED", label: "Treatment Successful" },
+  { value: "NEEDS_REVIEW", label: "Needs Review" },
+]
 
-export default function EnquiryCalendar({ embedded }: { embedded?: boolean }) {
+const nextActionOptions = [
+  { value: "CALL_AGAIN", label: "Call Again" },
+  { value: "CREATE_FOLLOW_UP", label: "Create Follow-Up" },
+  { value: "BOOK_APPOINTMENT", label: "Book Appointment" },
+  { value: "CLOSE_ENQUIRY", label: "Close Enquiry" },
+]
+
+const timeSlots = [
+  "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
+  "12:00", "12:30", "14:00", "14:30", "15:00", "15:30",
+  "16:00", "16:30", "17:00", "17:30", "18:00", "18:30",
+  "19:00", "19:30", "20:00", "20:30", "21:00", "21:30",
+]
+
+export default function EnquiryCalendar() {
   const queryClient = useQueryClient()
   const { addToast } = useToast()
   const today = new Date()
-  const [calDate, setCalDate] = useState(today)
-  const [calendarView, setCalendarView] = useState<"day" | "week" | "month">("month")
-  const [actionOpen, setActionOpen] = useState<string | null>(null)
-  const [actionType, setActionType] = useState("CALL")
-  const [actionNotes, setActionNotes] = useState("")
-  const [nextFuDate, setNextFuDate] = useState("")
+  const [selectedDate, setSelectedDate] = useState(format(today, "yyyy-MM-dd"))
+  const [viewMode, setViewMode] = useState<"day" | "week" | "month">("day")
+  const [statusFilter, setStatusFilter] = useState("")
+  const [typeFilter, setTypeFilter] = useState("")
+  const [searchQuery, setSearchQuery] = useState("")
 
-  const monthStart = startOfMonth(calDate)
-  const monthEnd = endOfMonth(calDate)
-  const startDay = monthStart.getDay()
-  const daysInMonth = monthEnd.getDate()
-  const calDays: (number | null)[] = []
-  for (let i = 0; i < startDay; i++) calDays.push(null)
-  for (let d = 1; d <= daysInMonth; d++) calDays.push(d)
+  const selDate = new Date(selectedDate + "T00:00:00")
 
-  const ms = format(monthStart, "yyyy-MM-dd")
-  const me = format(monthEnd, "yyyy-MM-dd")
-
-  const { data: enquiries, isLoading } = useQuery({
-    queryKey: ["enquiries", "calendar", ms, me],
-    queryFn: () => enquiriesApi.calendar({ start_date: ms, end_date: me }),
-  })
-  const items: any[] = enquiries || []
-
-  const eventsByDate: Record<string, any[]> = {}
-  items.forEach((e: any) => {
-    const d = e.enquiry_date
-    if (d) { eventsByDate[d] = eventsByDate[d] || []; eventsByDate[d].push(e) }
-  })
-
-  const followUpMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => enquiriesApi.createFollowUp(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["enquiries"] })
-      addToast({ title: "Action Recorded", variant: "success" })
-      setActionOpen(null); setActionNotes(""); setNextFuDate("")
-    },
-    onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed", variant: "destructive" }),
-  })
-
-  function calNav(d: -1 | 1) {
-    if (calendarView === "day") setCalDate(c => d > 0 ? addDays(c, 1) : subDays(c, 1))
-    else if (calendarView === "week") setCalDate(c => d > 0 ? addWeeks(c, 1) : subWeeks(c, 1))
-    else setCalDate(c => d > 0 ? addMonths(c, 1) : subMonths(c, 1))
+  function getRange() {
+    const d = new Date(selectedDate + "T00:00:00")
+    if (viewMode === "day") return { start: selectedDate, end: selectedDate }
+    if (viewMode === "week") return { start: format(startOfWeek(d, { weekStartsOn: 1 }), "yyyy-MM-dd"), end: format(endOfWeek(d, { weekStartsOn: 1 }), "yyyy-MM-dd") }
+    return { start: format(startOfMonth(d), "yyyy-MM-dd"), end: format(endOfMonth(d), "yyyy-MM-dd") }
   }
 
-  function calLabel() {
-    if (calendarView === "day") return format(calDate, "MMM dd, yyyy")
-    if (calendarView === "week") {
-      const sw = startOfWeek(calDate, { weekStartsOn: 1 }), ew = endOfWeek(calDate, { weekStartsOn: 1 })
-      return `${format(sw, "MMM dd")} - ${format(ew, "MMM dd, yyyy")}`
+  const dateRange = getRange()
+
+  const { data: items, isFetching } = useQuery({
+    queryKey: ["enquiry-calendar", dateRange.start, dateRange.end, statusFilter, typeFilter],
+    queryFn: () => enquiriesApi.calendar({ start_date: dateRange.start, end_date: dateRange.end, status: statusFilter || undefined, type: typeFilter || undefined }),
+  })
+  const allItems: any[] = items || []
+
+  const searchedItems = searchQuery
+    ? allItems.filter((i: any) =>
+        (i.patient_name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (i.op_number || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (i.treatment_name || "").toLowerCase().includes(searchQuery.toLowerCase()))
+    : allItems
+
+  const filteredItems = viewMode === "day" ? searchedItems.filter((i: any) => i.due_date === selectedDate) : searchedItems
+
+  // --- Doctors scoped to hospital ---
+  const currentUser = (() => {
+    try { return JSON.parse(sessionStorage.getItem("user") || localStorage.getItem("user") || "null") } catch { return null }
+  })()
+  const hospitalId = currentUser?.hospital_id
+
+  const { data: doctors } = useQuery({
+    queryKey: ["doctors-list", hospitalId],
+    queryFn: () => doctorsApi.list(hospitalId ? { hospital_id: hospitalId, limit: 200 } : { limit: 200 }).then((r: any) => {
+      if (Array.isArray(r)) return r
+      if (r?.users) return r.users
+      if (r?.data) return r.data
+      return []
+    }),
+  })
+  const doctorsList: any[] = Array.isArray(doctors) ? doctors : []
+
+  // --- Feedback Dialog ---
+  const [feedbackOpen, setFeedbackOpen] = useState<string | null>(null)
+  const [feedbackItem, setFeedbackItem] = useState<any>(null)
+  const [fbResponseStatus, setFbResponseStatus] = useState("")
+  const [fbPatientFeedback, setFbPatientFeedback] = useState("")
+  const [fbStaffNotes, setFbStaffNotes] = useState("")
+  const [fbSummary, setFbSummary] = useState("")
+  const [fbNextAction, setFbNextAction] = useState("")
+  const [fbSaving, setFbSaving] = useState(false)
+
+  function openFeedback(item: any, channel?: string) {
+    setFeedbackItem(item)
+    setFeedbackOpen(item.id)
+    setFbResponseStatus(item.response_status || "")
+    setFbPatientFeedback(item.feedback || "")
+    setFbStaffNotes(item.staff_notes || "")
+    setFbSummary(item.response || "")
+    setFbNextAction(item.next_action || "")
+  }
+
+  function closeFeedback() {
+    setFeedbackOpen(null); setFeedbackItem(null); setFbSaving(false)
+    setFbResponseStatus(""); setFbPatientFeedback(""); setFbStaffNotes(""); setFbSummary(""); setFbNextAction("")
+  }
+
+  async function handleRecordFeedback() {
+    if (!feedbackOpen || !fbResponseStatus) return
+    setFbSaving(true)
+    try {
+      // Map response status to follow-up status
+      let status = "PENDING"
+      if (["NO_RESPONSE", "BUSY", "WRONG_NUMBER"].includes(fbResponseStatus)) status = "NO_RESPONSE"
+      else if (fbResponseStatus === "NOT_INTERESTED") status = "LOST"
+      else if (["INTERESTED", "APPOINTMENT_REQUIRED", "NEEDS_MORE_TIME", "REQUESTED_CALLBACK", "NEEDS_REVIEW"].includes(fbResponseStatus)) status = "CONTACTED"
+      else if (fbResponseStatus === "TREATMENT_COMPLETED") status = "COMPLETED"
+
+      await crmApi.followUps.update(feedbackOpen, {
+        status, response_status: fbResponseStatus,
+        patient_feedback: fbPatientFeedback || undefined,
+        staff_notes: fbStaffNotes || undefined,
+        response_summary: fbSummary || undefined,
+        next_action: fbNextAction || undefined,
+      })
+      queryClient.invalidateQueries({ queryKey: ["enquiry-calendar"] })
+      addToast({ title: "Feedback saved", variant: "success" })
+      closeFeedback()
+    } catch (err: any) {
+      addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to save feedback", variant: "destructive" })
     }
-    return format(calDate, "MMMM yyyy")
+    setFbSaving(false)
   }
 
-  function openAction(enqId: string, action: string) {
-    setActionOpen(enqId)
-    setActionType(action)
-    setActionNotes("")
-    setNextFuDate("")
+  // --- Mark Completed ---
+  async function handleMarkCompleted(id: string) {
+    try {
+      await crmApi.followUps.markCompleted(id)
+      queryClient.invalidateQueries({ queryKey: ["enquiry-calendar"] })
+      addToast({ title: "Marked completed", variant: "success" })
+    } catch (err: any) {
+      addToast({ title: "Error", description: err?.response?.data?.detail || "Failed", variant: "destructive" })
+    }
   }
+
+  // --- Reschedule Dialog ---
+  const [reschedOpen, setReschedOpen] = useState<string | null>(null)
+  const [reschedDate, setReschedDate] = useState("")
+  const [reschedTime, setReschedTime] = useState("")
+  const [reschedSaving, setReschedSaving] = useState(false)
+
+  async function handleReschedule() {
+    if (!reschedOpen || !reschedDate) return
+    setReschedSaving(true)
+    try {
+      await crmApi.followUps.reschedule(reschedOpen, { follow_up_date: reschedDate, follow_up_time: reschedTime || undefined })
+      queryClient.invalidateQueries({ queryKey: ["enquiry-calendar"] })
+      addToast({ title: "Rescheduled", variant: "success" })
+      setReschedOpen(null); setReschedSaving(false)
+    } catch (err: any) {
+      addToast({ title: "Error", description: err?.response?.data?.detail || "Failed", variant: "destructive" })
+      setReschedSaving(false)
+    }
+  }
+
+  // --- Appointment Booking Dialog ---
+  const [apptOpen, setApptOpen] = useState<string | null>(null)
+  const [apptItem, setApptItem] = useState<any>(null)
+  const [apptDoctorId, setApptDoctorId] = useState("")
+  const [apptDate, setApptDate] = useState("")
+  const [apptTime, setApptTime] = useState("")
+  const [apptSaving, setApptSaving] = useState(false)
+
+  const { data: availableSlots, isFetching: slotsLoading } = useQuery({
+    queryKey: ["appointment-slots", apptDoctorId, apptDate],
+    queryFn: () => appointmentsApi.slots({ doctor_id: apptDoctorId, date: apptDate }),
+    enabled: !!apptDoctorId && !!apptDate,
+  })
+  const slotsList: string[] = Array.isArray(availableSlots) ? availableSlots :
+    availableSlots?.slots ? availableSlots.slots : []
+
+  function openAppointment(item: any) {
+    setApptItem(item)
+    setApptOpen(item.id)
+    setApptDoctorId(item.doctor_id || "")
+    setApptDate("")
+    setApptTime("")
+  }
+
+  async function handleBookAppointment() {
+    if (!apptOpen || !apptItem || !apptDoctorId || !apptDate || !apptTime) return
+    setApptSaving(true)
+    try {
+      // Create appointment
+      const resp = await appointmentsApi.create({
+        patient_id: apptItem.patient_id,
+        doctor_id: apptDoctorId,
+        appointment_date: apptDate,
+        appointment_time: apptTime,
+        appointment_type: "FOLLOW_UP",
+        notes: "Created from enquiry calendar follow-up",
+      })
+      // Update follow-up status
+      await crmApi.followUps.update(apptOpen, {
+        status: "APPOINTMENT_BOOKED",
+        appointment_id: resp.id || resp.appointment_id,
+        next_action: "BOOK_APPOINTMENT",
+      })
+      queryClient.invalidateQueries({ queryKey: ["enquiry-calendar"] })
+      addToast({ title: "Appointment created & follow-up updated", variant: "success" })
+      setApptOpen(null); setApptItem(null); setApptDoctorId(""); setApptDate(""); setApptTime(""); setApptSaving(false)
+    } catch (err: any) {
+      addToast({ title: "Error", description: err?.response?.data?.detail || "Booking failed", variant: "destructive" })
+      setApptSaving(false)
+    }
+  }
+
+  // --- WhatsApp Dialog ---
+  const [waOpen, setWaOpen] = useState<string | null>(null)
+  const [waItem, setWaItem] = useState<any>(null)
+  const [waMessage, setWaMessage] = useState("")
+
+  function openWhatsApp(item: any) {
+    const phone = item.patient_phone
+    if (!phone) { addToast({ title: "No phone number for this patient", variant: "destructive" }); return }
+    setWaItem(item)
+    setWaOpen(item.id)
+    setWaMessage(`Dear ${item.patient_name}, this is a follow-up regarding your ${item.treatment_name || "treatment"} at our clinic. Please let us know if you'd like to schedule a visit.`)
+  }
+
+  async function sendWhatsApp() {
+    if (!waOpen || !waItem || !waMessage) return
+    const phone = waItem.patient_phone?.replace(/[^0-9]/g, "")
+    if (!phone) return
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(waMessage)}`, "_blank")
+    // Auto-mark as contacted and record channel
+    try {
+      await crmApi.followUps.update(waOpen, { status: "CONTACTED", contact_channel: "WHATSAPP" })
+      queryClient.invalidateQueries({ queryKey: ["enquiry-calendar"] })
+    } catch {}
+    setWaOpen(null); setWaMessage("")
+    setTimeout(() => openFeedback(waItem, "WHATSAPP"), 800)
+  }
+
+  // --- Call handler ---
+  function handleCall(item: any) {
+    const phone = item.patient_phone
+    if (!phone) { addToast({ title: "No phone number for this patient", variant: "destructive" }); return }
+    window.open(`tel:${phone}`, "_self")
+    // Auto-mark as contacted
+    crmApi.followUps.update(item.id, { status: "CONTACTED", contact_channel: "CALL" }).then(() => {
+      queryClient.invalidateQueries({ queryKey: ["enquiry-calendar"] })
+    }).catch(() => {})
+    setTimeout(() => openFeedback(item, "CALL"), 600)
+  }
+
+  // --- Timeline Dialog ---
+  const [timelineOpen, setTimelineOpen] = useState<string | null>(null)
+  const [timelineItem, setTimelineItem] = useState<any>(null)
+  const { data: timelineData } = useQuery({
+    queryKey: ["patient-timeline", timelineItem?.patient_id],
+    queryFn: () => crmApi.patientFollowUpHistory(timelineItem.patient_id),
+    enabled: !!timelineItem?.patient_id,
+  })
+  const timelineEntries: any[] = Array.isArray(timelineData) ? timelineData : []
+
+  // --- Navigation ---
+  function navDay(d: -1 | 1) { setSelectedDate(format(d > 0 ? addDays(selDate, 1) : subDays(selDate, 1), "yyyy-MM-dd")) }
+  function navWeek(d: -1 | 1) { setSelectedDate(format(d > 0 ? addWeeks(selDate, 1) : subWeeks(selDate, 1), "yyyy-MM-dd")) }
+  function navMonth(d: -1 | 1) { setSelectedDate(format(d > 0 ? addMonths(selDate, 1) : subMonths(selDate, 1), "yyyy-MM-dd")) }
+  function navToday() { setSelectedDate(format(today, "yyyy-MM-dd")) }
+  function handleNav(d: -1 | 1) { if (viewMode === "day") navDay(d); else if (viewMode === "week") navWeek(d); else navMonth(d) }
+  function handleDayClick(dateStr: string) { setSelectedDate(dateStr); setViewMode("day") }
+
+  // --- Calendar grid ---
+  const calStart = startOfMonth(selDate)
+  const calEnd = endOfMonth(selDate)
+
+  // --- Summary counts ---
+  const dayItems = allItems.filter((i: any) => i.due_date === selectedDate)
+  const dayFU = dayItems.filter((i: any) => i.follow_up_type === "1_DAY_FOLLOW_UP").length
+  const day7FU = dayItems.filter((i: any) => i.follow_up_type === "7_DAY_FOLLOW_UP").length
+  const day6m = dayItems.filter((i: any) => i.follow_up_type === "6_MONTH_RECALL").length
+  const day12m = dayItems.filter((i: any) => i.follow_up_type === "12_MONTH_RECALL").length
+  const dayOther = dayItems.filter((i: any) => !["1_DAY_FOLLOW_UP", "7_DAY_FOLLOW_UP", "6_MONTH_RECALL", "12_MONTH_RECALL"].includes(i.follow_up_type)).length
 
   return (
     <div className="space-y-6">
-      {!embedded && (
-        <PageHeader title="Enquiry Calendar" description="Track and manage patient enquiries" />
-      )}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-1 border rounded-md">
-          <Button variant="ghost" size="icon-sm" onClick={() => calNav(-1)}><CalendarDays className="h-4 w-4" /></Button>
-          <span className="text-sm font-semibold min-w-[160px] text-center">{calLabel()}</span>
-          <Button variant="ghost" size="icon-sm" onClick={() => calNav(1)}><CalendarDays className="h-4 w-4" /></Button>
+      <PageHeader title="Enquiry Calendar" description="Single CRM action center — manage all follow-ups from one screen">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" size="sm" onClick={navToday}><ChevronsLeft className="h-4 w-4 mr-1" />Today</Button>
+          <Button variant="outline" size="sm" onClick={() => handleNav(-1)}><ChevronLeft className="h-4 w-4" /></Button>
+          <span className="text-sm font-semibold min-w-[160px] text-center">
+            {viewMode === "day" ? format(selDate, "dd MMM yyyy") :
+             viewMode === "week" ? `${format(startOfWeek(selDate, { weekStartsOn: 1 }), "dd MMM")} - ${format(endOfWeek(selDate, { weekStartsOn: 1 }), "dd MMM yyyy")}` :
+             format(selDate, "MMMM yyyy")}
+          </span>
+          <Button variant="outline" size="sm" onClick={() => handleNav(1)}><ChevronRight className="h-4 w-4" /></Button>
+          <div className="flex border rounded-md ml-2">
+            <Button variant={viewMode === "day" ? "default" : "ghost"} size="sm" className="rounded-r-none text-xs h-8" onClick={() => setViewMode("day")}>Day</Button>
+            <Button variant={viewMode === "week" ? "default" : "ghost"} size="sm" className="rounded-none text-xs h-8" onClick={() => setViewMode("week")}>Week</Button>
+            <Button variant={viewMode === "month" ? "default" : "ghost"} size="sm" className="rounded-l-none text-xs h-8" onClick={() => setViewMode("month")}>Month</Button>
+          </div>
         </div>
-        <Input type="date" value={format(calDate, "yyyy-MM-dd")}
-          onChange={(e) => e.target.value && setCalDate(new Date(e.target.value + "T00:00:00"))}
-          className="w-40 text-sm" />
-        <div className="flex gap-1 ml-auto">
-          {(["day", "week", "month"] as const).map((v) => (
-            <Button key={v} variant={calendarView === v ? "default" : "outline"} size="sm"
-              onClick={() => setCalendarView(v)} className="text-xs">
-              {v.charAt(0).toUpperCase() + v.slice(1)}
-            </Button>
-          ))}
-        </div>
+      </PageHeader>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-5 gap-3">
+        {[
+          { label: "1-Day Follow-Ups", count: dayFU, color: "bg-blue-50 text-blue-700 border-blue-200" },
+          { label: "7-Day Follow-Ups", count: day7FU, color: "bg-purple-50 text-purple-700 border-purple-200" },
+          { label: "6-Month Recalls", count: day6m, color: "bg-amber-50 text-amber-700 border-amber-200" },
+          { label: "12-Month Recalls", count: day12m, color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+          { label: "Other", count: dayOther, color: "bg-gray-50 text-gray-700 border-gray-200" },
+        ].map((s) => (
+          <Card key={s.label} className={`py-2 px-3 border ${s.color}`}>
+            <div className="text-lg font-bold">{s.count}</div>
+            <div className="text-xs text-muted-foreground">{s.label}</div>
+          </Card>
+        ))}
       </div>
+
+      {/* Main Table Card */}
       <Card>
-        <CardContent className="p-4">
-          {isLoading ? (
+        <CardHeader className="pb-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Search patient, OP number, treatment..." value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)} className="pl-8 h-9 text-sm" />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[150px] h-9 text-sm"><SelectValue placeholder="All Statuses" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value=" ">All Statuses</SelectItem>
+                <SelectItem value="PENDING">Pending</SelectItem>
+                <SelectItem value="CONTACTED">Contacted</SelectItem>
+                <SelectItem value="INTERESTED">Interested</SelectItem>
+                <SelectItem value="APPOINTMENT_REQUIRED">Appointment Required</SelectItem>
+                <SelectItem value="APPOINTMENT_BOOKED">Appointment Booked</SelectItem>
+                <SelectItem value="COMPLETED">Completed</SelectItem>
+                <SelectItem value="NO_RESPONSE">No Response</SelectItem>
+                <SelectItem value="LOST">Lost</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-[150px] h-9 text-sm"><SelectValue placeholder="All Types" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value=" ">All Types</SelectItem>
+                <SelectItem value="1_DAY_FOLLOW_UP">1-Day FU</SelectItem>
+                <SelectItem value="7_DAY_FOLLOW_UP">7-Day FU</SelectItem>
+                <SelectItem value="6_MONTH_RECALL">6-Month Recall</SelectItem>
+                <SelectItem value="12_MONTH_RECALL">12-Month Recall</SelectItem>
+                <SelectItem value="CUSTOM_FOLLOW_UP">Custom FU</SelectItem>
+                <SelectItem value="ENQUIRY">Enquiry</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {isFetching ? (
             <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
-          ) : items.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground">No enquiries found for this period</div>
-          ) : calendarView === "month" ? (
-            <div className="grid grid-cols-7 gap-px rounded-lg border bg-gray-100">
-              {DAYS.map((d) => <div key={d} className="bg-white p-2 text-center text-xs font-semibold text-gray-500">{d}</div>)}
-              {calDays.map((day, i) => {
-                if (day === null) return <div key={`e-${i}`} className="bg-gray-50 p-2" />
-                const dateStr = `${format(calDate, "yyyy-MM")}-${String(day).padStart(2, "0")}`
-                const enqs = eventsByDate[dateStr] || []
-                const isToday = dateStr === format(today, "yyyy-MM-dd")
-                return (
-                  <div key={dateStr} onClick={() => { setCalDate(new Date(dateStr + "T00:00:00")); setCalendarView("day") }}
-                    className={`min-h-[50px] bg-white p-1.5 cursor-pointer hover:bg-blue-50 ${isToday ? "ring-2 ring-inset ring-blue-400" : ""}`}>
-                    <div className={`text-xs font-bold ${isToday ? "text-blue-600" : "text-gray-700"}`}>{day}</div>
-                    {enqs.map((e: any) => (
-                      <div key={e.id} className="text-[9px] truncate text-blue-600 mt-0.5">{e.patient_name}</div>
-                    ))}
-                  </div>
-                )
-              })}
+          ) : filteredItems.length === 0 ? (
+            <div className="py-12 text-center text-muted-foreground">
+              {viewMode === "day" ? `No items for ${format(selDate, "dd MMM yyyy")}` : "No items found for this period"}
             </div>
           ) : (
-            <div className="space-y-3 max-h-[600px] overflow-y-auto">
-              {items.map((enq: any) => (
-                <div key={enq.id} className="rounded-lg border p-4 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2 mb-1">
-                        <span className="text-sm font-semibold">{enq.patient_name}</span>
-                        <Badge className={`text-[10px] ${statusColors[enq.status] || ""}`}>{enq.status}</Badge>
-                      </div>
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                        <div className="flex items-center gap-1"><Phone className="h-3 w-3" /> {enq.patient_phone || "—"}</div>
-                        <div className="flex items-center gap-1"><CalendarDays className="h-3 w-3" /> {treatmentLabels[enq.treatment_interest] || enq.treatment_interest}</div>
-                        <div className="flex items-center gap-1">Staff: {enq.assigned_staff || "Unassigned"}</div>
-                        {enq.next_follow_up_date && <div>Next FU: {enq.next_follow_up_date}</div>}
-                      </div>
-                      {enq.notes && <p className="mt-1 text-xs text-gray-400">{enq.notes}</p>}
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      {enq.patient_phone && (
-                        <Button variant="ghost" size="icon-sm" className="text-green-600"
-                          onClick={() => openAction(enq.id, "CALL")} title="Log Call">
-                          <Phone className="h-4 w-4" />
-                        </Button>
-                      )}
-                      {enq.patient_phone && (
-                        <Button variant="ghost" size="icon-sm" className="text-blue-600"
-                          onClick={() => openAction(enq.id, "WHATSAPP")} title="Log WhatsApp">
-                          <MessageCircle className="h-4 w-4" />
-                        </Button>
-                      )}
-                      <Button variant="ghost" size="icon-sm" className="text-purple-600"
-                        onClick={() => openAction(enq.id, "MARK_INTERESTED")} title="Mark Interested">
-                        <CheckCircle className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
+            <div className="max-h-[500px] overflow-auto relative">
+              <Table>
+                <TableHeader className="sticky top-0 bg-white z-10">
+                  <TableRow>
+                    <TableHead className="whitespace-nowrap">Patient Name</TableHead>
+                    <TableHead className="whitespace-nowrap">OP No.</TableHead>
+                    <TableHead className="whitespace-nowrap">Doctor</TableHead>
+                    <TableHead className="whitespace-nowrap">Type</TableHead>
+                    <TableHead className="whitespace-nowrap">Treatment</TableHead>
+                    <TableHead className="whitespace-nowrap">FU Type</TableHead>
+                    <TableHead className="whitespace-nowrap">Due</TableHead>
+                    <TableHead className="whitespace-nowrap">Status</TableHead>
+                    <TableHead className="whitespace-nowrap">Last Contact</TableHead>
+                    <TableHead className="whitespace-nowrap sticky right-0 bg-white z-10">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredItems.map((item: any) => {
+                    const isOverdue = item.due_date && item.due_date < format(today, "yyyy-MM-dd") && !["COMPLETED", "APPOINTMENT_BOOKED", "LOST", "CONVERTED"].includes(item.status)
+                    return (
+                      <TableRow key={`${item.source}-${item.id}`} className={isOverdue ? "bg-red-50/30" : ""}>
+                        <TableCell className="font-medium whitespace-nowrap">{item.patient_name}</TableCell>
+                        <TableCell className="text-muted-foreground text-xs whitespace-nowrap">{item.op_number || "—"}</TableCell>
+                        <TableCell className="text-xs whitespace-nowrap">{item.doctor_name || "—"}</TableCell>
+                        <TableCell className="text-xs whitespace-nowrap">{item.treatment_type || "—"}</TableCell>
+                        <TableCell className="text-xs max-w-[100px] truncate">{item.treatment_name || "—"}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-[10px] whitespace-nowrap">
+                            {followUpTypeLabels[item.follow_up_type] || item.follow_up_type}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className={`text-xs whitespace-nowrap ${isOverdue ? "text-red-600 font-semibold" : ""}`}>
+                          {item.due_date || "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={`text-[10px] ${followUpStatusColors[item.status] || "bg-gray-50"}`}>
+                            {item.status || "—"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                          {item.last_contact_date ? format(new Date(item.last_contact_date), "dd MMM HH:mm") : "—"}
+                        </TableCell>
+                        <TableCell className="sticky right-0 bg-white">
+                          <TooltipProvider>
+                            <div className="flex items-center gap-0.5">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon-sm" className="h-7 w-7" onClick={() => handleCall(item)}>
+                                    <Phone className="h-3.5 w-3.5 text-green-600" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">Call {item.patient_phone || ""}</TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon-sm" className="h-7 w-7" onClick={() => openWhatsApp(item)}>
+                                    <MessageCircle className="h-3.5 w-3.5 text-green-600" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">Send WhatsApp</TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon-sm" className="h-7 w-7" onClick={() => openFeedback(item)}>
+                                    <FileText className="h-3.5 w-3.5 text-blue-600" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">Record Feedback</TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon-sm" className="h-7 w-7" onClick={() => openAppointment(item)}>
+                                    <Calendar className="h-3.5 w-3.5 text-purple-600" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">Create Follow-Up / Book Appointment</TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon-sm" className="h-7 w-7"
+                                    onClick={() => { setReschedOpen(item.id); setReschedDate(item.due_date || selectedDate); setReschedTime("") }}>
+                                    <RotateCcw className="h-3.5 w-3.5 text-amber-600" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">Reschedule</TooltipContent>
+                              </Tooltip>
+                              {item.status !== "COMPLETED" && item.status !== "LOST" && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon-sm" className="h-7 w-7" onClick={() => handleMarkCompleted(item.id)}>
+                                      <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top">Mark Completed</TooltipContent>
+                                </Tooltip>
+                              )}
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon-sm" className="h-7 w-7"
+                                    onClick={() => { setTimelineItem(item); setTimelineOpen(item.id) }}>
+                                    <History className="h-3.5 w-3.5 text-gray-500" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">View Timeline</TooltipContent>
+                              </Tooltip>
+                            </div>
+                          </TooltipProvider>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
             </div>
           )}
         </CardContent>
       </Card>
 
-      <Dialog open={!!actionOpen} onOpenChange={(o) => { if (!o) { setActionOpen(null); setActionNotes(""); setNextFuDate("") } }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Log Enquiry Action</DialogTitle>
-            <DialogDescription>
-              {actionType === "CALL" ? "Record a call made to this enquiry" :
-               actionType === "WHATSAPP" ? "Record a WhatsApp message sent" :
-               actionType === "MARK_INTERESTED" ? "Mark this patient as interested" :
-               actionType === "MARK_NOT_INTERESTED" ? "Mark as not interested" : "Record action"}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
+      {/* Calendar Grid */}
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-sm">Calendar — click a day</CardTitle></CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-7 gap-px rounded-lg border bg-gray-100 overflow-hidden">
+            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+              <div key={d} className="bg-white p-2 text-center text-xs font-semibold text-gray-500">{d}</div>
+            ))}
+            {(() => {
+              const startDay = calStart.getDay(), daysInMonth = calEnd.getDate()
+              const cells: React.ReactNode[] = []
+              for (let i = 0; i < startDay; i++) cells.push(<div key={`e-${i}`} className="bg-gray-50 p-2" />)
+              for (let d = 1; d <= daysInMonth; d++) {
+                const dateStr = `${format(selDate, "yyyy-MM")}-${String(d).padStart(2, "0")}`
+                const dayItems = allItems.filter((i: any) => i.due_date === dateStr)
+                const isToday = dateStr === format(today, "yyyy-MM-dd")
+                const isSelected = dateStr === selectedDate
+                cells.push(
+                  <div key={dateStr} onClick={() => handleDayClick(dateStr)}
+                    className={`min-h-[55px] bg-white p-1.5 cursor-pointer hover:bg-blue-50 transition-colors
+                      ${isToday ? "ring-2 ring-inset ring-blue-400" : ""}
+                      ${isSelected ? "bg-blue-100 ring-2 ring-inset ring-blue-500" : ""}`}>
+                    <div className={`text-xs font-bold ${isToday ? "text-blue-600" : isSelected ? "text-blue-700" : "text-gray-700"}`}>{d}</div>
+                    <div className="text-[9px] text-blue-600 mt-0.5 leading-tight">
+                      {dayItems.slice(0, 3).map((item: any) => (
+                        <div key={item.id} className="truncate">{item.patient_name}</div>
+                      ))}
+                      {dayItems.length > 3 && <div className="text-gray-400">+{dayItems.length - 3}</div>}
+                    </div>
+                  </div>
+                )
+              }
+              return cells
+            })()}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Feedback Dialog */}
+      <Dialog open={!!feedbackOpen} onOpenChange={(o) => { if (!o) closeFeedback() }}>
+        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Record Feedback — {feedbackItem?.patient_name || ""}</DialogTitle></DialogHeader>
+          <div className="space-y-4 px-1">
             <div className="space-y-2">
-              <Label>Action Type</Label>
-              <Select value={actionType} onValueChange={setActionType}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="CALL">Phone Call</SelectItem>
-                  <SelectItem value="WHATSAPP">WhatsApp Message</SelectItem>
-                  <SelectItem value="BOOK_APPOINTMENT">Book Appointment</SelectItem>
-                  <SelectItem value="MARK_INTERESTED">Mark Interested</SelectItem>
-                  <SelectItem value="MARK_NOT_INTERESTED">Mark Not Interested</SelectItem>
-                  <SelectItem value="CONVERT_TO_TREATMENT">Convert to Treatment</SelectItem>
+              <Label>Patient Response <span className="text-red-500">*</span></Label>
+              <Select value={fbResponseStatus} onValueChange={setFbResponseStatus}>
+                <SelectTrigger><SelectValue placeholder="Select patient response" /></SelectTrigger>
+                <SelectContent position="popper" className="max-h-[220px]">
+                  {responseStatusOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Notes</Label>
-              <Textarea value={actionNotes} onChange={(e) => setActionNotes(e.target.value)} rows={3} placeholder="Action notes..." />
+              <Label>Patient Feedback</Label>
+              <Textarea value={fbPatientFeedback} onChange={(e) => setFbPatientFeedback(e.target.value)} rows={2} placeholder="What the patient said..." />
             </div>
             <div className="space-y-2">
-              <Label>Next Follow-Up Date (optional)</Label>
-              <Input type="date" value={nextFuDate} onChange={(e) => setNextFuDate(e.target.value)} />
+              <Label>Staff Notes</Label>
+              <Textarea value={fbStaffNotes} onChange={(e) => setFbStaffNotes(e.target.value)} rows={2} placeholder="Internal notes..." />
             </div>
-            <Button className="w-full" onClick={() => {
-              if (actionOpen) followUpMutation.mutate({
-                id: actionOpen,
-                data: { action: actionType, notes: actionNotes || undefined, next_follow_up_date: nextFuDate || undefined }
-              })
-            }} disabled={followUpMutation.isPending}>
-              {followUpMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Save Action
+            <div className="space-y-2">
+              <Label>Response Summary</Label>
+              <Input value={fbSummary} onChange={(e) => setFbSummary(e.target.value)} placeholder="Brief outcome" />
+            </div>
+            <div className="space-y-2">
+              <Label>Next Action</Label>
+              <Select value={fbNextAction} onValueChange={setFbNextAction}>
+                <SelectTrigger><SelectValue placeholder="Select next action" /></SelectTrigger>
+                <SelectContent>
+                  {nextActionOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button variant="outline" className="flex-1" onClick={closeFeedback}>Cancel</Button>
+              <Button className="flex-1" onClick={handleRecordFeedback} disabled={!fbResponseStatus || fbSaving}>
+                {fbSaving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                Save Feedback
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* WhatsApp Dialog */}
+      <Dialog open={!!waOpen} onOpenChange={(o) => { if (!o) { setWaOpen(null); setWaMessage("") } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Send WhatsApp to {waItem?.patient_name || ""}</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="text-sm text-muted-foreground">
+              To: <strong>{waItem?.patient_phone || ""}</strong>
+            </div>
+            <div className="space-y-2">
+              <Label>Message</Label>
+              <Textarea value={waMessage} onChange={(e) => setWaMessage(e.target.value)} rows={5} placeholder="Type your message..." />
+            </div>
+            <p className="text-xs text-muted-foreground">WhatsApp will open in a new tab with this message pre-filled.</p>
+            <Button className="w-full" onClick={sendWhatsApp} disabled={!waMessage}>
+              <MessageCircle className="h-4 w-4 mr-2" /> Open WhatsApp
             </Button>
+            <Button variant="outline" className="w-full" onClick={() => { setWaOpen(null); setWaMessage("") }}>Cancel</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Appointment Booking Dialog */}
+      <Dialog open={!!apptOpen} onOpenChange={(o) => { if (!o) { setApptOpen(null); setApptItem(null); setApptDoctorId(""); setApptDate(""); setApptTime("") } }}>
+        <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Book Appointment (Follow-Up)</DialogTitle></DialogHeader>
+          <div className="space-y-4 px-1">
+            <p className="text-sm text-muted-foreground">Patient: <strong>{apptItem?.patient_name || ""}</strong></p>
+            <div className="space-y-2">
+              <Label>Assigned Doctor <span className="text-red-500">*</span></Label>
+              <Select value={apptDoctorId} onValueChange={setApptDoctorId}>
+                <SelectTrigger><SelectValue placeholder="Select doctor" /></SelectTrigger>
+                <SelectContent position="popper" className="max-h-[220px]">
+                  {doctorsList.length === 0 && <SelectItem value="__loading__" disabled>No doctors available</SelectItem>}
+                  {doctorsList.map((doc: any) => (
+                    <SelectItem key={doc.id} value={doc.id}>{doc.full_name || doc.name || doc.username}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Appointment Date <span className="text-red-500">*</span></Label>
+              <Input type="date" value={apptDate} onChange={(e) => setApptDate(e.target.value)} min={format(today, "yyyy-MM-dd")} />
+            </div>
+            {apptDoctorId && apptDate && (
+              <div className="space-y-2">
+                <Label>Available Time Slots</Label>
+                {slotsLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading slots...</div>
+                ) : slotsList.length > 0 ? (
+                  <div className="grid grid-cols-4 gap-1.5 max-h-[180px] overflow-y-auto p-1 border rounded-md">
+                    {slotsList.map((slot: string) => (
+                      <Button key={slot} variant={apptTime === slot ? "default" : "outline"} size="sm"
+                        className={`text-xs h-8 ${apptTime === slot ? "ring-2 ring-primary" : ""}`}
+                        onClick={() => setApptTime(slot)}>
+                        {slot.replace(/^(\d{2})(\d{2})$/, "$1:$2")}
+                      </Button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-amber-600">No available slots for this doctor on this date. Try another date or doctor.</p>
+                )}
+                <div className="space-y-2 mt-2">
+                  <Label>Or enter time manually</Label>
+                  <Select value={apptTime} onValueChange={setApptTime}>
+                    <SelectTrigger><SelectValue placeholder="Select time" /></SelectTrigger>
+                    <SelectContent position="popper" className="max-h-[220px]">
+                      {timeSlots.map((t) => (
+                        <SelectItem key={t} value={t}>{t}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+            <Button className="w-full" onClick={handleBookAppointment}
+              disabled={!apptDoctorId || !apptDate || !apptTime || apptSaving}>
+              {apptSaving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              <Calendar className="h-4 w-4 mr-2" /> Book Appointment
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reschedule Dialog */}
+      <Dialog open={!!reschedOpen} onOpenChange={(o) => { if (!o) setReschedOpen(null) }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>Reschedule Follow-Up</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>New Date <span className="text-red-500">*</span></Label>
+              <Input type="date" value={reschedDate} onChange={(e) => setReschedDate(e.target.value)} min={format(today, "yyyy-MM-dd")} />
+            </div>
+            <div className="space-y-2">
+              <Label>New Time (optional)</Label>
+              <Select value={reschedTime} onValueChange={setReschedTime}>
+                <SelectTrigger><SelectValue placeholder="Select time" /></SelectTrigger>
+                <SelectContent position="popper" className="max-h-[220px]">
+                  {timeSlots.map((t) => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button className="w-full" onClick={handleReschedule} disabled={!reschedDate || reschedSaving}>
+              {reschedSaving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Reschedule
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Timeline Dialog */}
+      <Dialog open={!!timelineOpen} onOpenChange={(o) => { if (!o) { setTimelineOpen(null); setTimelineItem(null) } }}>
+        <DialogContent className="sm:max-w-md max-h-[80vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Patient Timeline — {timelineItem?.patient_name || ""}</DialogTitle></DialogHeader>
+          <div className="space-y-3 px-1">
+            {timelineEntries.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground text-sm">
+                <History className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                No timeline entries found for this patient.
+              </div>
+            ) : (
+              timelineEntries.map((entry: any, idx: number) => (
+                <div key={entry.id || idx} className="flex gap-3">
+                  <div className="flex flex-col items-center">
+                    <div className="w-2.5 h-2.5 rounded-full bg-primary mt-1.5" />
+                    {idx < timelineEntries.length - 1 && <div className="w-px flex-1 bg-gray-200" />}
+                  </div>
+                  <div className="flex-1 pb-4">
+                    <div className="text-xs text-muted-foreground">
+                      {entry.created_at ? format(new Date(entry.created_at), "dd MMM yyyy HH:mm") : ""}
+                    </div>
+                    <div className="text-sm font-medium">{entry.action || entry.status || entry.follow_up_type || "Event"}</div>
+                    {(entry.notes || entry.patient_feedback || entry.response_summary) && (
+                      <div className="text-xs text-muted-foreground mt-0.5">{entry.notes || entry.patient_feedback || entry.response_summary}</div>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </DialogContent>
       </Dialog>

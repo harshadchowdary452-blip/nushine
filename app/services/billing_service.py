@@ -638,10 +638,9 @@ class BillingService:
 
     async def delete(self, billing_id: str, user_id: str = None) -> bool:
         try:
+            await self.audit_log_repo.create(user_id=user_id, action="DELETE_BILLING", entity_type="BILLING", entity_id=billing_id, details="Billing deleted")
+            await self._record_history(billing_id, "DELETE_BILLING", changes_summary="Billing deleted", user_id=user_id)
             result = await self.repo.delete(billing_id)
-            if result:
-                await self.audit_log_repo.create(user_id=user_id, action="DELETE_BILLING", entity_type="BILLING", entity_id=billing_id, details="Billing deleted")
-                await self._record_history(billing_id, "DELETE_BILLING", changes_summary="Billing deleted", user_id=user_id)
             return result
         except Exception as e:
             logger.exception("DELETE_BILLING - Error: %s", str(e))

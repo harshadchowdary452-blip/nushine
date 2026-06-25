@@ -390,12 +390,17 @@ export interface AuditLog {
 export interface HospitalMonthlyExpense {
   id: string;
   hospital_id: string;
+  expense_date: string;
   expense_month: number;
   expense_year: number;
   expense_category: string;
   expense_name: string;
   description: string | null;
   amount: number;
+  payment_method: string | null;
+  vendor: string | null;
+  invoice_number: string | null;
+  notes: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -403,21 +408,42 @@ export interface HospitalMonthlyExpense {
 
 export interface ExpenseCreate {
   hospital_id?: string;
-  expense_month: number;
-  expense_year: number;
+  expense_date: string;
   expense_category: string;
   expense_name: string;
   description?: string;
   amount: number;
+  payment_method?: string;
+  vendor?: string;
+  invoice_number?: string;
+  notes?: string;
 }
 
 export interface ExpenseUpdate {
-  expense_month?: number;
-  expense_year?: number;
+  expense_date?: string;
   expense_category?: string;
   expense_name?: string;
   description?: string;
   amount?: number;
+  payment_method?: string;
+  vendor?: string;
+  invoice_number?: string;
+  notes?: string;
+}
+
+export interface ExpenseAnalytics {
+  today_total: number;
+  this_week_total: number;
+  this_month_total: number;
+  year_to_date_total: number;
+  category_breakdown: { category: string; amount: number }[];
+  total_expenses: number;
+}
+
+export interface CalendarDay {
+  date: string;
+  count: number;
+  total: number;
 }
 
 export interface TrendPoint {

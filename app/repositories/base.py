@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional, TypeVar, Generic, Type
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, and_
 from app.database import Base
 
 ModelType = TypeVar("ModelType", bound=Base)
@@ -27,13 +27,31 @@ class BaseRepository(Generic[ModelType]):
         query = select(self.model)
         if filters:
             for key, value in filters.items():
-                if key.endswith("__in") and value is not None and isinstance(value, (list, tuple)):
+                if value is None:
+                    continue
+                if key.endswith("__in") and isinstance(value, (list, tuple)):
                     attr_name = key[:-4]
                     if hasattr(self.model, attr_name):
                         query = query.where(getattr(self.model, attr_name).in_(value))
-                elif key == "search" and value and hasattr(self.model, "full_name"):
+                elif key.endswith("__ge"):
+                    attr_name = key[:-4]
+                    if hasattr(self.model, attr_name):
+                        query = query.where(getattr(self.model, attr_name) >= value)
+                elif key.endswith("__gt"):
+                    attr_name = key[:-4]
+                    if hasattr(self.model, attr_name):
+                        query = query.where(getattr(self.model, attr_name) > value)
+                elif key.endswith("__le"):
+                    attr_name = key[:-4]
+                    if hasattr(self.model, attr_name):
+                        query = query.where(getattr(self.model, attr_name) <= value)
+                elif key.endswith("__lt"):
+                    attr_name = key[:-4]
+                    if hasattr(self.model, attr_name):
+                        query = query.where(getattr(self.model, attr_name) < value)
+                elif key == "search" and hasattr(self.model, "full_name"):
                     query = query.where(self.model.full_name.ilike(f"%{value}%"))
-                elif hasattr(self.model, key) and value is not None:
+                elif hasattr(self.model, key):
                     query = query.where(getattr(self.model, key) == value)
         if order_by and hasattr(self.model, order_by):
             order_col = getattr(self.model, order_by)

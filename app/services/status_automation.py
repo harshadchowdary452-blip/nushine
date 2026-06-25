@@ -233,14 +233,14 @@ class StatusAutomationService:
             )
             fu = fu_r.scalar_one_or_none()
             if fu:
-                fu.status = FollowUpStatus.CANCELLED
+                fu.status = FollowUpStatus.LOST
         re_engagement = FollowUp(
             patient_id=appt.patient_id,
             doctor_id=appt.doctor_id,
             follow_up_date=date.today() + timedelta(days=3),
             follow_up_time=time(10, 0),
             follow_up_type=FollowUpType.MANUAL.value,
-            status=FollowUpStatus.SCHEDULED.value,
+            status=FollowUpStatus.PENDING.value,
             notes=f"Re-engagement: patient missed appointment on {appt.appointment_date}",
         )
         self.db.add(re_engagement)
@@ -253,7 +253,7 @@ class StatusAutomationService:
             )
             fu = fu_r.scalar_one_or_none()
             if fu:
-                fu.status = FollowUpStatus.OPEN
+                fu.status = FollowUpStatus.PENDING
                 fu.reminder_sent = True
                 await self.db.flush()
 
@@ -335,10 +335,9 @@ class StatusAutomationService:
             if fu.case_id:
                 await self._check_case_completion(fu.case_id)
             await self.update_patient_status(fu.patient_id)
-        elif new_status == FollowUpStatus.SCHEDULED:
+        elif new_status == FollowUpStatus.CONTACTED:
             await self.update_patient_status(fu.patient_id)
-            await self._auto_create_appointment_from_follow_up(follow_up_id)
-        elif new_status == FollowUpStatus.OPEN:
+        elif new_status == FollowUpStatus.PENDING:
             if fu.case_id:
                 case = await self.db.get(Case, fu.case_id)
                 if case:
@@ -433,7 +432,7 @@ class StatusAutomationService:
         has_follow_up_r = await self.db.execute(
             select(FollowUp).where(
                 FollowUp.patient_id == patient_id,
-                FollowUp.status.in_([FollowUpStatus.SCHEDULED.value, FollowUpStatus.OPEN.value]),
+                FollowUp.status.in_([FollowUpStatus.PENDING.value]),
             ).limit(1)
         )
         has_pending_follow_up = has_follow_up_r.first() is not None
@@ -455,7 +454,7 @@ class StatusAutomationService:
         r = await self.db.execute(
             select(FollowUp).where(
                 FollowUp.case_id == case_id,
-                FollowUp.status.in_([FollowUpStatus.SCHEDULED.value, FollowUpStatus.OPEN.value]),
+                FollowUp.status.in_([FollowUpStatus.PENDING.value]),
             ).limit(1)
         )
         return r.first() is not None
