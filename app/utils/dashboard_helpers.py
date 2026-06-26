@@ -26,6 +26,13 @@ def get_date_range(period: str = "this_month", start_date: Optional[str] = None,
 
     if period == "today":
         return today, today + timedelta(days=1)
+    elif period == "yesterday":
+        return today - timedelta(days=1), today
+    elif period == "last_month":
+        month_start = today.replace(day=1)
+        last_month_end = month_start
+        last_month_start = (month_start - timedelta(days=1)).replace(day=1)
+        return last_month_start, last_month_end
     elif period == "last_7_days":
         return today - timedelta(days=7), today + timedelta(days=1)
     elif period == "last_30_days":

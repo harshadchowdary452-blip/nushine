@@ -25,6 +25,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import DentalEmptyState from "@/components/ui/dental-empty-state"
+import ExpensesVsRevenueQuickView from "@/components/dashboard/expenses-vs-revenue-quick-view"
 import { useAuthStore } from "@/store/authStore"
 
 const COLORS = ["#4F46E5", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899", "#06B6D4", "#F97316", "#14B8A6", "#84CC16"]
@@ -263,7 +264,7 @@ export default function CrmDashboardPage() {
         <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
           <Activity className="h-4 w-4 text-indigo-500" /> Today's CRM Overview
         </h2>
-        <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9">
+        <div className="grid gap-3 grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-8">
           <KpiCard title="CRM Tasks" value={formatIndianNumber(overview.crm_tasks ?? 0)} icon={Target} color="primary" onClick={navToCalendar} />
           <KpiCard title="Follow-Ups Today" value={formatIndianNumber(overview.follow_ups_today ?? 0)} icon={Clock} color="info" onClick={navToCalendar} />
           <KpiCard title="6-Month Recalls" value={formatIndianNumber(overview.six_month_recalls ?? 0)} icon={CalendarDays} color="warning" onClick={navToCalendar} />
@@ -271,7 +272,6 @@ export default function CrmDashboardPage() {
           <KpiCard title="Contacted Today" value={formatIndianNumber(overview.patients_contacted ?? 0)} icon={Phone} color="success" />
           <KpiCard title="Appts Created" value={formatIndianNumber(overview.appointments_created_today ?? 0)} icon={BookOpen} color="teal" />
           <KpiCard title="CRM Appointments" value={formatIndianNumber(overview.appointments_from_crm ?? 0)} icon={CalendarDays} color="pink" />
-          <KpiCard title="Pending Tasks" value={formatIndianNumber(overview.pending_tasks ?? 0)} icon={AlertCircle} color="warning" />
           <KpiCard title="Overdue" value={formatIndianNumber(overview.overdue_tasks ?? 0)} icon={AlertCircle} color="danger" />
         </div>
       </div>
@@ -524,7 +524,12 @@ export default function CrmDashboardPage() {
       </div>
 
       {/* ════════════════════════════════════
-         SECTION 9: PATIENT ACQUISITION & REVENUE
+         SECTION 9: EXPENSES VS REVENUE QUICK VIEW
+         ════════════════════════════════════ */}
+      <ExpensesVsRevenueQuickView className={cn(GLASS, "rounded-2xl p-5")} />
+
+      {/* ════════════════════════════════════
+         SECTION 10: PATIENT ACQUISITION & REVENUE
          ════════════════════════════════════ */}
       <div className={cn(GLASS, "rounded-2xl p-5")}>
         <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
@@ -588,7 +593,7 @@ export default function CrmDashboardPage() {
       </div>
 
       {/* ════════════════════════════════════
-         SECTION 10: CRM TIMELINE
+         SECTION 11: CRM TIMELINE
          ════════════════════════════════════ */}
       <div className={cn(GLASS, "rounded-2xl p-5")}>
         <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
@@ -635,7 +640,7 @@ export default function CrmDashboardPage() {
       </div>
 
       {/* ════════════════════════════════════
-         SECTION 11: UPCOMING WORK
+         SECTION 12: UPCOMING WORK
          ════════════════════════════════════ */}
       <div className={cn(GLASS, "rounded-2xl p-5")}>
         <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">

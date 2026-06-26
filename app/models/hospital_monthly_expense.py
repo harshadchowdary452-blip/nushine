@@ -8,10 +8,10 @@ from app.database import Base
 class HospitalMonthlyExpense(Base):
     __tablename__ = "hospital_monthly_expenses"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    hospital_id: Mapped[str] = mapped_column(String(36), ForeignKey("hospitals.id"), nullable=False)
-    expense_date: Mapped[date] = mapped_column(Date, nullable=False)
-    expense_month: Mapped[int] = mapped_column(Integer, nullable=False)
-    expense_year: Mapped[int] = mapped_column(Integer, nullable=False)
+    hospital_id: Mapped[str] = mapped_column(String(36), ForeignKey("hospitals.id"), nullable=False, index=True)
+    expense_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    expense_month: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    expense_year: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     expense_category: Mapped[str] = mapped_column(String(255), nullable=False)
     expense_name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=True)

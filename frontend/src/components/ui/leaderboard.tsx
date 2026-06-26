@@ -1,3 +1,4 @@
+import { memo } from "react"
 import { motion } from "framer-motion"
 import { TrendingUp, TrendingDown, Medal, Trophy, Award } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -24,7 +25,7 @@ interface LeaderboardProps {
 const rankIcons = [Trophy, Medal, Award]
 const rankColors = ["text-yellow-500", "text-gray-400", "text-amber-700"]
 
-export default function Leaderboard({ title, items, valueLabel, loading, icon: Icon, onItemClick }: LeaderboardProps) {
+function Leaderboard({ title, items, valueLabel, loading, icon: Icon, onItemClick }: LeaderboardProps) {
   if (loading) {
     return (
       <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-kpi">
@@ -94,3 +95,5 @@ export default function Leaderboard({ title, items, valueLabel, loading, icon: I
     </motion.div>
   )
 }
+
+export default memo(Leaderboard)

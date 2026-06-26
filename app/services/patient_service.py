@@ -11,7 +11,7 @@ from app.repositories.treatment_plan_repository import TreatmentPlanRepository
 from app.repositories.appointment_repository import AppointmentRepository
 from app.repositories.audit_log_repository import AuditLogRepository
 from app.models.patient import Patient, PatientStatus
-from app.models.case import Case, CaseStatus
+from app.models.case import Case, CaseStatus, ClinicalFinding
 from app.models.billing import Billing, PaymentStatus
 from app.models.appointment import Appointment
 from app.models.treatment_plan import TreatmentPlan
@@ -23,6 +23,8 @@ from app.models.lead import Lead
 from app.models.pre_op import PreOp
 from app.models.post_op import PostOp
 from app.models.consultant_note import ConsultantNote
+from app.models.case_timeline import CaseTimeline
+from app.models.consent_form import ConsentForm
 from app.models.billing_history import BillingHistory
 from app.models.payment_transaction import PaymentTransaction
 
@@ -134,6 +136,8 @@ class PatientService:
                 await self.db.execute(sa_delete(PreOp).where(PreOp.case_id == c.id))
                 await self.db.execute(sa_delete(PostOp).where(PostOp.case_id == c.id))
                 await self.db.execute(sa_delete(ConsultantNote).where(ConsultantNote.case_id == c.id))
+                await self.db.execute(sa_delete(ClinicalFinding).where(ClinicalFinding.case_id == c.id))
+                await self.db.execute(sa_delete(ConsentForm).where(ConsentForm.case_id == c.id))
                 tps = (await self.db.execute(select(TreatmentPlan).where(TreatmentPlan.case_id == c.id))).scalars().all()
                 for tp in tps:
                     await self.db.execute(sa_delete(TreatmentSitting).where(TreatmentSitting.treatment_plan_id == tp.id))
@@ -143,6 +147,7 @@ class PatientService:
                     await self.db.execute(sa_delete(BillingHistory).where(BillingHistory.billing_id == bid))
                     await self.db.execute(sa_delete(PaymentTransaction).where(PaymentTransaction.billing_id == bid))
                 await self.db.execute(sa_delete(Billing).where(Billing.case_id == c.id))
+                await self.db.execute(sa_delete(CaseTimeline).where(CaseTimeline.case_id == c.id))
             await self.db.execute(sa_delete(Case).where(Case.patient_id == patient_id))
             result = await self.repo.delete(patient_id)
             if result:

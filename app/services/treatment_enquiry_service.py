@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
 from app.models.treatment_type import TreatmentType
 from app.models.follow_up import FollowUp, FollowUpType, FollowUpStatus
-from app.models.treatment_plan import TreatmentPlan
+from app.models.treatment_plan import TreatmentPlan, TreatmentPlanStatus
 from app.models.case import Case
 from app.models.patient import Patient
 from app.models.hospital import Hospital
@@ -213,63 +213,24 @@ class TreatmentEnquiryService:
         ctx = await self._get_plan_context(plan_id)
         if not ctx:
             return
-        plan = ctx["plan"]
-        rule = await self._find_matching_rule(plan, ctx["hospital_id"])
-        if not rule:
-            return
-        today = date.today()
-        treatment_name = plan.treatment_name
-        created = []
-        if rule.follow_up_1_day:
-            fu = FollowUp(
-                patient_id=ctx["patient_id"], hospital_id=ctx["hospital_id"],
-                doctor_id=ctx["doctor_id"], case_id=plan.case_id,
-                treatment_id=plan_id, treatment_name=treatment_name,
-                treatment_type_id=plan.treatment_type_id,
-                follow_up_date=today + timedelta(days=1),
-                follow_up_time=time(10, 0),
-                follow_up_type=FollowUpType.ONE_DAY_FOLLOW_UP.value,
-                status=FollowUpStatus.PENDING.value,
-                treatment_completed_date=today,
-                notes=f"Auto-generated: 1-day post treatment check for '{treatment_name}' (sitting #{sitting_number})",
-            )
-            self.db.add(fu); created.append(fu)
-        if rule.follow_up_7_day:
-            fu = FollowUp(
-                patient_id=ctx["patient_id"], hospital_id=ctx["hospital_id"],
-                doctor_id=ctx["doctor_id"], case_id=plan.case_id,
-                treatment_id=plan_id, treatment_name=treatment_name,
-                treatment_type_id=plan.treatment_type_id,
-                follow_up_date=today + timedelta(days=7),
-                follow_up_time=time(10, 0),
-                follow_up_type=FollowUpType.SEVEN_DAY_FOLLOW_UP.value,
-                status=FollowUpStatus.PENDING.value,
-                treatment_completed_date=today,
-                notes=f"Auto-generated: 7-day post treatment check for '{treatment_name}' (sitting #{sitting_number})",
-            )
-            self.db.add(fu); created.append(fu)
-        await self.db.flush()
         case_id = ctx["case"].id if ctx["case"] else None
         if case_id:
             await self._add_timeline(case_id, f"Treatment Sitting #{sitting_number} Completed")
-        for fu in created:
-            if case_id:
-                await self._add_timeline(case_id, f"{fu.follow_up_type.replace('_', ' ').title()} Created", new_value=f"Due: {fu.follow_up_date.isoformat()}")
-            try:
-                await self._send_whatsapp_for(fu, treatment_name)
-            except Exception as e:
-                logger.warning("WhatsApp send failed for %s follow-up: %s", fu.follow_up_type, e)
-        if created:
-            await self.db.flush()
-        logger.info("Created %d follow-up(s) for plan %s", len(created), plan_id)
+        await self.db.flush()
+        logger.info("Recorded sitting #%s completion for plan %s", sitting_number, plan_id)
 
     async def on_treatment_plan_completed(self, plan_id: str) -> None:
         ctx = await self._get_plan_context(plan_id)
         if not ctx:
             return
         plan = ctx["plan"]
+        # Only proceed if the plan is truly completed
+        if plan.status != TreatmentPlanStatus.COMPLETED:
+            logger.info("Plan %s status is %s, not COMPLETED — skipping CRM rule engine", plan_id, plan.status)
+            return
         rule = await self._find_matching_rule(plan, ctx["hospital_id"])
         if not rule:
+            logger.info("No active CRM rule found for plan %s — skipping", plan_id)
             return
         today = date.today()
         treatment_name = plan.treatment_name

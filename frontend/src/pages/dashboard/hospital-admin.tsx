@@ -1,8 +1,7 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, useCallback, lazy, Suspense } from "react"
 import { motion } from "framer-motion"
 import { useQuery } from "@tanstack/react-query"
-import { Calendar, DollarSign, Users, FolderOpen, TrendingUp, Award, Activity, BarChart3, IndianRupee, PieChart, Sparkles, FileText } from "lucide-react"
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar } from "recharts"
+import { Calendar, Users, FolderOpen, Award, Activity, Sparkles, FileText, DollarSign, TrendingUp, IndianRupee, PieChart } from "lucide-react"
 import { useAuthStore } from "@/store/authStore"
 import { dashboardApi, consentFormsApi } from "@/services/endpoints"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -14,26 +13,8 @@ import Leaderboard from "@/components/ui/leaderboard"
 import QuickViewDrawer from "@/components/ui/quick-view-drawer"
 import DateFilterBar from "@/components/ui/date-filter-bar"
 import AnalyticsDrawer from "@/components/analytics-drawer"
+const FinancialDashboard = lazy(() => import("@/components/dashboard/financial-dashboard"))
 import { formatIndianRupees, formatIndianNumber } from "@/lib/currency"
-
-const ChartTooltip = ({ active, payload, label }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="rounded-xl border border-gray-100 bg-white p-3 shadow-lg">
-        <p className="text-sm font-semibold text-gray-900 mb-1">{label}</p>
-        {payload.map((p: any, i: number) => {
-          const isFinancial = ["Revenue", "Expenses", "Profit", "revenue", "expenses", "profit"].includes(p.name) || ["revenue", "expenses", "profit"].includes(p.dataKey)
-          return (
-            <p key={i} className="text-xs" style={{ color: p.color }}>
-              {p.name}: {isFinancial ? formatIndianRupees(p.value != null ? p.value : 0) : formatIndianNumber(p.value != null ? p.value : 0)}
-            </p>
-          )
-        })}
-      </div>
-    )
-  }
-  return null
-}
 
 function getGreeting(): string {
   const h = new Date().getHours()
@@ -54,6 +35,12 @@ export default function HospitalAdminDashboard() {
   const [endDate, setEndDate] = useState("")
   const { addToast } = useToast()
 
+  const onApptClick = useCallback(() => setDrawerMetric("appointments"), [])
+  const onPatientClick = useCallback(() => setDrawerMetric("patients"), [])
+  const onCaseClick = useCallback(() => setDrawerMetric("cases"), [])
+  const onDrawerClose = useCallback(() => setDrawerMetric(null), [])
+  const onQuickViewClose = useCallback(() => setQuickView(null), [])
+
   const dashParams = useMemo(() => {
     const p: Record<string, string> = { period }
     if (period === "custom" && startDate) p.start_date = startDate
@@ -68,6 +55,11 @@ export default function HospitalAdminDashboard() {
     gcTime: 60000,
     refetchInterval: 30000,
   })
+
+  const onDoctorClick = useCallback((id?: string) => {
+    const item = (stats?.doctor_performance ?? []).find((d: any) => d.id === id)
+    if (item) setQuickView({ type: "doctor", id: item.id, name: item.name })
+  }, [stats?.doctor_performance])
 
   const { data: consentStats } = useQuery({
     queryKey: ["consent-form-stats", user?.hospital_id],
@@ -126,63 +118,21 @@ export default function HospitalAdminDashboard() {
         </div>
       </div>
 
-      {/* KPI Grid - 4 columns on desktop */}
-      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-        <KpiCard icon={DollarSign} title="Revenue" value={formatIndianRupees(stats?.total_revenue ?? 0)} color="success" delay={0} onClick={() => setDrawerMetric("revenue")} />
-        <KpiCard icon={Calendar} title="Appointments" value={formatIndianNumber(stats?.today_appointments ?? 0)} color="warning" delay={0.04} onClick={() => setDrawerMetric("appointments")} />
-        <KpiCard icon={Users} title="Patients" value={formatIndianNumber(stats?.total_patients ?? 0)} color="info" delay={0.08} onClick={() => setDrawerMetric("patients")} />
-        <KpiCard icon={FolderOpen} title="Active Cases" value={formatIndianNumber(stats?.total_active_cases ?? 0)} color="danger" delay={0.12} onClick={() => setDrawerMetric("cases")} />
-        <KpiCard icon={TrendingUp} title="Period Revenue" value={formatIndianRupees(stats?.period_revenue ?? 0)} color="primary" delay={0.16} onClick={() => setDrawerMetric("period-revenue")} />
-        <KpiCard icon={IndianRupee} title="Expenses" value={formatIndianRupees(stats?.total_expenses ?? 0)} color="danger" delay={0.2} onClick={() => setDrawerMetric("expenses")} />
-      </div>
-
-      {/* Second KPI row - 4 columns */}
+      {/* Operational KPI cards */}
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
-        <KpiCard icon={TrendingUp} title="Monthly Revenue" value={formatIndianRupees(stats?.monthly_revenue ?? 0)} color="primary" delay={0.04} onClick={() => setDrawerMetric("monthly-revenue")} />
-        <KpiCard icon={BarChart3} title="Yearly Revenue" value={formatIndianRupees(stats?.yearly_revenue ?? 0)} color="warning" delay={0.08} onClick={() => setDrawerMetric("yearly-revenue")} />
-        <KpiCard icon={TrendingUp} title="Net Profit" value={formatIndianRupees(stats?.net_profit ?? 0)} color={(stats?.net_profit ?? 0) >= 0 ? "success" : "danger"} delay={0.12} onClick={() => setDrawerMetric("profit")} />
-        <KpiCard icon={PieChart} title="Profit Margin" value={stats?.profit_margin != null ? `${stats.profit_margin.toFixed(1)}%` : "0%"} color="primary" delay={0.16} onClick={() => setDrawerMetric("margin")} />
+        <KpiCard icon={Calendar} title="Appointments" value={formatIndianNumber(stats?.today_appointments ?? 0)} color="warning" delay={0.04} onClick={onApptClick} />
+        <KpiCard icon={Users} title="Patients" value={formatIndianNumber(stats?.total_patients ?? 0)} color="info" delay={0.08} onClick={onPatientClick} />
+        <KpiCard icon={FolderOpen} title="Active Cases" value={formatIndianNumber(stats?.total_active_cases ?? 0)} color="danger" delay={0.12} onClick={onCaseClick} />
         <KpiCard icon={FileText} title="Consent Forms" value={formatIndianNumber(consentStats?.total ?? 0)} description={`${formatIndianNumber(consentStats?.this_month ?? 0)} this month`} color="info" delay={0.2} />
       </div>
 
+      {/* Financial Dashboard (period-aware) */}
+      <Suspense fallback={<div className="h-[420px] rounded-xl bg-gray-50 animate-pulse" />}>
+        <FinancialDashboard />
+      </Suspense>
+
       {hasData && (
         <>
-          {/* Charts row - max 280px height */}
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Card>
-              <CardHeader className="px-4 py-3"><CardTitle className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Revenue vs Expenses</CardTitle></CardHeader>
-              <CardContent className="px-4 pb-4">
-                <ResponsiveContainer width="100%" height={260}>
-                  <LineChart data={stats?.revenue_expense_trend || stats?.revenue_trend?.map((d: any) => ({ ...d, expenses: 0, profit: 0 })) || []}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Legend />
-                    <Line type="monotone" dataKey="revenue" name="Revenue" stroke="#10B981" strokeWidth={2} dot={{ r: 3 }} />
-                    <Line type="monotone" dataKey="expenses" name="Expenses" stroke="#EF4444" strokeWidth={2} dot={{ r: 3 }} />
-                    <Line type="monotone" dataKey="profit" name="Profit" stroke="#4F46E5" strokeWidth={2} dot={{ r: 3 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="px-4 py-3"><CardTitle className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Expense Breakdown</CardTitle></CardHeader>
-              <CardContent className="px-4 pb-4">
-                <ResponsiveContainer width="100%" height={260}>
-                  <BarChart data={stats?.expense_trend || stats?.revenue_expense_trend || []}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Legend />
-                    <Bar dataKey="expenses" name="Expenses" fill="#EF4444" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
-
           {/* Capacity + Leaderboards */}
           {(stats?.capacity_most_booked_doctors?.length > 0 || stats?.capacity_peak_hours?.length > 0) && (
             <div className="grid gap-4 lg:grid-cols-2">
@@ -236,10 +186,7 @@ export default function HospitalAdminDashboard() {
               items={(stats?.doctor_performance ?? []).map((d: any, i: number) => ({
                 rank: i + 1, name: d.name, value: formatIndianRupees(d.value), id: d.id,
               }))}
-              onItemClick={(id) => {
-                const item = (stats?.doctor_performance ?? []).find((d: any) => d.id === id)
-                if (item) setQuickView({ type: "doctor", id: item.id, name: item.name })
-              }}
+              onItemClick={onDoctorClick}
             />
             <Leaderboard
               title="Top Treatments"
@@ -285,12 +232,12 @@ export default function HospitalAdminDashboard() {
       )}
 
       {quickView && (
-        <QuickViewDrawer open={!!quickView} onClose={() => setQuickView(null)} type={quickView.type} entityId={quickView.id} entityName={quickView.name} />
+        <QuickViewDrawer open={!!quickView} onClose={onQuickViewClose} type={quickView.type} entityId={quickView.id} entityName={quickView.name} />
       )}
 
       <AnalyticsDrawer
         open={!!drawerMetric}
-        onClose={() => setDrawerMetric(null)}
+        onClose={onDrawerClose}
         period={period}
         onPeriodChange={setPeriod}
         title={

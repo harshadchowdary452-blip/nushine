@@ -282,6 +282,17 @@ async def super_admin_dashboard(
     # Monthly growth trend with expenses (respect period)
     combined_trend = await revenue_trend_with_expenses(db, hospital_ids=None, period=period, start_date=start_date, end_date=end_date)
 
+    total_pending_billing = float((await db.execute(
+        select(func.coalesce(func.sum(Billing.pending_amount), 0))
+    )).scalar() or 0)
+
+    expense_breakdown_r = await db.execute(
+        select(HospitalMonthlyExpense.expense_category, func.coalesce(func.sum(HospitalMonthlyExpense.amount), 0).label("total"))
+        .where(HospitalMonthlyExpense.expense_date >= date_start.date(), HospitalMonthlyExpense.expense_date < date_end.date())
+        .group_by(HospitalMonthlyExpense.expense_category).order_by(text("total DESC"))
+    )
+    expense_breakdown = [{"category": row[0], "amount": float(row[1])} for row in expense_breakdown_r.all()]
+
     return {
         "total_groups": total_groups,
         "total_hospitals": total_hospitals,
@@ -302,6 +313,8 @@ async def super_admin_dashboard(
         "revenue_expense_trend": combined_trend,
         "expense_trend": [{"month": t["month"], "expenses": t["expenses"]} for t in combined_trend],
         "profit_trend": [{"month": t["month"], "profit": t["profit"], "profit_margin": t["profit_margin"]} for t in combined_trend],
+        "total_pending_billing": total_pending_billing,
+        "expense_breakdown": expense_breakdown,
         "admin_group_performance": admin_group_performance[:5],
         "hospital_performance": hospital_performance[:5],
         "doctor_performance": doctor_performance[:5],
@@ -465,6 +478,23 @@ async def group_admin_dashboard(
     # Monthly growth trend with expenses (respect period)
     combined_trend = await revenue_trend_with_expenses(db, case_ids if case_ids else [], hospital_ids, period=period, start_date=start_date, end_date=end_date)
 
+    total_pending_billing = float((await db.execute(
+        select(func.coalesce(func.sum(Billing.pending_amount), 0)).where(
+            Billing.case_id.in_(case_ids) if case_ids else text("false"),
+        )
+    )).scalar() or 0) if case_ids else 0
+
+    expense_breakdown_r = await db.execute(
+        select(HospitalMonthlyExpense.expense_category, func.coalesce(func.sum(HospitalMonthlyExpense.amount), 0).label("total"))
+        .where(
+            HospitalMonthlyExpense.hospital_id.in_(hospital_ids),
+            HospitalMonthlyExpense.expense_date >= date_start.date(),
+            HospitalMonthlyExpense.expense_date < date_end.date(),
+        )
+        .group_by(HospitalMonthlyExpense.expense_category).order_by(text("total DESC"))
+    )
+    expense_breakdown = [{"category": row[0], "amount": float(row[1])} for row in expense_breakdown_r.all()]
+
     return {
         "selected_hospital_id": hospital_id,
         "total_hospitals": len(group_hospital_ids),
@@ -485,6 +515,8 @@ async def group_admin_dashboard(
         "revenue_expense_trend": combined_trend,
         "expense_trend": [{"month": t["month"], "expenses": t["expenses"]} for t in combined_trend],
         "profit_trend": [{"month": t["month"], "profit": t["profit"], "profit_margin": t["profit_margin"]} for t in combined_trend],
+        "expense_breakdown": expense_breakdown,
+        "total_pending_billing": total_pending_billing,
         "hospital_performance": hospital_performance[:5],
         "doctor_performance": doctor_performance[:5],
     }

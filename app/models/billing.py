@@ -22,7 +22,7 @@ class PaymentStatus(str, Enum):
 class Billing(Base):
     __tablename__ = "billings"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    case_id: Mapped[str] = mapped_column(String(36), ForeignKey("cases.id"), nullable=False)
+    case_id: Mapped[str] = mapped_column(String(36), ForeignKey("cases.id"), nullable=False, index=True)
     treatment_plan_id: Mapped[str] = mapped_column(String(36), ForeignKey("treatment_plans.id"), nullable=True)
     original_amount: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
     total_amount: Mapped[float] = mapped_column(Float, nullable=False)
@@ -40,6 +40,6 @@ class Billing(Base):
     invoice_number: Mapped[str] = mapped_column(String(50), nullable=True, unique=True)
     due_date: Mapped[date] = mapped_column(Date, nullable=True)
     projected_amount: Mapped[float] = mapped_column(Float, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), index=True)
     case = relationship("Case", back_populates="billings")

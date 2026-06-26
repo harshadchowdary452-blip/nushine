@@ -1,3 +1,4 @@
+import { memo } from "react"
 import type { LucideIcon } from "lucide-react"
 import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
@@ -24,7 +25,7 @@ const colorMap = {
   danger: { bg: "bg-red-50", text: "text-red-600", icon: "text-red-600" },
 }
 
-export default function KpiCard({ title, value, icon: Icon, trend, description, className, loading = false, color = "primary", delay = 0, onClick }: KpiCardProps) {
+function KpiCard({ title, value, icon: Icon, trend, description, className, loading = false, color = "primary", delay = 0, onClick }: KpiCardProps) {
   const c = colorMap[color]
 
   if (loading) {
@@ -91,3 +92,5 @@ export default function KpiCard({ title, value, icon: Icon, trend, description, 
     </motion.div>
   )
 }
+
+export default memo(KpiCard)

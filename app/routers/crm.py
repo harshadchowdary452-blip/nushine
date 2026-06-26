@@ -27,6 +27,7 @@ from app.models.communication_log import CommunicationLog, CommunicationChannel,
 from app.models.notification import Notification
 from app.models.patient_feedback import PatientFeedback
 from app.models.follow_up import FollowUp, FollowUpStatus, FollowUpType
+from app.models.treatment_type import TreatmentType
 from app.models.enquiry import Enquiry
 from app.models.follow_up_response import FollowUpResponse, FollowUpResponseStatus
 from app.models.whatsapp_template import WhatsAppTemplate
@@ -3459,12 +3460,6 @@ async def get_enhanced_crm_dashboard(
         "patients_contacted": contacted_today,
         "appointments_created_today": appts_today,
         "appointments_from_crm": crm_appts,
-        "pending_tasks": (await db.execute(
-            select(func.count()).select_from(fu_base.where(
-                FollowUp.follow_up_date >= today,
-                FollowUp.status.in_(["PENDING", "SCHEDULED"])
-            ).subquery())
-        )).scalar() or 0,
         "overdue_tasks": overdue,
     }
 

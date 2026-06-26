@@ -27,10 +27,10 @@ class RuleCreate(BaseModel):
     treatment_type_id: str
     treatment_name: Optional[str] = None
     treatment_template_id: Optional[str] = None
-    follow_up_1_day: bool = True
-    follow_up_7_day: bool = True
-    recall_6_month: bool = True
-    recall_12_month: bool = True
+    follow_up_1_day: bool = False
+    follow_up_7_day: bool = False
+    recall_6_month: bool = False
+    recall_12_month: bool = False
     custom_recall_days: Optional[int] = None
     enquiry_enabled: bool = False
     auto_appointment_enabled: bool = False

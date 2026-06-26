@@ -1,14 +1,15 @@
+import { memo } from "react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
 const PERIODS = [
   { value: "today", label: "Today" },
+  { value: "yesterday", label: "Yesterday" },
   { value: "last_7_days", label: "Last 7 Days" },
   { value: "last_30_days", label: "Last 30 Days" },
   { value: "this_month", label: "This Month" },
-  { value: "last_3_months", label: "Last 3 Months" },
-  { value: "last_6_months", label: "Last 6 Months" },
+  { value: "last_month", label: "Last Month" },
   { value: "this_quarter", label: "This Quarter" },
   { value: "this_year", label: "This Year" },
   { value: "custom", label: "Custom Range" },
@@ -21,9 +22,10 @@ interface DateFilterBarProps {
   endDate?: string
   onStartDateChange?: (date: string) => void
   onEndDateChange?: (date: string) => void
+  compact?: boolean
 }
 
-export default function DateFilterBar({
+function DateFilterBar({
   period, onPeriodChange, startDate, endDate, onStartDateChange, onEndDateChange,
 }: DateFilterBarProps) {
   return (
@@ -70,3 +72,5 @@ export default function DateFilterBar({
     </div>
   )
 }
+
+export default memo(DateFilterBar)
