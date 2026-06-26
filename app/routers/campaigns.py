@@ -1,13 +1,22 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, BackgroundTasks
 from typing import Optional
-from datetime import date
+from datetime import date, datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, desc, func
+from pydantic import BaseModel
+
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.core.permissions import verify_permission, Permission
-from app.schemas.campaign import CampaignCreate, CampaignUpdate, CampaignResponse, CampaignLaunchResponse, CampaignAnalytics, CampaignRecipientResponse
+from app.schemas.campaign import (
+    CampaignCreate, CampaignUpdate, CampaignResponse, CampaignLaunchResponse,
+    CampaignProgressResponse, CampaignAnalytics, CampaignRecipientResponse,
+    CampaignResponseDetail, AudiencePreviewResponse, CampaignROI,
+    CampaignDashboardWidgets, CampaignTimelineEntry, CampaignAnalyticsDetail,
+)
 from app.services.campaign_service import CampaignService
-from app.models.campaign import Campaign
+from app.models.campaign import Campaign, CampaignRecipient
+from app.models.patient import Patient
 
 router = APIRouter(prefix="/campaigns", tags=["Campaigns"])
 
@@ -124,20 +133,19 @@ async def delete_campaign(
 @router.post("/{campaign_id}/launch")
 async def launch_campaign(
     campaign_id: str,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
     verify_permission(current_user, Permission.MANAGE_PATIENTS)
-    hospital_id = current_user.get("hospital_id")
-    if not hospital_id:
-        hospital_id = getattr(existing, "hospital_id", None)
-    if not hospital_id:
-        raise HTTPException(status_code=400, detail="Hospital ID required")
     svc = CampaignService(db)
     existing = await svc.get(campaign_id)
     if not existing:
         raise HTTPException(status_code=404, detail="Campaign not found")
     _verify_hospital_access(existing, current_user)
+    hospital_id = current_user.get("hospital_id") or existing.hospital_id
+    if not hospital_id:
+        raise HTTPException(status_code=400, detail="Hospital ID required")
     result = await svc.launch(campaign_id, hospital_id)
     await db.commit()
     return result
@@ -154,9 +162,6 @@ async def get_campaign_recipients(
     if not existing:
         raise HTTPException(status_code=404, detail="Campaign not found")
     _verify_hospital_access(existing, current_user)
-    from sqlalchemy import select, desc
-    from app.models.campaign import CampaignRecipient
-    from app.models.patient import Patient
     q = select(CampaignRecipient, Patient.full_name).join(
         Patient, CampaignRecipient.patient_id == Patient.id
     ).where(CampaignRecipient.campaign_id == campaign_id).order_by(desc(CampaignRecipient.created_at))
@@ -169,6 +174,106 @@ async def get_campaign_recipients(
         "responded_at": r[0].responded_at.isoformat() if r[0].responded_at else None,
         "created_at": r[0].created_at.isoformat(),
     } for r in rows]
+
+
+@router.post("/preview-audience")
+async def preview_audience(
+    body: _AudiencePreviewRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    verify_permission(current_user, Permission.MANAGE_PATIENTS)
+    svc = CampaignService(db)
+    result = await svc.preview_audience(
+        target=body.target,
+        hospital_id=body.hospital_id or current_user.get("hospital_id"),
+        filters=body.filters,
+    )
+    return result
+
+
+@router.post("/{campaign_id}/duplicate")
+async def duplicate_campaign(
+    campaign_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    verify_permission(current_user, Permission.MANAGE_PATIENTS)
+    svc = CampaignService(db)
+    existing = await svc.get(campaign_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    _verify_hospital_access(existing, current_user)
+    result = await svc.duplicate(campaign_id)
+    await db.commit()
+    return result
+
+
+@router.post("/{campaign_id}/archive")
+async def archive_campaign(
+    campaign_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    verify_permission(current_user, Permission.MANAGE_PATIENTS)
+    svc = CampaignService(db)
+    existing = await svc.get(campaign_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    _verify_hospital_access(existing, current_user)
+    result = await svc.archive(campaign_id)
+    await db.commit()
+    return result
+
+
+@router.post("/{campaign_id}/resend")
+async def resend_campaign(
+    campaign_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    verify_permission(current_user, Permission.MANAGE_PATIENTS)
+    svc = CampaignService(db)
+    existing = await svc.get(campaign_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    _verify_hospital_access(existing, current_user)
+    result = await svc.resend(campaign_id, current_user.get("hospital_id"))
+    await db.commit()
+    return result
+
+
+@router.get("/{campaign_id}/progress")
+async def get_campaign_progress(
+    campaign_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    verify_permission(current_user, Permission.MANAGE_PATIENTS)
+    svc = CampaignService(db)
+    existing = await svc.get(campaign_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    _verify_hospital_access(existing, current_user)
+    return await svc.get_progress(campaign_id)
+
+
+@router.post("/webhook/inbound")
+async def inbound_webhook(
+    payload: dict,
+    db: AsyncSession = Depends(get_db),
+):
+    svc = CampaignService(db)
+    result = await svc.handle_inbound_webhook(payload)
+    return result
+
+
+# --- Inline request body models ---
+
+class _AudiencePreviewRequest(BaseModel):
+    target: str
+    filters: Optional[dict] = None
+    hospital_id: Optional[str] = None
 
 
 # --- CRM Analytics Endpoints ---

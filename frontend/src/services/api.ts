@@ -9,9 +9,9 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().accessToken;
-  if (token) {
-    config.headers.Authorization = "Bearer " + token;
+  const state = useAuthStore.getState();
+  if (state._hasHydrated && state.accessToken) {
+    config.headers.Authorization = "Bearer " + state.accessToken;
   }
   return config;
 });

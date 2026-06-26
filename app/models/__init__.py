@@ -27,7 +27,8 @@ from app.models.follow_up import FollowUp, FollowUpStatus, FollowUpType
 from app.models.status_audit_log import StatusAuditLog
 from app.models.email_template import EmailTemplate
 from app.models.hospital_settings import HospitalSettings
-from app.models.campaign import Campaign, CampaignRecipient, CampaignStatus, CampaignType, CampaignChannel, CampaignTarget, CampaignRecipientStatus
+from app.models.campaign import Campaign, CampaignRecipient, CampaignResponse, CampaignTimeline, CampaignStatus, CampaignType, CampaignChannel, CampaignTarget, CampaignRecipientStatus
+from app.models.campaign_template import CampaignTemplate, TemplateChannel, TemplateCategory
 from app.models.follow_up_response import FollowUpResponse, FollowUpResponseStatus, FeedbackType, EnquiryOutcome
 from app.models.whatsapp_template import WhatsAppTemplate
 from app.models.lead import Lead, LeadCommunication, LeadCall, LeadSource, LeadStatus, LeadCallOutcome
@@ -49,7 +50,9 @@ __all__ = [
     "Notification", "PatientFeedback", "FollowUp", "FollowUpStatus", "FollowUpType",
     "EmailTemplate",
     "StatusAuditLog", "HospitalSettings",
-    "Campaign", "CampaignRecipient", "CampaignStatus", "CampaignType", "CampaignChannel", "CampaignTarget", "CampaignRecipientStatus",
+    "Campaign", "CampaignRecipient", "CampaignResponse", "CampaignTimeline",
+    "CampaignStatus", "CampaignType", "CampaignChannel", "CampaignTarget", "CampaignRecipientStatus",
+    "CampaignTemplate", "TemplateChannel", "TemplateCategory",
     "FollowUpResponse", "FollowUpResponseStatus", "FeedbackType", "EnquiryOutcome",
     "WhatsAppTemplate",
     "WhatsAppConfig",

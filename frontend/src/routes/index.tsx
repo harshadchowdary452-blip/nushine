@@ -30,6 +30,8 @@ const WhatsAppMessaging = lazy(() => import("@/pages/whatsapp/messaging"));
 const CommunicationHistory = lazy(() => import("@/pages/crm/communications"));
 const EmailTemplates = lazy(() => import("@/pages/crm/email-templates"));
 const Campaigns = lazy(() => import("@/pages/crm/campaigns"));
+const CampaignTemplates = lazy(() => import("@/pages/crm/campaign-templates"));
+
 const EnquiryCalendar = lazy(() => import("@/pages/crm/enquiry-calendar"));
 const LeadAnalytics = lazy(() => import("@/pages/crm/lead-analytics"));
 const RevenueAttribution = lazy(() => import("@/pages/crm/revenue-attribution"));
@@ -155,6 +157,8 @@ export const router = createBrowserRouter([
       { path: "/crm/dashboard2", element: withRoles(<CrmDashboard />, ADMIN_ROLES) },
       { path: "/crm/settings", element: withRoles(<CrmSettings />, ["HOSPITAL_ADMIN"]) },
       { path: "/crm/campaigns", element: withRoles(<Campaigns />, ["HOSPITAL_ADMIN"]) },
+      { path: "/crm/campaign-templates", element: withRoles(<CampaignTemplates />, ["HOSPITAL_ADMIN"]) },
+
       { path: "/crm/enquiry-calendar", element: withRoles(<EnquiryCalendar />, ["HOSPITAL_ADMIN"]) },
       { path: "/crm/lead-analytics", element: withRoles(<LeadAnalytics />, ADMIN_ROLES) },
       { path: "/crm/revenue-attribution", element: withRoles(<RevenueAttribution />, ADMIN_ROLES) },

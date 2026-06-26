@@ -35,16 +35,11 @@ export const useAuthStore = create<AuthState>()(
         accessToken: state.accessToken,
         refreshToken: state.refreshToken,
       }),
-      onRehydrateStorage: () => (state) => {
-        const hasValidSession = !!state?.user && !!state?.accessToken && !!state?.refreshToken;
-        if (!hasValidSession) {
-          useAuthStore.setState({
-            user: null,
-            accessToken: null,
-            refreshToken: null,
-          });
-        }
-      },
     }
   )
 );
+
+export function useIsAuthenticated() {
+  const { user, accessToken, refreshToken } = useAuthStore();
+  return !!user && !!accessToken && !!refreshToken;
+}

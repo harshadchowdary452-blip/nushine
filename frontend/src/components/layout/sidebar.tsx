@@ -53,6 +53,8 @@ const roleNav: Record<string, NavSection[]> = {
       { label: "Leads", icon: UserPlus, path: "/leads" },
       { label: "Enquiry Calendar", icon: CalendarDays, path: "/crm/enquiry-calendar" },
       { label: "Campaigns", icon: Megaphone, path: "/crm/campaigns" },
+      { label: "Templates", icon: FileText, path: "/crm/campaign-templates" },
+
       { label: "WhatsApp", icon: MessageSquare, path: "/whatsapp" },
       { label: "Communications", icon: Mail, path: "/crm/communications" },
       { label: "CRM Settings", icon: Settings, path: "/crm/settings" },

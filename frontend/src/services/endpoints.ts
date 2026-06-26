@@ -240,16 +240,34 @@ export const whatsappV2Api = {
 };
 
 export const campaignsApi = {
-  list: (params?: { skip?: number; limit?: number }) =>
+  list: (params?: { skip?: number; limit?: number; status?: string; campaign_type?: string }) =>
     api.get("/campaigns", { params }).then((r) => r.data),
   get: (id: string) => api.get(`/campaigns/${id}`).then((r) => r.data),
   create: (data: any) => api.post("/campaigns", data).then((r) => r.data),
   update: (id: string, data: any) => api.put(`/campaigns/${id}`, data).then((r) => r.data),
   delete: (id: string) => api.delete(`/campaigns/${id}`).then((r) => r.data),
   launch: (id: string) => api.post(`/campaigns/${id}/launch`).then((r) => r.data),
-  recipients: (id: string) => api.get(`/campaigns/${id}/recipients`).then((r) => r.data),
+  duplicate: (id: string) => api.post(`/campaigns/${id}/duplicate`).then((r) => r.data),
+  archive: (id: string) => api.post(`/campaigns/${id}/archive`).then((r) => r.data),
+  resend: (id: string) => api.post(`/campaigns/${id}/resend`).then((r) => r.data),
+  progress: (id: string) => api.get(`/campaigns/${id}/progress`).then((r) => r.data),
+  recipients: (id: string, params?: { skip?: number; limit?: number; status?: string }) =>
+    api.get(`/campaigns/${id}/recipients`, { params }).then((r) => r.data),
+  previewAudience: (data: { target: string; filters?: any; hospital_id?: string }) =>
+    api.post("/campaigns/preview-audience", data).then((r) => r.data),
+  recordResponse: (campaignId: string, recipientId: string, data: { message: string; is_lead?: boolean }) =>
+    api.post(`/campaigns/${campaignId}/recipients/${recipientId}/response`, data).then((r) => r.data),
+  responses: (params?: { campaign_id?: string; search?: string; status?: string; skip?: number; limit?: number }) =>
+    api.get("/campaigns/responses", { params }).then((r) => r.data),
+  convertLead: (campaignId: string, data: { lead_id: string; patient_data: any }) =>
+    api.post(`/campaigns/${campaignId}/convert-lead`, data).then((r) => r.data),
+  createAppointment: (campaignId: string, data: { patient_id: string; doctor_id: string; appointment_date: string; appointment_time: string; notes?: string }) =>
+    api.post(`/campaigns/${campaignId}/create-appointment`, data).then((r) => r.data),
+  availableDoctors: (params: { date: string; hospital_id?: string }) =>
+    api.get("/campaigns/available-doctors", { params }).then((r) => r.data),
   analytics: {
     overview: () => api.get("/campaigns/analytics/overview").then((r) => r.data),
+    detailed: () => api.get("/campaigns/analytics/detailed").then((r) => r.data),
     retention: () => api.get("/campaigns/analytics/retention").then((r) => r.data),
     followUpSuggestions: () => api.get("/campaigns/analytics/follow-up-suggestions").then((r) => r.data),
     followUpCalendar: (start: string, end: string) =>
@@ -257,6 +275,10 @@ export const campaignsApi = {
     patientInteractions: (patientId: string) =>
       api.get(`/campaigns/analytics/patient-interactions/${patientId}`).then((r) => r.data),
   },
+  roi: (campaignId: string) => api.get(`/campaigns/${campaignId}/roi`).then((r) => r.data),
+  dashboardWidgets: () => api.get("/campaigns/dashboard/widgets").then((r) => r.data),
+  patientTimeline: (patientId: string, campaignId?: string) =>
+    api.get(`/campaigns/patients/${patientId}/timeline`, { params: campaignId ? { campaign_id: campaignId } : {} }).then((r) => r.data),
 };
 
 export const whatsappConfigApi = {
@@ -270,6 +292,18 @@ export const whatsappTemplatesApi = {
   update: (id: string, data: { name?: string; message?: string; is_active?: boolean }) =>
     api.put(`/crm/whatsapp-templates/${id}`, data).then((r) => r.data),
   delete: (id: string) => api.delete(`/crm/whatsapp-templates/${id}`).then((r) => r.data),
+};
+
+export const campaignTemplatesApi = {
+  list: (params?: { channel?: string; category?: string }) =>
+    api.get("/campaign-templates", { params }).then((r) => r.data),
+  get: (id: string) => api.get(`/campaign-templates/${id}`).then((r) => r.data),
+  create: (data: { name: string; channel: string; category: string; message: string }) =>
+    api.post("/campaign-templates", data).then((r) => r.data),
+  update: (id: string, data: { name?: string; channel?: string; category?: string; message?: string; is_active?: boolean }) =>
+    api.put(`/campaign-templates/${id}`, data).then((r) => r.data),
+  delete: (id: string) => api.delete(`/campaign-templates/${id}`).then((r) => r.data),
+  duplicate: (id: string) => api.post(`/campaign-templates/${id}/duplicate`).then((r) => r.data),
 };
 
 export const leadsApi = {

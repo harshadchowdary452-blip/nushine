@@ -14,7 +14,7 @@ import {
 } from "recharts"
 import { cn } from "@/lib/utils"
 import { formatIndianRupees, formatIndianNumber } from "@/lib/currency"
-import { crmApi, doctorsApi } from "@/services/endpoints"
+import { crmApi, doctorsApi, campaignsApi } from "@/services/endpoints"
 import DashboardDateFilter, { type DateRangePreset } from "@/components/ui/dashboard-date-filter"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -125,6 +125,12 @@ export default function CrmDashboardPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["crm-enhanced-dashboard", params],
     queryFn: () => crmApi.enhancedDashboard(params),
+    staleTime: 30000,
+  })
+
+  const { data: campaignWidgets } = useQuery({
+    queryKey: ["campaigns", "dashboard-widgets"],
+    queryFn: () => campaignsApi.dashboardWidgets(),
     staleTime: 30000,
   })
 
@@ -277,7 +283,22 @@ export default function CrmDashboardPage() {
       </div>
 
       {/* ════════════════════════════════════
-         SECTION 2: TODAY'S WORK QUEUE
+         SECTION 2: CAMPAIGN PERFORMANCE
+         ════════════════════════════════════ */}
+      <div>
+        <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+          <Send className="h-4 w-4 text-indigo-500" /> Campaign Performance
+        </h2>
+        <div className="grid gap-3 grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4">
+          <KpiCard title="Campaign Messages Today" value={formatIndianNumber(campaignWidgets?.messages_today ?? 0)} icon={Send} color="primary" />
+          <KpiCard title="Campaign Replies Today" value={formatIndianNumber(campaignWidgets?.replies_today ?? 0)} icon={MessageCircle} color="success" />
+          <KpiCard title="Campaign Appointments" value={formatIndianNumber(campaignWidgets?.appointments ?? 0)} icon={CalendarDays} color="info" />
+          <KpiCard title="Campaign Conversions" value={formatIndianNumber(campaignWidgets?.conversions ?? 0)} icon={TrendingUp} color="warning" />
+        </div>
+      </div>
+
+      {/* ════════════════════════════════════
+         SECTION 3: TODAY'S WORK QUEUE
          ════════════════════════════════════ */}
       <div className={cn(GLASS, "rounded-2xl overflow-hidden")}>
         <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
@@ -364,7 +385,7 @@ export default function CrmDashboardPage() {
       </div>
 
       {/* ════════════════════════════════════
-         SECTIONS 3+4: FOLLOW-UP SUMMARY + FUNNEL (side by side)
+         SECTIONS 4+5: FOLLOW-UP SUMMARY + FUNNEL (side by side)
          ════════════════════════════════════ */}
       <div className="grid gap-4 md:grid-cols-2">
         {/* SECTION 3: Follow-Up Summary */}
@@ -412,7 +433,7 @@ export default function CrmDashboardPage() {
       </div>
 
       {/* ════════════════════════════════════
-         SECTIONS 5+6: PATIENT RESPONSE + CONDITION (side by side)
+         SECTIONS 6+7: PATIENT RESPONSE + CONDITION (side by side)
          ════════════════════════════════════ */}
       <div className="grid gap-4 md:grid-cols-2">
         {/* SECTION 5: Patient Response Analytics */}
@@ -456,7 +477,7 @@ export default function CrmDashboardPage() {
       </div>
 
       {/* ════════════════════════════════════
-         SECTIONS 7+8: TREATMENT TYPE + DOCTOR (side by side)
+         SECTIONS 8+9: TREATMENT TYPE + DOCTOR (side by side)
          ════════════════════════════════════ */}
       <div className="grid gap-4 md:grid-cols-2">
         {/* SECTION 7: Treatment Type Performance */}
@@ -524,12 +545,12 @@ export default function CrmDashboardPage() {
       </div>
 
       {/* ════════════════════════════════════
-         SECTION 9: EXPENSES VS REVENUE QUICK VIEW
+         SECTION 10: EXPENSES VS REVENUE QUICK VIEW
          ════════════════════════════════════ */}
       <ExpensesVsRevenueQuickView className={cn(GLASS, "rounded-2xl p-5")} />
 
       {/* ════════════════════════════════════
-         SECTION 10: PATIENT ACQUISITION & REVENUE
+         SECTION 11: PATIENT ACQUISITION & REVENUE
          ════════════════════════════════════ */}
       <div className={cn(GLASS, "rounded-2xl p-5")}>
         <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
@@ -593,7 +614,7 @@ export default function CrmDashboardPage() {
       </div>
 
       {/* ════════════════════════════════════
-         SECTION 11: CRM TIMELINE
+         SECTION 12: CRM TIMELINE
          ════════════════════════════════════ */}
       <div className={cn(GLASS, "rounded-2xl p-5")}>
         <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
@@ -640,7 +661,7 @@ export default function CrmDashboardPage() {
       </div>
 
       {/* ════════════════════════════════════
-         SECTION 12: UPCOMING WORK
+         SECTION 13: UPCOMING WORK
          ════════════════════════════════════ */}
       <div className={cn(GLASS, "rounded-2xl p-5")}>
         <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">

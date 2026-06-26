@@ -1,0 +1,196 @@
+INFO:     Will watch for changes in these directories: ['C:\\Users\\harsh\\fastapi-project']
+DEBUG:matplotlib:matplotlib data path: C:\Users\harsh\AppData\Local\Programs\Python\Python314\Lib\site-packages\matplotlib\mpl-data
+DEBUG:matplotlib:CONFIGDIR=C:\Users\harsh\AppData\Local\matplotlib
+DEBUG:matplotlib:interactive is False
+DEBUG:matplotlib:platform is win32
+DEBUG:matplotlib:CACHEDIR=C:\Users\harsh\AppData\Local\matplotlib
+DEBUG:matplotlib.font_manager:Using fontManager instance from C:\Users\harsh\AppData\Local\matplotlib\fontlist-v3.11.0.json
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [18592] using WatchFiles
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:matplotlib:matplotlib data path: C:\Users\harsh\AppData\Local\Programs\Python\Python314\Lib\site-packages\matplotlib\mpl-data
+DEBUG:matplotlib:CONFIGDIR=C:\Users\harsh\AppData\Local\matplotlib
+DEBUG:matplotlib:interactive is False
+DEBUG:matplotlib:platform is win32
+DEBUG:matplotlib:CACHEDIR=C:\Users\harsh\AppData\Local\matplotlib
+DEBUG:matplotlib.font_manager:Using fontManager instance from C:\Users\harsh\AppData\Local\matplotlib\fontlist-v3.11.0.json
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+INFO:     Started server process [2368]
+INFO:     Waiting for application startup.
+DEBUG:watchfiles.main:2 changes detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err'), (<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server_errors.log')}
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+DEBUG:watchfiles.main:7 changes detected: {(<Change.deleted: 3>, 'C:\\Users\\harsh\\fastapi-project\\alembic\\versions\\__pycache__\\6dd7ea0d565c_add_campaign_redesign_tables_and_fields.cpython-314.pyc'), (<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\.git\\FETCH_HEAD'), (<Change.added: 1>, 'C:\\Users\\harsh\\fastapi-project\\alembic\\versions\\__pycache__\\6dd7ea0d565c_add_campaign_redesign_tables_and_fields.cpython-314.pyc'), (<Change.deleted: 3>, 'C:\\Users\\harsh\\fastapi-project\\alembic\\versions\\__pycache__\\6dd7ea0d565c_add_campaign_redesign_tables_and_fields.cpython-314.pyc.1843439580976'), (<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err'), (<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\alembic\\versions\\__pycache__'), (<Change.added: 1>, 'C:\\Users\\harsh\\fastapi-project\\alembic\\versions\\__pycache__\\6dd7ea0d565c_add_campaign_redesign_tables_and_fields.cpython-314.pyc.1843439580976')}
+INFO  [alembic.runtime.migration] Running upgrade 9f7ebbffc4cf -> 6b778d416392, add_indexes_for_dashboard_queries
+INFO  [alembic.runtime.migration] Running upgrade 6b778d416392 -> 6dd7ea0d565c, add_campaign_redesign_tables_and_fields
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:4 changes detected: {(<Change.deleted: 3>, 'C:\\Users\\harsh\\fastapi-project\\.git\\refs\\remotes\\origin\\HEAD.lock'), (<Change.added: 1>, 'C:\\Users\\harsh\\fastapi-project\\.git\\refs\\remotes\\origin\\HEAD.lock'), (<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err'), (<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\.git\\FETCH_HEAD')}
+DEBUG:watchfiles.main:5 changes detected: {(<Change.deleted: 3>, 'C:\\Users\\harsh\\fastapi-project\\.git\\objects\\maintenance.lock'), (<Change.added: 1>, 'C:\\Users\\harsh\\fastapi-project\\.git\\objects\\maintenance.lock'), (<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err'), (<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\.git\\objects'), (<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\.git\\refs\\remotes\\origin')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}
+DEBUG:watchfiles.main:1 change detected: {(<Change.modified: 2>, 'C:\\Users\\harsh\\fastapi-project\\server.err')}

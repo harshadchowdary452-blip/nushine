@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { patientsApi, casesApi, appointmentsApi, billingApi, treatmentApi, campaignsApi, crmApi, usersApi, consentFormsApi } from "@/services/endpoints";
+import { patientsApi, casesApi, appointmentsApi, billingApi, treatmentApi, campaignsApi, crmApi, usersApi, doctorsApi, consentFormsApi } from "@/services/endpoints";
 import api from "@/services/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,12 +22,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -55,13 +49,13 @@ import {
   ZoomOut,
   RotateCcw,
   MessageSquare,
-  Heart,
-  Star,
   Loader2,
   CalendarDays,
   Plus,
   CalendarRange,
   Stethoscope,
+  CreditCard,
+  ScrollText,
 } from "lucide-react";
 
 function getInitials(name: string): string {
@@ -98,6 +92,7 @@ export default function PatientDetail() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { addToast } = useToast();
+  const [activeTab, setActiveTab] = useState("overview");
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({
     full_name: "",
@@ -129,7 +124,7 @@ export default function PatientDetail() {
 
   const { data: doctorsData } = useQuery({
     queryKey: ["doctors", "dropdown"],
-    queryFn: () => usersApi.list({ role: "DOCTOR", page_size: 200 }),
+    queryFn: () => doctorsApi.list({ page_size: 200 }),
   });
   const doctors: any[] = Array.isArray(doctorsData) ? doctorsData : doctorsData?.items || [];
 
@@ -260,6 +255,17 @@ export default function PatientDetail() {
     }
   }, [patient]);
 
+  const tabBarRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const container = tabBarRef.current;
+    if (!container) return;
+    const activeBtn = container.querySelector<HTMLButtonElement>('[data-active="true"]');
+    if (activeBtn) {
+      activeBtn.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    }
+  }, [activeTab]);
+
   if (isLoading) return <PatientSkeleton />;
   if (error || !patient) {
     return (
@@ -342,6 +348,19 @@ export default function PatientDetail() {
       </div>
     );
   }
+
+  const tabs: { value: string; label: string; icon: any; getCount?: () => number | null }[] = [
+    { value: "overview", label: "Overview", icon: User },
+    { value: "cases", label: "Cases", icon: FileText, getCount: () => casesList.length },
+    { value: "appointments", label: "Appointments", icon: Calendar, getCount: () => appointmentsList.length },
+    { value: "treatments", label: "Treatments", icon: Activity, getCount: () => treatmentPlansList.length },
+    { value: "billing", label: "Billing", icon: CreditCard, getCount: () => billingsList.length },
+    { value: "responses", label: "Responses", icon: MessageSquare, getCount: () => followUpResponsesList.length },
+    { value: "follow-ups", label: "Follow-Ups", icon: CalendarDays, getCount: () => followUpHistory?.length || 0 },
+    { value: "timeline", label: "Timeline", icon: Clock },
+    { value: "images", label: "Images", icon: Camera },
+    { value: "consent-forms", label: "Consent Forms", icon: ScrollText },
+  ];
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -796,22 +815,64 @@ export default function PatientDetail() {
         </div>
       </Card>
 
-      {/* Tabs */}
-      <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="bg-white border border-border rounded-xl p-1 overflow-x-auto flex-nowrap scroll-smooth">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="cases">Cases ({casesList.length})</TabsTrigger>
-          <TabsTrigger value="appointments">Appointments ({appointmentsList.length})</TabsTrigger>
-          <TabsTrigger value="treatments">Treatments ({treatmentPlansList.length})</TabsTrigger>
-          <TabsTrigger value="billing">Billing ({billingsList.length})</TabsTrigger>
-          <TabsTrigger value="responses">Responses ({followUpResponsesList.length})</TabsTrigger>
-          <TabsTrigger value="follow-ups">Follow-Ups ({followUpHistory?.length || 0})</TabsTrigger>
-          <TabsTrigger value="timeline">Timeline</TabsTrigger>
-          <TabsTrigger value="images">Images</TabsTrigger>
-          <TabsTrigger value="consent-forms">Consent Forms</TabsTrigger>
-        </TabsList>
+      {/* Sticky Responsive Tab Navigation */}
+      <div className="sticky top-[57px] z-20 bg-background border-b border-border -mx-6 px-6 mb-6 shadow-sm">
+        <div
+          ref={tabBarRef}
+          className="flex items-center gap-1 overflow-x-auto scrollbar-hide scroll-smooth py-2.5"
+          onWheel={(e) => {
+            const el = e.currentTarget;
+            if (el.scrollWidth > el.clientWidth) {
+              el.scrollLeft += e.deltaY;
+            }
+          }}
+          role="tablist"
+          aria-label="Patient section navigation"
+        >
+          {tabs.map((tab) => {
+            const count = tab.getCount?.();
+            const isActive = activeTab === tab.value;
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.value}
+                role="tab"
+                aria-selected={isActive}
+                aria-label={`${tab.label}${count != null && count > 0 ? ` (${count})` : ""}`}
+                data-active={isActive ? "true" : undefined}
+                onClick={() => setActiveTab(tab.value)}
+                className={`
+                  relative flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium
+                  whitespace-nowrap transition-all duration-200 min-h-[44px] flex-shrink-0
+                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2
+                  ${isActive
+                    ? "bg-primary text-white shadow-md shadow-primary/20"
+                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                  }
+                `}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                <span className="truncate max-w-[90px] sm:max-w-none">{tab.label}</span>
+                {count != null && count > 0 && (
+                  <span
+                    className={`
+                      inline-flex items-center justify-center rounded-full text-xs font-semibold
+                      px-1.5 py-0.5 min-w-[20px] h-5 leading-none
+                      ${isActive ? "bg-white/20 text-white" : "bg-muted/50 text-muted-foreground"}
+                    `}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-        <TabsContent value="overview" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
+      {/* Tab Content - Lazy Loaded */}
+      {activeTab === "overview" && (
+        <div className="overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 320px)" }}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card className="p-6 border-border shadow-card">
               <h3 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
@@ -920,9 +981,11 @@ export default function PatientDetail() {
               )}
             </Card>
           </div>
-        </TabsContent>
+        </div>
+      )}
 
-        <TabsContent value="cases" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
+      {activeTab === "cases" && (
+        <div className="overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 320px)" }}>
           {casesList.length === 0 ? (
             <Card className="p-12 text-center border-border shadow-card">
               <FileText className="h-12 w-12 text-text-muted mx-auto mb-3" />
@@ -952,9 +1015,11 @@ export default function PatientDetail() {
               ))}
             </div>
           )}
-        </TabsContent>
+        </div>
+      )}
 
-        <TabsContent value="appointments" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
+      {activeTab === "appointments" && (
+        <div className="overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 320px)" }}>
           {appointmentsList.length === 0 ? (
             <Card className="p-12 text-center border-border shadow-card">
               <Clock className="h-12 w-12 text-text-muted mx-auto mb-3" />
@@ -977,9 +1042,11 @@ export default function PatientDetail() {
               ))}
             </div>
           )}
-        </TabsContent>
+        </div>
+      )}
 
-        <TabsContent value="treatments" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
+      {activeTab === "treatments" && (
+        <div className="overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 320px)" }}>
           {treatmentPlansList.length === 0 ? (
             <Card className="p-12 text-center border-border shadow-card">
               <FileText className="h-12 w-12 text-text-muted mx-auto mb-3" />
@@ -1020,9 +1087,11 @@ export default function PatientDetail() {
               })}
             </div>
           )}
-        </TabsContent>
+        </div>
+      )}
 
-        <TabsContent value="billing" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
+      {activeTab === "billing" && (
+        <div className="overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 320px)" }}>
           {billingsList.length === 0 ? (
             <Card className="p-12 text-center border-border shadow-card">
               <FileText className="h-12 w-12 text-text-muted mx-auto mb-3" />
@@ -1048,9 +1117,11 @@ export default function PatientDetail() {
               ))}
             </div>
           )}
-        </TabsContent>
+        </div>
+      )}
 
-        <TabsContent value="responses" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
+      {activeTab === "responses" && (
+        <div className="overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 320px)" }}>
           <Card className="p-6 border-border shadow-card">
             <h3 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
               <MessageSquare className="h-5 w-5 text-primary" />
@@ -1139,9 +1210,11 @@ export default function PatientDetail() {
               </div>
             )}
           </Card>
-        </TabsContent>
+        </div>
+      )}
 
-        <TabsContent value="follow-ups" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
+      {activeTab === "follow-ups" && (
+        <div className="overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 320px)" }}>
           {followUpHistory && followUpHistory.length > 0 ? (
             <FollowUpHistory patientId={id!} />
           ) : (
@@ -1150,13 +1223,17 @@ export default function PatientDetail() {
               <p className="text-text-secondary">No follow-ups found</p>
             </Card>
           )}
-        </TabsContent>
+        </div>
+      )}
 
-        <TabsContent value="timeline" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
+      {activeTab === "timeline" && (
+        <div className="overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 320px)" }}>
           {renderTimeline()}
-        </TabsContent>
+        </div>
+      )}
 
-        <TabsContent value="images" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
+      {activeTab === "images" && (
+        <div className="overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 320px)" }}>
           <div className="space-y-6">
             {casesList.length === 0 ? (
               <Card className="p-12 text-center border-border shadow-card">
@@ -1169,13 +1246,14 @@ export default function PatientDetail() {
               ))
             )}
           </div>
-        </TabsContent>
+        </div>
+      )}
 
-        <TabsContent value="consent-forms" className="mt-6 overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 300px)" }}>
+      {activeTab === "consent-forms" && (
+        <div className="overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 320px)" }}>
           <ConsentFormsSection patientId={patient.id} />
-        </TabsContent>
-
-      </Tabs>
+        </div>
+      )}
     </div>
   );
 }
