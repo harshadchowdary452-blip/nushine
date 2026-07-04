@@ -10,6 +10,7 @@ from app.models.case import Case
 from app.repositories.pre_op_repository import PreOpRepository
 from app.repositories.audit_log_repository import AuditLogRepository
 from app.config import settings
+from app.services.timeline_helper import record_timeline_event
 
 router = APIRouter(prefix="/pre-ops", tags=["Pre-Op"])
 
@@ -96,4 +97,10 @@ async def add_pre_op(case_id: str, notes: Optional[str] = Form(None), photos: Li
         return {"id": str(updated.id), "notes": updated.notes, "photo_urls": photo_urls, "xray_urls": xray_urls}
     pre_op = await repo.create(case_id=case_id, notes=notes, photo_urls=",".join(photo_urls) if photo_urls else None, xray_urls=",".join(xray_urls) if xray_urls else None)
     await audit.create(user_id=current_user.get("sub"), action="ADD_PRE_OP", entity_type="PRE_OP", entity_id=str(pre_op.id), details="Pre-op added")
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=case_obj.patient_id,
+        action="Pre-Op Added",
+        description=f"Pre-operative notes added",
+        module="Treatments",
+    )
     return {"id": str(pre_op.id), "notes": pre_op.notes, "photo_urls": photo_urls, "xray_urls": xray_urls}

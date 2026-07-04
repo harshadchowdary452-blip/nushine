@@ -16,6 +16,8 @@ class CaseRepository(BaseRepository[Case]):
         query = select(self.model).where(self.model.id == id).options(
             selectinload(self.model.patient),
             selectinload(self.model.doctor),
+            selectinload(self.model.created_by),
+            selectinload(self.model.updated_by),
             selectinload(self.model.consultant),
             selectinload(self.model.findings),
         )
@@ -26,6 +28,8 @@ class CaseRepository(BaseRepository[Case]):
         query = select(self.model).options(
             selectinload(self.model.patient),
             selectinload(self.model.doctor),
+            selectinload(self.model.created_by),
+            selectinload(self.model.updated_by),
             selectinload(self.model.consultant),
             selectinload(self.model.findings),
         )

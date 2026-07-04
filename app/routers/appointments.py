@@ -16,6 +16,7 @@ from app.models.user import User
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.audit_log import AuditLog
 from app.services.status_automation import StatusAutomationService
+from app.services.timeline_helper import record_timeline_event, build_changes
 
 router = APIRouter(prefix="/appointments", tags=["Appointments"])
 logger = logging.getLogger(__name__)
@@ -196,6 +197,13 @@ async def create_appointment(data: AppointmentCreate, db: AsyncSession = Depends
     service = AppointmentService(db)
     appointment = await service.create(data.model_dump(), user_id=current_user.get("sub"))
 
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=data.patient_id,
+        action="Appointment Created",
+        description=f"Appointment created for patient",
+        module="Appointments",
+    )
+
     return appointment
 
 
@@ -258,13 +266,23 @@ async def update_appointment(appointment_id: str, data: AppointmentUpdate, db: A
     if not appointment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
     await verify_tenant_access(current_user, appointment, "appointment", db)
-    appointment = await service.update(appointment_id, data.model_dump(exclude_none=True), user_id=current_user.get("sub"))
+    old_data = {"status": appointment.status.value if hasattr(appointment.status, 'value') else appointment.status, "appointment_date": str(appointment.appointment_date) if appointment.appointment_date else None, "appointment_time": str(appointment.appointment_time) if appointment.appointment_time else None, "notes": appointment.notes}
+    updated = await service.update(appointment_id, data.model_dump(exclude_none=True), user_id=current_user.get("sub"))
     if data.status is not None:
         from app.models.appointment import AppointmentStatus
         svc = StatusAutomationService(db)
         await svc.update_appointment_status(appointment_id, AppointmentStatus(data.status))
         await db.commit()
-    return appointment
+    new_data = {"status": updated.status.value if hasattr(updated.status, 'value') else updated.status, "appointment_date": str(updated.appointment_date) if updated.appointment_date else None, "appointment_time": str(updated.appointment_time) if updated.appointment_time else None, "notes": updated.notes}
+    changes = build_changes(old_data, new_data)
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=appointment.patient_id,
+        action="Appointment Updated",
+        description=f"Appointment updated",
+        module="Appointments",
+        changes=changes,
+    )
+    return updated
 
 
 @router.delete("/{appointment_id}", response_model=MessageResponse)
@@ -275,7 +293,14 @@ async def delete_appointment(appointment_id: str, db: AsyncSession = Depends(get
     if not appointment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
     await verify_tenant_access(current_user, appointment, "appointment", db)
+    patient_id = appointment.patient_id
     deleted = await service.delete(appointment_id, user_id=current_user.get("sub"))
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=patient_id,
+        action="Appointment Deleted",
+        description=f"Appointment on {appointment.appointment_date} deleted",
+        module="Appointments",
+    )
     return MessageResponse(message="Appointment deleted successfully")
 
 
@@ -287,12 +312,19 @@ async def cancel_appointment(appointment_id: str, db: AsyncSession = Depends(get
     if not appointment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
     await verify_tenant_access(current_user, appointment, "appointment", db)
+    patient_id = appointment.patient_id
     appointment = await service.cancel(appointment_id, user_id=current_user.get("sub"))
     if not appointment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
     svc = StatusAutomationService(db)
     await svc.update_appointment_status(appointment_id, AppointmentStatus.CANCELLED)
     await db.commit()
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=patient_id,
+        action="Appointment Cancelled",
+        description=f"Appointment on {appointment.appointment_date} cancelled",
+        module="Appointments",
+    )
     return MessageResponse(message="Appointment cancelled successfully")
 
 
@@ -329,6 +361,13 @@ async def reassign_appointment_doctor(
         details=f"Doctor changed from {old_doctor.full_name if old_doctor else old_doctor_id} to {new_doctor.full_name}. Reason: {req.reason or 'Not specified'}",
     )
     db.add(audit)
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=appointment.patient_id,
+        action="Doctor Reassigned",
+        description=f"Doctor changed from {old_doctor.full_name if old_doctor else old_doctor_id} to {new_doctor.full_name}",
+        module="Appointments",
+        changes=[{"field": "doctor", "old_value": old_doctor.full_name if old_doctor else old_doctor_id, "new_value": new_doctor.full_name}],
+    )
     await db.commit()
     await db.refresh(appointment)
 

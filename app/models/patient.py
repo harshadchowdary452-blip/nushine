@@ -9,10 +9,14 @@ from enum import Enum
 class PatientStatus(str, Enum):
     NEW = "NEW"
     ACTIVE = "ACTIVE"
+    INACTIVE = "INACTIVE"
     UNDER_TREATMENT = "UNDER_TREATMENT"
+    TREATMENT_ONGOING = "TREATMENT_ONGOING"
     FOLLOW_UP = "FOLLOW_UP"
     COMPLETED = "COMPLETED"
-    INACTIVE = "INACTIVE"
+    OPD = "OPD"
+    LOST = "LOST"
+    ARCHIVED = "ARCHIVED"
 
 
 class Patient(Base):
@@ -38,7 +42,7 @@ class Patient(Base):
     sugar: Mapped[str] = mapped_column(String(20), nullable=True)
     spo2: Mapped[str] = mapped_column(String(10), nullable=True)
     medical_history: Mapped[str] = mapped_column(Text, nullable=True)
-    diagnosis: Mapped[str] = mapped_column(Text, nullable=True)
+    abha_id: Mapped[str] = mapped_column(String(20), index=True, nullable=True)
     op_no: Mapped[str] = mapped_column(String(100), nullable=True)
     emergency_contact: Mapped[str] = mapped_column(String(255), nullable=True)
     photo_url: Mapped[str] = mapped_column(String(500), nullable=True)

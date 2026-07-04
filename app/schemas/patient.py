@@ -24,7 +24,7 @@ class PatientCreate(BaseModel):
     sugar: Optional[str] = None
     spo2: Optional[str] = None
     medical_history: Optional[str] = None
-    diagnosis: Optional[str] = None
+    abha_id: Optional[str] = None
     op_no: Optional[str] = None
     status: Optional[str] = None
 
@@ -48,7 +48,7 @@ class PatientUpdate(BaseModel):
     sugar: Optional[str] = None
     spo2: Optional[str] = None
     medical_history: Optional[str] = None
-    diagnosis: Optional[str] = None
+    abha_id: Optional[str] = None
     op_no: Optional[str] = None
     status: Optional[str] = None
 
@@ -75,7 +75,7 @@ class PatientResponse(BaseModel):
     sugar: Optional[str]
     spo2: Optional[str]
     medical_history: Optional[str]
-    diagnosis: Optional[str]
+    abha_id: Optional[str]
     op_no: Optional[str]
     photo_url: Optional[str]
     status: str

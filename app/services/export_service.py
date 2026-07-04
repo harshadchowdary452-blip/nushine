@@ -102,16 +102,16 @@ def _stream_csv(rows, headers, filename):
 async def _csv_patients(db, hospital_ids, date_start, date_end):
     q = select(
         Patient.op_no, Patient.full_name, Patient.age, Patient.gender,
-        Patient.phone, Patient.patient_source, Patient.doctor_id, Patient.status,
+        Patient.phone, Patient.abha_id, Patient.patient_source, Patient.doctor_id, Patient.status,
     ).where(Patient.created_at >= date_start, Patient.created_at < date_end)
     if hospital_ids is not None:
         q = q.where(Patient.hospital_id.in_(hospital_ids))
     q = q.order_by(Patient.created_at.desc())
     rows = (await db.execute(q)).all()
-    doc_ids = set(r[6] for r in rows if r[6])
+    doc_ids = set(r[7] for r in rows if r[7])
     doc_names = await _name_dict(db, User, doc_ids)
-    headers = ["OP Number", "Patient Name", "Age", "Gender", "Phone", "Source", "Assigned Doctor", "Status"]
-    data = [[r[0] or "", r[1], r[2] or "", r[3] or "", r[4] or "", r[5] or "", doc_names.get(r[6], ""), r[7]] for r in rows]
+    headers = ["OP Number", "Patient Name", "Age", "Gender", "Phone", "ABHA ID", "Source", "Assigned Doctor", "Status"]
+    data = [[r[0] or "", r[1], r[2] or "", r[3] or "", r[4] or "", r[5] or "", r[6] or "", doc_names.get(r[7], ""), r[8]] for r in rows]
     return data, headers, len(rows)
 
 

@@ -1,12 +1,12 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   Phone, MessageCircle, CheckCircle, Loader2,
   Search, ChevronLeft, ChevronRight, ChevronsLeft, Calendar,
-  FileText, History, RotateCcw, User, Stethoscope, X,
+  FileText, History, RotateCcw, User, Stethoscope, X, Copy, Check,
 } from "lucide-react"
 import { format, addDays, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addWeeks, subWeeks, addMonths, subMonths } from "date-fns"
-import { enquiriesApi, crmApi, appointmentsApi, doctorsApi } from "@/services/endpoints"
+import { enquiriesApi, crmApi, appointmentsApi, doctorsApi, whatsappTemplatesApi } from "@/services/endpoints"
 import PageHeader from "@/components/layout/page-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -19,6 +19,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+
+
+const DEFAULT_ENQUIRY_TEMPLATE = `Hello {{patient_name}},
+
+We hope you are doing well after your recent {{treatment_name}} at {{hospital_name}}.
+
+We would like to know how you are feeling now.
+
+• Are you recovering well?
+• Are you experiencing any discomfort?
+• Would you like to schedule a follow-up visit with Dr. {{doctor_name}} if required?
+
+Please let us know. We are happy to assist you.
+
+Thank you,
+{{hospital_name}}`
+
+function replaceTemplateVars(template: string, vars: Record<string, string | undefined>): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] || "")
+}
 
 const followUpStatusColors: Record<string, string> = {
   PENDING: "bg-amber-50 border-amber-200 text-amber-700",
@@ -41,6 +61,7 @@ const followUpTypeLabels: Record<string, string> = {
   "12_MONTH_RECALL": "12-Month Recall",
   CUSTOM_FOLLOW_UP: "Custom FU",
   ENQUIRY: "Enquiry",
+  OPD_FOLLOW_UP: "OPD Follow-Up",
   MANUAL: "Manual",
 }
 
@@ -134,6 +155,22 @@ export default function EnquiryCalendar() {
   const [fbNextAction, setFbNextAction] = useState("")
   const [fbSaving, setFbSaving] = useState(false)
 
+  // Interested to Visit Again
+  const [fbInterested, setFbInterested] = useState("")
+  // Appointment from feedback
+  const [fbApptOpen, setFbApptOpen] = useState(false)
+  const [fbApptDoctorId, setFbApptDoctorId] = useState("")
+  const [fbApptDate, setFbApptDate] = useState("")
+  const [fbApptTime, setFbApptTime] = useState("")
+  const [fbApptSaving, setFbApptSaving] = useState(false)
+
+  const { data: fbSlots } = useQuery({
+    queryKey: ["fb-appointment-slots", fbApptDoctorId, fbApptDate],
+    queryFn: () => appointmentsApi.slots({ doctor_id: fbApptDoctorId, date: fbApptDate }),
+    enabled: !!fbApptDoctorId && !!fbApptDate && fbApptOpen,
+  })
+  const fbSlotsList: string[] = Array.isArray(fbSlots) ? fbSlots : fbSlots?.slots ? fbSlots.slots : []
+
   function openFeedback(item: any, channel?: string) {
     setFeedbackItem(item)
     setFeedbackOpen(item.id)
@@ -142,18 +179,23 @@ export default function EnquiryCalendar() {
     setFbStaffNotes(item.staff_notes || "")
     setFbSummary(item.response || "")
     setFbNextAction(item.next_action || "")
+    setFbInterested("")
+    setFbApptOpen(false)
+    setFbApptDoctorId(item.doctor_id || "")
+    setFbApptDate("")
+    setFbApptTime("")
   }
 
   function closeFeedback() {
-    setFeedbackOpen(null); setFeedbackItem(null); setFbSaving(false)
+    setFeedbackOpen(null); setFeedbackItem(null); setFbSaving(false); setFbApptOpen(false)
     setFbResponseStatus(""); setFbPatientFeedback(""); setFbStaffNotes(""); setFbSummary(""); setFbNextAction("")
+    setFbInterested(""); setFbApptDoctorId(""); setFbApptDate(""); setFbApptTime(""); setFbApptSaving(false)
   }
 
   async function handleRecordFeedback() {
     if (!feedbackOpen || !fbResponseStatus) return
     setFbSaving(true)
     try {
-      // Map response status to follow-up status
       let status = "PENDING"
       if (["NO_RESPONSE", "BUSY", "WRONG_NUMBER"].includes(fbResponseStatus)) status = "NO_RESPONSE"
       else if (fbResponseStatus === "NOT_INTERESTED") status = "LOST"
@@ -166,8 +208,12 @@ export default function EnquiryCalendar() {
         staff_notes: fbStaffNotes || undefined,
         response_summary: fbSummary || undefined,
         next_action: fbNextAction || undefined,
+        interested_to_visit_again: fbInterested || undefined,
       })
       queryClient.invalidateQueries({ queryKey: ["enquiry-calendar"] })
+      queryClient.invalidateQueries({ queryKey: ["dash"] })
+      queryClient.invalidateQueries({ queryKey: ["crm-enhanced-dashboard"] })
+      queryClient.invalidateQueries({ queryKey: ["dashboard-doctors"] })
       addToast({ title: "Feedback saved", variant: "success" })
       closeFeedback()
     } catch (err: any) {
@@ -176,12 +222,43 @@ export default function EnquiryCalendar() {
     setFbSaving(false)
   }
 
+  async function handleFbBookAppointment() {
+    if (!feedbackItem || !feedbackOpen || !fbApptDoctorId || !fbApptDate || !fbApptTime) return
+    setFbApptSaving(true)
+    try {
+      const resp = await appointmentsApi.create({
+        patient_id: feedbackItem.patient_id,
+        doctor_id: fbApptDoctorId,
+        appointment_date: fbApptDate,
+        appointment_time: fbApptTime,
+        appointment_type: "FOLLOW_UP",
+        notes: "Created from enquiry calendar feedback",
+      })
+      await crmApi.followUps.update(feedbackOpen, {
+        status: "APPOINTMENT_BOOKED",
+        appointment_id: resp.id || resp.appointment_id,
+      })
+      queryClient.invalidateQueries({ queryKey: ["enquiry-calendar"] })
+      queryClient.invalidateQueries({ queryKey: ["dash"] })
+      queryClient.invalidateQueries({ queryKey: ["crm-enhanced-dashboard"] })
+      queryClient.invalidateQueries({ queryKey: ["dashboard-doctors"] })
+      addToast({ title: "Appointment created & feedback saved", variant: "success" })
+      closeFeedback()
+    } catch (err: any) {
+      addToast({ title: "Error", description: err?.response?.data?.detail || "Booking failed", variant: "destructive" })
+    }
+    setFbApptSaving(false)
+  }
+
   // --- Mark Completed ---
   async function handleMarkCompleted(id: string) {
     try {
       await crmApi.followUps.markCompleted(id)
       queryClient.invalidateQueries({ queryKey: ["enquiry-calendar"] })
-      addToast({ title: "Marked completed", variant: "success" })
+      queryClient.invalidateQueries({ queryKey: ["dash"] })
+      queryClient.invalidateQueries({ queryKey: ["crm-enhanced-dashboard"] })
+      queryClient.invalidateQueries({ queryKey: ["dashboard-doctors"] })
+      addToast({ title: "Marked completed, dashboard updated", variant: "success" })
     } catch (err: any) {
       addToast({ title: "Error", description: err?.response?.data?.detail || "Failed", variant: "destructive" })
     }
@@ -251,7 +328,10 @@ export default function EnquiryCalendar() {
         next_action: "BOOK_APPOINTMENT",
       })
       queryClient.invalidateQueries({ queryKey: ["enquiry-calendar"] })
-      addToast({ title: "Appointment created & follow-up updated", variant: "success" })
+      queryClient.invalidateQueries({ queryKey: ["dash"] })
+      queryClient.invalidateQueries({ queryKey: ["crm-enhanced-dashboard"] })
+      queryClient.invalidateQueries({ queryKey: ["dashboard-doctors"] })
+      addToast({ title: "Appointment created, timeline & dashboard updated", variant: "success" })
       setApptOpen(null); setApptItem(null); setApptDoctorId(""); setApptDate(""); setApptTime(""); setApptSaving(false)
     } catch (err: any) {
       addToast({ title: "Error", description: err?.response?.data?.detail || "Booking failed", variant: "destructive" })
@@ -263,26 +343,73 @@ export default function EnquiryCalendar() {
   const [waOpen, setWaOpen] = useState<string | null>(null)
   const [waItem, setWaItem] = useState<any>(null)
   const [waMessage, setWaMessage] = useState("")
+  const [waLoading, setWaLoading] = useState(false)
+  const [waTemplateError, setWaTemplateError] = useState("")
 
-  function openWhatsApp(item: any) {
+  function buildWhatsAppVars(item: any): Record<string, string> {
+    return {
+      patient_name: item.patient_name || "Patient",
+      doctor_name: item.doctor_name || "Doctor",
+      hospital_name: currentUser?.hospital_name || "our clinic",
+      treatment_name: item.treatment_name || "treatment",
+      appointment_date: item.appointment_date || "soon",
+      hospital_phone: currentUser?.hospital_phone || item.hospital_phone || "",
+    }
+  }
+
+  async function openWhatsApp(item: any) {
     const phone = item.patient_phone
-    if (!phone) { addToast({ title: "No phone number for this patient", variant: "destructive" }); return }
+    if (!phone) { addToast({ title: "Patient mobile number is not available.", variant: "destructive" }); return }
     setWaItem(item)
     setWaOpen(item.id)
-    setWaMessage(`Dear ${item.patient_name}, this is a follow-up regarding your ${item.treatment_name || "treatment"} at our clinic. Please let us know if you'd like to schedule a visit.`)
+    setWaTemplateError("")
+    setWaLoading(true)
+    // Try to load backend template named "Enquiry Follow-Up" or "1-Day Enquiry"
+    try {
+      const templates = await whatsappTemplatesApi.list({ hospital_id: currentUser?.hospital_id })
+      const list: any[] = Array.isArray(templates) ? templates : templates?.items || templates?.data || []
+      const template = list.find((t: any) =>
+        t.is_active !== false && t.name && /enquiry|follow.?up/i.test(t.name) && t.message
+      )
+      if (template && template.message) {
+        const vars = buildWhatsAppVars(item)
+        setWaMessage(replaceTemplateVars(template.message, vars))
+      } else {
+        // No enquiry template found, try any active template
+        const anyTemplate = list.find((t: any) => t.is_active !== false && t.message)
+        if (anyTemplate?.message) {
+          const vars = buildWhatsAppVars(item)
+          setWaMessage(replaceTemplateVars(anyTemplate.message, vars))
+        } else {
+          setWaMessage(replaceTemplateVars(DEFAULT_ENQUIRY_TEMPLATE, buildWhatsAppVars(item)))
+        }
+      }
+    } catch {
+      setWaMessage(replaceTemplateVars(DEFAULT_ENQUIRY_TEMPLATE, buildWhatsAppVars(item)))
+    }
+    setWaLoading(false)
   }
 
   async function sendWhatsApp() {
     if (!waOpen || !waItem || !waMessage) return
-    const phone = waItem.patient_phone?.replace(/[^0-9]/g, "")
-    if (!phone) return
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(waMessage)}`, "_blank")
-    // Auto-mark as contacted and record channel
+    // Validate no unresolved template variables
+    const unresolved = waMessage.match(/\{\{(\w+)\}\}/g)
+    if (unresolved && unresolved.length > 0) {
+      setWaTemplateError(`Unresolved variables: ${unresolved.join(", ")}. Please replace them before sending.`)
+      return
+    }
+    const rawPhone = waItem.patient_phone || ""
+    const phone = rawPhone.replace(/[^0-9]/g, "")
+    if (!phone) { addToast({ title: "Patient mobile number is not available.", variant: "destructive" }); return }
+    // Open WhatsApp with message
+    const waLink = `https://wa.me/${phone}?text=${encodeURIComponent(waMessage)}`
+    window.open(waLink, "_blank")
+    // Auto-mark as contacted
     try {
-      await crmApi.followUps.update(waOpen, { status: "CONTACTED", contact_channel: "WHATSAPP" })
+      await crmApi.followUps.update(waOpen, { status: "CONTACTED", contact_channel: "WHATSAPP", whatsapp_message: waMessage })
       queryClient.invalidateQueries({ queryKey: ["enquiry-calendar"] })
     } catch {}
-    setWaOpen(null); setWaMessage("")
+    setWaOpen(null); setWaMessage(""); setWaTemplateError("")
     setTimeout(() => openFeedback(waItem, "WHATSAPP"), 800)
   }
 
@@ -290,7 +417,11 @@ export default function EnquiryCalendar() {
   function handleCall(item: any) {
     const phone = item.patient_phone
     if (!phone) { addToast({ title: "No phone number for this patient", variant: "destructive" }); return }
-    window.open(`tel:${phone}`, "_self")
+    // Copy number to clipboard as fallback
+    navigator.clipboard.writeText(phone).catch(() => {})
+    // Open dialer
+    window.location.href = `tel:${phone}`
+    addToast({ title: `Dialing ${phone}`, description: "Number copied to clipboard", variant: "default" })
     // Auto-mark as contacted
     crmApi.followUps.update(item.id, { status: "CONTACTED", contact_channel: "CALL" }).then(() => {
       queryClient.invalidateQueries({ queryKey: ["enquiry-calendar"] })
@@ -397,6 +528,7 @@ export default function EnquiryCalendar() {
                 <SelectItem value="12_MONTH_RECALL">12-Month Recall</SelectItem>
                 <SelectItem value="CUSTOM_FOLLOW_UP">Custom FU</SelectItem>
                 <SelectItem value="ENQUIRY">Enquiry</SelectItem>
+                <SelectItem value="OPD_FOLLOW_UP">OPD Follow-Up</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -582,8 +714,8 @@ export default function EnquiryCalendar() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Patient Feedback</Label>
-              <Textarea value={fbPatientFeedback} onChange={(e) => setFbPatientFeedback(e.target.value)} rows={2} placeholder="What the patient said..." />
+              <Label>Patient Condition / Feedback</Label>
+              <Textarea value={fbPatientFeedback} onChange={(e) => setFbPatientFeedback(e.target.value)} rows={2} placeholder="How is the patient feeling? Any discomfort?" />
             </div>
             <div className="space-y-2">
               <Label>Staff Notes</Label>
@@ -593,6 +725,75 @@ export default function EnquiryCalendar() {
               <Label>Response Summary</Label>
               <Input value={fbSummary} onChange={(e) => setFbSummary(e.target.value)} placeholder="Brief outcome" />
             </div>
+            <div className="space-y-2">
+              <Label>Interested To Visit Again</Label>
+              <div className="flex gap-2">
+                {["Yes", "No", "Maybe"].map((opt) => (
+                  <Button
+                    key={opt}
+                    type="button"
+                    variant={fbInterested === opt ? "default" : "outline"}
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setFbInterested(opt)}
+                  >
+                    {opt}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            {fbInterested === "Yes" && (
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-3">
+                <Label className="font-semibold text-primary">Create Appointment</Label>
+                <div className="space-y-2">
+                  <Label>Doctor <span className="text-red-500">*</span></Label>
+                  <Select value={fbApptDoctorId} onValueChange={setFbApptDoctorId}>
+                    <SelectTrigger><SelectValue placeholder="Select doctor" /></SelectTrigger>
+                    <SelectContent position="popper" className="max-h-[220px]">
+                      {doctorsList.length === 0 && <SelectItem value="__loading__" disabled>No doctors available</SelectItem>}
+                      {doctorsList.map((doc: any) => (
+                        <SelectItem key={doc.id} value={doc.id}>{doc.full_name || doc.name || doc.username}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Date <span className="text-red-500">*</span></Label>
+                  <Input type="date" value={fbApptDate} onChange={(e) => setFbApptDate(e.target.value)} min={format(today, "yyyy-MM-dd")} />
+                </div>
+                {fbApptDoctorId && fbApptDate && (
+                  <div className="space-y-2">
+                    <Label>Available Time Slots</Label>
+                    {fbSlotsList.length > 0 ? (
+                      <div className="grid grid-cols-4 gap-1.5 max-h-[150px] overflow-y-auto p-1 border rounded-md">
+                        {fbSlotsList.map((slot: string) => (
+                          <Button key={slot} variant={fbApptTime === slot ? "default" : "outline"} size="sm"
+                            className={`text-xs h-8 ${fbApptTime === slot ? "ring-2 ring-primary" : ""}`}
+                            onClick={() => setFbApptTime(slot)}>
+                            {slot.replace(/^(\d{2})(\d{2})$/, "$1:$2")}
+                          </Button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">No slots found. Select a time manually below.</p>
+                    )}
+                    <Select value={fbApptTime} onValueChange={setFbApptTime}>
+                      <SelectTrigger><SelectValue placeholder="Or select time" /></SelectTrigger>
+                      <SelectContent position="popper" className="max-h-[220px]">
+                        {timeSlots.map((t) => (
+                          <SelectItem key={t} value={t}>{t}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <Button className="w-full" onClick={handleFbBookAppointment}
+                  disabled={!fbApptDoctorId || !fbApptDate || !fbApptTime || fbApptSaving}>
+                  {fbApptSaving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                  <Calendar className="h-4 w-4 mr-2" /> Create Appointment
+                </Button>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Next Action</Label>
               <Select value={fbNextAction} onValueChange={setFbNextAction}>
@@ -616,22 +817,31 @@ export default function EnquiryCalendar() {
       </Dialog>
 
       {/* WhatsApp Dialog */}
-      <Dialog open={!!waOpen} onOpenChange={(o) => { if (!o) { setWaOpen(null); setWaMessage("") } }}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog open={!!waOpen} onOpenChange={(o) => { if (!o) { setWaOpen(null); setWaMessage(""); setWaTemplateError("") } }}>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader><DialogTitle>Send WhatsApp to {waItem?.patient_name || ""}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="text-sm text-muted-foreground">
               To: <strong>{waItem?.patient_phone || ""}</strong>
             </div>
             <div className="space-y-2">
-              <Label>Message</Label>
-              <Textarea value={waMessage} onChange={(e) => setWaMessage(e.target.value)} rows={5} placeholder="Type your message..." />
+              <Label>Message Preview</Label>
+              {waLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-4"><Loader2 className="h-4 w-4 animate-spin" /> Loading template...</div>
+              ) : (
+                <Textarea value={waMessage} onChange={(e) => setWaMessage(e.target.value)} rows={8} className="text-sm font-mono" placeholder="Type your message..." />
+              )}
             </div>
-            <p className="text-xs text-muted-foreground">WhatsApp will open in a new tab with this message pre-filled.</p>
-            <Button className="w-full" onClick={sendWhatsApp} disabled={!waMessage}>
-              <MessageCircle className="h-4 w-4 mr-2" /> Open WhatsApp
-            </Button>
-            <Button variant="outline" className="w-full" onClick={() => { setWaOpen(null); setWaMessage("") }}>Cancel</Button>
+            {waTemplateError && (
+              <div className="text-xs text-red-600 bg-red-50 rounded px-3 py-2">{waTemplateError}</div>
+            )}
+            <p className="text-xs text-muted-foreground">WhatsApp will open in a new tab with this message pre-filled. You can edit the message before sending.</p>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => { setWaOpen(null); setWaMessage(""); setWaTemplateError("") }}>Cancel</Button>
+              <Button className="flex-1" onClick={sendWhatsApp} disabled={!waMessage || waLoading}>
+                <MessageCircle className="h-4 w-4 mr-2" /> Open WhatsApp
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

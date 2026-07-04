@@ -211,8 +211,6 @@ class CampaignService:
             query = query.where(Patient.doctor_id == filters["doctor_id"])
         if filters.get("city"):
             query = query.where(Patient.address.ilike(f"%{filters['city']}%"))
-        if filters.get("tags"):
-            query = query.where(Patient.diagnosis.ilike(f"%{filters['tags']}%"))
         result = await self.db.execute(query)
         return list(result.scalars().all())
 

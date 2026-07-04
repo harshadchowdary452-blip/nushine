@@ -23,7 +23,7 @@ class CaseTimelineRepository(BaseRepository[CaseTimeline]):
         result = await self.db.execute(query)
         return list(result.scalars().all())
 
-    async def create_entry(self, case_id: str, action: str, field_name: str = None, old_value: str = None, new_value: str = None, performed_by: str = None) -> CaseTimeline:
+    async def create_entry(self, case_id: str, action: str, field_name: str = None, old_value: str = None, new_value: str = None, performed_by: str = None, performer_role: str = None) -> CaseTimeline:
         entry = self.model(
             case_id=case_id,
             action=action,
@@ -31,6 +31,7 @@ class CaseTimelineRepository(BaseRepository[CaseTimeline]):
             old_value=old_value,
             new_value=new_value,
             performed_by=performed_by,
+            performer_role=performer_role,
         )
         self.db.add(entry)
         await self.db.flush()

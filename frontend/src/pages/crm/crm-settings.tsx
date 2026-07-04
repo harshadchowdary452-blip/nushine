@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Settings, Plus, Trash2, Loader2, ToggleLeft, ToggleRight, Database } from "lucide-react"
+import { Settings, Plus, Trash2, Loader2, ToggleLeft, ToggleRight, Database, Clock, User, Flag } from "lucide-react"
 import { crmSettingsApi, treatmentTypesApi } from "@/services/endpoints"
 import PageHeader from "@/components/layout/page-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -29,6 +29,12 @@ export default function CrmSettings() {
     queryFn: () => crmSettingsApi.rules.list(),
   })
   const rulesList: any[] = rules || []
+
+  const { data: opdSettings } = useQuery({
+    queryKey: ["crm-settings", "opd"],
+    queryFn: () => crmSettingsApi.opd.get(),
+  })
+  const opdSetting: any = Array.isArray(opdSettings) ? opdSettings[0] : opdSettings
 
   const { data: treatmentTypes } = useQuery({
     queryKey: ["treatment-types"],
@@ -69,6 +75,15 @@ export default function CrmSettings() {
       addToast({ title: "Seeded", description: `Created ${data.seeded?.length || 0} treatment types`, variant: "success" })
     },
     onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Seed failed", variant: "destructive" }),
+  })
+
+  const opdUpdateMutation = useMutation({
+    mutationFn: (data: any) => crmSettingsApi.opd.update(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["crm-settings"] })
+      addToast({ title: "OPD Settings Updated", variant: "success" })
+    },
+    onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to update OPD settings", variant: "destructive" }),
   })
 
   return (
@@ -129,6 +144,70 @@ export default function CrmSettings() {
               ))}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* OPD Settings Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Clock className="h-5 w-5 text-primary" />
+            OPD Follow-Up Settings
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!opdSetting && (
+            <div className="py-8 text-center text-muted-foreground">
+              <p>Loading default OPD settings...</p>
+            </div>
+          )}
+          <div className="space-y-4 max-w-md">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="text-sm font-medium">Enable OPD Follow-Up</Label>
+                <p className="text-xs text-muted-foreground">Auto-create enquiry when patient status changes to OPD</p>
+              </div>
+              <Switch
+                checked={opdSetting?.opd_follow_up_enabled ?? true}
+                onCheckedChange={(v) => opdUpdateMutation.mutate({ ...opdSetting, opd_follow_up_enabled: v })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Default Due After</Label>
+              <Select
+                value={String(opdSetting?.default_due_days ?? 1)}
+                onValueChange={(v) => opdUpdateMutation.mutate({ ...opdSetting, default_due_days: parseInt(v) })}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 Day</SelectItem>
+                  <SelectItem value="2">2 Days</SelectItem>
+                  <SelectItem value="3">3 Days</SelectItem>
+                  <SelectItem value="7">7 Days</SelectItem>
+                  <SelectItem value="14">14 Days</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Priority</Label>
+              <Select
+                value={opdSetting?.priority ?? "MEDIUM"}
+                onValueChange={(v) => opdUpdateMutation.mutate({ ...opdSetting, priority: v })}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="LOW">Low</SelectItem>
+                  <SelectItem value="MEDIUM">Medium</SelectItem>
+                  <SelectItem value="HIGH">High</SelectItem>
+                  <SelectItem value="URGENT">Urgent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </CardContent>
       </Card>
 

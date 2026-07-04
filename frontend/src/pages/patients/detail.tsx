@@ -31,7 +31,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/toast";
 import { formatIndianRupees } from "@/lib/currency";
 import SearchableSelect from "@/components/ui/searchable-select";
-import type { Patient, Case, Appointment, Billing, TreatmentPlan } from "@/types";
+import type { Patient, Case, Appointment, Billing, TreatmentPlan, PatientTimelineEntry } from "@/types";
 import {
   User,
   Phone,
@@ -105,7 +105,7 @@ export default function PatientDetail() {
     source_campaign_date: "",
     address: "",
     medical_history: "",
-    diagnosis: "",
+    abha_id: "",
     age: "",
     status: "",
     height: "",
@@ -202,6 +202,22 @@ export default function PatientDetail() {
     enabled: !!id,
   });
 
+  const [timelineModule, setTimelineModule] = useState<string>("all");
+  const [timelineSearch, setTimelineSearch] = useState("");
+  const [timelineStartDate, setTimelineStartDate] = useState("");
+  const [timelineEndDate, setTimelineEndDate] = useState("");
+  const timelineParams = {
+    ...(timelineModule && timelineModule !== "all" && { module: timelineModule }),
+    ...(timelineSearch && { search: timelineSearch }),
+    ...(timelineStartDate && { start_date: timelineStartDate }),
+    ...(timelineEndDate && { end_date: timelineEndDate }),
+  };
+  const { data: timelineData } = useQuery({
+    queryKey: ["patient-timeline", id, timelineParams],
+    queryFn: () => patientsApi.getPatientTimeline(id!, timelineParams),
+    enabled: !!id,
+  });
+
   const updateMutation = useMutation({
     mutationFn: (data: Record<string, unknown>) => patientsApi.update(id!, data),
     onSuccess: () => {
@@ -242,7 +258,7 @@ export default function PatientDetail() {
         source_campaign_date: patient.source_campaign_date || "",
         address: patient.address || "",
         medical_history: patient.medical_history || "",
-        diagnosis: patient.diagnosis || "",
+        abha_id: patient.abha_id || "",
         age: patient.age?.toString() || "",
         status: patient.status || "",
         height: patient.height?.toString() || "",
@@ -286,31 +302,8 @@ export default function PatientDetail() {
   const followUpResponsesList: any[] = followUpResponses || [];
 
   function renderTimeline() {
-    type TimelineItem = { date: string; type: string; label: string; description: string; id: string };
-    const events: TimelineItem[] = [];
-
-    appointmentsList.forEach((a: any) => {
-      events.push({ date: a.appointment_date, type: "appointment", label: `Appointment — ${a.status || "SCHEDULED"}`, description: `${a.appointment_time || ""} ${a.notes ? "— " + a.notes : ""}`, id: a.id });
-    });
-    casesList.forEach((c: any) => {
-      events.push({ date: c.created_at?.split("T")[0] || "", type: "case", label: `Case Created — ${c.chief_complaint || ""}`, description: c.diagnosis ? `Diagnosis: ${c.diagnosis}` : "", id: c.id });
-    });
-    treatmentPlansList.forEach((t: any) => {
-      events.push({ date: t.start_date || t.created_at?.split("T")[0] || "", type: "treatment", label: `Treatment — ${t.treatment_name || ""}`, description: `Cost: ${formatIndianRupees(t.cost)}`, id: t.id });
-    });
-    billingsList.forEach((b: any) => {
-      events.push({ date: b.created_at?.split("T")[0] || "", type: "billing", label: `Billing — ${b.payment_status || "DRAFT"}`, description: `Amount: ${formatIndianRupees(b.total_amount)}`, id: b.id });
-    });
-    interactionsList.forEach((i: any) => {
-      events.push({ date: i.created_at?.split("T")[0] || "", type: "interaction", label: `${i.type || "Interaction"} ${i.channel ? "via " + i.channel : ""}`, description: i.message || i.notes || "", id: i.id || `i-${Math.random()}` });
-    });
-    followUpResponsesList.forEach((r: any) => {
-      events.push({ date: r.created_at?.split("T")[0] || "", type: "response", label: `Follow-Up Response — ${r.response_status || ""}`, description: r.response_message || "", id: r.id });
-    });
-
-    events.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-
-    if (events.length === 0) {
+    const timelineEntries: PatientTimelineEntry[] = Array.isArray(timelineData?.entries) ? timelineData.entries : [];
+    if (timelineEntries.length === 0) {
       return (
         <Card className="p-12 text-center border-border shadow-card">
           <Clock className="h-12 w-12 text-text-muted mx-auto mb-3" />
@@ -319,29 +312,39 @@ export default function PatientDetail() {
       );
     }
 
-    const typeStyles: Record<string, string> = {
-      appointment: "bg-blue-50 text-blue-600 border-blue-200",
-      case: "bg-purple-50 text-purple-600 border-purple-200",
-      treatment: "bg-green-50 text-green-600 border-green-200",
-      billing: "bg-amber-50 text-amber-600 border-amber-200",
-      interaction: "bg-cyan-50 text-cyan-600 border-cyan-200",
-      response: "bg-teal-50 text-teal-600 border-teal-200",
-    };
-
     return (
       <div className="relative pl-8 border-l-2 border-border space-y-6">
-        {events.map((ev, idx) => (
-          <div key={`${ev.id}-${idx}`} className="relative">
-            <div className={`absolute -left-[25px] p-1 rounded-full border-2 ${typeStyles[ev.type] || "bg-gray-50 text-gray-600 border-gray-200"}`}>
+        {timelineEntries.map((ev) => (
+          <div key={ev.id} className="relative">
+            <div className="absolute -left-[25px] p-1 rounded-full border-2 border-gray-200 bg-gray-50 text-gray-600">
               <div className="h-2 w-2 rounded-full bg-current" />
             </div>
             <div className="bg-card rounded-lg border border-border p-4 shadow-sm">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{ev.type}</span>
-                <span className="text-xs text-text-muted">{ev.date || ""}</span>
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{ev.module || "System"}</span>
+                <span className="text-xs text-text-muted">{ev.created_at ? new Date(ev.created_at).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" }) : ""}</span>
+                {ev.user_name && (
+                  <span className="text-xs text-text-muted ml-auto">
+                    by <span className="font-medium text-text-primary">{ev.user_name}</span>
+                    {ev.user_role && <span className="text-text-muted"> ({ev.user_role})</span>}
+                    {ev.hospital_name && <span className="text-text-muted"> — {ev.hospital_name}</span>}
+                  </span>
+                )}
               </div>
-              <p className="text-sm font-medium text-text-primary">{ev.label}</p>
+              <p className="text-sm font-medium text-text-primary">{ev.action}</p>
               {ev.description && <p className="text-xs text-text-secondary mt-1">{ev.description}</p>}
+              {ev.changes && ev.changes.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {ev.changes.map((c, ci) => (
+                    <div key={ci} className="text-xs bg-muted/30 rounded px-2 py-1">
+                      <span className="font-medium text-text-primary">{c.field}: </span>
+                      <span className="text-text-muted line-through">{c.old_value ?? "—"}</span>
+                      <span className="text-text-muted mx-1">→</span>
+                      <span className="text-success font-medium">{c.new_value ?? "—"}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -617,13 +620,24 @@ export default function PatientDetail() {
                           />
                         </div>
                       </div>
-                      <div className="grid gap-2 mt-3">
-                        <Label>OP No.</Label>
-                        <Input
-                          value={editForm.op_no}
-                          onChange={(e) => setEditForm((f) => ({ ...f, op_no: e.target.value }))}
-                          placeholder="e.g. OP-2024-001"
-                        />
+                      <div className="grid grid-cols-2 gap-4 mt-3">
+                        <div className="grid gap-2">
+                          <Label>OP No.</Label>
+                          <Input
+                            value={editForm.op_no}
+                            onChange={(e) => setEditForm((f) => ({ ...f, op_no: e.target.value }))}
+                            placeholder="e.g. OP-2024-001"
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label>ABHA ID</Label>
+                          <Input
+                            value={editForm.abha_id}
+                            onChange={(e) => setEditForm((f) => ({ ...f, abha_id: e.target.value }))}
+                            placeholder="14-digit ABHA number"
+                            maxLength={20}
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -703,14 +717,6 @@ export default function PatientDetail() {
                     </h4>
                     <div className="space-y-3">
                       <div className="grid gap-2">
-                        <Label>Diagnosis</Label>
-                        <Textarea
-                          value={editForm.diagnosis}
-                          onChange={(e) => setEditForm((f) => ({ ...f, diagnosis: e.target.value }))}
-                          placeholder="Enter diagnosis..."
-                        />
-                      </div>
-                      <div className="grid gap-2">
                         <Label>Medical History</Label>
                         <Textarea
                           value={editForm.medical_history}
@@ -764,10 +770,14 @@ export default function PatientDetail() {
                         <SelectContent>
                           <SelectItem value="NEW">New</SelectItem>
                           <SelectItem value="ACTIVE">Active</SelectItem>
+                          <SelectItem value="INACTIVE">Inactive</SelectItem>
                           <SelectItem value="UNDER_TREATMENT">Under Treatment</SelectItem>
+                          <SelectItem value="TREATMENT_ONGOING">Treatment Ongoing</SelectItem>
                           <SelectItem value="FOLLOW_UP">Follow Up</SelectItem>
                           <SelectItem value="COMPLETED">Completed</SelectItem>
-                          <SelectItem value="INACTIVE">Inactive</SelectItem>
+                          <SelectItem value="OPD">OPD</SelectItem>
+                          <SelectItem value="LOST">Lost</SelectItem>
+                          <SelectItem value="ARCHIVED">Archived</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -805,10 +815,14 @@ export default function PatientDetail() {
               <SelectContent>
                 <SelectItem value="NEW">New</SelectItem>
                 <SelectItem value="ACTIVE">Active</SelectItem>
+                <SelectItem value="INACTIVE">Inactive</SelectItem>
                 <SelectItem value="UNDER_TREATMENT">Under Treatment</SelectItem>
+                <SelectItem value="TREATMENT_ONGOING">Treatment Ongoing</SelectItem>
                 <SelectItem value="FOLLOW_UP">Follow Up</SelectItem>
                 <SelectItem value="COMPLETED">Completed</SelectItem>
-                <SelectItem value="INACTIVE">Inactive</SelectItem>
+                <SelectItem value="OPD">OPD</SelectItem>
+                <SelectItem value="LOST">Lost</SelectItem>
+                <SelectItem value="ARCHIVED">Archived</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -896,6 +910,10 @@ export default function PatientDetail() {
                   <dt className="text-text-secondary">OP No.</dt>
                   <dd className="font-medium">{patient.op_no || "—"}</dd>
                 </div>
+                <div className="flex justify-between">
+                  <dt className="text-text-secondary">ABHA ID</dt>
+                  <dd className="font-medium">{patient.abha_id || "Not Available"}</dd>
+                </div>
               </dl>
             </Card>
 
@@ -960,15 +978,7 @@ export default function PatientDetail() {
                 <div><span className="text-sm text-text-secondary">SpO2</span><p className="font-semibold">{patient.spo2 || "—"}</p></div>
               </div>
             </Card>
-            {patient.diagnosis && (
-              <Card className="p-6 border-border shadow-card md:col-span-2">
-                <h3 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
-                  <Activity className="h-5 w-5 text-primary" />
-                  Diagnosis
-                </h3>
-                <p className="text-text-secondary whitespace-pre-wrap">{patient.diagnosis}</p>
-              </Card>
-            )}
+
             <Card className="p-6 border-border shadow-card md:col-span-2">
               <h3 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
                 <Activity className="h-5 w-5 text-primary" />
@@ -1228,6 +1238,35 @@ export default function PatientDetail() {
 
       {activeTab === "timeline" && (
         <div className="overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 320px)" }}>
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <Input
+              placeholder="Search timeline..."
+              value={timelineSearch}
+              onChange={(e) => setTimelineSearch(e.target.value)}
+              className="w-48 h-8 text-xs"
+            />
+            <Select value={timelineModule} onValueChange={(v) => setTimelineModule(v)}>
+              <SelectTrigger className="w-36 h-8 text-xs"><SelectValue placeholder="All modules" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All modules</SelectItem>
+                <SelectItem value="patient">Patient</SelectItem>
+                <SelectItem value="appointment">Appointment</SelectItem>
+                <SelectItem value="case">Case</SelectItem>
+                <SelectItem value="treatment_plan">Treatment</SelectItem>
+                <SelectItem value="billing">Billing</SelectItem>
+                <SelectItem value="consent_form">Consent</SelectItem>
+                <SelectItem value="crm">CRM</SelectItem>
+                <SelectItem value="enquiry">Enquiry</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input type="date" value={timelineStartDate} onChange={(e) => setTimelineStartDate(e.target.value)} className="w-36 h-8 text-xs" placeholder="From" />
+            <Input type="date" value={timelineEndDate} onChange={(e) => setTimelineEndDate(e.target.value)} className="w-36 h-8 text-xs" placeholder="To" />
+            {(timelineSearch || timelineModule !== "all" || timelineStartDate || timelineEndDate) && (
+              <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setTimelineSearch(""); setTimelineModule("all"); setTimelineStartDate(""); setTimelineEndDate(""); }}>
+                Clear
+              </Button>
+            )}
+          </div>
           {renderTimeline()}
         </div>
       )}

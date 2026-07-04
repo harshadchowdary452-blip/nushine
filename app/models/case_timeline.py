@@ -14,6 +14,7 @@ class CaseTimeline(Base):
     old_value: Mapped[str] = mapped_column(Text, nullable=True)
     new_value: Mapped[str] = mapped_column(Text, nullable=True)
     performed_by: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
+    performer_role: Mapped[str] = mapped_column(String(50), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     case = relationship("Case", back_populates="timeline_entries")

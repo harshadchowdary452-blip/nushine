@@ -28,21 +28,67 @@ class CaseCreate(BaseModel):
     consultant_id: Optional[str] = None
     appointment_id: Optional[str] = None
     chief_complaint: str = Field(..., min_length=1)
+    chief_complaint_duration: Optional[str] = None
+    chief_complaint_severity: Optional[str] = None
+    chief_complaint_associated_symptoms: Optional[str] = None
+    hpi: Optional[str] = None
+    personal_history: Optional[str] = None
+    family_history: Optional[str] = None
+    medical_history: Optional[str] = None
+    dental_history: Optional[str] = None
+    extra_oral_examination: Optional[str] = None
+    intra_oral_examination: Optional[str] = None
+    clinical_findings_summary: Optional[str] = None
+    periodontal_examination: Optional[str] = None
+    investigations: Optional[str] = None
+    provisional_diagnosis: Optional[str] = None
+    final_diagnosis: Optional[str] = None
     diagnosis: Optional[str] = None
     initial_treatment_plan: Optional[str] = None
+    treatment_plan_estimated_cost: Optional[float] = None
+    treatment_plan_estimated_visits: Optional[int] = None
+    doctor_registration_number: Optional[str] = None
+    doctor_specialization: Optional[str] = None
     notes: Optional[str] = None
     findings: Optional[List[ClinicalFindingCreate]] = None
 
 
 class CaseUpdate(BaseModel):
     chief_complaint: Optional[str] = None
+    chief_complaint_duration: Optional[str] = None
+    chief_complaint_severity: Optional[str] = None
+    chief_complaint_associated_symptoms: Optional[str] = None
+    hpi: Optional[str] = None
+    personal_history: Optional[str] = None
+    family_history: Optional[str] = None
+    medical_history: Optional[str] = None
+    dental_history: Optional[str] = None
+    extra_oral_examination: Optional[str] = None
+    intra_oral_examination: Optional[str] = None
+    clinical_findings_summary: Optional[str] = None
+    periodontal_examination: Optional[str] = None
+    investigations: Optional[str] = None
+    provisional_diagnosis: Optional[str] = None
+    final_diagnosis: Optional[str] = None
     diagnosis: Optional[str] = None
     initial_treatment_plan: Optional[str] = None
+    treatment_plan_estimated_cost: Optional[float] = None
+    treatment_plan_estimated_visits: Optional[int] = None
+    doctor_registration_number: Optional[str] = None
+    doctor_specialization: Optional[str] = None
     status: Optional[str] = None
     consultant_id: Optional[str] = None
     doctor_id: Optional[str] = None
     notes: Optional[str] = None
     findings: Optional[List[ClinicalFindingCreate]] = None
+
+
+class UserBrief(BaseModel):
+    id: str
+    full_name: Optional[str] = None
+    role: Optional[str] = None
+
+    model_config = {"from_attributes": True}
 
 
 class CaseResponse(BaseModel):
@@ -54,9 +100,30 @@ class CaseResponse(BaseModel):
     appointment_id: Optional[str] = None
     patient_name: Optional[str] = None
     doctor_name: Optional[str] = None
+    created_by: Optional[UserBrief] = None
+    updated_by: Optional[UserBrief] = None
     chief_complaint: str
-    diagnosis: Optional[str]
+    chief_complaint_duration: Optional[str] = None
+    chief_complaint_severity: Optional[str] = None
+    chief_complaint_associated_symptoms: Optional[str] = None
+    hpi: Optional[str] = None
+    personal_history: Optional[str] = None
+    family_history: Optional[str] = None
+    medical_history: Optional[str] = None
+    dental_history: Optional[str] = None
+    extra_oral_examination: Optional[str] = None
+    intra_oral_examination: Optional[str] = None
+    clinical_findings_summary: Optional[str] = None
+    periodontal_examination: Optional[str] = None
+    investigations: Optional[str] = None
+    provisional_diagnosis: Optional[str] = None
+    final_diagnosis: Optional[str] = None
+    diagnosis: Optional[str] = None
     initial_treatment_plan: Optional[str] = None
+    treatment_plan_estimated_cost: Optional[float] = None
+    treatment_plan_estimated_visits: Optional[int] = None
+    doctor_registration_number: Optional[str] = None
+    doctor_specialization: Optional[str] = None
     status: str
     notes: Optional[str]
     is_active: bool
@@ -76,6 +143,7 @@ class CaseTimelineResponse(BaseModel):
     new_value: Optional[str] = None
     performed_by: Optional[str] = None
     performer_name: Optional[str] = None
+    performer_role: Optional[str] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

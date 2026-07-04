@@ -76,6 +76,7 @@ class FollowUp(Base):
     response_summary: Mapped[str] = mapped_column(String(100), nullable=True)
     response_status: Mapped[str] = mapped_column(String(30), nullable=True)
     next_action: Mapped[str] = mapped_column(String(30), nullable=True)
+    interested_to_visit_again: Mapped[str] = mapped_column(String(10), nullable=True)
     contact_channel: Mapped[str] = mapped_column(String(20), nullable=True)
     last_contact_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

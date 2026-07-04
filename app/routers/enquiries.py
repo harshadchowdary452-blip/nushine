@@ -12,6 +12,7 @@ from app.models.patient import Patient
 from app.models.user import User
 from app.models.follow_up import FollowUp, FollowUpStatus, FollowUpType
 from app.models.treatment_type import TreatmentType
+from app.services.timeline_helper import record_timeline_event
 
 router = APIRouter(prefix="/crm/enquiries", tags=["CRM Enquiries"])
 
@@ -68,6 +69,12 @@ async def create_enquiry(data: EnquiryCreate, db: AsyncSession = Depends(get_db)
     db.add(enquiry)
     await db.flush()
     await db.commit()
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=data.patient_id,
+        action="CRM Enquiry Created",
+        description=f"Enquiry created for {data.treatment_interest} (status: {enquiry.status})",
+        module="CRM",
+    )
     return {"id": str(enquiry.id), "status": enquiry.status}
 
 
@@ -177,6 +184,7 @@ async def get_enquiry_calendar(
     for e in enq_rows:
         patient = await db.get(Patient, e.patient_id)
         staff = await db.get(User, e.assigned_staff_id) if e.assigned_staff_id else None
+        fu_type = "OPD_FOLLOW_UP" if e.treatment_interest == "OPD_FOLLOW_UP" else "ENQUIRY"
         result.append({
             "id": str(e.id),
             "source": "enquiry",
@@ -184,15 +192,21 @@ async def get_enquiry_calendar(
             "patient_name": patient.full_name if patient else "Unknown",
             "op_number": patient.op_no if patient else None,
             "doctor_name": staff.full_name if staff else None,
+            "doctor_id": str(e.assigned_staff_id) if e.assigned_staff_id else None,
             "treatment_type": None,
             "treatment_name": e.treatment_interest,
-            "follow_up_type": "ENQUIRY",
+            "follow_up_type": fu_type,
             "due_date": e.next_follow_up_date.isoformat() if e.next_follow_up_date else e.created_at.date().isoformat(),
             "status": e.status,
             "response": None,
             "feedback": e.notes,
             "staff_notes": None,
             "action_required": None,
+            "response_status": None,
+            "next_action": None,
+            "contact_channel": None,
+            "last_contact_date": None,
+            "patient_phone": patient.phone if patient else None,
         })
 
     # Sort by due_date
@@ -229,6 +243,8 @@ async def update_enquiry(enquiry_id: str, data: EnquiryUpdate, db: AsyncSession 
     if not e:
         raise HTTPException(status_code=404, detail="Enquiry not found")
     _verify_hospital_access(e, current_user)
+    old_status = e.status
+    old_interest = e.treatment_interest
     if data.treatment_interest is not None: e.treatment_interest = data.treatment_interest
     if data.status is not None: e.status = data.status
     if data.notes is not None: e.notes = data.notes
@@ -236,6 +252,13 @@ async def update_enquiry(enquiry_id: str, data: EnquiryUpdate, db: AsyncSession 
     if data.next_follow_up_date is not None: e.next_follow_up_date = date.fromisoformat(data.next_follow_up_date)
     e.updated_at = datetime.now(timezone.utc)
     await db.commit()
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=e.patient_id,
+        action="CRM Enquiry Updated",
+        description=f"Enquiry updated: status {old_status} -> {e.status}",
+        module="CRM",
+        changes=[{"field": "status", "old_value": old_status, "new_value": e.status}] if old_status != e.status else None,
+    )
     return {"success": True}
 
 
@@ -246,9 +269,16 @@ async def delete_enquiry(enquiry_id: str, db: AsyncSession = Depends(get_db), cu
     if not e:
         raise HTTPException(status_code=404, detail="Enquiry not found")
     _verify_hospital_access(e, current_user)
+    patient_id = e.patient_id
     await db.execute(sa_delete(EnquiryFollowUp).where(EnquiryFollowUp.enquiry_id == enquiry_id))
     await db.delete(e)
     await db.commit()
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=patient_id,
+        action="CRM Enquiry Deleted",
+        description=f"Enquiry deleted",
+        module="CRM",
+    )
     return {"success": True}
 
 
@@ -275,6 +305,12 @@ async def create_enquiry_follow_up(enquiry_id: str, data: EnquiryFollowUpAction,
     if data.next_follow_up_date:
         e.next_follow_up_date = date.fromisoformat(data.next_follow_up_date)
     await db.commit()
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=e.patient_id,
+        action="CRM Follow-Up Action",
+        description=f"Follow-up action '{data.action}' performed on enquiry",
+        module="CRM",
+    )
     return {"success": True, "enquiry_status": e.status}
 
 

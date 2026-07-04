@@ -76,7 +76,7 @@ interface PatientForm {
   source_campaign_date: string
   address: string
   medical_history: string
-  diagnosis: string
+  abha_id: string
   height: string
   weight: string
   bp: string
@@ -89,7 +89,7 @@ function getEmptyForm(): PatientForm {
   return {
     full_name: "", email: "", phone: "", gender: "", age: "",
     patient_source: "", source_campaign_name: "", source_campaign_id: "",
-    source_campaign_date: "", address: "", medical_history: "", diagnosis: "",
+    source_campaign_date: "", address: "", medical_history: "", abha_id: "",
     height: "", weight: "", bp: "", sugar: "", spo2: "", op_no: "",
   }
 }
@@ -335,7 +335,7 @@ export default function PatientList() {
           </div>
           <div className="flex flex-wrap items-center gap-2 mt-2">
             <span className="text-xs text-muted-foreground mr-1">Status:</span>
-            {["all", "NEW", "ACTIVE", "UNDER_TREATMENT", "FOLLOW_UP", "COMPLETED", "INACTIVE"].map((s) => (
+            {["all", "NEW", "ACTIVE", "INACTIVE", "UNDER_TREATMENT", "TREATMENT_ONGOING", "FOLLOW_UP", "COMPLETED", "OPD", "LOST", "ARCHIVED"].map((s) => (
               <Button
                 key={s}
                 variant={statusFilter === s ? "default" : "outline"}
@@ -548,23 +548,26 @@ export default function PatientList() {
                   onChange={(e) => setForm({ ...form, address: e.target.value })}
                 />
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="op_no">OP No.</Label>
-                <Input
-                  id="op_no"
-                  value={form.op_no}
-                  onChange={(e) => setForm({ ...form, op_no: e.target.value })}
-                  placeholder="e.g. OP-2024-001"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="diagnosis">Diagnosis</Label>
-                <Input
-                  id="diagnosis"
-                  value={form.diagnosis}
-                  onChange={(e) => setForm({ ...form, diagnosis: e.target.value })}
-                  placeholder="Initial diagnosis..."
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="op_no">OP No.</Label>
+                  <Input
+                    id="op_no"
+                    value={form.op_no}
+                    onChange={(e) => setForm({ ...form, op_no: e.target.value })}
+                    placeholder="e.g. OP-2024-001"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="abha_id">ABHA ID</Label>
+                  <Input
+                    id="abha_id"
+                    value={form.abha_id}
+                    onChange={(e) => setForm({ ...form, abha_id: e.target.value })}
+                    placeholder="14-digit ABHA number"
+                    maxLength={20}
+                  />
+                </div>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="medical_history">Medical History</Label>

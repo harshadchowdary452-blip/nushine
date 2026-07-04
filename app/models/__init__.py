@@ -40,6 +40,8 @@ from app.models.treatment_follow_up_rule import TreatmentFollowUpRule
 from app.models.treatment_template import TreatmentTemplate
 from app.models.treatment_type import TreatmentType
 from app.models.export_job import ExportJob
+from app.models.crm_opd_setting import CrmOpdSetting
+from app.models.patient_timeline import PatientTimeline
 
 __all__ = [
     "AdminGroup", "Hospital", "User", "Patient", "Consultant",
@@ -65,4 +67,6 @@ __all__ = [
     "TreatmentFollowUpRule",
     "TreatmentTemplate",
     "TreatmentType",
+    "CrmOpdSetting",
+    "PatientTimeline",
 ]

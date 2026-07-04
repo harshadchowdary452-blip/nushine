@@ -27,7 +27,7 @@ class User(Base):
     admin_group = relationship("AdminGroup", back_populates="users")
     patients = relationship("Patient", back_populates="doctor")
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
-    cases = relationship("Case", back_populates="doctor")
+    cases = relationship("Case", foreign_keys="Case.doctor_id", back_populates="doctor")
     appointments = relationship("Appointment", back_populates="doctor")
     created_expenses = relationship("HospitalMonthlyExpense", back_populates="creator")
     working_hours = relationship("DoctorWorkingHour", back_populates="doctor", cascade="all, delete-orphan")

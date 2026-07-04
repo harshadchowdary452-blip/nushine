@@ -15,17 +15,39 @@ from app.schemas.common import MessageResponse
 from app.models.case import Case
 from app.models.patient import Patient
 from app.models.hospital import Hospital
+from app.models.billing import Billing as BillingModel
 from app.models.billing_history import BillingHistory
+from app.services.timeline_helper import record_timeline_event, build_changes
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/billings", tags=["Billings"])
+
+
+async def _get_patient_id_from_billing(db: AsyncSession, billing_id: str) -> str:
+    q = select(Patient.id).select_from(BillingModel).join(Case, BillingModel.case_id == Case.id).join(Patient, Case.patient_id == Patient.id).where(BillingModel.id == billing_id)
+    r = await db.execute(q)
+    row = r.one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Associated patient not found")
+    return row[0]
 
 
 @router.post("/", response_model=BillingResponse, status_code=status.HTTP_201_CREATED)
 async def create_billing(data: BillingCreate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_BILLING)
     service = BillingService(db)
-    return await service.create(data.model_dump(), user_id=current_user.get("sub"))
+    billing = await service.create(data.model_dump(), user_id=current_user.get("sub"))
+    billing_id = billing.id
+    patient_id = await _get_patient_id_from_billing(db, billing_id)
+    billing_obj = await db.get(BillingModel, billing_id)
+    if billing_obj:
+        await record_timeline_event(
+            db, current_user=current_user, patient_id=patient_id,
+            action="Billing Created",
+            description=f"Billing created (amount: {billing_obj.total_amount}, status: {billing_obj.payment_status})",
+            module="Billing",
+        )
+    return billing
 
 
 @router.get("/")
@@ -163,7 +185,14 @@ async def delete_billing(billing_id: str, db: AsyncSession = Depends(get_db), cu
     if not billing:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Billing not found")
     await verify_tenant_access(current_user, billing, "billing", db)
+    patient_id = await _get_patient_id_from_billing(db, billing_id)
     deleted = await service.delete(billing_id, user_id=current_user.get("sub"))
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=patient_id,
+        action="Billing Deleted",
+        description=f"Billing deleted",
+        module="Billing",
+    )
     return MessageResponse(message="Billing deleted successfully")
 
 
@@ -188,9 +217,18 @@ async def update_payment(billing_id: str, data: BillingUpdate, db: AsyncSession 
     if not billing:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Billing not found")
     await verify_tenant_access(current_user, billing, "billing", db)
+    old_paid = billing.paid_amount
     paid_amount = data.paid_amount or 0
-    billing = await service.update_payment(billing_id, paid_amount, payment_method=data.payment_method, notes=data.notes, user_id=current_user.get("sub"))
-    return billing
+    updated = await service.update_payment(billing_id, paid_amount, payment_method=data.payment_method, notes=data.notes, user_id=current_user.get("sub"))
+    patient_id = await _get_patient_id_from_billing(db, billing_id)
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=patient_id,
+        action="Payment Updated",
+        description=f"Payment of ₹{paid_amount} received (total paid: ₹{updated.paid_amount})",
+        module="Billing",
+        changes=[{"field": "paid_amount", "old_value": str(old_paid), "new_value": str(updated.paid_amount)}],
+    )
+    return updated
 
 
 @router.put("/{billing_id}/discount", response_model=BillingResponse)
@@ -202,7 +240,8 @@ async def apply_discount(billing_id: str, data: BillingDiscountUpdate, db: Async
     if not billing:
         raise HTTPException(status_code=404, detail="Billing not found")
     await verify_tenant_access(current_user, billing, "billing", db)
-    billing = await service.apply_discount(
+    old_discount = billing.discount_amount
+    updated = await service.apply_discount(
         billing_id=billing_id,
         discount_type=data.discount_type,
         discount_percent=data.discount_percent,
@@ -210,7 +249,15 @@ async def apply_discount(billing_id: str, data: BillingDiscountUpdate, db: Async
         discount_reason=data.discount_reason,
         user_id=current_user.get("sub"),
     )
-    return billing
+    patient_id = await _get_patient_id_from_billing(db, billing_id)
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=patient_id,
+        action="Discount Applied",
+        description=f"Discount of {data.discount_percent or 0}% / ₹{data.discount_amount or 0} applied",
+        module="Billing",
+        changes=[{"field": "discount_amount", "old_value": str(old_discount), "new_value": str(updated.discount_amount)}],
+    )
+    return updated
 
 
 @router.get("/{billing_id}/transactions")

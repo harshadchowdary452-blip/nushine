@@ -28,6 +28,7 @@ class TreatmentInterest(str, Enum):
     SCALING = "SCALING"
     FILLING = "FILLING"
     BUDGET_APPROVAL = "BUDGET_APPROVAL"
+    OPD_FOLLOW_UP = "OPD_FOLLOW_UP"
     OTHER = "OTHER"
 
 

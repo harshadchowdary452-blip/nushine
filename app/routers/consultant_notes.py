@@ -7,6 +7,7 @@ from app.core.permissions import verify_permission, verify_tenant_access, Permis
 from sqlalchemy import select
 from app.models.case import Case
 from app.services.consultant_note_service import ConsultantNoteService
+from app.services.timeline_helper import record_timeline_event
 from app.schemas.consultant_note import ConsultantNoteCreate, ConsultantNoteResponse
 
 router = APIRouter(prefix="/consultant-notes", tags=["Consultant Notes"])
@@ -16,7 +17,17 @@ router = APIRouter(prefix="/consultant-notes", tags=["Consultant Notes"])
 async def create_note(data: ConsultantNoteCreate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.ASSIGN_CONSULTANT)
     service = ConsultantNoteService(db)
-    return await service.create(data.model_dump(), user_id=current_user.get("sub"))
+    note = await service.create(data.model_dump(), user_id=current_user.get("sub"))
+    case_result = await db.execute(select(Case).where(Case.id == data.case_id))
+    case_obj = case_result.scalar_one_or_none()
+    if case_obj:
+        await record_timeline_event(
+            db, current_user=current_user, patient_id=case_obj.patient_id,
+            action="Consultant Note Added",
+            description=f"Consultant note added",
+            module="Treatments",
+        )
+    return note
 
 
 @router.get("/by-case/{case_id}")

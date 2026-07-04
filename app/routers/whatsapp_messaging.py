@@ -20,6 +20,7 @@ from app.models.follow_up import FollowUp
 from app.models.communication_log import CommunicationLog, CommunicationStatus, MessageAudit, MessageType
 from app.utils.whatsapp import WhatsAppProvider
 from app.repositories.patient_repository import PatientRepository
+from app.services.timeline_helper import record_timeline_event
 import json
 
 router = APIRouter(prefix="/whatsapp", tags=["WhatsApp Messaging"])
@@ -380,6 +381,13 @@ async def send_whatsapp(
     await db.commit()
     await db.refresh(log)
 
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=patient.id,
+        action="WhatsApp Sent",
+        description=f"WhatsApp {request.send_mode} sent: {request.message_type}",
+        module="Communication",
+    )
+
     links = provider.generate_deep_link(patient.phone or "", clean)
 
     return SendResponse(
@@ -716,4 +724,10 @@ async def confirm_delivery(
     )
     db.add(audit_entry)
     await db.commit()
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=log.patient_id,
+        action="WhatsApp Delivered",
+        description=f"WhatsApp message delivered",
+        module="Communication",
+    )
     return {"success": True, "status": "DELIVERED"}

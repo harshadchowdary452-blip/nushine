@@ -5,6 +5,7 @@ from app.database import get_db
 from app.dependencies import get_current_user
 from app.core.permissions import verify_permission, Permission
 from app.services.lead_service import LeadService
+from app.services.timeline_helper import record_timeline_event
 from app.schemas.lead import LeadCreate, LeadUpdate, LeadResponse, LeadStatusUpdate, LeadConvertCreate, LeadFollowUpCreate, LeadAppointmentCreate, LeadCallCreate, LeadCallResponse, LeadCommunicationCreate, LeadCommunicationResponse
 
 router = APIRouter(prefix="/leads", tags=["Leads"])
@@ -122,19 +123,35 @@ async def get_lead(lead_id: str, db: AsyncSession = Depends(get_db), current_use
 async def update_lead(lead_id: str, data: LeadUpdate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_LEADS)
     service = LeadService(db)
-    await _verify_lead_access(service, lead_id, current_user)
-    return await service.update(lead_id, data.model_dump(exclude_none=True), user_id=current_user.get("sub"))
+    old = await _verify_lead_access(service, lead_id, current_user)
+    result = await service.update(lead_id, data.model_dump(exclude_none=True), user_id=current_user.get("sub"))
+    if result and result.converted_patient_id:
+        await record_timeline_event(
+            db, current_user=current_user, patient_id=result.converted_patient_id,
+            action="Lead Updated",
+            description=f"Lead '{result.lead_name}' updated",
+            module="CRM",
+        )
+    return result
 
 
 @router.put("/{lead_id}/status", response_model=LeadResponse)
 async def update_lead_status(lead_id: str, data: LeadStatusUpdate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_LEADS)
     service = LeadService(db)
-    await _verify_lead_access(service, lead_id, current_user)
+    old = await _verify_lead_access(service, lead_id, current_user)
+    old_status = old.status
     result = await service.update_status(lead_id, data.status, user_id=current_user.get("sub"))
     if result:
         await _recalc_lead_score(db, result)
         await db.flush()
+        if result.converted_patient_id:
+            await record_timeline_event(
+                db, current_user=current_user, patient_id=result.converted_patient_id,
+                action="Lead Status Changed",
+                description=f"Lead '{result.lead_name}' status changed from {old_status} to {result.status}",
+                module="CRM",
+            )
     return result
 
 
@@ -142,7 +159,14 @@ async def update_lead_status(lead_id: str, data: LeadStatusUpdate, db: AsyncSess
 async def delete_lead(lead_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_LEADS)
     service = LeadService(db)
-    await _verify_lead_access(service, lead_id, current_user)
+    lead = await _verify_lead_access(service, lead_id, current_user)
+    if lead.converted_patient_id:
+        await record_timeline_event(
+            db, current_user=current_user, patient_id=lead.converted_patient_id,
+            action="Lead Deleted",
+            description=f"Lead '{lead.lead_name}' deleted",
+            module="CRM",
+        )
     await service.delete(lead_id, user_id=current_user.get("sub"))
 
 
@@ -158,8 +182,16 @@ async def get_lead_communications(lead_id: str, db: AsyncSession = Depends(get_d
 async def add_lead_communication(lead_id: str, data: LeadCommunicationCreate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_LEADS)
     service = LeadService(db)
-    await _verify_lead_access(service, lead_id, current_user)
-    return await service.add_communication(lead_id, data.model_dump(), user_id=current_user.get("sub"))
+    lead = await _verify_lead_access(service, lead_id, current_user)
+    result = await service.add_communication(lead_id, data.model_dump(), user_id=current_user.get("sub"))
+    if lead.converted_patient_id:
+        await record_timeline_event(
+            db, current_user=current_user, patient_id=lead.converted_patient_id,
+            action="Communication Added",
+            description=f"Communication added to lead '{lead.lead_name}'",
+            module="CRM",
+        )
+    return result
 
 
 @router.get("/{lead_id}/calls")
@@ -174,8 +206,16 @@ async def get_lead_calls(lead_id: str, db: AsyncSession = Depends(get_db), curre
 async def add_lead_call(lead_id: str, data: LeadCallCreate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_LEADS)
     service = LeadService(db)
-    await _verify_lead_access(service, lead_id, current_user)
-    return await service.add_call(lead_id, data.model_dump(), user_id=current_user.get("sub"))
+    lead = await _verify_lead_access(service, lead_id, current_user)
+    result = await service.add_call(lead_id, data.model_dump(), user_id=current_user.get("sub"))
+    if lead.converted_patient_id:
+        await record_timeline_event(
+            db, current_user=current_user, patient_id=lead.converted_patient_id,
+            action="Call Added",
+            description=f"Call added to lead '{lead.lead_name}'",
+            module="CRM",
+        )
+    return result
 
 
 @router.post("/{lead_id}/convert")
@@ -186,6 +226,13 @@ async def convert_lead(lead_id: str, data: LeadConvertCreate, db: AsyncSession =
     result = await service.convert(lead_id, data.model_dump(exclude_none=True), user_id=current_user.get("sub"))
     if "error" in result:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result["error"])
+    if result.get("patient_id"):
+        await record_timeline_event(
+            db, current_user=current_user, patient_id=result["patient_id"],
+            action="Lead Converted to Patient",
+            description=f"Lead {lead_id} converted to patient",
+            module="CRM",
+        )
     return result
 
 
@@ -232,6 +279,12 @@ async def create_lead_follow_up(lead_id: str, data: LeadFollowUpCreate, db: Asyn
     lead.last_contacted_at = datetime.now(timezone.utc)
     await db.flush()
     await service.audit_log_repo.create(user_id=current_user.get("sub"), action="LEAD_FOLLOW_UP", entity_type="LEAD", entity_id=lead_id, details=f"Follow-up scheduled for {follow_up_date}")
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=patient_id,
+        action="Lead Follow-Up Created",
+        description=f"Follow-up scheduled for lead on {follow_up_date}",
+        module="CRM",
+    )
     return {"message": "Follow-up created", "follow_up_id": fu.id, "follow_up_date": follow_up_date.isoformat()}
 
 
@@ -288,6 +341,12 @@ async def book_lead_appointment(lead_id: str, data: LeadAppointmentCreate, db: A
     await _recalc_lead_score(db, lead)
     await db.flush()
     await service.audit_log_repo.create(user_id=current_user.get("sub"), action="LEAD_APPOINTMENT", entity_type="LEAD", entity_id=lead_id, details=f"Appointment booked for {appt_date}")
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=patient.id,
+        action="Lead Appointment Booked",
+        description=f"Appointment booked for lead on {appt_date}",
+        module="CRM",
+    )
     return {"message": "Appointment booked", "appointment_id": appt.id, "patient_id": patient.id, "appointment_date": appt_date.isoformat(), "appointment_time": appt_time.strftime("%H:%M")}
 
 

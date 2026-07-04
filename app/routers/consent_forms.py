@@ -12,6 +12,7 @@ from app.schemas.consent_form import ConsentFormCreate, ConsentFormUpdate, Conse
 from app.schemas.common import MessageResponse
 from app.models.hospital import Hospital
 from app.models.consent_form import ConsentForm
+from app.services.timeline_helper import record_timeline_event, build_changes
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/consent-forms", tags=["Consent Forms"])
@@ -77,7 +78,14 @@ async def create_consent_form(
         "case_id": case_id,
         "treatment_plan_id": treatment_plan_id,
     }
-    return await service.create(data, file_bytes, file_ext, user_id=current_user.get("sub"))
+    cf = await service.create(data, file_bytes, file_ext, user_id=current_user.get("sub"))
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=cf.patient_id or patient_id,
+        action="Consent Form Created",
+        description=f"Consent form '{cf.consent_type}' created for {cf.patient_name}",
+        module="Consent",
+    )
+    return cf
 
 
 @router.get("/", response_model=ConsentFormListResponse)
@@ -161,7 +169,17 @@ async def update_consent_form(
     if not cf:
         raise HTTPException(status_code=404, detail="Consent form not found")
     _verify_hospital_access(current_user, cf)
+    old_data = {"remarks": cf.remarks, "consent_type": cf.consent_type}
     updated = await service.update(cf_id, data.model_dump(exclude_none=True), user_id=current_user.get("sub"))
+    new_data = {"remarks": updated.remarks, "consent_type": updated.consent_type}
+    changes = build_changes(old_data, new_data)
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=cf.patient_id,
+        action="Consent Form Updated",
+        description=f"Consent form '{cf.consent_type}' updated",
+        module="Consent",
+        changes=changes,
+    )
     return updated
 
 
@@ -183,6 +201,12 @@ async def replace_consent_form_pdf(
         raise HTTPException(status_code=404, detail="Consent form not found")
     _verify_hospital_access(current_user, cf)
     updated = await service.replace_pdf(cf_id, file_bytes, file_ext, user_id=current_user.get("sub"))
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=cf.patient_id,
+        action="Consent Form PDF Replaced",
+        description=f"PDF replaced for consent form '{cf.consent_type}'",
+        module="Consent",
+    )
     return updated
 
 
@@ -237,6 +261,12 @@ async def delete_consent_form(
         raise HTTPException(status_code=404, detail="Consent form not found")
     _verify_hospital_access(current_user, cf)
     await service.soft_delete(cf_id, user_id=current_user.get("sub"))
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=cf.patient_id,
+        action="Consent Form Deleted",
+        description=f"Consent form '{cf.consent_type}' deleted",
+        module="Consent",
+    )
     return MessageResponse(message="Consent form deleted successfully")
 
 
@@ -252,6 +282,12 @@ async def restore_consent_form(
     if not cf:
         raise HTTPException(status_code=404, detail="Consent form not found")
     _verify_hospital_access(current_user, cf)
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=cf.patient_id,
+        action="Consent Form Restored",
+        description=f"Consent form '{cf.consent_type}' restored",
+        module="Consent",
+    )
     return cf
 
 

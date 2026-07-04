@@ -101,7 +101,7 @@ export interface Patient {
   sugar: string | null;
   spo2: string | null;
   medical_history: string | null;
-  diagnosis: string | null;
+  abha_id: string | null;
   op_no: string | null;
   photo_url: string | null;
   status: PatientStatus;
@@ -112,7 +112,7 @@ export interface Patient {
 
 export type CaseStatus = "NEW" | "DIAGNOSIS_PENDING" | "TREATMENT_PLANNED" | "IN_PROGRESS" | "FOLLOW_UP" | "COMPLETED" | "CANCELLED";
 
-export type PatientStatus = "NEW" | "ACTIVE" | "UNDER_TREATMENT" | "FOLLOW_UP" | "COMPLETED" | "INACTIVE";
+export type PatientStatus = "NEW" | "ACTIVE" | "INACTIVE" | "UNDER_TREATMENT" | "TREATMENT_ONGOING" | "FOLLOW_UP" | "COMPLETED" | "OPD" | "LOST" | "ARCHIVED";
 
 export interface ClinicalFinding {
   id: string;
@@ -133,9 +133,30 @@ export interface Case {
   appointment_id?: string | null;
   patient_name?: string;
   doctor_name?: string;
+  created_by?: { id: string; full_name?: string; role?: string } | null;
+  updated_by?: { id: string; full_name?: string; role?: string } | null;
   chief_complaint: string;
+  chief_complaint_duration?: string | null;
+  chief_complaint_severity?: string | null;
+  chief_complaint_associated_symptoms?: string | null;
+  hpi?: string | null;
+  personal_history?: string | null;
+  family_history?: string | null;
+  medical_history?: string | null;
+  dental_history?: string | null;
+  extra_oral_examination?: string | null;
+  intra_oral_examination?: string | null;
+  clinical_findings_summary?: string | null;
+  periodontal_examination?: string | null;
+  investigations?: string | null;
+  provisional_diagnosis?: string | null;
+  final_diagnosis?: string | null;
   diagnosis: string | null;
   initial_treatment_plan?: string | null;
+  treatment_plan_estimated_cost?: number | null;
+  treatment_plan_estimated_visits?: number | null;
+  doctor_registration_number?: string | null;
+  doctor_specialization?: string | null;
   status: CaseStatus;
   notes: string | null;
   findings?: ClinicalFinding[] | null;
@@ -156,6 +177,7 @@ export interface CaseTimeline {
   new_value: string | null;
   performed_by: string | null;
   performer_name: string | null;
+  performer_role: string | null;
   created_at: string;
 }
 
@@ -607,6 +629,28 @@ export interface QuickViewPatientBilling {
   pending_amount: number;
   payment_status: string;
   created_at: string;
+}
+
+export interface PatientTimelineEntry {
+  id: string;
+  patient_id: string;
+  action: string;
+  description: string | null;
+  module: string | null;
+  performed_by: string | null;
+  user_name: string | null;
+  user_role: string | null;
+  hospital_id: string | null;
+  hospital_name: string | null;
+  changes: Array<{ field: string; old_value: string | null; new_value: string | null }> | [];
+  created_at: string;
+}
+
+export interface PatientTimelineResponse {
+  entries: PatientTimelineEntry[];
+  total: number;
+  skip: number;
+  limit: number;
 }
 
 export interface QuickViewPatientTimeline {

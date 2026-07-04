@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List, Optional
 import os, shutil, uuid
+from datetime import date
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.core.permissions import verify_permission, verify_tenant_access, Permission, Role
@@ -10,11 +11,17 @@ from app.models.appointment import Appointment
 from app.models.case import Case
 from app.models.patient import Patient
 from app.services.patient_service import PatientService
+from app.services.timeline_service import TimelineService
+from app.services.timeline_helper import record_timeline_event, build_changes
 from app.schemas.patient import PatientCreate, PatientUpdate, PatientResponse
 from app.schemas.common import MessageResponse
 from app.config import settings
 
 router = APIRouter(prefix="/patients", tags=["Patients"])
+
+TRACKED_PATIENT_FIELDS = ["full_name", "gender", "phone", "email", "address", "age", "abha_id",
+                          "op_no", "height", "weight", "bp", "sugar", "spo2", "medical_history",
+                          "emergency_contact", "patient_source", "doctor_id", "status", "date_of_birth"]
 
 
 @router.post("/", response_model=PatientResponse, status_code=status.HTTP_201_CREATED)
@@ -32,7 +39,11 @@ async def create_patient(data: PatientCreate, db: AsyncSession = Depends(get_db)
     if role == Role.DOCTOR.value:
         if not data_dict.get("doctor_id"):
             data_dict["doctor_id"] = current_user.get("sub")
-    return await service.create(data_dict, user_id=current_user.get("sub"))
+    patient = await service.create(data_dict, user_id=current_user.get("sub"))
+    await record_timeline_event(db, patient_id=str(patient.id), action="Patient Created",
+        module="patient", description=f"Patient '{patient.full_name}' created",
+        current_user=current_user)
+    return patient
 
 
 @router.get("/")
@@ -115,6 +126,33 @@ async def get_patient(patient_id: str, db: AsyncSession = Depends(get_db), curre
     return patient
 
 
+@router.get("/{patient_id}/timeline")
+async def get_patient_timeline(
+    patient_id: str,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    module: Optional[str] = Query(None),
+    user_id: Optional[str] = Query(None),
+    action_type: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.MANAGE_PATIENTS, Permission.VIEW_ALL_PATIENTS)
+    patient = await db.get(Patient, patient_id)
+    if not patient:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+    await verify_tenant_access(current_user, patient, "patient", db)
+    service = TimelineService(db)
+    entries, total = await service.get_timeline(
+        patient_id=patient_id, skip=skip, limit=limit,
+        module=module, user_id=user_id, action_type=action_type,
+        search=search, start_date=start_date, end_date=end_date,
+    )
+    return {"entries": entries, "total": total, "skip": skip, "limit": limit}
+
+
 @router.put("/{patient_id}", response_model=PatientResponse)
 async def update_patient(patient_id: str, data: PatientUpdate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_PATIENTS)
@@ -123,7 +161,14 @@ async def update_patient(patient_id: str, data: PatientUpdate, db: AsyncSession 
     if not patient:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
     await verify_tenant_access(current_user, patient, "patient", db)
-    patient = await service.update(patient_id, data.model_dump(exclude_none=True), user_id=current_user.get("sub"))
+    old_data = {f: getattr(patient, f, None) for f in TRACKED_PATIENT_FIELDS}
+    update_data = data.model_dump(exclude_none=True)
+    patient = await service.update(patient_id, update_data, user_id=current_user.get("sub"))
+    if patient:
+        changes = build_changes(update_data, old_data, TRACKED_PATIENT_FIELDS)
+        await record_timeline_event(db, patient_id=patient_id, action="Patient Updated",
+            module="patient", description=f"Patient '{patient.full_name}' updated",
+            current_user=current_user, changes=changes)
     return patient
 
 
@@ -135,6 +180,9 @@ async def delete_patient(patient_id: str, db: AsyncSession = Depends(get_db), cu
     if not patient:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
     await verify_tenant_access(current_user, patient, "patient", db)
+    await record_timeline_event(db, patient_id=patient_id, action="Patient Deleted",
+        module="patient", description=f"Patient '{patient.full_name}' deleted",
+        current_user=current_user)
     deleted = await service.delete(patient_id, user_id=current_user.get("sub"))
     return MessageResponse(message="Patient deleted successfully")
 
@@ -154,4 +202,7 @@ async def upload_patient_photo(patient_id: str, file: UploadFile = File(...), db
     with open(os.path.join(upload_path, filename), "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     patient = await service.update(patient_id, {"photo_url": f"/uploads/patient_photos/{filename}"}, user_id=current_user.get("sub"))
+    await record_timeline_event(db, patient_id=patient_id, action="Photo Uploaded",
+        module="patient", description="Patient photo uploaded",
+        current_user=current_user)
     return patient

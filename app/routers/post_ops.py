@@ -10,6 +10,7 @@ from app.models.case import Case
 from app.repositories.post_op_repository import PostOpRepository
 from app.repositories.audit_log_repository import AuditLogRepository
 from app.config import settings
+from app.services.timeline_helper import record_timeline_event
 
 router = APIRouter(prefix="/post-ops", tags=["Post-Op"])
 
@@ -82,4 +83,10 @@ async def add_post_op(case_id: str, notes: Optional[str] = Form(None), report: O
         return {"id": str(updated.id), "notes": updated.notes, "report": updated.report, "photo_urls": photo_urls}
     post_op = await repo.create(case_id=case_id, notes=notes, report=report, photo_urls=",".join(photo_urls) if photo_urls else None)
     await audit.create(user_id=current_user.get("sub"), action="ADD_POST_OP", entity_type="POST_OP", entity_id=str(post_op.id), details="Post-op added")
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=case_obj.patient_id,
+        action="Post-Op Added",
+        description=f"Post-operative notes added",
+        module="Treatments",
+    )
     return {"id": str(post_op.id), "notes": post_op.notes, "report": post_op.report, "photo_urls": photo_urls}

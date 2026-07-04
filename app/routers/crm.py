@@ -23,6 +23,7 @@ def _verify_hospital_access(entity, current_user):
         if entity_hid and user_hid and str(entity_hid) != str(user_hid):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: entity belongs to another hospital")
 from app.core.permissions import Role, Permission, verify_permission
+from app.services.timeline_helper import record_timeline_event, build_changes
 from app.models.communication_log import CommunicationLog, CommunicationChannel, CommunicationStatus, MessageType
 from app.models.notification import Notification
 from app.models.patient_feedback import PatientFeedback
@@ -110,10 +111,12 @@ class FollowUpUpdate(BaseModel):
     response_summary: Optional[str] = None
     response_status: Optional[str] = None
     next_action: Optional[str] = None
+    interested_to_visit_again: Optional[str] = None
     contact_channel: Optional[str] = None
     follow_up_date: Optional[str] = None
     follow_up_time: Optional[str] = None
     appointment_id: Optional[str] = None
+    whatsapp_message: Optional[str] = None
 
 class FollowUpFeedbackCreate(BaseModel):
     response_status: str  # INTERESTED, NOT_INTERESTED, NEEDS_MORE_TIME, REQUESTED_CALLBACK, BUSY, NO_RESPONSE, WRONG_NUMBER, TREATMENT_COMPLETED, NEEDS_REVIEW
@@ -547,6 +550,12 @@ async def submit_feedback(
         rating=req.rating, review=req.review, comments=req.comments)
     db.add(fb)
     await db.commit()
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=req.patient_id,
+        action="Feedback Submitted",
+        description=f"Feedback submitted with rating {req.rating}",
+        module="CRM",
+    )
     return {"success": True, "id": str(fb.id)}
 
 
@@ -665,6 +674,12 @@ async def create_follow_up(
     db.add(notif)
 
     await db.commit()
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=req.patient_id,
+        action="Follow-Up Created",
+        description=f"Follow-up appointment created for {req.follow_up_date}",
+        module="CRM",
+    )
     return {
         "success": True,
         "id": str(fu.id),
@@ -706,8 +721,15 @@ async def delete_follow_up(follow_up_id: str, db: AsyncSession = Depends(get_db)
     if not fu:
         raise HTTPException(status_code=404, detail="Follow-up not found")
     _verify_hospital_access(fu, current_user)
+    patient_id = fu.patient_id
     await db.delete(fu)
     await db.commit()
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=patient_id,
+        action="Follow-Up Deleted",
+        description=f"Follow-up deleted",
+        module="CRM",
+    )
     return {"success": True}
 
 
@@ -726,12 +748,14 @@ async def update_follow_up(
     if req.response_summary is not None: fu.response_summary = req.response_summary
     if req.response_status is not None: fu.response_status = req.response_status
     if req.next_action is not None: fu.next_action = req.next_action
+    if req.interested_to_visit_again is not None: fu.interested_to_visit_again = req.interested_to_visit_again
     if req.contact_channel is not None: fu.contact_channel = req.contact_channel
     if req.status is not None or req.patient_feedback is not None:
         fu.last_contact_date = datetime.now(timezone.utc)
     if req.follow_up_date is not None: fu.follow_up_date = date.fromisoformat(req.follow_up_date)
     if req.follow_up_time is not None: fu.follow_up_time = time.fromisoformat(req.follow_up_time)
     if req.appointment_id is not None: fu.appointment_id = req.appointment_id
+    if req.whatsapp_message is not None: fu.whatsapp_message = req.whatsapp_message
     # Sync linked appointment status
     if req.status is not None and fu.appointment_id:
         appt = await db.get(Appointment, fu.appointment_id)
@@ -742,11 +766,18 @@ async def update_follow_up(
                 appt.status = AppointmentStatus.COMPLETED
             elif req.status == "LOST":
                 appt.status = AppointmentStatus.CANCELLED
+    patient_id = fu.patient_id
     await db.commit()
     if req.status is not None:
         svc = StatusAutomationService(db)
         await svc.update_followup_status(follow_up_id, FollowUpStatus(req.status))
         await db.commit()
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=patient_id,
+        action="Follow-Up Updated",
+        description=f"Follow-up status: {req.status or 'unchanged'}",
+        module="CRM",
+    )
     return {"success": True}
 
 
@@ -778,11 +809,18 @@ async def record_follow_up_feedback(
         fu.status = FollowUpStatus.CONTACTED.value
     elif req.response_status == "TREATMENT_COMPLETED":
         fu.status = FollowUpStatus.COMPLETED.value
+    patient_id = fu.patient_id
     await db.commit()
     # Log to timeline
     svc = StatusAutomationService(db)
     await svc.update_followup_status(follow_up_id, FollowUpStatus(fu.status))
     await db.commit()
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=patient_id,
+        action="Follow-Up Feedback Recorded",
+        description=f"Follow-up feedback: {req.response_status}",
+        module="CRM",
+    )
     return {"success": True}
 
 
@@ -812,6 +850,12 @@ async def create_appointment_from_follow_up(
     fu.next_action = "BOOK_APPOINTMENT"
     fu.last_contact_date = datetime.now(timezone.utc)
     await db.commit()
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=fu.patient_id,
+        action="Appointment Booked from Follow-Up",
+        description=f"Appointment booked from follow-up on {req.appointment_date}",
+        module="CRM",
+    )
     return {"success": True, "appointment_id": str(appt.id)}
 
 
@@ -828,7 +872,14 @@ async def reschedule_follow_up(
     if req.follow_up_time:
         fu.follow_up_time = time.fromisoformat(req.follow_up_time)
     fu.status = FollowUpStatus.PENDING.value
+    patient_id = fu.patient_id
     await db.commit()
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=patient_id,
+        action="Follow-Up Rescheduled",
+        description=f"Follow-up rescheduled to {req.follow_up_date}",
+        module="CRM",
+    )
     return {"success": True, "new_date": req.follow_up_date}
 
 
@@ -845,7 +896,14 @@ async def mark_follow_up_completed(
     fu.completed_date = datetime.now(timezone.utc)
     fu.completed_by = current_user.get("id")
     fu.last_contact_date = datetime.now(timezone.utc)
+    patient_id = fu.patient_id
     await db.commit()
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=patient_id,
+        action="Follow-Up Completed",
+        description=f"Follow-up marked as completed",
+        module="CRM",
+    )
     return {"success": True}
 
 
@@ -877,7 +935,14 @@ async def record_follow_up_response(
         response_status=req.response_status)
     db.add(fr)
     fu.status = FollowUpStatus.COMPLETED.value
+    patient_id = fu.patient_id
     await db.commit()
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=patient_id,
+        action="Follow-Up Response Recorded",
+        description=f"Follow-up response: {req.response_status}",
+        module="CRM",
+    )
     return {"success": True, "id": str(fr.id)}
 
 
@@ -2417,6 +2482,12 @@ async def mark_follow_up_done(
     if req.notes:
         fu.notes = (fu.notes or "") + "\n[Done] " + req.notes
     await db.commit()
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=fu.patient_id,
+        action="Follow-Up Marked Done",
+        description=f"Follow-up marked as completed",
+        module="CRM",
+    )
     return {"success": True}
 
 
@@ -2473,6 +2544,12 @@ async def log_follow_up_communication(
         sent_at=datetime.now(timezone.utc))
     db.add(log)
     await db.commit()
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=fu.patient_id,
+        action="Follow-Up Communication Sent",
+        description=f"{req.channel} communication sent for follow-up",
+        module="CRM",
+    )
     return {"success": True, "log_id": str(log.id)}
 
 
@@ -2527,6 +2604,12 @@ async def record_follow_up_response_crm(
     fu.completed_by = current_user.get("sub")
 
     await db.commit()
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=fu.patient_id,
+        action="Follow-Up Response Recorded",
+        description=f"Response recorded ({req.response_status})",
+        module="CRM",
+    )
     return {
         "success": True,
         "response_id": str(fr.id),
@@ -2596,6 +2679,12 @@ async def create_follow_up_from_enquiry(
     response.appointment_id = str(appt.id)
 
     await db.commit()
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=req.patient_id,
+        action="Follow-Up Created from Enquiry",
+        description=f"Follow-up created from enquiry response for {patient.full_name}",
+        module="CRM",
+    )
     return {
         "success": True,
         "follow_up_id": str(follow_up.id),

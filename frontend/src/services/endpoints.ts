@@ -64,10 +64,12 @@ export const patientsApi = {
   update: (id: string, data: any) => api.put(`/patients/${id}`, data).then((r) => r.data),
   delete: (id: string) => api.delete(`/patients/${id}`).then((r) => r.data),
   search: (params?: PaginationParams) => api.get("/patients/search", { params: withPagination(params) }).then((r) => r.data),
+  getPatientTimeline: (patientId: string, params?: Record<string, unknown>) =>
+    api.get(`/patients/${patientId}/timeline`, { params }).then((r) => r.data),
 };
 
 export const casesApi = {
-  list: (params?: PaginationParams) => api.get("/cases", { params: withPagination(params) }).then((r) => r.data),
+  list: (params?: Record<string, unknown>) => api.get("/cases", { params }).then((r) => r.data),
   get: (id: string) => api.get(`/cases/${id}`).then((r) => r.data),
   create: (data: any) => api.post("/cases", data).then((r) => r.data),
   update: (id: string, data: any) => api.put(`/cases/${id}`, data).then((r) => r.data),
@@ -509,6 +511,10 @@ export const crmSettingsApi = {
     delete: (id: string) => api.delete(`/crm/settings/rules/${id}`).then((r) => r.data),
   },
   summary: () => api.get("/crm/settings/summary").then((r) => r.data),
+  opd: {
+    get: () => api.get("/crm/opd-settings/").then((r) => r.data),
+    update: (data: any) => api.post("/crm/opd-settings/", data).then((r) => r.data),
+  },
 };
 
 export const consentFormsApi = {

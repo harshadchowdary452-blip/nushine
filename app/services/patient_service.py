@@ -1,5 +1,6 @@
 import logging
 from typing import Optional, List
+from datetime import date, timedelta, datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete as sa_delete
 from fastapi import HTTPException, status
@@ -14,7 +15,7 @@ from app.models.patient import Patient, PatientStatus
 from app.models.case import Case, CaseStatus, ClinicalFinding
 from app.models.billing import Billing, PaymentStatus
 from app.models.appointment import Appointment
-from app.models.treatment_plan import TreatmentPlan
+from app.models.treatment_plan import TreatmentPlan, TreatmentPlanStatus
 from app.models.treatment_sitting import TreatmentSitting
 from app.models.follow_up import FollowUp
 from app.models.communication_log import CommunicationLog
@@ -27,6 +28,8 @@ from app.models.case_timeline import CaseTimeline
 from app.models.consent_form import ConsentForm
 from app.models.billing_history import BillingHistory
 from app.models.payment_transaction import PaymentTransaction
+from app.models.enquiry import Enquiry, EnquiryStatus
+from app.models.crm_opd_setting import CrmOpdSetting
 
 logger = logging.getLogger(__name__)
 
@@ -71,20 +74,84 @@ class PatientService:
             filters["status"] = status_filter
         patients = await self.repo.get_all(filters=filters or None)
         if query:
-            patients = [p for p in patients if query.lower() in p.full_name.lower() or (p.phone and query in p.phone) or (p.email and query.lower() in p.email.lower())]
+            ql = query.lower()
+            patients = [p for p in patients if ql in p.full_name.lower() or (p.phone and query in p.phone) or (p.email and ql in p.email.lower()) or (p.op_no and query in p.op_no) or (p.abha_id and query in p.abha_id)]
         return patients
 
     async def update(self, patient_id: str, data: dict, user_id: str = None) -> Optional[Patient]:
         try:
             if "status" in data and data["status"]:
                 data["status"] = PatientStatus(data["status"])
-            patient = await self.repo.update(patient_id, **data)
+            clean_data = {k: v for k, v in data.items() if v is not None and v != ""}
+            patient = await self.repo.update(patient_id, **clean_data)
             if patient:
                 await self.audit_log_repo.create(user_id=user_id, action="UPDATE_PATIENT", entity_type="PATIENT", entity_id=patient_id, details="Patient updated")
+            if clean_data.get("status") == PatientStatus.OPD:
+                await self._auto_create_opd_enquiry(patient, user_id)
             return patient
         except Exception as e:
             logger.exception("UPDATE_PATIENT - Error: %s", str(e))
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update patient: {str(e)}")
+
+    async def _auto_create_opd_enquiry(self, patient: Patient, user_id: str = None):
+        try:
+            # Check if all treatment plans are completed (treatment fully done)
+            cases = await self.case_repo.get_all(filters={"patient_id": patient.id})
+            all_treatment_completed = True
+            for c in cases:
+                tps = await self.treatment_plan_repo.get_all(filters={"case_id": c.id})
+                for tp in tps:
+                    if tp.status != TreatmentPlanStatus.COMPLETED:
+                        all_treatment_completed = False
+                        break
+                if not all_treatment_completed:
+                    break
+            if cases and all_treatment_completed:
+                logger.info("AUTO_CREATE_OPD_ENQUIRY - Skipped (all treatment completed) for patient %s", patient.id)
+                return
+            # Check for existing OPD enquiry for this patient
+            existing = await self.db.execute(
+                select(Enquiry).where(
+                    Enquiry.patient_id == patient.id,
+                    Enquiry.treatment_interest == "OPD_FOLLOW_UP",
+                    Enquiry.status != EnquiryStatus.CONVERTED.value,
+                )
+            )
+            if existing.scalar_one_or_none():
+                logger.info("AUTO_CREATE_OPD_ENQUIRY - Skipped (already exists) for patient %s", patient.id)
+                return
+            # Get OPD settings (gracefully handle missing table)
+            due_days = 1
+            assigned_staff = None
+            try:
+                opd_settings = await self.db.execute(
+                    select(CrmOpdSetting).where(CrmOpdSetting.hospital_id == patient.hospital_id, CrmOpdSetting.is_active == True)
+                )
+                opd_setting = opd_settings.scalar_one_or_none()
+                if opd_setting:
+                    due_days = opd_setting.default_due_days
+                    assigned_staff = opd_setting.assigned_staff_id
+            except Exception:
+                pass
+            due_date = date.today() + timedelta(days=due_days)
+            enquiry = Enquiry(
+                hospital_id=patient.hospital_id,
+                patient_id=patient.id,
+                assigned_staff_id=assigned_staff or user_id,
+                treatment_interest="OPD_FOLLOW_UP",
+                notes="Patient completed OP consultation but treatment has not started. Follow up with the patient regarding the proposed treatment plan.",
+                status=EnquiryStatus.NEW.value,
+                next_follow_up_date=due_date,
+            )
+            self.db.add(enquiry)
+            await self.db.flush()
+            await self.audit_log_repo.create(
+                user_id=user_id, action="AUTO_CREATE_OPD_ENQUIRY",
+                entity_type="ENQUIRY", entity_id=str(enquiry.id),
+                details=f"OPD Follow-Up enquiry auto-created for patient {patient.full_name}",
+            )
+        except Exception as e:
+            logger.exception("AUTO_CREATE_OPD_ENQUIRY - Error: %s", str(e))
 
     async def auto_update_patient_status(self, patient_id: str, user_id: str = None) -> Optional[Patient]:
         try:
