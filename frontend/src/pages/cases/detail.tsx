@@ -16,8 +16,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/components/ui/toast"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import type { Case, ClinicalFinding } from "@/types"
-import Odontogram from "@/components/odontogram/Odontogram"
+import type { Case } from "@/types"
+import ProfessionalOdontogram from "@/components/toothchart/ProfessionalOdontogram"
+import type { ToothFinding } from "@/components/toothchart/types"
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5173/api/v1"
 
@@ -45,6 +46,30 @@ function CollapsibleSection({ title, defaultOpen, children }: { title: string; d
   )
 }
 
+// Adapter: API ClinicalFinding → ToothFinding
+function apiFindingToLocal(api: any): ToothFinding {
+  const typeMap: Record<string, string> = {
+    'Dental Caries': 'Decayed',
+    'Dental caries': 'Decayed',
+    'dental caries': 'Decayed',
+    'Filling Amalgam': 'Restored',
+    'Filling Composite': 'Restored',
+    'Missing Tooth': 'Missing',
+    'Missing tooth': 'Missing',
+    'MissingTooth': 'Missing',
+  }
+  const condition = (typeMap[api.finding_type] || api.finding_type) as ToothFinding['condition']
+  return {
+    id: api.id || `api-${Date.now()}`,
+    toothNumber: parseInt(api.tooth_number) || 0,
+    condition: ['Decayed', 'Restored', 'Defective', 'Missing', 'Erupt', 'Implant', 'Impacted', 'Bridge', 'Denture'].includes(condition) ? condition : 'Decayed',
+    surfaces: api.surface ? [api.surface as any] : undefined,
+    material: api.material || undefined,
+    description: api.notes || api.description || undefined,
+    date: (api.created_at || new Date().toISOString()).split('T')[0],
+  }
+}
+
 export default function CaseHistoryDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -57,7 +82,7 @@ export default function CaseHistoryDetail() {
 
   // Form state
   const [form, setForm] = useState<Record<string, any>>({})
-  const [findings, setFindings] = useState<ClinicalFinding[]>([])
+  const [findings, setFindings] = useState<ToothFinding[]>([])
 
   const { data: caseData, isFetching } = useQuery({
     queryKey: ["case", id],
@@ -94,7 +119,7 @@ export default function CaseHistoryDetail() {
         notes: c.notes || "",
         doctor_id: c.doctor_id || "",
       })
-      setFindings(c.findings || [])
+      setFindings((c.findings || []).map(apiFindingToLocal))
     }
   }, [c])
 
@@ -108,10 +133,10 @@ export default function CaseHistoryDetail() {
       payload.treatment_plan_estimated_cost = payload.treatment_plan_estimated_cost ? Number(payload.treatment_plan_estimated_cost) : null
       payload.treatment_plan_estimated_visits = payload.treatment_plan_estimated_visits ? Number(payload.treatment_plan_estimated_visits) : null
       payload.findings = findings.length > 0 ? findings.map((f) => ({
-        finding_type: f.finding_type,
-        tooth_number: f.tooth_number || undefined,
-        severity: f.severity || undefined,
-        notes: f.notes || undefined,
+        finding_type: f.condition,
+        tooth_number: String(f.toothNumber) || undefined,
+        severity: undefined,
+        notes: f.description || undefined,
       })) : undefined
       Object.keys(payload).forEach((k) => { if (payload[k] === "" || payload[k] === undefined || payload[k] === null) delete payload[k] })
       await casesApi.update(id, payload)
@@ -144,14 +169,13 @@ export default function CaseHistoryDetail() {
   function handlePrint() { window.print() }
 
   // Auto-generate findings summary
-  function computeFindingsSummary(f: ClinicalFinding[]) {
+  function computeFindingsSummary(f: ToothFinding[]) {
     if (f.length === 0) return ""
     const groups: Record<string, string[]> = {}
     for (const f2 of f) {
-      if (f2.finding_type === "Healthy") continue
-      const key = `Tooth ${f2.tooth_number}`
+      const key = `Tooth ${f2.toothNumber}`
       if (!groups[key]) groups[key] = []
-      groups[key].push(f2.finding_type + (f2.notes ? ` (${f2.notes})` : ""))
+      groups[key].push(f2.condition + (f2.description ? ` (${f2.description})` : ""))
     }
     return Object.entries(groups).map(([tooth, types]) => `${tooth} - ${types.join(", ")}`).join("\n")
   }
@@ -299,9 +323,13 @@ export default function CaseHistoryDetail() {
           </CollapsibleSection>
 
           <CollapsibleSection title="9. Clinical Findings — Interactive Odontogram" defaultOpen>
-            <Odontogram
+            <ProfessionalOdontogram
               findings={findings}
-              onFindingsChange={setFindings}
+              onFindingsChange={(updated) => setFindings(updated)}
+              patientName={c?.patient_name}
+              opNumber={c?.patient?.op_no ?? undefined}
+              doctorName={c?.doctor_name}
+              visitDate={c?.created_at ? format(new Date(c.created_at), "dd MMM yyyy") : undefined}
             />
             <div className="mt-4">
               <Label>Clinical Findings Summary</Label>
@@ -390,8 +418,9 @@ export default function CaseHistoryDetail() {
           </TabsContent>
 
           <TabsContent value="findings" className="mt-4">
-            <Odontogram
-              findings={c.findings || []}
+            <ProfessionalOdontogram
+              findings={(c.findings || []).map(apiFindingToLocal)}
+              onFindingsChange={() => {}}
               readonly
             />
           </TabsContent>

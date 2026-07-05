@@ -115,13 +115,14 @@ export type CaseStatus = "NEW" | "DIAGNOSIS_PENDING" | "TREATMENT_PLANNED" | "IN
 export type PatientStatus = "NEW" | "ACTIVE" | "INACTIVE" | "UNDER_TREATMENT" | "TREATMENT_ONGOING" | "FOLLOW_UP" | "COMPLETED" | "OPD" | "LOST" | "ARCHIVED";
 
 export interface ClinicalFinding {
-  id: string;
-  case_id: string;
+  id?: string | number;
+  case_id?: string;
   finding_type: string;
   tooth_number: string | null;
+  surface?: string;
   severity: string | null;
   notes: string | null;
-  created_at: string;
+  created_at?: string;
 }
 
 export interface Case {
