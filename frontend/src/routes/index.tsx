@@ -19,6 +19,7 @@ const PatientList = lazy(() => import("@/pages/patients/list"));
 const PatientDetail = lazy(() => import("@/pages/patients/detail"));
 const CaseList = lazy(() => import("@/pages/cases/list"));
 const CaseDetail = lazy(() => import("@/pages/cases/detail"));
+const CasePrintPreview = lazy(() => import("@/pages/cases/print-preview"));
 const AppointmentList = lazy(() => import("@/pages/appointments/list"));
 const AppointmentDetail = lazy(() => import("@/pages/appointments/detail"));
 const ConsultantList = lazy(() => import("@/pages/consultants/list"));
@@ -165,6 +166,7 @@ export const router = createBrowserRouter([
       { path: "/leads", element: withRoles(<LeadList />, ADMIN_ROLES) },
       { path: "/leads/:id", element: withRoles(<LeadDetail />, ADMIN_ROLES) },
       { path: "/cases", element: withRoles(<CaseList />, CARE_ROLES) },
+      { path: "/cases/:id/print", element: withRoles(<CasePrintPreview />, CARE_ROLES) },
       { path: "/cases/:id", element: withRoles(<CaseDetail />, CARE_ROLES) },
       { path: "/treatments", element: withRoles(<TreatmentList />, CARE_ROLES) },
       { path: "/treatments/:id", element: withRoles(<TreatmentDetail />, CARE_ROLES) },

@@ -21,8 +21,11 @@ class ClinicalFinding(Base):
     finding_type: Mapped[str] = mapped_column(String(50), nullable=False)
     tooth_number: Mapped[str] = mapped_column(String(10), nullable=True)
     severity: Mapped[str] = mapped_column(String(20), nullable=True)
+    dentition_type: Mapped[str] = mapped_column(String(5), nullable=True)
+    surface: Mapped[str] = mapped_column(String(50), nullable=True)
     notes: Mapped[str] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     case = relationship("Case", back_populates="findings")
 
 
@@ -71,6 +74,13 @@ class Case(Base):
     # Doctor Info
     doctor_registration_number: Mapped[str] = mapped_column(String(50), nullable=True)
     doctor_specialization: Mapped[str] = mapped_column(String(100), nullable=True)
+    # Patient Instructions
+    patient_instructions: Mapped[str] = mapped_column(Text, nullable=True)
+    # Medicines Prescribed
+    medicines_prescribed: Mapped[str] = mapped_column(Text, nullable=True)
+    # Follow-up
+    follow_up_instructions: Mapped[str] = mapped_column(Text, nullable=True)
+    next_review_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     # Status
     status: Mapped[CaseStatus] = mapped_column(SAEnum(CaseStatus, create_constraint=False), default=CaseStatus.OPEN, nullable=False)
     notes: Mapped[str] = mapped_column(Text, nullable=True)

@@ -222,12 +222,6 @@ export default function ToothGrid({
             }}>
               Undo
             </button>
-            <button onClick={() => window.print()} style={{
-              padding: '4px 10px', borderRadius: 5, fontSize: 10, fontWeight: 500,
-              border: '1px solid #E5E7EB', background: '#FFF', color: '#374151', cursor: 'pointer',
-            }}>
-              Print
-            </button>
           </div>
         </div>
 

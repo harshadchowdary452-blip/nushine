@@ -940,7 +940,6 @@ export default function Odontogram({
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
   const [showSummary, setShowSummary] = useState(false)
   const [showOcclusal, setShowOcclusal] = useState(false)
-  const [showPrint, setShowPrint] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<HTMLDivElement>(null)
 
@@ -1043,10 +1042,6 @@ export default function Odontogram({
           {/* Occlusal toggle */}
           <button onClick={() => setShowOcclusal(!showOcclusal)} style={btnStyle(showOcclusal)}>
             {showOcclusal ? "Hide Occlusal" : "Occlusal"}
-          </button>
-          {/* Print */}
-          <button onClick={() => window.print()} style={{ ...btnStyle(false), background: "#f8f9fb" }}>
-            🖨 Print
           </button>
         </div>
       </div>

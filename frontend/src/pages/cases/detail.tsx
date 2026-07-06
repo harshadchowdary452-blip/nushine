@@ -18,7 +18,7 @@ import { useToast } from "@/components/ui/toast"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { Case } from "@/types"
 import ProfessionalOdontogram from "@/components/toothchart/ProfessionalOdontogram"
-import type { ToothFinding } from "@/components/toothchart/types"
+import type { ToothFinding, ToothSurface, ToothCondition } from "@/components/toothchart/types"
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5173/api/v1"
 
@@ -46,28 +46,50 @@ function CollapsibleSection({ title, defaultOpen, children }: { title: string; d
   )
 }
 
-// Adapter: API ClinicalFinding → ToothFinding
-function apiFindingToLocal(api: any): ToothFinding {
-  const typeMap: Record<string, string> = {
-    'Dental Caries': 'Decayed',
-    'Dental caries': 'Decayed',
-    'dental caries': 'Decayed',
-    'Filling Amalgam': 'Restored',
-    'Filling Composite': 'Restored',
-    'Missing Tooth': 'Missing',
-    'Missing tooth': 'Missing',
-    'MissingTooth': 'Missing',
-  }
-  const condition = (typeMap[api.finding_type] || api.finding_type) as ToothFinding['condition']
+// Visual-only mapping: finding_type → ToothCondition (for tooth box rendering)
+const TYPE_TO_VISUAL: Record<string, ToothCondition> = {
+  'Dental Caries': 'Decayed', 'Composite Filling': 'Restored',
+  'Amalgam': 'Restored', 'RCT Completed': 'Restored',
+  'RCT Required': 'Decayed', 'Calculus': 'Defective',
+  'Crown': 'Restored', 'Bridge': 'Bridge', 'Implant': 'Implant',
+  'Fracture': 'Defective', 'Mobility': 'Defective',
+  'Tenderness': 'Decayed', 'Missing Tooth': 'Missing',
+  'Root Stump': 'Defective', 'Impacted': 'Impacted',
+  'Erupting': 'Erupt', 'Denture': 'Denture', 'Impaction': 'Impacted',
+  'Decayed': 'Decayed', 'Restored': 'Restored',
+  'Defective': 'Defective', 'Missing': 'Missing',
+}
+
+const CODE_TO_SURFACE: Record<string, ToothSurface> = {
+  'M': 'Mesial', 'D': 'Distal', 'B': 'Buccal', 'L': 'Lingual',
+  'O': 'Occlusal', 'I': 'Incisal', 'La': 'Labial',
+}
+
+const SURFACE_TO_CODE: Record<ToothSurface, string> = {
+  Mesial: 'M', Distal: 'D', Buccal: 'B', Lingual: 'L',
+  Occlusal: 'O', Incisal: 'I', Labial: 'La',
+}
+
+// Direct adapter: API ClinicalFinding → ToothFinding (no remapping, no pattern matching)
+function apiToFinding(api: any): ToothFinding {
+  const surfaces = api.surface
+    ? api.surface.split(',').map((s: string) => CODE_TO_SURFACE[s.trim()]).filter(Boolean) as ToothSurface[]
+    : []
   return {
     id: api.id || `api-${Date.now()}`,
     toothNumber: parseInt(api.tooth_number) || 0,
-    condition: ['Decayed', 'Restored', 'Defective', 'Missing', 'Erupt', 'Implant', 'Impacted', 'Bridge', 'Denture'].includes(condition) ? condition : 'Decayed',
-    surfaces: api.surface ? [api.surface as any] : undefined,
-    material: api.material || undefined,
-    description: api.notes || api.description || undefined,
+    condition: TYPE_TO_VISUAL[api.finding_type] || 'Decayed',
+    surfaces: surfaces.length > 0 ? surfaces : undefined,
+    description: api.notes || undefined,
     date: (api.created_at || new Date().toISOString()).split('T')[0],
+    findingType: api.finding_type,
+    dentitionType: api.dentition_type || undefined,
+    severity: api.severity || undefined,
   }
+}
+
+function getFindingLabel(f: ToothFinding): string {
+  return f.findingType || f.originalFindingType || f.condition
 }
 
 export default function CaseHistoryDetail() {
@@ -88,6 +110,8 @@ export default function CaseHistoryDetail() {
     queryKey: ["case", id],
     queryFn: () => casesApi.get(id!),
     enabled: !!id,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   })
   const c: Case | undefined = caseData
 
@@ -114,12 +138,16 @@ export default function CaseHistoryDetail() {
         initial_treatment_plan: c.initial_treatment_plan || "",
         treatment_plan_estimated_cost: c.treatment_plan_estimated_cost || "",
         treatment_plan_estimated_visits: c.treatment_plan_estimated_visits || "",
+        patient_instructions: c.patient_instructions || "",
+        medicines_prescribed: c.medicines_prescribed || "",
+        follow_up_instructions: c.follow_up_instructions || "",
+        next_review_date: c.next_review_date || "",
         doctor_registration_number: c.doctor_registration_number || "",
         doctor_specialization: c.doctor_specialization || "",
         notes: c.notes || "",
         doctor_id: c.doctor_id || "",
       })
-      setFindings((c.findings || []).map(apiFindingToLocal))
+      setFindings((c.findings || []).map(apiToFinding))
     }
   }, [c])
 
@@ -133,14 +161,18 @@ export default function CaseHistoryDetail() {
       payload.treatment_plan_estimated_cost = payload.treatment_plan_estimated_cost ? Number(payload.treatment_plan_estimated_cost) : null
       payload.treatment_plan_estimated_visits = payload.treatment_plan_estimated_visits ? Number(payload.treatment_plan_estimated_visits) : null
       payload.findings = findings.length > 0 ? findings.map((f) => ({
-        finding_type: f.condition,
-        tooth_number: String(f.toothNumber) || undefined,
-        severity: undefined,
+        id: (f.id && !f.id.startsWith('f-') && !f.id.startsWith('api-')) ? f.id : undefined,
+        finding_type: getFindingLabel(f),
+        tooth_number: String(f.toothNumber),
         notes: f.description || undefined,
+        severity: f.severity || undefined,
+        dentition_type: f.dentitionType || undefined,
+        surface: f.surfaces?.map((s) => SURFACE_TO_CODE[s]).join(',') || undefined,
       })) : undefined
       Object.keys(payload).forEach((k) => { if (payload[k] === "" || payload[k] === undefined || payload[k] === null) delete payload[k] })
       await casesApi.update(id, payload)
       queryClient.invalidateQueries({ queryKey: ["case", id] })
+      queryClient.invalidateQueries({ queryKey: ["case-timeline", id] })
       addToast({ title: "Case history updated", variant: "success" })
       setEditing(false)
     } catch (err: any) {
@@ -152,9 +184,7 @@ export default function CaseHistoryDetail() {
   async function handleDownloadPdf() {
     if (!id) return
     try {
-      const resp = await fetch(`${API_BASE}/cases/${id}/pdf`, { credentials: "include" })
-      if (!resp.ok) throw new Error("PDF generation failed")
-      const blob = await resp.blob()
+      const blob = await casesApi.getPdfBlob(id)
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
@@ -162,11 +192,9 @@ export default function CaseHistoryDetail() {
       a.click()
       window.URL.revokeObjectURL(url)
     } catch (err: any) {
-      addToast({ title: "Error", description: err.message || "PDF failed", variant: "destructive" })
+      addToast({ title: "Error", description: err?.response?.data?.detail || err.message || "PDF failed", variant: "destructive" })
     }
   }
-
-  function handlePrint() { window.print() }
 
   // Auto-generate findings summary
   function computeFindingsSummary(f: ToothFinding[]) {
@@ -175,7 +203,7 @@ export default function CaseHistoryDetail() {
     for (const f2 of f) {
       const key = `Tooth ${f2.toothNumber}`
       if (!groups[key]) groups[key] = []
-      groups[key].push(f2.condition + (f2.description ? ` (${f2.description})` : ""))
+      groups[key].push(getFindingLabel(f2) + (f2.description ? ` (${f2.description})` : ""))
     }
     return Object.entries(groups).map(([tooth, types]) => `${tooth} - ${types.join(", ")}`).join("\n")
   }
@@ -216,11 +244,11 @@ export default function CaseHistoryDetail() {
         </div>
         <div className="flex items-center gap-2">
           <Badge className={`text-xs ${statusColors[c.status] || ""}`}>{c.status}</Badge>
-          <Button variant="outline" size="sm" onClick={handleDownloadPdf}>
-            <Download className="h-4 w-4 mr-1" /> PDF
+          <Button variant="outline" size="sm" onClick={() => navigate(`/cases/${id}/print`)}>
+            <Printer className="h-4 w-4 mr-1" /> Print Preview
           </Button>
-          <Button variant="outline" size="sm" onClick={handlePrint}>
-            <Printer className="h-4 w-4 mr-1" /> Print
+          <Button variant="outline" size="sm" onClick={handleDownloadPdf}>
+            <Download className="h-4 w-4 mr-1" /> Download PDF
           </Button>
           <Button size="sm" onClick={() => setEditing(!editing)}>
             <PenLine className="h-4 w-4 mr-1" /> {editing ? "Cancel" : "Edit"}
@@ -229,39 +257,51 @@ export default function CaseHistoryDetail() {
       </div>
 
       {/* Patient, Doctor & Audit Info */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        <Card className="lg:col-span-2">
           <CardHeader className="py-3"><CardTitle className="text-sm">Patient Details</CardTitle></CardHeader>
-          <CardContent className="py-2 text-sm space-y-1">
-            <p><span className="text-muted-foreground">Name:</span> {c.patient_name || "—"}</p>
-            <p><span className="text-muted-foreground">OP No:</span> {c.patient?.op_no || "—"}</p>
-            <p><span className="text-muted-foreground">ABHA ID:</span> {c.patient?.abha_id || "—"}</p>
-            <p><span className="text-muted-foreground">Phone:</span> {c.patient?.phone || "—"}</p>
+          <CardContent className="py-2 text-sm">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+              <p><span className="text-muted-foreground">Name:</span> {c.patient_name || "—"}</p>
+              <p><span className="text-muted-foreground">OP No:</span> {c.patient?.op_no || "—"}</p>
+              <p><span className="text-muted-foreground">Age/Gender:</span> {[c.patient?.age, c.patient?.gender].filter(Boolean).join("/") || "—"}</p>
+              <p><span className="text-muted-foreground">DOB:</span> {c.patient?.date_of_birth ? format(new Date(c.patient.date_of_birth), "dd MMM yyyy") : "—"}</p>
+              <p><span className="text-muted-foreground">Phone:</span> {c.patient?.phone || "—"}</p>
+              <p><span className="text-muted-foreground">Alt Mobile:</span> {c.patient?.emergency_contact || "—"}</p>
+              <p><span className="text-muted-foreground">Email:</span> {c.patient?.email || "—"}</p>
+              <p><span className="text-muted-foreground">ABHA ID:</span> {c.patient?.abha_id || "—"}</p>
+              <p className="col-span-2"><span className="text-muted-foreground">Address:</span> {c.patient?.address || "—"}</p>
+              <p><span className="text-muted-foreground">Source:</span> {c.patient?.patient_source || "—"}</p>
+              <p><span className="text-muted-foreground">Status:</span> {c.patient?.status || "—"}</p>
+              <p><span className="text-muted-foreground">Reg Date:</span> {c.patient?.created_at ? format(new Date(c.patient.created_at), "dd MMM yyyy") : "—"}</p>
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="py-3"><CardTitle className="text-sm">Doctor Details</CardTitle></CardHeader>
           <CardContent className="py-2 text-sm space-y-1">
-            <p><span className="text-muted-foreground">Name:</span> Dr. {c.doctor_name || "—"}</p>
-            <p><span className="text-muted-foreground">Reg No:</span> {c.doctor_registration_number || "—"}</p>
-            <p><span className="text-muted-foreground">Specialization:</span> {c.doctor_specialization || "—"}</p>
-            <p><span className="text-muted-foreground">Date:</span> {c.created_at ? format(new Date(c.created_at), "dd MMM yyyy HH:mm") : "—"}</p>
+            <p><span className="text-muted-foreground">Name:</span> Dr. {c.doctor_name || c.doctor?.full_name || "—"}</p>
+            <p><span className="text-muted-foreground">Qualification:</span> {c.doctor?.specialization || c.doctor_specialization || "—"}</p>
+            <p><span className="text-muted-foreground">Specialization:</span> {c.doctor_specialization || c.doctor?.specialization || "—"}</p>
+            <p><span className="text-muted-foreground">Reg No:</span> {c.doctor_registration_number || c.doctor?.license_number || "—"}</p>
+            <p><span className="text-muted-foreground">Mobile:</span> {c.doctor?.phone || "—"}</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="py-3"><CardTitle className="text-sm">Created By</CardTitle></CardHeader>
+          <CardHeader className="py-3"><CardTitle className="text-sm">Visit Details</CardTitle></CardHeader>
           <CardContent className="py-2 text-sm space-y-1">
-            <p><span className="text-muted-foreground">Name:</span> {c.created_by?.full_name || "—"}</p>
-            <p><span className="text-muted-foreground">Role:</span> {c.created_by?.role || "—"}</p>
-            <p><span className="text-muted-foreground">Date:</span> {c.created_at ? format(new Date(c.created_at), "dd MMM yyyy HH:mm") : "—"}</p>
+            <p><span className="text-muted-foreground">Date:</span> {c.appointment_date ? format(new Date(c.appointment_date), "dd MMM yyyy") : c.created_at ? format(new Date(c.created_at), "dd MMM yyyy") : "—"}</p>
+            {c.appointment_time && <p><span className="text-muted-foreground">Time:</span> {c.appointment_time}</p>}
+            <p><span className="text-muted-foreground">Doctor:</span> Dr. {c.doctor_name || c.doctor?.full_name || "—"}</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="py-3"><CardTitle className="text-sm">Last Updated By</CardTitle></CardHeader>
+          <CardHeader className="py-3"><CardTitle className="text-sm">Audit</CardTitle></CardHeader>
           <CardContent className="py-2 text-sm space-y-1">
-            <p><span className="text-muted-foreground">Name:</span> {c.updated_by?.full_name || "—"}</p>
-            <p><span className="text-muted-foreground">Role:</span> {c.updated_by?.role || "—"}</p>
-            <p><span className="text-muted-foreground">Date:</span> {c.updated_at ? format(new Date(c.updated_at), "dd MMM yyyy HH:mm") : "—"}</p>
+            <p><span className="text-muted-foreground">Created By:</span> {c.created_by?.full_name || "—"}</p>
+            <p><span className="text-muted-foreground">Updated By:</span> {c.updated_by?.full_name || "—"}</p>
+            <p><span className="text-muted-foreground">Created:</span> {c.created_at ? format(new Date(c.created_at), "dd MMM yyyy hh:mm a") : "—"}</p>
+            <p><span className="text-muted-foreground">Updated:</span> {c.updated_at ? format(new Date(c.updated_at), "dd MMM yyyy hh:mm a") : "—"}</p>
           </CardContent>
         </Card>
       </div>
@@ -330,6 +370,7 @@ export default function CaseHistoryDetail() {
               opNumber={c?.patient?.op_no ?? undefined}
               doctorName={c?.doctor_name}
               visitDate={c?.created_at ? format(new Date(c.created_at), "dd MMM yyyy") : undefined}
+              patientDateOfBirth={c?.patient?.date_of_birth ?? undefined}
             />
             <div className="mt-4">
               <Label>Clinical Findings Summary</Label>
@@ -379,6 +420,30 @@ export default function CaseHistoryDetail() {
               className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[80px]" />
           </CollapsibleSection>
 
+          <CollapsibleSection title="16. Patient Instructions">
+            <textarea value={form.patient_instructions || ""} onChange={(e) => setForm({ ...form, patient_instructions: e.target.value })}
+              className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[80px]"
+              placeholder="Maintain oral hygiene. Brush twice daily. Avoid hard food. Take prescribed medicines..." />
+          </CollapsibleSection>
+
+          <CollapsibleSection title="17. Medicines Prescribed">
+            <textarea value={form.medicines_prescribed || ""} onChange={(e) => setForm({ ...form, medicines_prescribed: e.target.value })}
+              className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[80px]"
+              placeholder="Medicine, Dosage, Frequency, Duration..." />
+          </CollapsibleSection>
+
+          <CollapsibleSection title="18. Follow-Up">
+            <div className="space-y-3">
+              <textarea value={form.follow_up_instructions || ""} onChange={(e) => setForm({ ...form, follow_up_instructions: e.target.value })}
+                className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[60px]"
+                placeholder="Return for follow-up if pain or swelling develops..." />
+              <div>
+                <Label>Next Review Date</Label>
+                <Input type="date" value={form.next_review_date ? (typeof form.next_review_date === 'string' ? form.next_review_date.split('T')[0] : '') : ""} onChange={(e) => setForm({ ...form, next_review_date: e.target.value })} />
+              </div>
+            </div>
+          </CollapsibleSection>
+
           {/* Save button */}
           <div className="sticky bottom-4 flex gap-3 bg-background/95 backdrop-blur p-3 rounded-lg border shadow-lg">
             <Button variant="outline" className="flex-1" onClick={() => setEditing(false)}>Cancel</Button>
@@ -419,9 +484,10 @@ export default function CaseHistoryDetail() {
 
           <TabsContent value="findings" className="mt-4">
             <ProfessionalOdontogram
-              findings={(c.findings || []).map(apiFindingToLocal)}
+              findings={(c.findings || []).map(apiToFinding)}
               onFindingsChange={() => {}}
               readonly
+              patientDateOfBirth={c?.patient?.date_of_birth ?? undefined}
             />
           </TabsContent>
 
@@ -442,6 +508,17 @@ export default function CaseHistoryDetail() {
                 <CardContent className="text-sm space-y-1">
                   {c.treatment_plan_estimated_visits && <p>Estimated Visits: <strong>{c.treatment_plan_estimated_visits}</strong></p>}
                   {c.treatment_plan_estimated_cost && <p>Estimated Cost: <strong>₹{c.treatment_plan_estimated_cost}</strong></p>}
+                </CardContent>
+              </Card>
+            )}
+            {c.patient_instructions && <SectionCard title="Patient Instructions" content={c.patient_instructions} />}
+            {c.medicines_prescribed && <SectionCard title="Medicines Prescribed" content={c.medicines_prescribed} />}
+            {c.follow_up_instructions && <SectionCard title="Follow-Up Instructions" content={c.follow_up_instructions} />}
+            {c.next_review_date && (
+              <Card>
+                <CardHeader className="py-3"><CardTitle className="text-sm">Next Review Date</CardTitle></CardHeader>
+                <CardContent className="text-sm">
+                  {format(new Date(c.next_review_date), "dd MMM yyyy")}
                 </CardContent>
               </Card>
             )}

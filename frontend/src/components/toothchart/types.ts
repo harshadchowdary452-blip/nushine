@@ -19,6 +19,10 @@ export type ToothFinding = {
   material?: string
   description?: string
   date: string
+  originalFindingType?: string
+  findingType?: string
+  dentitionType?: 'ADULT' | 'CHILD'
+  severity?: string
 }
 
 export type FindingFormData = {

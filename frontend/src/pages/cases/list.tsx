@@ -505,7 +505,7 @@ function CreateCaseForm({ onSuccess }: { onSuccess: () => void }) {
                 {FINDING_TYPES.map((ft) => {
                   const active = findings.some((f) => f.tooth_number === toothModal && f.finding_type === ft)
                   return (
-                    <Button key={ft} variant={active ? "default" : "outline"} size="sm" className="text-[9px] h-7 px-1"
+                    <Button key={ft} type="button" variant={active ? "default" : "outline"} size="sm" className="text-[9px] h-7 px-1"
                       style={active ? { backgroundColor: findingColors[ft] || undefined } : undefined}
                       onClick={() => {
                         if (active) {
@@ -520,8 +520,8 @@ function CreateCaseForm({ onSuccess }: { onSuccess: () => void }) {
                 })}
               </div>
               <div className="flex gap-2 mt-2">
-                <Button variant="outline" size="sm" className="flex-1 h-7 text-xs" onClick={() => setToothModal(null)}>Done</Button>
-                <Button size="sm" variant="destructive" className="flex-1 h-7 text-xs" onClick={() => { setFindings((prev) => prev.filter((f) => f.tooth_number !== toothModal)); setToothModal(null) }}>Clear</Button>
+                <Button type="button" variant="outline" size="sm" className="flex-1 h-7 text-xs" onClick={() => setToothModal(null)}>Done</Button>
+                <Button type="button" size="sm" variant="destructive" className="flex-1 h-7 text-xs" onClick={() => { setFindings((prev) => prev.filter((f) => f.tooth_number !== toothModal)); setToothModal(null) }}>Clear</Button>
               </div>
             </div>
           </div>

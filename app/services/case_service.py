@@ -46,6 +46,10 @@ FIELD_ACTION_MAP = {
     "doctor_registration_number": "Doctor Reg Number Updated",
     "doctor_specialization": "Doctor Specialization Updated",
     "notes": "Clinical Notes Updated",
+    "patient_instructions": "Patient Instructions Updated",
+    "medicines_prescribed": "Medicines Prescribed Updated",
+    "follow_up_instructions": "Follow-up Instructions Updated",
+    "next_review_date": "Next Review Date Updated",
 }
 
 
@@ -84,6 +88,10 @@ class CaseService:
                 doctor = doctor_result.scalar_one_or_none()
                 if not doctor:
                     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Doctor with id {doctor_id} not found")
+                if not data.get("doctor_registration_number"):
+                    data["doctor_registration_number"] = doctor.license_number
+                if not data.get("doctor_specialization"):
+                    data["doctor_specialization"] = doctor.specialization
             if not doctor_id and user_id:
                 data["doctor_id"] = user_id
 
@@ -145,6 +153,10 @@ class CaseService:
         if case.updated_by:
             case.updated_by_name = case.updated_by.full_name
             case.updated_by_role = case.updated_by.role
+        # Attach appointment date/time
+        if case.appointment:
+            case.appointment_date = case.appointment.appointment_date
+            case.appointment_time = case.appointment.appointment_time
         return case
 
     async def get(self, case_id: str) -> Optional[Case]:
@@ -176,6 +188,14 @@ class CaseService:
                 old_doctor_name = old_case.doctor_name or old_case.doctor_id or "None"
                 await self._add_timeline(case_id, "Assigned Doctor Changed",
                     old_value=old_doctor_name, new_value=data["doctor_id"], user_id=user_id, performer_role=user_role)
+                # Auto-populate doctor info from the new User record
+                new_doc_result = await self.db.execute(select(User).where(User.id == data["doctor_id"]))
+                new_doc = new_doc_result.scalar_one_or_none()
+                if new_doc:
+                    if "doctor_registration_number" not in data or not data.get("doctor_registration_number"):
+                        data["doctor_registration_number"] = new_doc.license_number
+                    if "doctor_specialization" not in data or not data.get("doctor_specialization"):
+                        data["doctor_specialization"] = new_doc.specialization
 
             # Track all clinical field changes
             for field, action in FIELD_ACTION_MAP.items():
@@ -202,9 +222,14 @@ class CaseService:
                     detail = f"{ft}" + (f" - Tooth {tn}" if tn else "")
                     await self._add_timeline(case_id, "Clinical Finding Added", new_value=detail, user_id=user_id, performer_role=user_role)
 
+                old_by_id = {f.id: f for f in old_findings}
                 await self.db.execute(sa_delete(ClinicalFinding).where(ClinicalFinding.case_id == case_id))
                 for f in findings_data:
-                    finding = ClinicalFinding(case_id=case_id, **f)
+                    finding = ClinicalFinding(case_id=case_id, **{k: v for k, v in f.items() if k != "id"})
+                    # Preserve original created_at for findings that had a DB id
+                    fid = f.get("id")
+                    if fid and fid in old_by_id:
+                        finding.created_at = old_by_id[fid].created_at
                     self.db.add(finding)
                 await self.db.flush()
 
@@ -212,6 +237,7 @@ class CaseService:
             case = await self.repo.update(case_id, **data)
             if case:
                 await self.audit_log_repo.create(user_id=user_id, action="UPDATE_CASE", entity_type="CASE", entity_id=case_id, details="Case updated")
+                await self.attach_names(case)
             return case
         except Exception as e:
             logger.exception("UPDATE_CASE - Error: %s", str(e))
@@ -229,6 +255,7 @@ class CaseService:
                     old_value=old_consultant_id or "None", new_value=consultant_id,
                     user_id=user_id, performer_role=user_role)
                 await self.audit_log_repo.create(user_id=user_id, action="ASSIGN_CONSULTANT", entity_type="CASE", entity_id=case_id, details="Consultant assigned")
+                await self.attach_names(case)
             return case
         except Exception as e:
             logger.exception("ASSIGN_CONSULTANT - Error: %s", str(e))
@@ -245,6 +272,7 @@ class CaseService:
             if case:
                 await self._add_timeline(case_id, "Case Closed", new_value="COMPLETED", user_id=user_id, performer_role=user_role)
                 await self.audit_log_repo.create(user_id=user_id, action="COMPLETE_CASE", entity_type="CASE", entity_id=case_id, details="Case completed")
+                await self.attach_names(case)
                 from app.services.patient_service import PatientService
                 patient_svc = PatientService(self.db)
                 await patient_svc.auto_update_patient_status(case.patient_id, user_id=user_id)

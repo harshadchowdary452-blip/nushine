@@ -103,6 +103,7 @@ export interface Patient {
   medical_history: string | null;
   abha_id: string | null;
   op_no: string | null;
+  emergency_contact: string | null;
   photo_url: string | null;
   status: PatientStatus;
   is_active: boolean;
@@ -156,11 +157,17 @@ export interface Case {
   initial_treatment_plan?: string | null;
   treatment_plan_estimated_cost?: number | null;
   treatment_plan_estimated_visits?: number | null;
+  patient_instructions?: string | null;
+  medicines_prescribed?: string | null;
+  follow_up_instructions?: string | null;
+  next_review_date?: string | null;
   doctor_registration_number?: string | null;
   doctor_specialization?: string | null;
   status: CaseStatus;
   notes: string | null;
   findings?: ClinicalFinding[] | null;
+  appointment_date?: string | null;
+  appointment_time?: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;

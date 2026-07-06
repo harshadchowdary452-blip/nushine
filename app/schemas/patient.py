@@ -77,6 +77,7 @@ class PatientResponse(BaseModel):
     medical_history: Optional[str]
     abha_id: Optional[str]
     op_no: Optional[str]
+    emergency_contact: Optional[str]
     photo_url: Optional[str]
     status: str
     is_active: bool

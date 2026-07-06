@@ -19,6 +19,7 @@ class CaseRepository(BaseRepository[Case]):
             selectinload(self.model.created_by),
             selectinload(self.model.updated_by),
             selectinload(self.model.consultant),
+            selectinload(self.model.appointment),
             selectinload(self.model.findings),
         )
         result = await self.db.execute(query)
@@ -31,6 +32,7 @@ class CaseRepository(BaseRepository[Case]):
             selectinload(self.model.created_by),
             selectinload(self.model.updated_by),
             selectinload(self.model.consultant),
+            selectinload(self.model.appointment),
             selectinload(self.model.findings),
         )
         if filters:

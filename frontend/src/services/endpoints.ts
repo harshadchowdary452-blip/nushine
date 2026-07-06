@@ -76,6 +76,10 @@ export const casesApi = {
   delete: (id: string) => api.delete(`/cases/${id}`).then((r) => r.data),
   getTimeline: (id: string, params?: Record<string, unknown>) =>
     api.get(`/cases/${id}/timeline`, { params }).then((r) => r.data),
+  getOdontogramBlob: (id: string) =>
+    api.get(`/cases/${id}/odontogram`, { responseType: "blob" }).then((r) => r.data),
+  getPdfBlob: (id: string) =>
+    api.get(`/cases/${id}/pdf`, { responseType: "blob" }).then((r) => r.data),
 };
 
 export const appointmentsApi = {

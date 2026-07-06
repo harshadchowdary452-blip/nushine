@@ -1,12 +1,15 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, date, time
+from app.schemas.patient import PatientResponse
 
 
 class ClinicalFindingCreate(BaseModel):
     finding_type: str
     tooth_number: Optional[str] = None
     severity: Optional[str] = None
+    dentition_type: Optional[str] = None
+    surface: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -16,8 +19,11 @@ class ClinicalFindingResponse(BaseModel):
     finding_type: str
     tooth_number: Optional[str] = None
     severity: Optional[str] = None
+    dentition_type: Optional[str] = None
+    surface: Optional[str] = None
     notes: Optional[str] = None
     created_at: datetime
+    updated_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 
@@ -47,6 +53,10 @@ class CaseCreate(BaseModel):
     initial_treatment_plan: Optional[str] = None
     treatment_plan_estimated_cost: Optional[float] = None
     treatment_plan_estimated_visits: Optional[int] = None
+    patient_instructions: Optional[str] = None
+    medicines_prescribed: Optional[str] = None
+    follow_up_instructions: Optional[str] = None
+    next_review_date: Optional[datetime] = None
     doctor_registration_number: Optional[str] = None
     doctor_specialization: Optional[str] = None
     notes: Optional[str] = None
@@ -74,6 +84,10 @@ class CaseUpdate(BaseModel):
     initial_treatment_plan: Optional[str] = None
     treatment_plan_estimated_cost: Optional[float] = None
     treatment_plan_estimated_visits: Optional[int] = None
+    patient_instructions: Optional[str] = None
+    medicines_prescribed: Optional[str] = None
+    follow_up_instructions: Optional[str] = None
+    next_review_date: Optional[datetime] = None
     doctor_registration_number: Optional[str] = None
     doctor_specialization: Optional[str] = None
     status: Optional[str] = None
@@ -87,6 +101,9 @@ class UserBrief(BaseModel):
     id: str
     full_name: Optional[str] = None
     role: Optional[str] = None
+    phone: Optional[str] = None
+    specialization: Optional[str] = None
+    license_number: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -98,10 +115,14 @@ class CaseResponse(BaseModel):
     doctor_id: Optional[str]
     consultant_id: Optional[str]
     appointment_id: Optional[str] = None
+    patient: Optional[PatientResponse] = None
     patient_name: Optional[str] = None
+    doctor: Optional[UserBrief] = None
     doctor_name: Optional[str] = None
     created_by: Optional[UserBrief] = None
     updated_by: Optional[UserBrief] = None
+    appointment_date: Optional[date] = None
+    appointment_time: Optional[time] = None
     chief_complaint: str
     chief_complaint_duration: Optional[str] = None
     chief_complaint_severity: Optional[str] = None
@@ -122,6 +143,10 @@ class CaseResponse(BaseModel):
     initial_treatment_plan: Optional[str] = None
     treatment_plan_estimated_cost: Optional[float] = None
     treatment_plan_estimated_visits: Optional[int] = None
+    patient_instructions: Optional[str] = None
+    medicines_prescribed: Optional[str] = None
+    follow_up_instructions: Optional[str] = None
+    next_review_date: Optional[datetime] = None
     doctor_registration_number: Optional[str] = None
     doctor_specialization: Optional[str] = None
     status: str
