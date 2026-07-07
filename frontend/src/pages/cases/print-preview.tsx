@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
-import { Loader2, Printer, Download, ArrowLeft } from "lucide-react"
+import { Loader2, Printer, ArrowLeft, Download } from "lucide-react"
 import { format } from "date-fns"
 import { casesApi } from "@/services/endpoints"
 import { Button } from "@/components/ui/button"
@@ -44,7 +44,6 @@ function apiToFinding(api: any): ToothFinding {
 
 function surfaceDisplay(f: any): string {
   if (f.surface) return f.surface.replace(/,/g, ', ')
-  // backward compat: old records had surfaces encoded in notes as [S:M,O,D]
   if (f.notes) {
     const m = f.notes.match(/\[S:([^\]]+)\]/)
     if (m) return m[1]
@@ -54,7 +53,6 @@ function surfaceDisplay(f: any): string {
 
 function remarkDisplay(f: any): string {
   if (f.notes) {
-    // backward compat: strip old [S:...] / [M:...] encoding
     let s = f.notes
     s = s.replace(/^\[S:[^\]]*\]\s*/g, "")
     s = s.replace(/^\[M:[^\]]*\]\s*/g, "")
@@ -91,11 +89,11 @@ export default function CasePrintPreview() {
   const handleDownloadPdf = async () => {
     if (!id) return
     try {
-      const blob = await casesApi.getPdfBlob(id)
+      const blob = await casesApi.getPdfBlob(id!)
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
-      a.download = `case_history_${id.slice(0, 8)}.pdf`
+      a.download = `case_history_${id!.slice(0, 8)}.pdf`
       a.click()
       window.URL.revokeObjectURL(url)
     } catch (err: any) {
@@ -112,8 +110,25 @@ export default function CasePrintPreview() {
   const hospitalGst = h?.gst_number || ""
   const logoUrl = h?.logo_url || ""
 
+  const patient = c.patient
+  const doctor = c.doctor
+
+  const visitDate = c.appointment_date
+    ? format(new Date(c.appointment_date), "dd MMM yyyy")
+    : c.created_at
+      ? format(new Date(c.created_at), "dd MMM yyyy")
+      : "—"
+
+  const doctorName = c.doctor_name || doctor?.full_name || "—"
+  const doctorRegNo = c.doctor_registration_number || doctor?.license_number || ""
+  const doctorSpec = c.doctor_specialization || doctor?.specialization || ""
+  const doctorPhone = doctor?.phone || ""
+
+  const caseNum = c.case_number || c.id.slice(0, 8).toUpperCase()
+
   return (
     <div className="min-h-screen bg-gray-100">
+      {/* Toolbar */}
       <div className="print:hidden sticky top-0 z-50 bg-white border-b shadow-sm px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => navigate(`/cases/${id}`)}>
@@ -122,7 +137,7 @@ export default function CasePrintPreview() {
           <span className="text-sm font-medium text-muted-foreground">Print Preview</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground hidden sm:inline">Case #{c.case_number || c.id.slice(0, 8)}</span>
+          <span className="text-xs text-muted-foreground hidden sm:inline">Case #{caseNum}</span>
           <Button size="sm" onClick={handlePrint}>
             <Printer className="h-4 w-4 mr-1" /> Print
           </Button>
@@ -132,11 +147,16 @@ export default function CasePrintPreview() {
         </div>
       </div>
 
-      <div className="max-w-[210mm] mx-auto bg-white shadow-lg my-4 print:shadow-none print:my-0" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+      {/* PRINT AREA */}
+      <div
+        id="print-area"
+        className="max-w-[210mm] mx-auto bg-white shadow-lg my-4 print:shadow-none print:my-0"
+        style={{ fontFamily: "'Inter', 'Roboto', system-ui, sans-serif" }}
+      >
         <style>{`
-          @page { size: A4; margin: 20mm; }
+          @page { size: A4; margin: 22mm 25mm; }
           @media print {
-            html, body { font-family: Inter, system-ui, sans-serif; }
+            html, body { font-family: 'Inter', 'Roboto', system-ui, sans-serif; }
             body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             .no-break { page-break-inside: avoid; }
             .keep-with-next { page-break-after: avoid; }
@@ -144,222 +164,153 @@ export default function CasePrintPreview() {
             tr { page-break-inside: avoid; page-break-after: auto; }
             thead { display: table-header-group; }
             tfoot { display: table-footer-group; }
-            .print-hide { display: none; }
-          }
-          .sec-title {
-            background: #294184; color: #fff; font-size: 16px; font-weight: 700;
-            padding: 8px 20px; letter-spacing: 0.02em; line-height: 1.5;
-          }
-          .info-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px 24px;
-            padding: 16px 20px;
-          }
-          .info-row {
-            display: flex;
-            align-items: baseline;
-            gap: 8px;
-            line-height: 1.5;
-          }
-          .info-row .label {
-            font-size: 11px; font-weight: 600; color: #6b7280;
-            white-space: nowrap; min-width: 120px;
-          }
-          .info-row .value {
-            font-size: 11px; font-weight: 400; color: #1f2937;
-          }
-          .info-row-full {
-            grid-column: 1 / -1;
-          }
-          .content-box {
-            padding: 12px 20px;
-            font-size: 11px; line-height: 1.6; color: #1f2937;
-            white-space: pre-wrap;
-          }
-          .data-table {
-            width: 100%; border-collapse: collapse;
-            font-size: 10.5px; line-height: 1.5;
-          }
-          .data-table th {
-            background: #294184; color: #fff; font-size: 11px; font-weight: 700;
-            padding: 8px 10px; border: 1px solid #d1d5db; text-align: left;
-          }
-          .data-table td {
-            padding: 6px 10px; border: 1px solid #d1d5db; vertical-align: top;
-          }
-          .data-table tr:nth-child(even) { background: #f9fafb; }
-          .sig-line {
-            border-bottom: 1px solid #9ca3af; width: 180px; height: 0;
-            margin-bottom: 4px;
+            .no-print { display: none !important; }
           }
         `}</style>
 
-        {/* ── PRINT-ONLY HEADER (repeated on each page) ── */}
-        <table className="print-hide" style={{ display: 'none' }} />
-
-        {/* ── LETTERHEAD ── */}
-        <div className="no-break" style={{ padding: '28px 28px 0' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        {/* ─── LETTERHEAD ─── */}
+        <div className="no-break" style={{ padding: '0 8px' }}>
+          {/* Logo + Hospital Info */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 0 }}>
             <div>
               {logoUrl ? (
-                <img src={logoUrl} alt="Logo" style={{ width: 80, height: 80, objectFit: 'contain' }} />
+                <img src={logoUrl} alt="Logo" style={{ width: 72, height: 72, objectFit: 'contain', borderRadius: 6 }} />
               ) : (
-                <div style={{ width: 80, height: 80, background: '#f3f4f6', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: 10 }}>Logo</div>
+                <div style={{ width: 72, height: 72, background: '#f3f4f6', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: 10 }}>Logo</div>
               )}
             </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 28, fontWeight: 700, color: '#294184', lineHeight: 1.2 }}>{hospitalName}</div>
+            <div style={{ textAlign: 'right', flex: 1, marginLeft: 20 }}>
+              <div style={{ fontSize: 24, fontWeight: 700, color: '#1B3A5C', lineHeight: 1.2 }}>{hospitalName}</div>
               {hospitalAddress && <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4, lineHeight: 1.5 }}>{hospitalAddress}</div>}
               <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2, lineHeight: 1.5 }}>
                 {[hospitalPhone && `Tel: ${hospitalPhone}`, hospitalEmail && hospitalEmail].filter(Boolean).join(" | ")}
               </div>
-              <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2, lineHeight: 1.5 }}>
+              <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1, lineHeight: 1.5 }}>
                 {[hospitalRegNo && `Reg: ${hospitalRegNo}`, hospitalGst && `GST: ${hospitalGst}`].filter(Boolean).join(" | ")}
               </div>
             </div>
           </div>
-          <hr style={{ border: 'none', borderTop: '3px solid #294184', margin: '16px 0 14px' }} />
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: '#294184', textAlign: 'center', margin: 0, lineHeight: 1.3 }}>DENTAL CASE HISTORY REPORT</h1>
-          <hr style={{ border: 'none', borderTop: '1px solid #e5e7eb', margin: '14px 0 18px' }} />
+
+          {/* Divider */}
+          <div style={{ borderTop: '3px solid #1B3A5C', margin: '14px 0 0' }} />
+          <div style={{ borderTop: '1px solid #e5e7eb', margin: '2px 0 14px' }} />
+
+          {/* Title */}
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: '#1B3A5C', textAlign: 'center', margin: 0, lineHeight: 1.3, letterSpacing: '0.02em' }}>
+            DENTAL CASE HISTORY REPORT
+          </h1>
+
+          {/* Case Info Line */}
+          <div style={{ textAlign: 'center', fontSize: 10.5, color: '#6b7280', marginTop: 8, lineHeight: 1.6 }}>
+            Case #: {caseNum} &nbsp;|&nbsp; Visit Date: {visitDate} &nbsp;|&nbsp; Doctor: Dr. {doctorName} &nbsp;|&nbsp; Hospital: {hospitalName}
+          </div>
+          <div style={{ borderTop: '1px solid #e5e7eb', margin: '10px 0 14px' }} />
         </div>
 
-        {/* ── PATIENT INFORMATION ── */}
-        <div className="no-break keep-with-next" style={{ padding: '0 28px' }}>
-          <div className="sec-title">PATIENT INFORMATION</div>
-          <div style={{ border: '1px solid #e5e7eb', borderTop: 'none' }}>
-            <div className="info-grid">
+        {/* ─── PATIENT INFORMATION ─── */}
+        <div className="no-break keep-with-next" style={{ padding: '0 8px' }}>
+          <div className="section-title">PATIENT INFORMATION</div>
+          <div style={{ border: '1px solid #e5e7eb', borderTop: 'none', padding: '12px 16px' }}>
+            <div className="info-grid-2col">
               <div className="info-row">
-                <span className="label">Patient Name :</span>
-                <span className="value">{c.patient?.full_name || c.patient_name || "—"}</span>
+                <span className="info-label">Patient Name :</span>
+                <span className="info-value">{patient?.full_name || c.patient_name || "—"}</span>
               </div>
               <div className="info-row">
-                <span className="label">OP Number :</span>
-                <span className="value">{c.patient?.op_no || "—"}</span>
+                <span className="info-label">OP Number :</span>
+                <span className="info-value">{patient?.op_no || "—"}</span>
               </div>
               <div className="info-row">
-                <span className="label">Age :</span>
-                <span className="value">{c.patient?.age ? `${c.patient.age} Years` : "—"}</span>
+                <span className="info-label">ABHA ID :</span>
+                <span className="info-value">{patient?.abha_id || "—"}</span>
               </div>
               <div className="info-row">
-                <span className="label">Gender :</span>
-                <span className="value">{c.patient?.gender || "—"}</span>
+                <span className="info-label">Age :</span>
+                <span className="info-value">{patient?.age ? `${patient.age} Years` : "—"}</span>
               </div>
               <div className="info-row">
-                <span className="label">Date of Birth :</span>
-                <span className="value">{c.patient?.date_of_birth ? format(new Date(c.patient.date_of_birth), "dd MMM yyyy") : "—"}</span>
+                <span className="info-label">Gender :</span>
+                <span className="info-value">{patient?.gender || "—"}</span>
               </div>
               <div className="info-row">
-                <span className="label">ABHA ID :</span>
-                <span className="value">{c.patient?.abha_id || "—"}</span>
+                <span className="info-label">Date of Birth :</span>
+                <span className="info-value">{patient?.date_of_birth ? format(new Date(patient.date_of_birth), "dd MMM yyyy") : "—"}</span>
               </div>
               <div className="info-row">
-                <span className="label">Mobile :</span>
-                <span className="value">{c.patient?.phone || "—"}</span>
+                <span className="info-label">Mobile :</span>
+                <span className="info-value">{patient?.phone || "—"}</span>
               </div>
               <div className="info-row">
-                <span className="label">Email :</span>
-                <span className="value">{c.patient?.email || "—"}</span>
+                <span className="info-label">Email :</span>
+                <span className="info-value">{patient?.email || "—"}</span>
               </div>
               <div className="info-row info-row-full">
-                <span className="label">Address :</span>
-                <span className="value">{c.patient?.address || "—"}</span>
-              </div>
-              <div className="info-row info-row-full" style={{ borderTop: '1px solid #f3f4f6', paddingTop: 10, marginTop: 4 }}>
-                <span className="label">Doctor :</span>
-                <span className="value">Dr. {c.doctor_name || c.doctor?.full_name || "—"} {c.doctor_specialization || c.doctor?.specialization ? <>| {c.doctor_specialization || c.doctor?.specialization}</> : ""} {c.doctor_registration_number || c.doctor?.license_number ? <>| Reg: {c.doctor_registration_number || c.doctor?.license_number}</> : ""}</span>
+                <span className="info-label">Address :</span>
+                <span className="info-value">{patient?.address || "—"}</span>
               </div>
               <div className="info-row">
-                <span className="label">Visit Date :</span>
-                <span className="value">{c.appointment_date ? format(new Date(c.appointment_date), "dd MMM yyyy") : c.created_at ? format(new Date(c.created_at), "dd MMM yyyy") : "—"}</span>
+                <span className="info-label">Emergency Contact :</span>
+                <span className="info-value">{patient?.emergency_contact || "—"}</span>
+              </div>
+            </div>
+
+            <div style={{ borderTop: '1px solid #e5e7eb', margin: '8px 0', paddingTop: 8 }}>
+              <div className="info-row info-row-full" style={{ marginBottom: 4 }}>
+                <span className="info-label">Doctor :</span>
+                <span className="info-value">
+                  Dr. {doctorName}
+                  {doctorRegNo ? ` | Reg: ${doctorRegNo}` : ""}
+                  {doctorSpec ? ` | ${doctorSpec}` : ""}
+                </span>
               </div>
               <div className="info-row">
-                <span className="label">Emergency Contact :</span>
-                <span className="value">{c.patient?.emergency_contact || "—"}</span>
+                <span className="info-label">Visit Date :</span>
+                <span className="info-value">{visitDate}</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* ── CHIEF COMPLAINT ── */}
-        {c.chief_complaint && (
-          <div className="no-break" style={{ padding: '0 28px', marginTop: 18 }}>
-            <div className="sec-title">Chief Complaint</div>
-            <div style={{ border: '1px solid #e5e7eb', borderTop: 'none' }}>
-              <div className="content-box">{c.chief_complaint}</div>
-              {(c.chief_complaint_duration || c.chief_complaint_severity || c.chief_complaint_associated_symptoms) && (
-                <div style={{ padding: '0 20px 10px', fontSize: 10.5, color: '#6b7280', lineHeight: 1.5 }}>
-                  {c.chief_complaint_duration && <>Duration: {c.chief_complaint_duration} | </>}
-                  {c.chief_complaint_severity && <>Severity: {c.chief_complaint_severity} | </>}
-                  {c.chief_complaint_associated_symptoms && <>Associated Symptoms: {c.chief_complaint_associated_symptoms}</>}
-                </div>
-              )}
+        {/* ─── CLINICAL DETAILS SECTIONS ─── */}
+        {[
+          { title: "Chief Complaint", content: c.chief_complaint, extra: (
+            (c.chief_complaint_duration || c.chief_complaint_severity || c.chief_complaint_associated_symptoms) ? (
+              <div style={{ fontSize: 10.5, color: '#6b7280', lineHeight: 1.5, padding: '0 0 6px' }}>
+                {c.chief_complaint_duration && <>Duration: {c.chief_complaint_duration} | </>}
+                {c.chief_complaint_severity && <>Severity: {c.chief_complaint_severity} | </>}
+                {c.chief_complaint_associated_symptoms && <>Associated Symptoms: {c.chief_complaint_associated_symptoms}</>}
+              </div>
+            ) : null
+          )},
+          { title: "History of Present Illness", content: c.hpi },
+          { title: "Medical History", content: c.medical_history },
+          { title: "Dental History", content: c.dental_history },
+          { title: "Personal History", content: c.personal_history },
+          { title: "Family History", content: c.family_history },
+          { title: "Extra Oral Examination", content: c.extra_oral_examination },
+          { title: "Intra Oral Examination", content: c.intra_oral_examination },
+          { title: "Periodontal Examination", content: c.periodontal_examination },
+          { title: "Investigations", content: c.investigations },
+        ].map((sec) =>
+          sec.content ? (
+            <div key={sec.title} className="no-break" style={{ padding: '0 8px', marginTop: 14 }}>
+              <div className="section-title">{sec.title.toUpperCase()}</div>
+              <div style={{ border: '1px solid #e5e7eb', borderTop: 'none', padding: '10px 16px' }}>
+                <div style={{ fontSize: 11, lineHeight: 1.6, color: '#1f2937', whiteSpace: 'pre-wrap' }}>{sec.content}</div>
+                {sec.extra}
+              </div>
             </div>
-          </div>
+          ) : null
         )}
 
-        {/* ── HISTORY OF PRESENT ILLNESS ── */}
-        {c.hpi && (
-          <div className="no-break" style={{ padding: '0 28px', marginTop: 18 }}>
-            <div className="sec-title">History of Present Illness</div>
+        {/* ─── CLINICAL FINDINGS ─── */}
+        {(findings.length > 0 || c.clinical_findings_summary) && (
+          <div style={{ padding: '0 8px', marginTop: 14 }}>
+            <div className="section-title keep-with-next">CLINICAL FINDINGS</div>
             <div style={{ border: '1px solid #e5e7eb', borderTop: 'none' }}>
-              <div className="content-box">{c.hpi}</div>
-            </div>
-          </div>
-        )}
-
-        {/* ── MEDICAL HISTORY ── */}
-        {c.medical_history && (
-          <div className="no-break" style={{ padding: '0 28px', marginTop: 18 }}>
-            <div className="sec-title">Medical History</div>
-            <div style={{ border: '1px solid #e5e7eb', borderTop: 'none' }}>
-              <div className="content-box">{c.medical_history}</div>
-            </div>
-          </div>
-        )}
-
-        {/* ── DENTAL HISTORY ── */}
-        {c.dental_history && (
-          <div className="no-break" style={{ padding: '0 28px', marginTop: 18 }}>
-            <div className="sec-title">Dental History</div>
-            <div style={{ border: '1px solid #e5e7eb', borderTop: 'none' }}>
-              <div className="content-box">{c.dental_history}</div>
-            </div>
-          </div>
-        )}
-
-        {/* ── CLINICAL FINDINGS (TOOTH CHART) ── */}
-        {(findings.length > 0 || c.clinical_findings_summary || c.extra_oral_examination || c.intra_oral_examination || c.periodontal_examination || c.notes) && (
-          <div style={{ padding: '0 28px', marginTop: 18 }}>
-            <div className="sec-title keep-with-next">Clinical Findings</div>
-            <div style={{ border: '1px solid #e5e7eb', borderTop: 'none' }}>
-              {c.extra_oral_examination && (
-                <div style={{ padding: '0 20px', marginTop: 12 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#294184', marginBottom: 4 }}>Extra Oral Examination</div>
-                  <div className="content-box" style={{ padding: '0 0 10px' }}>{c.extra_oral_examination}</div>
-                </div>
-              )}
-              {c.intra_oral_examination && (
-                <div style={{ padding: '0 20px' }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#294184', marginBottom: 4 }}>Intra Oral Examination</div>
-                  <div className="content-box" style={{ padding: '0 0 10px' }}>{c.intra_oral_examination}</div>
-                </div>
-              )}
-              {c.periodontal_examination && (
-                <div style={{ padding: '0 20px' }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#294184', marginBottom: 4 }}>Periodontal Examination</div>
-                  <div className="content-box" style={{ padding: '0 0 10px' }}>{c.periodontal_examination}</div>
-                </div>
-              )}
-              {c.notes && (
-                <div style={{ padding: '0 20px' }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#294184', marginBottom: 4 }}>Clinical Notes</div>
-                  <div className="content-box" style={{ padding: '0 0 10px' }}>{c.notes}</div>
-                </div>
-              )}
               {findings.length > 0 && (
-                <div className="no-break" style={{ padding: '0 20px 14px' }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#294184', marginBottom: 8 }}>Tooth Chart</div>
+                <div className="no-break" style={{ padding: '12px 16px' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#1B3A5C', marginBottom: 10 }}>Tooth Chart</div>
                   <ProfessionalOdontogram
                     findings={(findings || []).map(apiToFinding)}
                     onFindingsChange={() => {}}
@@ -368,23 +319,24 @@ export default function CasePrintPreview() {
                   />
                 </div>
               )}
+
               {findings.length > 0 && (
-                <div className="no-break" style={{ padding: '0 20px 14px' }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#294184', marginBottom: 8 }}>Clinical Findings Summary</div>
-                  <table className="data-table">
+                <div className="no-break" style={{ padding: '0 16px 14px' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#1B3A5C', marginBottom: 8 }}>Clinical Findings Summary</div>
+                  <table className="findings-table">
                     <thead>
                       <tr>
-                        <th style={{ width: '14%' }}>Tooth</th>
-                        <th style={{ width: '26%' }}>Finding</th>
-                        <th style={{ width: '18%' }}>Surface</th>
-                        <th style={{ width: '18%' }}>Severity</th>
-                        <th style={{ width: '24%' }}>Remarks</th>
+                        <th>Tooth</th>
+                        <th>Finding</th>
+                        <th>Surface</th>
+                        <th>Severity</th>
+                        <th>Remarks</th>
                       </tr>
                     </thead>
                     <tbody>
                       {findings.map((f: any, i: number) => (
                         <tr key={f.id || i}>
-                          <td style={{ fontWeight: 600 }}>{f.tooth_number || "—"}</td>
+                          <td style={{ fontWeight: 600, textAlign: 'center' }}>{f.tooth_number || "—"}</td>
                           <td>{f.finding_type || "—"}</td>
                           <td>{surfaceDisplay(f)}</td>
                           <td>{f.severity || "—"}</td>
@@ -395,245 +347,306 @@ export default function CasePrintPreview() {
                   </table>
                 </div>
               )}
+
               {c.clinical_findings_summary && (
-                <div style={{ padding: '0 20px 14px' }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#294184', marginBottom: 4 }}>Summary Notes</div>
-                  <div className="content-box" style={{ padding: '0 0 10px' }}>{c.clinical_findings_summary}</div>
+                <div style={{ padding: '0 16px 14px' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#1B3A5C', marginBottom: 4 }}>Summary Notes</div>
+                  <div style={{ fontSize: 11, lineHeight: 1.6, color: '#1f2937', whiteSpace: 'pre-wrap' }}>{c.clinical_findings_summary}</div>
                 </div>
               )}
             </div>
           </div>
         )}
 
-        {/* ── INVESTIGATIONS ── */}
-        {c.investigations && (
-          <div className="no-break" style={{ padding: '0 28px', marginTop: 18 }}>
-            <div className="sec-title">Investigations</div>
-            <div style={{ border: '1px solid #e5e7eb', borderTop: 'none' }}>
-              <div className="content-box">{c.investigations}</div>
-            </div>
-          </div>
-        )}
-
-        {/* ── DIAGNOSIS ── */}
-        {(c.provisional_diagnosis || c.final_diagnosis || c.diagnosis) && (
-          <div style={{ padding: '0 28px', marginTop: 18 }}>
-            <div className="sec-title keep-with-next">Diagnosis</div>
+        {/* ─── DIAGNOSIS ─── */}
+        {(c.provisional_diagnosis || c.final_diagnosis) && (
+          <div style={{ padding: '0 8px', marginTop: 14 }}>
+            <div className="section-title keep-with-next">DIAGNOSIS</div>
             <div style={{ border: '1px solid #e5e7eb', borderTop: 'none' }}>
               {c.provisional_diagnosis && (
-                <div style={{ padding: '12px 20px 0' }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#294184', marginBottom: 4 }}>Provisional Diagnosis</div>
-                  <div className="content-box" style={{ padding: '0 0 10px' }}>{c.provisional_diagnosis}</div>
+                <div className="no-break" style={{ padding: '12px 16px' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#1B3A5C', marginBottom: 4 }}>Provisional Diagnosis</div>
+                  <div style={{ fontSize: 11, lineHeight: 1.6, color: '#1f2937', whiteSpace: 'pre-wrap' }}>{c.provisional_diagnosis}</div>
                 </div>
               )}
               {c.final_diagnosis && (
-                <div className="no-break" style={{ padding: '10px 20px', margin: '0 20px 12px', border: '1px solid #fca5a5', background: '#fef2f2', borderRadius: 4 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#dc2626', marginBottom: 4 }}>FINAL DIAGNOSIS</div>
-                  <div style={{ fontSize: 11, color: '#991b1b', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{c.final_diagnosis}</div>
-                </div>
-              )}
-              {c.diagnosis && !c.final_diagnosis && (
-                <div style={{ padding: '12px 20px' }}>
-                  <div className="content-box" style={{ padding: 0 }}>{c.diagnosis}</div>
+                <div className="no-break" style={{ margin: '0 12px 12px', border: '1.5px solid #dc2626', background: '#fef2f2', borderRadius: 6, overflow: 'hidden' }}>
+                  <div style={{ background: '#dc2626', color: '#fff', fontWeight: 700, fontSize: 12, padding: '6px 12px' }}>FINAL DIAGNOSIS</div>
+                  <div style={{ padding: '10px 12px', fontSize: 11, color: '#991b1b', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{c.final_diagnosis}</div>
                 </div>
               )}
             </div>
           </div>
         )}
 
-        {/* ── TREATMENT PLAN ── */}
-        {(c.initial_treatment_plan || c.treatment_plan_estimated_visits || c.treatment_plan_estimated_cost) && (
-          <div className="no-break" style={{ padding: '0 28px', marginTop: 18 }}>
-            <div className="sec-title">Treatment Plan</div>
-            <div style={{ border: '1px solid #e5e7eb', borderTop: 'none' }}>
-              <div style={{ padding: '12px 20px' }}>
-                {c.initial_treatment_plan && (
-                  <div style={{ fontSize: 11, lineHeight: 1.6, color: '#1f2937', whiteSpace: 'pre-wrap', marginBottom: 12 }}>{c.initial_treatment_plan}</div>
-                )}
-                {(c.treatment_plan_estimated_visits || c.treatment_plan_estimated_cost) && (
-                  <div style={{ display: 'flex', gap: 24, fontSize: 11, color: '#374151' }}>
-                    {c.treatment_plan_estimated_visits && <div><span style={{ fontWeight: 600, color: '#6b7280' }}>Estimated Visits:</span> {c.treatment_plan_estimated_visits}</div>}
-                    {c.treatment_plan_estimated_cost && <div><span style={{ fontWeight: 600, color: '#6b7280' }}>Estimated Cost:</span> ₹{Number(c.treatment_plan_estimated_cost).toLocaleString("en-IN")}</div>}
-                  </div>
-                )}
-              </div>
+        {/* ─── TREATMENT PLAN ─── */}
+        {(c.treatment_plans && c.treatment_plans.length > 0) && (
+          <div className="no-break" style={{ padding: '0 8px', marginTop: 14 }}>
+            <div className="section-title">TREATMENT PLAN</div>
+            <div style={{ border: '1px solid #e5e7eb', borderTop: 'none', padding: '12px 16px' }}>
+              <table className="findings-table">
+                <thead>
+                  <tr>
+                    <th>Procedure</th>
+                    <th>Visits</th>
+                    <th>Priority</th>
+                    <th>Est. Cost</th>
+                    <th>Remarks</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {c.treatment_plans.map((tp: any, i: number) => (
+                    <tr key={tp.id || i}>
+                      <td style={{ fontWeight: 600 }}>{tp.treatment_name || "—"}</td>
+                      <td style={{ textAlign: 'center' }}>{tp.total_sittings || "-"}</td>
+                      <td style={{ textAlign: 'center' }}>{tp.status || "-"}</td>
+                      <td style={{ textAlign: 'right' }}>{tp.cost ? `₹${Number(tp.cost).toLocaleString("en-IN")}` : "-"}</td>
+                      <td>{tp.notes || "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {(c.treatment_plan_estimated_visits || c.treatment_plan_estimated_cost) && (
+                <div style={{ display: 'flex', gap: 24, fontSize: 11, color: '#374151', marginTop: 8 }}>
+                  {c.treatment_plan_estimated_visits && <div><span style={{ fontWeight: 600, color: '#6b7280' }}>Estimated Visits:</span> {c.treatment_plan_estimated_visits}</div>}
+                  {c.treatment_plan_estimated_cost && <div><span style={{ fontWeight: 600, color: '#6b7280' }}>Estimated Cost:</span> ₹{Number(c.treatment_plan_estimated_cost).toLocaleString("en-IN")}</div>}
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* ── MEDICINES ── */}
+        {c.initial_treatment_plan && (
+          <div className="no-break" style={{ padding: '0 8px', marginTop: 14 }}>
+            <div className="section-title">TREATMENT NOTES</div>
+            <div style={{ border: '1px solid #e5e7eb', borderTop: 'none', padding: '10px 16px' }}>
+              <div style={{ fontSize: 11, lineHeight: 1.6, color: '#1f2937', whiteSpace: 'pre-wrap' }}>{c.initial_treatment_plan}</div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── MEDICINES PRESCRIBED ─── */}
         {c.medicines_prescribed && (
-          <div className="no-break" style={{ padding: '0 28px', marginTop: 18 }}>
-            <div className="sec-title">Medicines Prescribed</div>
-            <div style={{ border: '1px solid #e5e7eb', borderTop: 'none' }}>
-              <div className="content-box">{c.medicines_prescribed}</div>
+          <div className="no-break" style={{ padding: '0 8px', marginTop: 14 }}>
+            <div className="section-title">MEDICINES PRESCRIBED</div>
+            <div style={{ border: '1px solid #e5e7eb', borderTop: 'none', padding: '10px 16px' }}>
+              <div style={{ fontSize: 11, lineHeight: 1.6, color: '#1f2937', whiteSpace: 'pre-wrap' }}>{c.medicines_prescribed}</div>
             </div>
           </div>
         )}
 
-        {/* ── PATIENT INSTRUCTIONS ── */}
+        {/* ─── PATIENT INSTRUCTIONS ─── */}
         {c.patient_instructions && (
-          <div className="no-break" style={{ padding: '0 28px', marginTop: 18 }}>
-            <div className="sec-title">Patient Instructions</div>
-            <div style={{ border: '1px solid #e5e7eb', borderTop: 'none' }}>
-              <div className="content-box">{c.patient_instructions}</div>
+          <div className="no-break" style={{ padding: '0 8px', marginTop: 14 }}>
+            <div className="section-title">PATIENT INSTRUCTIONS</div>
+            <div style={{ border: '1px solid #e5e7eb', borderTop: 'none', padding: '10px 16px' }}>
+              <div style={{ fontSize: 11, lineHeight: 1.6, color: '#1f2937', whiteSpace: 'pre-wrap' }}>{c.patient_instructions}</div>
             </div>
           </div>
         )}
 
-        {/* ── FOLLOW-UP ── */}
+        {/* ─── FOLLOW-UP ─── */}
         {(c.follow_up_instructions || c.next_review_date) && (
-          <div className="no-break" style={{ padding: '0 28px', marginTop: 18 }}>
-            <div className="sec-title">Follow-Up</div>
-            <div style={{ border: '1px solid #e5e7eb', borderTop: 'none' }}>
-              <div style={{ padding: '12px 20px' }}>
-                {c.follow_up_instructions && <div style={{ fontSize: 11, lineHeight: 1.6, color: '#1f2937', whiteSpace: 'pre-wrap', marginBottom: 8 }}>{c.follow_up_instructions}</div>}
+          <div className="no-break" style={{ padding: '0 8px', marginTop: 14 }}>
+            <div className="section-title">FOLLOW-UP</div>
+            <div style={{ border: '1px solid #e5e7eb', borderTop: 'none', padding: '12px 16px' }}>
+              {c.follow_up_instructions && (
+                <div style={{ fontSize: 11, lineHeight: 1.6, color: '#1f2937', whiteSpace: 'pre-wrap', marginBottom: 10 }}>{c.follow_up_instructions}</div>
+              )}
+              <div className="info-grid-2col">
                 {c.next_review_date && (
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#2563eb' }}>
-                    Next Review Date: {format(new Date(c.next_review_date), "dd MMM yyyy")}
+                  <div className="info-row">
+                    <span className="info-label">Next Visit :</span>
+                    <span className="info-value" style={{ fontWeight: 600, color: '#1B3A5C' }}>
+                      {format(new Date(c.next_review_date), "dd MMM yyyy")}
+                    </span>
                   </div>
                 )}
+                <div className="info-row">
+                  <span className="info-label">Doctor :</span>
+                  <span className="info-value">Dr. {doctorName}</span>
+                </div>
+                <div className="info-row info-row-full">
+                  <span className="info-label">Hospital :</span>
+                  <span className="info-value">
+                    {[hospitalName, hospitalPhone, hospitalEmail].filter(Boolean).join(" | ")}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* ── PERSONAL HISTORY ── */}
-        {c.personal_history && (
-          <div className="no-break" style={{ padding: '0 28px', marginTop: 18 }}>
-            <div className="sec-title">Personal History</div>
-            <div style={{ border: '1px solid #e5e7eb', borderTop: 'none' }}>
-              <div className="content-box">{c.personal_history}</div>
-            </div>
-          </div>
-        )}
-
-        {/* ── FAMILY HISTORY ── */}
-        {c.family_history && (
-          <div className="no-break" style={{ padding: '0 28px', marginTop: 18 }}>
-            <div className="sec-title">Family History</div>
-            <div style={{ border: '1px solid #e5e7eb', borderTop: 'none' }}>
-              <div className="content-box">{c.family_history}</div>
-            </div>
-          </div>
-        )}
-
-        {/* ── DOCTOR DETAILS ── */}
-        <div className="no-break" style={{ padding: '0 28px', marginTop: 18 }}>
-          <div className="sec-title">Doctor Details</div>
-          <div style={{ border: '1px solid #e5e7eb', borderTop: 'none' }}>
-            <div className="info-grid">
+        {/* ─── DOCTOR DETAILS ─── */}
+        <div className="no-break" style={{ padding: '0 8px', marginTop: 14 }}>
+          <div className="section-title">DOCTOR DETAILS</div>
+          <div style={{ border: '1px solid #e5e7eb', borderTop: 'none', padding: '12px 16px' }}>
+            <div className="info-grid-2col">
               <div className="info-row">
-                <span className="label">Doctor Name :</span>
-                <span className="value">Dr. {c.doctor_name || c.doctor?.full_name || "—"}</span>
+                <span className="info-label">Doctor Name :</span>
+                <span className="info-value">Dr. {doctorName}</span>
               </div>
               <div className="info-row">
-                <span className="label">Qualification :</span>
-                <span className="value">{c.doctor?.specialization || c.doctor_specialization || "—"}</span>
+                <span className="info-label">Qualification :</span>
+                <span className="info-value">{doctorSpec || doctor?.specialization || "—"}</span>
               </div>
               <div className="info-row">
-                <span className="label">Specialization :</span>
-                <span className="value">{c.doctor_specialization || c.doctor?.specialization || "—"}</span>
+                <span className="info-label">Specialization :</span>
+                <span className="info-value">{doctorSpec || "—"}</span>
               </div>
               <div className="info-row">
-                <span className="label">Registration No :</span>
-                <span className="value">{c.doctor_registration_number || c.doctor?.license_number || "—"}</span>
+                <span className="info-label">Registration No :</span>
+                <span className="info-value">{doctorRegNo || "—"}</span>
               </div>
               <div className="info-row">
-                <span className="label">Mobile :</span>
-                <span className="value">{c.doctor?.phone || "—"}</span>
+                <span className="info-label">Mobile :</span>
+                <span className="info-value">{doctorPhone || "—"}</span>
               </div>
               <div className="info-row">
-                <span className="label">Hospital :</span>
-                <span className="value">{hospitalName}</span>
-              </div>
-              <div className="info-row info-row-full" style={{ borderTop: '1px solid #f3f4f6', paddingTop: 10, marginTop: 4 }}>
-                <span className="label">Visit Date :</span>
-                <span className="value">{c.appointment_date ? format(new Date(c.appointment_date), "dd MMM yyyy") : c.created_at ? format(new Date(c.created_at), "dd MMM yyyy") : "—"}</span>
+                <span className="info-label">Hospital :</span>
+                <span className="info-value">{hospitalName}</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* ── AUDIT INFO ── */}
-        <div className="no-break" style={{ padding: '0 28px', marginTop: 18 }}>
-          <div className="sec-title">Audit Information</div>
-          <div style={{ border: '1px solid #e5e7eb', borderTop: 'none' }}>
-            <div className="info-grid">
-              <div className="info-row">
-                <span className="label">Created By :</span>
-                <span className="value">{c.created_by?.full_name || "—"}</span>
-              </div>
-              <div className="info-row">
-                <span className="label">Updated By :</span>
-                <span className="value">{c.updated_by?.full_name || "—"}</span>
-              </div>
-              <div className="info-row">
-                <span className="label">Created :</span>
-                <span className="value">{c.created_at ? format(new Date(c.created_at), "dd MMM yyyy hh:mm a") : "—"}</span>
-              </div>
-              <div className="info-row">
-                <span className="label">Updated :</span>
-                <span className="value">{c.updated_at ? format(new Date(c.updated_at), "dd MMM yyyy hh:mm a") : "—"}</span>
-              </div>
+        {/* ─── SIGNATURE ─── */}
+        <div className="no-break" style={{ padding: '0 8px', marginTop: 18 }}>
+          <div className="section-title">SIGNATURE</div>
+          <div style={{ border: '1px solid #e5e7eb', borderTop: 'none', padding: '14px 16px' }}>
+            <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.6, marginBottom: 20, fontStyle: 'italic' }}>
+              I acknowledge that I have been explained the diagnosis, treatment plan, risks, benefits, and alternatives. I consent to the proposed treatment.
+            </div>
+
+            {/* Signature lines */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24 }}>
+              {["Doctor Signature", "Patient Signature", "Hospital Seal"].map((label) => (
+                <div key={label} style={{ textAlign: 'center', width: '30%' }}>
+                  <div className="sig-line" />
+                  <div style={{ fontSize: 10, color: '#6b7280', marginTop: 4 }}>{label}</div>
+                  {label === "Hospital Seal" && (
+                    <div style={{ fontSize: 9, color: '#9ca3af', marginTop: 2 }}>{hospitalName}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              {["Date", "Witness", "Place"].map((label) => (
+                <div key={label} style={{ textAlign: 'center', width: '30%' }}>
+                  <div className="sig-line" />
+                  <div style={{ fontSize: 10, color: '#6b7280', marginTop: 4 }}>{label}</div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* ── SIGNATURE ── */}
-        <div className="no-break" style={{ padding: '0 28px', marginTop: 18 }}>
-          <div className="sec-title">Signature</div>
-          <div style={{ border: '1px solid #e5e7eb', borderTop: 'none' }}>
-            <div style={{ padding: '16px 20px' }}>
-              <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.6, marginBottom: 20, fontStyle: 'italic' }}>
-                I acknowledge that I have been explained the diagnosis, treatment plan, risks, benefits, and alternatives. I consent to the proposed treatment.
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24 }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div className="sig-line" />
-                  <div style={{ fontSize: 10, color: '#6b7280', marginTop: 4 }}>Patient Signature</div>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <div className="sig-line" />
-                  <div style={{ fontSize: 10, color: '#6b7280', marginTop: 4 }}>Doctor Signature</div>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <div className="sig-line" />
-                  <div style={{ fontSize: 10, color: '#6b7280', marginTop: 4 }}>Hospital Seal</div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div className="sig-line" />
-                  <div style={{ fontSize: 10, color: '#6b7280', marginTop: 4 }}>Date</div>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <div className="sig-line" />
-                  <div style={{ fontSize: 10, color: '#6b7280', marginTop: 4 }}>Witness</div>
-                </div>
-                <div style={{ textAlign: 'center', width: 180 }}>
-                  <div style={{ fontSize: 10, color: '#6b7280', marginTop: 16 }}>
-                    {hospitalName}
-                  </div>
-                </div>
-              </div>
-            </div>
+        {/* ─── FOOTER ─── */}
+        <div style={{ padding: '16px 8px 0' }}>
+          <div style={{ borderTop: '1px solid #e5e7eb', marginBottom: 6 }} />
+          <div style={{ fontSize: 9, color: '#9ca3af', lineHeight: 1.5, textAlign: 'center' }}>
+            This is a confidential medical record intended only for the patient.
           </div>
-        </div>
-
-        {/* ── FOOTER ── */}
-        <div style={{ padding: '20px 28px 28px' }}>
-          <hr style={{ border: 'none', borderTop: '1px solid #e5e7eb', marginBottom: 8 }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#9ca3af', lineHeight: 1.5 }}>
-            <span>Confidential Medical Record — {hospitalName}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#9ca3af', marginTop: 4 }}>
+            <span>{hospitalName}</span>
             <span>Page {'{page}'} of {'{pages}'}</span>
           </div>
-          <div style={{ fontSize: 9, color: '#9ca3af', marginTop: 2, lineHeight: 1.4, textAlign: 'center' }}>
-            This document contains confidential medical information intended only for the patient.
-            If you are not the intended recipient, please notify the sender immediately.
-          </div>
         </div>
+
+        {/* Padding at bottom for print */}
+        <div style={{ height: 20 }} />
       </div>
+
+      {/* ─── GLOBAL STYLES ─── */}
+      <style>{`
+        .section-title {
+          background: #1B3A5C;
+          color: #fff;
+          font-size: 14px;
+          font-weight: 700;
+          padding: 6px 16px;
+          letter-spacing: 0.02em;
+          line-height: 1.5;
+        }
+        .info-grid-2col {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 4px 20px;
+        }
+        .info-row {
+          display: flex;
+          align-items: baseline;
+          gap: 6px;
+          line-height: 1.6;
+        }
+        .info-row .info-label {
+          font-size: 11px;
+          font-weight: 600;
+          color: #6b7280;
+          white-space: nowrap;
+          min-width: 120px;
+        }
+        .info-row .info-value {
+          font-size: 11px;
+          font-weight: 400;
+          color: #1f2937;
+        }
+        .info-row-full {
+          grid-column: 1 / -1;
+        }
+        .info-row-full .info-label {
+          min-width: 120px;
+        }
+        .findings-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 10.5px;
+          line-height: 1.5;
+        }
+        .findings-table th {
+          background: #1B3A5C;
+          color: #fff;
+          font-size: 11px;
+          font-weight: 700;
+          padding: 7px 10px;
+          border: 1px solid #d1d5db;
+          text-align: left;
+        }
+        .findings-table td {
+          padding: 5px 10px;
+          border: 1px solid #d1d5db;
+          vertical-align: top;
+        }
+        .findings-table tr:nth-child(even) {
+          background: #f9fafb;
+        }
+        .sig-line {
+          border-bottom: 1px solid #9ca3af;
+          width: 100%;
+          height: 0;
+          margin-bottom: 4px;
+        }
+        @media print {
+          .section-title {
+            background: #1B3A5C !important;
+            color: #fff !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          .findings-table th {
+            background: #1B3A5C !important;
+            color: #fff !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          .findings-table tr:nth-child(even) {
+            background: #f9fafb !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+        }
+      `}</style>
     </div>
   )
 }
