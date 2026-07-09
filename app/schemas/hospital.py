@@ -25,6 +25,19 @@ class HospitalUpdate(BaseModel):
     is_active: Optional[bool] = None
 
 
+class HospitalBrief(BaseModel):
+    id: str
+    name: str
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    registration_number: Optional[str] = None
+    gst_number: Optional[str] = None
+    logo_url: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
 class HospitalResponse(BaseModel):
     id: str
     admin_group_id: str

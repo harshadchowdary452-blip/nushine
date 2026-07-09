@@ -44,6 +44,14 @@ async def lifespan(app: FastAPI):
     print("[STARTUP] Seeding super admin...")
     await seed_super_admin()
 
+    print("[STARTUP] Pre-launching Playwright browser for PDF generation...")
+    try:
+        from app.utils.case_pdf import _ensure_browser
+        await _ensure_browser()
+        print("[STARTUP] Playwright browser ready")
+    except Exception as e:
+        print(f"[STARTUP] Playwright pre-launch skipped: {e}")
+
     print("[STARTUP] Starting appointment reminder scheduler...")
     reminder_task = asyncio.create_task(check_appointment_reminders())
 
@@ -57,6 +65,9 @@ async def lifespan(app: FastAPI):
     yield
 
     print("[SHUTDOWN] Shutting down...")
+    from app.utils.case_pdf import _cleanup
+    await _cleanup()
+
     reminder_task.cancel()
     same_day_task.cancel()
     missed_task.cancel()

@@ -12,6 +12,7 @@ class Consultant(Base):
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str] = mapped_column(String(255), nullable=True)
     phone: Mapped[str] = mapped_column(String(50), nullable=True)
+    qualification: Mapped[str] = mapped_column(String(255), nullable=True)
     specialization: Mapped[str] = mapped_column(String(255), nullable=True)
     license_number: Mapped[str] = mapped_column(String(100), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

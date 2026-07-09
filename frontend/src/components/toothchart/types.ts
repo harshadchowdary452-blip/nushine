@@ -22,7 +22,6 @@ export type ToothFinding = {
   originalFindingType?: string
   findingType?: string
   dentitionType?: 'ADULT' | 'CHILD'
-  severity?: string
 }
 
 export type FindingFormData = {
@@ -63,24 +62,24 @@ export const CONDITION_LABELS: Record<ToothCondition, string> = {
 }
 
 export const CONDITION_COLORS: Record<ToothCondition, string> = {
-  Decayed: '#8B4513',
-  Restored: '#C0C0C0',
-  Defective: '#DAA520',
-  Missing: '#666',
-  Erupt: '#90EE90',
-  Implant: '#4169E1',
-  Impacted: '#FF8C00',
-  Bridge: '#9370DB',
-  Denture: '#B0C4DE',
+  Decayed: '#1F2937',
+  Restored: '#9CA3AF',
+  Defective: '#94A3B8',
+  Missing: '#D1D5DB',
+  Erupt: '#22C55E',
+  Implant: '#6B7280',
+  Impacted: '#94A3B8',
+  Bridge: '#A855F7',
+  Denture: '#D1D5DB',
 }
 
 export const SURFACE_COLORS: Record<string, string> = {
-  Decayed: '#5C2E00',
-  Restored: '#A0A0A0',
-  Defective: '#B8860B',
+  Decayed: '#1F2937',
+  Restored: '#9CA3AF',
+  Defective: '#94A3B8',
   Amalgam: '#808080',
   Composite: '#D2B48C',
-  Gold: '#DAA520',
+  Gold: '#F59E0B',
   Ceramic: '#F5F5DC',
   Zirconia: '#F0F0F0',
   Acrylic: '#E8E0D8',
@@ -179,21 +178,3 @@ export function getToothType(toothNumber: number): string {
   }
   return map[toothNumber] || 'central_incisor'
 }
-
-export const MOCK_FINDINGS: ToothFinding[] = [
-  { id: 'm1', toothNumber: 3, condition: 'Decayed', surfaces: ['Occlusal', 'Mesial'], description: 'Caries on occlusal extending to mesial', date: '2026-06-15' },
-  { id: 'm2', toothNumber: 8, condition: 'Restored', surfaces: ['Mesial'], material: 'Composite', description: 'Class III composite', date: '2024-03-10' },
-  { id: 'm3', toothNumber: 14, condition: 'Missing', date: '2023-11-20', description: 'Extracted due to extensive caries' },
-  { id: 'm4', toothNumber: 19, condition: 'Restored', surfaces: ['Occlusal'], material: 'Amalgam', description: 'Large MOD amalgam', date: '2025-01-22' },
-  { id: 'm5', toothNumber: 30, condition: 'Decayed', surfaces: ['Occlusal'], description: 'Small occlusal pit caries', date: '2026-07-01' },
-  { id: 'm6', toothNumber: 6, condition: 'Impacted', description: 'Impacted canine, high palatal position', date: '2026-02-14' },
-  { id: 'm7', toothNumber: 2, condition: 'Bridge', description: 'Bridge abutment #2-#4', date: '2024-09-05' },
-  { id: 'm8', toothNumber: 16, condition: 'Implant', material: 'Zirconia', description: 'Single implant crown', date: '2025-06-30' },
-  { id: 'm9', toothNumber: 25, condition: 'Defective', surfaces: ['Occlusal'], description: 'Defective amalgam, marginal ditching', date: '2026-04-18' },
-  { id: 'm10', toothNumber: 11, condition: 'Erupt', description: 'Partially erupted', date: '2026-05-01' },
-  { id: 'm11', toothNumber: 13, condition: 'Restored', surfaces: ['Occlusal', 'Buccal'], material: 'Composite', description: 'Composite buccal pit filling', date: '2025-08-12' },
-  { id: 'm12', toothNumber: 31, condition: 'Decayed', surfaces: ['Distal'], description: 'Distal root caries', date: '2026-07-01' },
-  { id: 'm13', toothNumber: 4, condition: 'Decayed', surfaces: ['Mesial', 'Distal'], description: 'MOD caries', date: '2026-06-20' },
-  { id: 'm14', toothNumber: 1, condition: 'Denture', description: 'Partial denture clasp on #1', date: '2025-12-01' },
-  { id: 'm15', toothNumber: 21, condition: 'Decayed', surfaces: ['Buccal'], description: 'Buccal cervical caries', date: '2026-07-02' },
-]

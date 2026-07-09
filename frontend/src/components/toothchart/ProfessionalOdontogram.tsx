@@ -1,5 +1,9 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react'
 import type { ToothCondition, ToothSurface, ToothFinding } from './types'
+import {
+  FINDING_TYPES, QUICK_FINDINGS, ALL_FINDING_NAMES,
+  getFindingColor, getFindingLabel,
+} from './findingConfig'
 
 interface Props {
   findings: ToothFinding[]
@@ -42,67 +46,6 @@ const FDI_LOWER = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 3
 const FDI_UPPER_C = [55, 54, 53, 52, 51, 61, 62, 63, 64, 65]
 const FDI_LOWER_C = [85, 84, 83, 82, 81, 71, 72, 73, 74, 75]
 
-// ─── Finding color map (direct lookup, no pattern matching) ────────────
-
-const FINDING_COLORS: Record<string, string> = {
-  'Dental Caries': '#DC2626', 'Composite Filling': '#3B82F6',
-  'Amalgam': '#6B7280', 'RCT Completed': '#9333EA',
-  'RCT Required': '#B91C1C', 'Calculus': '#EAB308',
-  'Crown': '#D97706', 'Bridge': '#14B8A6', 'Implant': '#6B7280',
-  'Fracture': '#000000', 'Mobility': '#F97316',
-  'Tenderness': '#EC4899', 'Missing Tooth': '#4B5563',
-  'Root Stump': '#92400E', 'Impacted': '#F97316',
-  'Erupting': '#10B981', 'Denture': '#8B5CF6',
-  'Decayed': '#DC2626', 'Restored': '#3B82F6',
-  'Defective': '#D97706', 'Missing': '#4B5563',
-  'Erupt': '#10B981',
-}
-
-function findingLabel(f: ToothFinding): string {
-  return f.findingType || f.originalFindingType || f.condition
-}
-
-function findingColor(f: ToothFinding): string {
-  return FINDING_COLORS[findingLabel(f)] || '#9CA3AF'
-}
-
-// ─── Quick-finding chip map ───────────────────────────────────────────
-
-const QUICK: Record<string, { condition: ToothCondition; material?: string }> = {
-  'Dental Caries':     { condition: 'Decayed' },
-  'Composite Filling': { condition: 'Restored', material: 'Composite' },
-  'Amalgam':           { condition: 'Restored', material: 'Amalgam' },
-  'RCT Completed':     { condition: 'Restored' },
-  'RCT Required':      { condition: 'Decayed' },
-  'Missing':           { condition: 'Missing' },
-  'Crown':             { condition: 'Restored' },
-  'Implant':           { condition: 'Implant' },
-  'Bridge':            { condition: 'Bridge' },
-  'Fracture':          { condition: 'Defective' },
-  'Calculus':          { condition: 'Defective' },
-  'Mobility':          { condition: 'Defective' },
-  'Tenderness':        { condition: 'Decayed' },
-  'Root Stump':        { condition: 'Defective' },
-  'Impaction':         { condition: 'Impacted' },
-}
-
-const QLABELS = Object.keys(QUICK)
-const MATERIALS = ['Composite', 'Amalgam', 'Gold', 'Ceramic', 'Zirconia', 'Acrylic', 'Metal', 'Porcelain']
-const CONDITIONS: ToothCondition[] = ['Decayed', 'Restored', 'Defective', 'Missing', 'Erupt', 'Implant', 'Impacted', 'Bridge', 'Denture']
-const SURF_LABEL: Record<string, string> = { Mesial: 'M', Distal: 'D', Buccal: 'B', Lingual: 'L', Occlusal: 'O', Incisal: 'I', Labial: 'La' }
-const SURF_COLOR: Record<string, string> = { Mesial: '#F59E0B', Distal: '#8B5CF6', Buccal: '#3B82F6', Lingual: '#10B981', Occlusal: '#EF4444', Incisal: '#EC4899', Labial: '#6366F1' }
-
-const LEGEND = [
-  { label: 'Dental Caries', color: '#DC2626' }, { label: 'Composite Filling', color: '#3B82F6' },
-  { label: 'Amalgam', color: '#6B7280' }, { label: 'RCT Completed', color: '#9333EA' },
-  { label: 'RCT Required', color: '#B91C1C' }, { label: 'Missing Tooth', color: '#4B5563' },
-  { label: 'Crown', color: '#D97706' }, { label: 'Implant', color: '#6B7280' },
-  { label: 'Bridge', color: '#14B8A6' }, { label: 'Fracture', color: '#000000' },
-  { label: 'Calculus', color: '#EAB308' }, { label: 'Mobility', color: '#F97316' },
-  { label: 'Tenderness', color: '#EC4899' }, { label: 'Root Stump', color: '#92400E' },
-  { label: 'Impacted', color: '#F97316' },
-]
-
 // ─── Helpers ──────────────────────────────────────────────────────────
 
 function toothName(n: number): string {
@@ -114,6 +57,14 @@ function toothName(n: number): string {
 }
 function quad(n: number): number { return Math.floor(n / 10) }
 function uid(): string { return `f-${Date.now()}-${Math.random().toString(36).slice(2, 6)}` }
+
+function findingLabel(f: ToothFinding): string {
+  return f.findingType || f.originalFindingType || f.condition
+}
+
+function findingColor(f: ToothFinding): string {
+  return getFindingColor(findingLabel(f))
+}
 
 // ─── ToothBox ─────────────────────────────────────────────────────────
 
@@ -174,10 +125,10 @@ function Legend({ findings }: { findings: ToothFinding[] }) {
     <div style={{ background: '#FFF', borderRadius: 8, border: '1px solid #E5E7EB', padding: '8px 12px' }}>
       <div style={{ fontSize: 10, fontWeight: 600, color: '#374151', marginBottom: 5, letterSpacing: '0.03em' }}>LEGEND</div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-        {LEGEND.map((item) => {
-          const a = active.has(item.label)
+        {FINDING_TYPES.map((item) => {
+          const a = active.has(item.name)
           return (
-            <div key={item.label} style={{
+            <div key={item.name} style={{
               display: 'inline-flex', alignItems: 'center', gap: 3,
               padding: '2px 6px', borderRadius: 4, fontSize: 9, fontWeight: 500,
               background: a ? `${item.color}12` : '#F9FAFB',
@@ -266,47 +217,65 @@ function Summary({ findings, onUpdate }: { findings: ToothFinding[]; onUpdate?: 
   )
 }
 
+const SURF_LABEL: Record<string, string> = { Mesial: 'M', Distal: 'D', Buccal: 'B', Lingual: 'L', Occlusal: 'O', Incisal: 'I', Labial: 'La' }
+const SURF_COLOR: Record<string, string> = { Mesial: '#F59E0B', Distal: '#8B5CF6', Buccal: '#3B82F6', Lingual: '#10B981', Occlusal: '#EF4444', Incisal: '#EC4899', Labial: '#6366F1' }
+
 // ─── Right Panel ──────────────────────────────────────────────────────
 
-function RightPanel({ n, fings, ro, onAdd, onRemove, onClose }: {
+function RightPanel({ n, fings, ro, onAdd, onRemove, onUpdateFinding, onClose }: {
   n: number; fings: ToothFinding[]; ro: boolean
-  onAdd: (c: ToothCondition, s: ToothSurface[], m: string, d: string, ft: string) => void
-  onRemove: (id: string) => void; onClose: () => void
+  onAdd: (ft: string, desc: string) => void
+  onRemove: (id: string) => void
+  onUpdateFinding: (id: string, updates: Partial<ToothFinding>) => void
+  onClose: () => void
 }) {
-  const [surf, setSurf] = useState<ToothSurface[]>([])
-  const [mat, setMat] = useState('')
-  const [desc, setDesc] = useState('')
   const [findingType, setFindingType] = useState('')
-  const [cond, setCond] = useState<ToothCondition>('Decayed')
-  const [txNote, setTxNote] = useState('')
-  const [txHist, setTxHist] = useState<{ date: string; note: string }[]>([])
+  const [desc, setDesc] = useState('')
+  const [editId, setEditId] = useState<string | null>(null)
 
-  const toggle = (s: ToothSurface) => setSurf((p) => p.includes(s) ? p.filter((x) => x !== s) : [...p, s])
-  const isPost = n % 10 >= 4
-  const allS: ToothSurface[] = isPost
-    ? ['Mesial', 'Distal', 'Occlusal', 'Buccal', 'Lingual']
-    : ['Mesial', 'Distal', 'Incisal', 'Labial', 'Lingual']
-
-  const handleQuick = (label: string) => {
-    const m = QUICK[label]
-    if (m) onAdd(m.condition, [], m.material || '', desc, label)
+  const handleAdd = () => {
+    if (!findingType) return
+    onAdd(findingType, desc)
+    setFindingType('')
+    setDesc('')
   }
 
-  const addSurface = (c: ToothCondition) => { onAdd(c, surf, mat, desc, findingType || c); setSurf([]); setMat(''); setDesc(''); setFindingType('') }
-  const addWhole = (c: ToothCondition) => { onAdd(c, [], '', desc, findingType || c); setDesc(''); setFindingType('') }
-  const addTx = () => { if (!txNote.trim()) return; setTxHist((p) => [...p, { date: new Date().toISOString().split('T')[0], note: txNote.trim() }]); setTxNote('') }
+  const handleQuick = (label: string) => {
+    onAdd(label, desc)
+    setDesc('')
+  }
 
   const disps = useMemo(() => fings.map((f) => ({ f, label: findingLabel(f), color: findingColor(f) })), [fings])
 
-  const wc = ['Missing', 'Implant', 'Impacted', 'Bridge', 'Denture']
-  const isWhole = wc.includes(cond)
+  const startEdit = (f: ToothFinding) => {
+    setEditId(f.id)
+    setFindingType(f.findingType || '')
+    setDesc(f.description || '')
+  }
+
+  const saveEdit = () => {
+    if (!editId) return
+    if (!findingType) return
+    onUpdateFinding(editId, {
+      findingType,
+      description: desc || undefined,
+    })
+    setEditId(null)
+    setFindingType('')
+    setDesc('')
+  }
+
+  const cancelEdit = () => {
+    setEditId(null)
+    setFindingType('')
+    setDesc('')
+  }
 
   return (
     <div style={{
       width: 260, flexShrink: 0, background: '#FFF', borderLeft: '1px solid #E5E7EB',
       display: 'flex', flexDirection: 'column', overflowY: 'auto', fontSize: 11,
     }}>
-      {/* Header */}
       <div style={{ padding: '8px 12px', borderBottom: '1px solid #E5E7EB', background: '#F8FAFC' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
@@ -314,7 +283,7 @@ function RightPanel({ n, fings, ro, onAdd, onRemove, onClose }: {
               <span style={{ fontSize: 16, fontWeight: 700, color: '#111827' }}>#{n}</span>
               <span style={{ fontSize: 10, color: '#6B7280' }}>{toothName(n)}</span>
             </div>
-            <div style={{ fontSize: 9, color: '#9CA3AF' }}>Quadrant {quad(n)} · {isPost ? 'Posterior' : 'Anterior'}</div>
+            <div style={{ fontSize: 9, color: '#9CA3AF' }}>Quadrant {quad(n)}</div>
           </div>
           <button onClick={onClose} style={{
             width: 22, height: 22, borderRadius: '50%', border: '1px solid #E5E7EB',
@@ -337,17 +306,28 @@ function RightPanel({ n, fings, ro, onAdd, onRemove, onClose }: {
                 padding: '2px 6px', borderRadius: 4, background: `${color}10`,
                 borderLeft: `2px solid ${color}`,
               }}>
-                <div style={{ fontSize: 10, lineHeight: 1.3 }}>
+                <div style={{ fontSize: 10, lineHeight: 1.3, flex: 1 }}>
                   <span style={{ fontWeight: 600, color: '#374151' }}>{label}</span>
                   {f.surfaces && f.surfaces.length > 0 && (
-                    <span style={{ color: '#6B7280', fontSize: 9 }}> ({f.surfaces.map((s) => SURF_LABEL[s]).join(',')})</span>
+                    <span style={{ color: '#6B7280', fontSize: 9 }}> [{f.surfaces.map((s) => SURF_LABEL[s]).join(',')}]</span>
+                  )}
+                  {f.description && label !== f.description && (
+                    <div style={{ color: '#6B7280', fontSize: 9, marginTop: 1 }}>{f.description}</div>
                   )}
                 </div>
                 {!ro && (
-                  <button onClick={() => onRemove(f.id)} style={{
-                    background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444',
-                    fontSize: 11, padding: 0, flexShrink: 0, marginLeft: 3,
-                  }}>✕</button>
+                  <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+                    {editId !== f.id && (
+                      <button onClick={() => startEdit(f)} style={{
+                        background: 'none', border: 'none', cursor: 'pointer', color: '#3B82F6',
+                        fontSize: 10, padding: 0,
+                      }}>✎</button>
+                    )}
+                    <button onClick={() => onRemove(f.id)} style={{
+                      background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444',
+                      fontSize: 11, padding: 0,
+                    }}>✕</button>
+                  </div>
                 )}
               </div>
             ))}
@@ -360,107 +340,55 @@ function RightPanel({ n, fings, ro, onAdd, onRemove, onClose }: {
         <div style={{ padding: '8px 12px', borderBottom: '1px solid #E5E7EB' }}>
           <div style={{ fontSize: 9, fontWeight: 600, color: '#374151', marginBottom: 5, letterSpacing: '0.03em' }}>QUICK FINDINGS</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-            {QLABELS.map((label) => {
-              const c = FINDING_COLORS[label] || '#6B7280'
-              return (
-                <button key={label} onClick={() => handleQuick(label)} style={{
-                  fontSize: 8, fontWeight: 500, padding: '1px 5px', borderRadius: 3, lineHeight: '16px',
-                  border: `1px solid ${c}40`, background: '#FFF', color: c, cursor: 'pointer', whiteSpace: 'nowrap',
-                }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = c + '15' }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = '#FFF' }}>
-                  {label}
-                </button>
-              )
-            })}
+            {QUICK_FINDINGS.map((ft) => (
+              <button key={ft.name} onClick={() => handleQuick(ft.name)} style={{
+                fontSize: 8, fontWeight: 500, padding: '1px 5px', borderRadius: 3, lineHeight: '16px',
+                border: `1px solid ${ft.color}40`, background: '#FFF', color: ft.color, cursor: 'pointer', whiteSpace: 'nowrap',
+              }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = ft.color + '15' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#FFF' }}>
+                {ft.label}
+              </button>
+            ))}
           </div>
         </div>
       )}
 
-      {/* Add finding form */}
+      {/* Add / Edit finding form */}
       {!ro && (
         <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 4, borderBottom: '1px solid #E5E7EB' }}>
-          <div style={{ fontSize: 9, fontWeight: 600, color: '#374151', letterSpacing: '0.03em' }}>ADD FINDING</div>
+          <div style={{ fontSize: 9, fontWeight: 600, color: '#374151', letterSpacing: '0.03em' }}>
+            {editId ? 'EDIT FINDING' : 'ADD FINDING'}
+          </div>
           <div>
-            <div style={{ fontSize: 8, color: '#6B7280', marginBottom: 1 }}>Condition</div>
-            <select value={cond} onChange={(e) => setCond(e.target.value as ToothCondition)} style={inp}>
-              {CONDITIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+            <div style={{ fontSize: 8, color: '#6B7280', marginBottom: 1 }}>Finding Type *</div>
+            <select value={findingType} onChange={(e) => setFindingType(e.target.value)} style={inp}>
+              <option value="">Select finding type...</option>
+              {FINDING_TYPES.map((ft) => <option key={ft.name} value={ft.name}>{ft.label}</option>)}
             </select>
           </div>
-          {!isWhole && (
-            <div>
-              <div style={{ fontSize: 8, color: '#6B7280', marginBottom: 1 }}>Surfaces</div>
-              <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                {allS.map((s) => (
-                  <button key={s} onClick={() => toggle(s)} style={{
-                    width: 24, height: 22, fontSize: 8, fontWeight: 600, borderRadius: 3,
-                    border: `1px solid ${surf.includes(s) ? SURF_COLOR[s] : '#D1D5DB'}`,
-                    background: surf.includes(s) ? SURF_COLOR[s] : '#FFF',
-                    color: surf.includes(s) ? '#FFF' : '#6B7280', cursor: 'pointer',
-                  }}>{SURF_LABEL[s]}</button>
-                ))}
-              </div>
+          <input type="text" placeholder="Clinical notes / remarks..." value={desc} onChange={(e) => setDesc(e.target.value)} style={inp} />
+          {editId ? (
+            <div style={{ display: 'flex', gap: 4 }}>
+              <button onClick={saveEdit} style={{
+                flex: 1, padding: '5px', borderRadius: 4, border: 'none',
+                background: '#2563EB', color: '#FFF', fontSize: 9, fontWeight: 600, cursor: 'pointer',
+              }}>Save</button>
+              <button onClick={cancelEdit} style={{
+                padding: '5px 10px', borderRadius: 4, border: '1px solid #D1D5DB',
+                background: '#FFF', color: '#374151', fontSize: 9, fontWeight: 500, cursor: 'pointer',
+              }}>Cancel</button>
             </div>
+          ) : (
+            <button onClick={handleAdd} disabled={!findingType} style={{
+              width: '100%', padding: '5px', borderRadius: 4, border: 'none',
+              background: !findingType ? '#E5E7EB' : '#2563EB',
+              color: !findingType ? '#9CA3AF' : '#FFF',
+              fontSize: 9, fontWeight: 600, cursor: !findingType ? 'not-allowed' : 'pointer',
+            }}>+ Add Finding</button>
           )}
-          <div>
-            <div style={{ fontSize: 8, color: '#6B7280', marginBottom: 1 }}>Material</div>
-            <select value={mat} onChange={(e) => setMat(e.target.value)} style={inp}>
-              <option value="">None</option>
-              {MATERIALS.map((m) => <option key={m} value={m}>{m}</option>)}
-            </select>
-          </div>
-          <div>
-            <div style={{ fontSize: 8, color: '#6B7280', marginBottom: 1 }}>Finding Type</div>
-            <input type="text" placeholder="e.g. RCT Required, Dental Caries..." value={findingType}
-              onChange={(e) => setFindingType(e.target.value)} style={inp} />
-          </div>
-          <input type="text" placeholder="Clinical notes..." value={desc} onChange={(e) => setDesc(e.target.value)} style={inp} />
-          <button onClick={() => { if (wc.includes(cond)) addWhole(cond); else if (surf.length > 0) addSurface(cond); else addWhole(cond) }} style={{
-            width: '100%', padding: '5px', borderRadius: 4, border: 'none',
-            background: '#2563EB', color: '#FFF', fontSize: 9, fontWeight: 600, cursor: 'pointer',
-          }}>+ Add {cond}</button>
         </div>
       )}
-
-      {/* Treatment History */}
-      <div style={{ padding: '8px 12px', flex: 1 }}>
-        <div style={{ fontSize: 9, fontWeight: 600, color: '#374151', marginBottom: 5, letterSpacing: '0.03em' }}>TREATMENT HISTORY</div>
-        {txHist.length === 0 && disps.length === 0 ? (
-          <div style={{ fontSize: 10, color: '#9CA3AF', fontStyle: 'italic' }}>No treatment recorded</div>
-        ) : (
-          <div style={{ maxHeight: 120, overflowY: 'auto', marginBottom: 6 }}>
-          {txHist.map((t, i) => (
-            <div key={i} style={{
-              fontSize: 9, color: '#374151', padding: '2px 6px', marginBottom: 3,
-              background: '#F9FAFB', borderRadius: 3, borderLeft: '2px solid #3B82F6',
-            }}>
-              <span style={{ color: '#6B7280', fontWeight: 600 }}>{t.date}</span> {t.note}
-            </div>
-          ))}
-          {disps.map(({ f, label, color }) => (
-            <div key={f.id} style={{
-              fontSize: 9, color: '#374151', padding: '2px 6px', marginBottom: 3,
-              background: '#F9FAFB', borderRadius: 3, borderLeft: `2px solid ${color}`,
-            }}>
-              <span style={{ color: '#6B7280', fontWeight: 600 }}>{f.date}</span>{' '}
-              {label}{f.description && label !== f.description ? ` — ${f.description}` : ''}
-            </div>
-          ))}
-          </div>
-        )}
-        {!ro && (
-          <div style={{ display: 'flex', gap: 3 }}>
-            <input type="text" placeholder="Add treatment note..." value={txNote}
-              onChange={(e) => setTxNote(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') addTx() }}
-              style={{ flex: 1, padding: '2px 6px', borderRadius: 3, border: '1px solid #D1D5DB', fontSize: 10, outline: 'none' }} />
-            <button onClick={addTx} style={{
-              padding: '2px 8px', borderRadius: 3, border: 'none',
-              background: '#2563EB', color: '#FFF', fontSize: 9, fontWeight: 600, cursor: 'pointer',
-            }}>Add</button>
-          </div>
-        )}
-      </div>
     </div>
   )
 }
@@ -470,36 +398,15 @@ const inp: React.CSSProperties = {
   fontSize: 10, color: '#374151', background: '#FFF', outline: 'none',
 }
 
-// ─── Mock data (standalone demo) ──────────────────────────────────────
-
-const MOCK: ToothFinding[] = [
-  { id: 'm1', toothNumber: 16, condition: 'Decayed', surfaces: ['Occlusal'], description: 'Dental Caries', date: '2026-06-15' },
-  { id: 'm2', toothNumber: 26, condition: 'Restored', surfaces: ['Mesial'], material: 'Composite', description: 'Composite Filling', date: '2024-03-10' },
-  { id: 'm3', toothNumber: 36, condition: 'Missing', date: '2023-11-20' },
-  { id: 'm4', toothNumber: 46, condition: 'Restored', surfaces: ['Occlusal'], material: 'Amalgam', description: 'Amalgam', date: '2025-01-22' },
-  { id: 'm5', toothNumber: 14, condition: 'Restored', description: 'RCT Completed', date: '2026-07-01' },
-  { id: 'm6', toothNumber: 18, condition: 'Decayed', description: 'RCT Required', date: '2026-02-14' },
-  { id: 'm7', toothNumber: 13, condition: 'Defective', description: 'Calculus', date: '2026-06-20' },
-  { id: 'm8', toothNumber: 37, condition: 'Restored', description: 'Crown', date: '2025-08-12' },
-  { id: 'm9', toothNumber: 22, condition: 'Bridge', date: '2024-09-05' },
-  { id: 'm10', toothNumber: 45, condition: 'Implant', date: '2025-06-15' },
-  { id: 'm11', toothNumber: 11, condition: 'Defective', description: 'Fracture', date: '2026-04-18' },
-  { id: 'm12', toothNumber: 31, condition: 'Defective', description: 'Mobility', date: '2026-07-01' },
-  { id: 'm13', toothNumber: 17, condition: 'Decayed', description: 'Tenderness', date: '2026-06-28' },
-  { id: 'm14', toothNumber: 47, condition: 'Defective', description: 'Root Stump', date: '2025-12-01' },
-  { id: 'm15', toothNumber: 24, condition: 'Impacted', description: 'Impaction', date: '2026-06-10' },
-]
-
 // ─── Exports ──────────────────────────────────────────────────────────
 
-export { FINDING_COLORS, LEGEND, CONDITIONS as ALL_CONDITIONS, findingLabel, findingColor, findingLabel as getFindingLabel, findingColor as getFindingColor }
+export { getFindingColor, getFindingLabel }
 
 // ─── Main Component ───────────────────────────────────────────────────
 
 export default function ProfessionalOdontogram(props: Props) {
   const [local, setLocal] = useState<ToothFinding[]>([])
   const [isChild, setIsChild] = useState<boolean>(() => {
-    // Default based on patient DOB if available (before findings load)
     if (props.patientDateOfBirth) {
       const age = new Date().getFullYear() - new Date(props.patientDateOfBirth).getFullYear()
       if (age < 12) return true
@@ -540,18 +447,16 @@ export default function ProfessionalOdontogram(props: Props) {
     props.onFindingsChange(updated)
   }
 
-  const add = (condition: ToothCondition, surfaces: ToothSurface[], material: string, description: string, findingType: string) => {
+  const add = (findingType: string, description: string) => {
     if (ro || sel === null) return
     const cur = ref.current
     const nf: ToothFinding = {
       id: uid(),
       toothNumber: sel,
-      condition,
-      surfaces: surfaces.length > 0 ? surfaces : undefined,
-      material: material || undefined,
+      condition: 'Restored',
       description: description || undefined,
       date: new Date().toISOString().split('T')[0],
-      findingType: findingType,
+      findingType,
       dentitionType: isChild ? 'CHILD' : 'ADULT',
     }
     emit([...cur, nf])
@@ -560,6 +465,12 @@ export default function ProfessionalOdontogram(props: Props) {
   const remove = (id: string) => {
     if (ro) return
     emit(ref.current.filter((f) => f.id !== id))
+  }
+
+  const updateFinding = (id: string, updates: Partial<ToothFinding>) => {
+    if (ro) return
+    const cur = ref.current
+    emit(cur.map((f) => f.id === id ? { ...f, ...updates } : f))
   }
 
   const selFindings = findings.filter((f) => f.toothNumber === sel)
@@ -632,7 +543,7 @@ export default function ProfessionalOdontogram(props: Props) {
 
       {/* Right panel */}
       {sel !== null && (
-        <RightPanel n={sel} fings={selFindings} ro={!!ro} onAdd={add} onRemove={remove} onClose={() => setSel(null)} />
+        <RightPanel n={sel} fings={selFindings} ro={!!ro} onAdd={add} onRemove={remove} onUpdateFinding={updateFinding} onClose={() => setSel(null)} />
       )}
     </div>
   )

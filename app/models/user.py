@@ -17,6 +17,7 @@ class User(Base):
     phone: Mapped[str] = mapped_column(String(50), nullable=True)
     role: Mapped[Role] = mapped_column(SAEnum(Role, create_constraint=False), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    qualification: Mapped[str] = mapped_column(String(255), nullable=True)
     specialization: Mapped[str] = mapped_column(String(255), nullable=True)
     license_number: Mapped[str] = mapped_column(String(100), nullable=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

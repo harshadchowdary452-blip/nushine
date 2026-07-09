@@ -14,7 +14,6 @@ class FindingData:
     finding_type: str
     tooth_number: Optional[str] = None
     surface: Optional[str] = None
-    severity: Optional[str] = None
     notes: Optional[str] = None
 
 

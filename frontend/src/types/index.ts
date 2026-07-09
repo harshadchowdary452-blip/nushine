@@ -121,7 +121,6 @@ export interface ClinicalFinding {
   finding_type: string;
   tooth_number: string | null;
   surface?: string;
-  severity: string | null;
   notes: string | null;
   created_at?: string;
 }

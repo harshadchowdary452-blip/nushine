@@ -20,7 +20,6 @@ class ClinicalFinding(Base):
     case_id: Mapped[str] = mapped_column(String(36), ForeignKey("cases.id"), nullable=False)
     finding_type: Mapped[str] = mapped_column(String(50), nullable=False)
     tooth_number: Mapped[str] = mapped_column(String(10), nullable=True)
-    severity: Mapped[str] = mapped_column(String(20), nullable=True)
     dentition_type: Mapped[str] = mapped_column(String(5), nullable=True)
     surface: Mapped[str] = mapped_column(String(50), nullable=True)
     notes: Mapped[str] = mapped_column(Text, nullable=True)
@@ -73,6 +72,7 @@ class Case(Base):
     treatment_plan_estimated_visits: Mapped[int] = mapped_column(nullable=True)
     # Doctor Info
     doctor_registration_number: Mapped[str] = mapped_column(String(50), nullable=True)
+    doctor_qualification: Mapped[str] = mapped_column(String(100), nullable=True)
     doctor_specialization: Mapped[str] = mapped_column(String(100), nullable=True)
     # Patient Instructions
     patient_instructions: Mapped[str] = mapped_column(Text, nullable=True)

@@ -28,7 +28,6 @@ export interface Finding {
   id: string
   type: FindingType
   surface?: "Occlusal" | "Mesial" | "Distal" | "Buccal" | "Lingual"
-  severity?: "Mild" | "Moderate" | "Severe" | "Grade I" | "Grade II" | "Grade III"
   note?: string
   createdAt: string
   toothNumber: string
@@ -48,19 +47,19 @@ interface Props {
 // ─── Mock Data ────────────────────────────────────────────────────
 
 const MOCK_FINDINGS: Finding[] = [
-  { id: "m1", type: "DentalCaries", surface: "Occlusal", severity: "Moderate", toothNumber: "16", createdAt: "2026-06-15T10:30:00Z" },
-  { id: "m2", type: "DentalCaries", surface: "Distal", severity: "Mild", toothNumber: "15", createdAt: "2026-06-15T10:30:00Z" },
+  { id: "m1", type: "DentalCaries", surface: "Occlusal", toothNumber: "16", createdAt: "2026-06-15T10:30:00Z" },
+  { id: "m2", type: "DentalCaries", surface: "Distal", toothNumber: "15", createdAt: "2026-06-15T10:30:00Z" },
   { id: "m3", type: "FillingAmalgam", surface: "Occlusal", toothNumber: "26", createdAt: "2026-03-10T09:00:00Z" },
   { id: "m4", type: "RootCanalTreated", toothNumber: "36", createdAt: "2026-01-20T14:00:00Z" },
   { id: "m5", type: "Crown", toothNumber: "36", createdAt: "2026-02-01T11:00:00Z" },
   { id: "m6", type: "MissingTooth", toothNumber: "18", createdAt: "2025-11-05T08:00:00Z" },
-  { id: "m7", type: "Calculus", severity: "Moderate", toothNumber: "31", createdAt: "2026-06-15T10:30:00Z" },
-  { id: "m8", type: "Calculus", severity: "Moderate", toothNumber: "41", createdAt: "2026-06-15T10:30:00Z" },
-  { id: "m9", type: "Mobility", severity: "Grade II", toothNumber: "46", createdAt: "2026-06-15T10:30:00Z" },
+  { id: "m7", type: "Calculus", toothNumber: "31", createdAt: "2026-06-15T10:30:00Z" },
+  { id: "m8", type: "Calculus", toothNumber: "41", createdAt: "2026-06-15T10:30:00Z" },
+  { id: "m9", type: "Mobility", toothNumber: "46", createdAt: "2026-06-15T10:30:00Z" },
   { id: "m10", type: "Fracture", toothNumber: "21", createdAt: "2026-05-01T09:00:00Z" },
-  { id: "m11", type: "Gingivitis", severity: "Mild", toothNumber: "11", createdAt: "2026-06-15T10:30:00Z" },
-  { id: "m12", type: "Gingivitis", severity: "Mild", toothNumber: "21", createdAt: "2026-06-15T10:30:00Z" },
-  { id: "m13", type: "Impaction", severity: "Moderate", toothNumber: "28", createdAt: "2026-04-10T13:00:00Z" },
+  { id: "m11", type: "Gingivitis", toothNumber: "11", createdAt: "2026-06-15T10:30:00Z" },
+  { id: "m12", type: "Gingivitis", toothNumber: "21", createdAt: "2026-06-15T10:30:00Z" },
+  { id: "m13", type: "Impaction", toothNumber: "28", createdAt: "2026-04-10T13:00:00Z" },
   { id: "m14", type: "Bridge", toothNumber: "45", createdAt: "2026-02-15T10:00:00Z" },
   { id: "m15", type: "Implant", toothNumber: "47", createdAt: "2025-12-01T09:00:00Z" },
 ]
@@ -161,13 +160,6 @@ function hasType(findings: Finding[], type: string): boolean {
 
 function hasBaseType(findings: Finding[], base: string): boolean {
   return findings.some((f) => f.type.startsWith(base))
-}
-
-function getSeveritySeverity(severity?: string): number {
-  if (!severity) return 1
-  if (severity === "Mild" || severity === "Grade I") return 1
-  if (severity === "Moderate" || severity === "Grade II") return 2
-  return 3
 }
 
 const S = (v: number) => String(v)
@@ -418,8 +410,7 @@ const ToothSVG = memo(function ToothSVG({
             else if (surf === "Distal") { cx2 = isMirror ? 32 : 68; cy2 = 40 }
             else if (surf === "Buccal") { cx2 = 50; cy2 = 48 }
             else if (surf === "Lingual") { cx2 = isMirror ? 55 : 45; cy2 = 30 }
-            const r = cf.severity === "Severe" ? 5 : cf.severity === "Moderate" ? 3.5 : 2.5
-            return <circle key={cf.id || "car"} cx={cx2} cy={cy2} r={r} fill="#5C2E00" opacity={0.8} />
+            return <circle key={cf.id || "car"} cx={cx2} cy={cy2} r={3.5} fill="#5C2E00" opacity={0.8} />
           })}
           {/* Legacy position-based caries */}
           {hasType(toothFindings, "Caries – Enamel") && (
@@ -602,7 +593,6 @@ function RightPanel({
 
   const [ftype, setFtype] = useState("Caries – Enamel")
   const [surf, setSurf] = useState("")
-  const [sev, setSev] = useState("Moderate")
   const [notes, setNotes] = useState("")
 
   const addFinding = () => {
@@ -612,13 +602,11 @@ function RightPanel({
       type: ftype as FindingType,
       toothNumber: S(toothNum),
       surface: (surf || undefined) as Finding["surface"],
-      severity: (sev || undefined) as Finding["severity"],
       note: notes || undefined,
       createdAt: new Date().toISOString(),
     }
     onFindingsChange([...findings, nf])
     setSurf("")
-    setSev("Moderate")
     setNotes("")
   }
 
@@ -701,7 +689,6 @@ function RightPanel({
                   <div style={{ fontSize: 11, color: "#374151" }}>
                     <span style={{ fontWeight: 600 }}>{f.type}</span>
                     {f.surface && <span style={{ color: "#6B7280" }}> ({f.surface})</span>}
-                    {f.severity && <span style={{ color: "#6B7280" }}> – {f.severity}</span>}
                     {f.note && <span style={{ color: "#9CA3AF" }}> — {f.note}</span>}
                   </div>
                   {!readonly && (
@@ -730,11 +717,6 @@ function RightPanel({
             <select value={surf} onChange={(e) => setSurf(e.target.value)} style={{ ...inputStyle, flex: 1 }}>
               <option value="">Surface</option>
               {surfaces.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-            <select value={sev} onChange={(e) => setSev(e.target.value)} style={{ ...inputStyle, width: 90 }}>
-              <option value="Mild">Mild</option>
-              <option value="Moderate">Moderate</option>
-              <option value="Severe">Severe</option>
             </select>
           </div>
 
@@ -812,13 +794,12 @@ function ClinicalSummary({ findings, isPrimary }: { findings: Finding[]; isPrima
               <th style={thStyle}>Name</th>
               <th style={thStyle}>Finding</th>
               <th style={thStyle}>Surface</th>
-              <th style={thStyle}>Severity</th>
               <th style={thStyle}>Notes</th>
             </tr>
           </thead>
           <tbody>
             {sorted.length === 0 && (
-              <tr><td colSpan={6} style={{ textAlign: "center", padding: 20, color: "#9CA3AF", fontStyle: "italic" }}>No clinical findings recorded</td></tr>
+              <tr><td colSpan={5} style={{ textAlign: "center", padding: 20, color: "#9CA3AF", fontStyle: "italic" }}>No clinical findings recorded</td></tr>
             )}
             {sorted.map(([toothNum, tfs]) => (
               tfs.map((f, idx) => (
@@ -832,15 +813,6 @@ function ClinicalSummary({ findings, isPrimary }: { findings: Finding[]; isPrima
                     </span>
                   </td>
                   <td style={tdStyle}>{f.surface || "—"}</td>
-                  <td style={tdStyle}>
-                    {f.severity ? (
-                      <span style={{
-                        padding: "1px 6px", borderRadius: 4, fontSize: 10, fontWeight: 500,
-                        background: f.severity === "Severe" ? "#FEE2E2" : f.severity === "Moderate" ? "#FEF3C7" : "#DBEAFE",
-                        color: f.severity === "Severe" ? "#DC2626" : f.severity === "Moderate" ? "#D97706" : "#2563EB",
-                      }}>{f.severity}</span>
-                    ) : "—"}
-                  </td>
                   <td style={{ ...tdStyle, color: "#9CA3AF" }}>{f.note || "—"}</td>
                 </tr>
               ))

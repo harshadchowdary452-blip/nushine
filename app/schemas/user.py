@@ -12,6 +12,7 @@ class UserCreate(BaseModel):
     phone: Optional[str] = None
     role: Optional[str] = None
     specialization: Optional[str] = None
+    qualification: Optional[str] = None
     license_number: Optional[str] = None
 
 
@@ -19,6 +20,7 @@ class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     phone: Optional[str] = None
     specialization: Optional[str] = None
+    qualification: Optional[str] = None
     license_number: Optional[str] = None
     hospital_id: Optional[str] = None
     admin_group_id: Optional[str] = None
@@ -35,6 +37,7 @@ class UserResponse(BaseModel):
     role: str
     is_active: bool
     specialization: Optional[str]
+    qualification: Optional[str]
     license_number: Optional[str]
     is_verified: bool
     last_login: Optional[datetime]

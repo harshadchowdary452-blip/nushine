@@ -1,26 +1,19 @@
-import { useState, useEffect, useMemo } from "react"
+import { useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
-  Loader2, ChevronDown, ChevronRight, Download, Printer, History,
-  Save, Plus, X, FileText, ExternalLink, PenLine, ArrowLeft
+  Loader2, Printer, PenLine, ArrowLeft
 } from "lucide-react"
 import { format } from "date-fns"
-import { casesApi, doctorsApi, patientsApi } from "@/services/endpoints"
+import { casesApi } from "@/services/endpoints"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/components/ui/toast"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { Case } from "@/types"
 import ProfessionalOdontogram from "@/components/toothchart/ProfessionalOdontogram"
-import type { ToothFinding, ToothSurface, ToothCondition } from "@/components/toothchart/types"
-
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5173/api/v1"
+import CaseReportForm, { apiToFinding } from "@/components/cases/CaseReportForm"
 
 const statusColors: Record<string, string> = {
   OPEN: "bg-blue-50 text-blue-700 border-blue-200",
@@ -31,80 +24,14 @@ const statusColors: Record<string, string> = {
 }
 
 
-function CollapsibleSection({ title, defaultOpen, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
-  const [open, setOpen] = useState(defaultOpen ?? false)
-  return (
-    <Card>
-      <CardHeader className="py-3 cursor-pointer" onClick={() => setOpen(!open)}>
-        <CardTitle className="text-sm flex items-center gap-2">
-          {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-          {title}
-        </CardTitle>
-      </CardHeader>
-      {open && <CardContent className="pt-0">{children}</CardContent>}
-    </Card>
-  )
-}
-
-// Visual-only mapping: finding_type → ToothCondition (for tooth box rendering)
-const TYPE_TO_VISUAL: Record<string, ToothCondition> = {
-  'Dental Caries': 'Decayed', 'Composite Filling': 'Restored',
-  'Amalgam': 'Restored', 'RCT Completed': 'Restored',
-  'RCT Required': 'Decayed', 'Calculus': 'Defective',
-  'Crown': 'Restored', 'Bridge': 'Bridge', 'Implant': 'Implant',
-  'Fracture': 'Defective', 'Mobility': 'Defective',
-  'Tenderness': 'Decayed', 'Missing Tooth': 'Missing',
-  'Root Stump': 'Defective', 'Impacted': 'Impacted',
-  'Erupting': 'Erupt', 'Denture': 'Denture', 'Impaction': 'Impacted',
-  'Decayed': 'Decayed', 'Restored': 'Restored',
-  'Defective': 'Defective', 'Missing': 'Missing',
-}
-
-const CODE_TO_SURFACE: Record<string, ToothSurface> = {
-  'M': 'Mesial', 'D': 'Distal', 'B': 'Buccal', 'L': 'Lingual',
-  'O': 'Occlusal', 'I': 'Incisal', 'La': 'Labial',
-}
-
-const SURFACE_TO_CODE: Record<ToothSurface, string> = {
-  Mesial: 'M', Distal: 'D', Buccal: 'B', Lingual: 'L',
-  Occlusal: 'O', Incisal: 'I', Labial: 'La',
-}
-
-// Direct adapter: API ClinicalFinding → ToothFinding (no remapping, no pattern matching)
-function apiToFinding(api: any): ToothFinding {
-  const surfaces = api.surface
-    ? api.surface.split(',').map((s: string) => CODE_TO_SURFACE[s.trim()]).filter(Boolean) as ToothSurface[]
-    : []
-  return {
-    id: api.id || `api-${Date.now()}`,
-    toothNumber: parseInt(api.tooth_number) || 0,
-    condition: TYPE_TO_VISUAL[api.finding_type] || 'Decayed',
-    surfaces: surfaces.length > 0 ? surfaces : undefined,
-    description: api.notes || undefined,
-    date: (api.created_at || new Date().toISOString()).split('T')[0],
-    findingType: api.finding_type,
-    dentitionType: api.dentition_type || undefined,
-    severity: api.severity || undefined,
-  }
-}
-
-function getFindingLabel(f: ToothFinding): string {
-  return f.findingType || f.originalFindingType || f.condition
-}
-
-export default function CaseHistoryDetail() {
+export default function CaseReportDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { addToast } = useToast()
 
   const [editing, setEditing] = useState(false)
-  const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState("clinical")
-
-  // Form state
-  const [form, setForm] = useState<Record<string, any>>({})
-  const [findings, setFindings] = useState<ToothFinding[]>([])
 
   const { data: caseData, isFetching } = useQuery({
     queryKey: ["case", id],
@@ -115,116 +42,21 @@ export default function CaseHistoryDetail() {
   })
   const c: Case | undefined = caseData
 
-  useEffect(() => {
-    if (c) {
-      setForm({
-        chief_complaint: c.chief_complaint || "",
-        chief_complaint_duration: c.chief_complaint_duration || "",
-        chief_complaint_severity: c.chief_complaint_severity || "",
-        chief_complaint_associated_symptoms: c.chief_complaint_associated_symptoms || "",
-        hpi: c.hpi || "",
-        personal_history: c.personal_history || "",
-        family_history: c.family_history || "",
-        medical_history: c.medical_history || "",
-        dental_history: c.dental_history || "",
-        extra_oral_examination: c.extra_oral_examination || "",
-        intra_oral_examination: c.intra_oral_examination || "",
-        clinical_findings_summary: c.clinical_findings_summary || "",
-        periodontal_examination: c.periodontal_examination || "",
-        investigations: c.investigations || "",
-        provisional_diagnosis: c.provisional_diagnosis || "",
-        final_diagnosis: c.final_diagnosis || "",
-        diagnosis: c.diagnosis || "",
-        initial_treatment_plan: c.initial_treatment_plan || "",
-        treatment_plan_estimated_cost: c.treatment_plan_estimated_cost || "",
-        treatment_plan_estimated_visits: c.treatment_plan_estimated_visits || "",
-        patient_instructions: c.patient_instructions || "",
-        medicines_prescribed: c.medicines_prescribed || "",
-        follow_up_instructions: c.follow_up_instructions || "",
-        next_review_date: c.next_review_date || "",
-        doctor_registration_number: c.doctor_registration_number || "",
-        doctor_specialization: c.doctor_specialization || "",
-        notes: c.notes || "",
-        doctor_id: c.doctor_id || "",
-      })
-      setFindings((c.findings || []).map(apiToFinding))
-    }
-  }, [c])
-
-  async function handleSave() {
+  async function handleSave(payload: Record<string, any>) {
     if (!id) return
-    setSaving(true)
-    try {
-      const findingsSummary = computeFindingsSummary(findings)
-      const payload = { ...form }
-      payload.clinical_findings_summary = payload.clinical_findings_summary || (findings.length > 0 ? findingsSummary : null)
-      payload.treatment_plan_estimated_cost = payload.treatment_plan_estimated_cost ? Number(payload.treatment_plan_estimated_cost) : null
-      payload.treatment_plan_estimated_visits = payload.treatment_plan_estimated_visits ? Number(payload.treatment_plan_estimated_visits) : null
-      payload.findings = findings.length > 0 ? findings.map((f) => ({
-        id: (f.id && !f.id.startsWith('f-') && !f.id.startsWith('api-')) ? f.id : undefined,
-        finding_type: getFindingLabel(f),
-        tooth_number: String(f.toothNumber),
-        notes: f.description || undefined,
-        severity: f.severity || undefined,
-        dentition_type: f.dentitionType || undefined,
-        surface: f.surfaces?.map((s) => SURFACE_TO_CODE[s]).join(',') || undefined,
-      })) : undefined
-      Object.keys(payload).forEach((k) => { if (payload[k] === "" || payload[k] === undefined || payload[k] === null) delete payload[k] })
-      await casesApi.update(id, payload)
-      queryClient.invalidateQueries({ queryKey: ["case", id] })
-      queryClient.invalidateQueries({ queryKey: ["case-timeline", id] })
-      addToast({ title: "Case history updated", variant: "success" })
-      setEditing(false)
-    } catch (err: any) {
-      addToast({ title: "Error", description: err?.response?.data?.detail || "Save failed", variant: "destructive" })
-    }
-    setSaving(false)
+    await casesApi.update(id, payload)
+    queryClient.invalidateQueries({ queryKey: ["case", id] })
+    queryClient.invalidateQueries({ queryKey: ["case-timeline", id] })
+    addToast({ title: "Case report updated", variant: "success" })
+    setEditing(false)
   }
-
-  async function handleDownloadPdf() {
-    if (!id) return
-    try {
-      const blob = await casesApi.getPdfBlob(id)
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `case_history_${id.slice(0, 8)}.pdf`
-      a.click()
-      window.URL.revokeObjectURL(url)
-    } catch (err: any) {
-      addToast({ title: "Error", description: err?.response?.data?.detail || err.message || "PDF failed", variant: "destructive" })
-    }
-  }
-
-  // Auto-generate findings summary
-  function computeFindingsSummary(f: ToothFinding[]) {
-    if (f.length === 0) return ""
-    const groups: Record<string, string[]> = {}
-    for (const f2 of f) {
-      const key = `Tooth ${f2.toothNumber}`
-      if (!groups[key]) groups[key] = []
-      groups[key].push(getFindingLabel(f2) + (f2.description ? ` (${f2.description})` : ""))
-    }
-    return Object.entries(groups).map(([tooth, types]) => `${tooth} - ${types.join(", ")}`).join("\n")
-  }
-
-  const findingsSummary = useMemo(() => computeFindingsSummary(findings), [findings])
-
-  // Sync summary to form
-  useEffect(() => {
-    if (findingsSummary && !form.clinical_findings_summary) {
-      setForm((prev: any) => ({ ...prev, clinical_findings_summary: findingsSummary }))
-    }
-  }, [findingsSummary])
 
   if (isFetching) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin" /></div>
   }
   if (!c) {
-    return <div className="py-20 text-center text-muted-foreground">Case history not found</div>
+    return <div className="py-20 text-center text-muted-foreground">Case report not found</div>
   }
-
-  const r = (v: any) => v || "—"
 
   return (
     <div className="space-y-6">
@@ -235,7 +67,7 @@ export default function CaseHistoryDetail() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-xl font-bold">Case History</h1>
+            <h1 className="text-xl font-bold">Case Report</h1>
             <p className="text-sm text-muted-foreground">
               #{c.case_number || c.id.slice(0, 8)} | {c.patient_name || "—"}
               {c.patient?.op_no && <> | OP: {c.patient.op_no}</>}
@@ -247,9 +79,6 @@ export default function CaseHistoryDetail() {
           <Button variant="outline" size="sm" onClick={() => navigate(`/cases/${id}/print`)}>
             <Printer className="h-4 w-4 mr-1" /> Print Preview
           </Button>
-          <Button variant="outline" size="sm" onClick={handleDownloadPdf}>
-            <Download className="h-4 w-4 mr-1" /> Download PDF
-          </Button>
           <Button size="sm" onClick={() => setEditing(!editing)}>
             <PenLine className="h-4 w-4 mr-1" /> {editing ? "Cancel" : "Edit"}
           </Button>
@@ -259,21 +88,18 @@ export default function CaseHistoryDetail() {
       {/* Patient, Doctor & Audit Info */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         <Card className="lg:col-span-2">
-          <CardHeader className="py-3"><CardTitle className="text-sm">Patient Details</CardTitle></CardHeader>
+          <CardHeader className="py-3"><CardTitle className="text-sm">Patient Information</CardTitle></CardHeader>
           <CardContent className="py-2 text-sm">
             <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-              <p><span className="text-muted-foreground">Name:</span> {c.patient_name || "—"}</p>
-              <p><span className="text-muted-foreground">OP No:</span> {c.patient?.op_no || "—"}</p>
-              <p><span className="text-muted-foreground">Age/Gender:</span> {[c.patient?.age, c.patient?.gender].filter(Boolean).join("/") || "—"}</p>
-              <p><span className="text-muted-foreground">DOB:</span> {c.patient?.date_of_birth ? format(new Date(c.patient.date_of_birth), "dd MMM yyyy") : "—"}</p>
-              <p><span className="text-muted-foreground">Phone:</span> {c.patient?.phone || "—"}</p>
-              <p><span className="text-muted-foreground">Alt Mobile:</span> {c.patient?.emergency_contact || "—"}</p>
-              <p><span className="text-muted-foreground">Email:</span> {c.patient?.email || "—"}</p>
+              <p><span className="text-muted-foreground">Patient Name:</span> {c.patient_name || "—"}</p>
+              <p><span className="text-muted-foreground">OP Number:</span> {c.patient?.op_no || "—"}</p>
+              <p><span className="text-muted-foreground">Age / Gender:</span> {[c.patient?.age, c.patient?.gender].filter(Boolean).join(" / ") || "—"}</p>
+              <p><span className="text-muted-foreground">Mobile:</span> {c.patient?.phone || "—"}</p>
               <p><span className="text-muted-foreground">ABHA ID:</span> {c.patient?.abha_id || "—"}</p>
-              <p className="col-span-2"><span className="text-muted-foreground">Address:</span> {c.patient?.address || "—"}</p>
-              <p><span className="text-muted-foreground">Source:</span> {c.patient?.patient_source || "—"}</p>
-              <p><span className="text-muted-foreground">Status:</span> {c.patient?.status || "—"}</p>
-              <p><span className="text-muted-foreground">Reg Date:</span> {c.patient?.created_at ? format(new Date(c.patient.created_at), "dd MMM yyyy") : "—"}</p>
+              <p><span className="text-muted-foreground">Address:</span> {c.patient?.address || "—"}</p>
+              <p><span className="text-muted-foreground">Doctor:</span> Dr. {c.doctor_name || c.doctor?.full_name || "—"}</p>
+              <p><span className="text-muted-foreground">Visit Date:</span> {c.appointment_date ? format(new Date(c.appointment_date), "dd MMM yyyy") : c.created_at ? format(new Date(c.created_at), "dd MMM yyyy") : "—"}</p>
+              <p><span className="text-muted-foreground">Case Number:</span> #{c.case_number || c.id.slice(0, 8).toUpperCase()}</p>
             </div>
           </CardContent>
         </Card>
@@ -308,151 +134,46 @@ export default function CaseHistoryDetail() {
 
       {/* Clinical Sections */}
       {editing ? (
-        <div className="space-y-3">
-          <CollapsibleSection title="1. Chief Complaint" defaultOpen>
-            <div className="space-y-3">
-              <div><Label>Chief Complaint *</Label><textarea value={form.chief_complaint || ""} onChange={(e) => setForm({ ...form, chief_complaint: e.target.value })}
-                className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[60px]" /></div>
-              <div className="grid grid-cols-2 gap-3">
-                <div><Label>Duration</Label><Input value={form.chief_complaint_duration || ""} onChange={(e) => setForm({ ...form, chief_complaint_duration: e.target.value })} placeholder="e.g. 2 weeks" /></div>
-                <div><Label>Severity</Label><Input value={form.chief_complaint_severity || ""} onChange={(e) => setForm({ ...form, chief_complaint_severity: e.target.value })} placeholder="e.g. Moderate" /></div>
-              </div>
-              <div><Label>Associated Symptoms</Label><textarea value={form.chief_complaint_associated_symptoms || ""} onChange={(e) => setForm({ ...form, chief_complaint_associated_symptoms: e.target.value })}
-                className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[60px]" /></div>
-            </div>
-          </CollapsibleSection>
-
-          <CollapsibleSection title="2. History of Present Illness (HPI)">
-            <textarea value={form.hpi || ""} onChange={(e) => setForm({ ...form, hpi: e.target.value })}
-              className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[100px]"
-              placeholder="Present illness, duration, progression, previous treatment, pain history, swelling, bleeding, sensitivity..." />
-          </CollapsibleSection>
-
-          <CollapsibleSection title="3. Personal History">
-            <textarea value={form.personal_history || ""} onChange={(e) => setForm({ ...form, personal_history: e.target.value })}
-              className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[80px]"
-              placeholder="Smoking, Alcohol, Tobacco, Pan Chewing, Betel Nut, Diet, Oral Hygiene Habits, Brushing Frequency, Flossing..." />
-          </CollapsibleSection>
-
-          <CollapsibleSection title="4. Family History">
-            <textarea value={form.family_history || ""} onChange={(e) => setForm({ ...form, family_history: e.target.value })}
-              className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[80px]"
-              placeholder="Diabetes, Hypertension, Heart Disease, Cancer, Periodontal Disease, Genetic Disorders..." />
-          </CollapsibleSection>
-
-          <CollapsibleSection title="5. Medical History">
-            <textarea value={form.medical_history || ""} onChange={(e) => setForm({ ...form, medical_history: e.target.value })}
-              className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[80px]" />
-          </CollapsibleSection>
-
-          <CollapsibleSection title="6. Dental History">
-            <textarea value={form.dental_history || ""} onChange={(e) => setForm({ ...form, dental_history: e.target.value })}
-              className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[80px]" />
-          </CollapsibleSection>
-
-          <CollapsibleSection title="7. Extra Oral Examination">
-            <textarea value={form.extra_oral_examination || ""} onChange={(e) => setForm({ ...form, extra_oral_examination: e.target.value })}
-              className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[80px]"
-              placeholder="Face Symmetry, TMJ, Lymph Nodes, Swelling, Tenderness, Mouth Opening, Profile, Skin, Lips..." />
-          </CollapsibleSection>
-
-          <CollapsibleSection title="8. Intra Oral Examination">
-            <textarea value={form.intra_oral_examination || ""} onChange={(e) => setForm({ ...form, intra_oral_examination: e.target.value })}
-              className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[80px]"
-              placeholder="Soft Tissue, Tongue, Palate, Floor of Mouth, Buccal Mucosa, Gingiva, Occlusion, Saliva..." />
-          </CollapsibleSection>
-
-          <CollapsibleSection title="9. Clinical Findings — Interactive Odontogram" defaultOpen>
-            <ProfessionalOdontogram
-              findings={findings}
-              onFindingsChange={(updated) => setFindings(updated)}
-              patientName={c?.patient_name}
-              opNumber={c?.patient?.op_no ?? undefined}
-              doctorName={c?.doctor_name}
-              visitDate={c?.created_at ? format(new Date(c.created_at), "dd MMM yyyy") : undefined}
-              patientDateOfBirth={c?.patient?.date_of_birth ?? undefined}
-            />
-            <div className="mt-4">
-              <Label>Clinical Findings Summary</Label>
-              <textarea value={form.clinical_findings_summary || findingsSummary}
-                onChange={(e) => setForm({ ...form, clinical_findings_summary: e.target.value })}
-                className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[60px] font-mono text-xs mt-1"
-                placeholder="Auto-generated from findings above. Edit if needed." />
-            </div>
-          </CollapsibleSection>
-
-          <CollapsibleSection title="10. Periodontal Examination">
-            <textarea value={form.periodontal_examination || ""} onChange={(e) => setForm({ ...form, periodontal_examination: e.target.value })}
-              className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[80px]"
-              placeholder="Pocket Depth, Clinical Attachment Loss, Bleeding On Probing, Plaque Index, Calculus Index, Gingival Index, Mobility Grade, Furcation, Recession, Missing Teeth..." />
-          </CollapsibleSection>
-
-          <CollapsibleSection title="11. Investigations">
-            <textarea value={form.investigations || ""} onChange={(e) => setForm({ ...form, investigations: e.target.value })}
-              className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[80px]"
-              placeholder="IOPA, OPG, CBCT, X-Ray, Blood Tests, Photographs..." />
-          </CollapsibleSection>
-
-          <CollapsibleSection title="12. Provisional Diagnosis">
-            <textarea value={form.provisional_diagnosis || ""} onChange={(e) => setForm({ ...form, provisional_diagnosis: e.target.value })}
-              className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[60px]" />
-          </CollapsibleSection>
-
-          <CollapsibleSection title="13. Final Diagnosis">
-            <textarea value={form.final_diagnosis || ""} onChange={(e) => setForm({ ...form, final_diagnosis: e.target.value })}
-              className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[60px]" />
-          </CollapsibleSection>
-
-          <CollapsibleSection title="14. Initial Treatment Plan">
-            <div className="space-y-3">
-              <textarea value={form.initial_treatment_plan || ""} onChange={(e) => setForm({ ...form, initial_treatment_plan: e.target.value })}
-                className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[80px]"
-                placeholder="Recommended procedures..." />
-              <div className="grid grid-cols-2 gap-3">
-                <div><Label>Estimated Visits</Label><Input type="number" value={form.treatment_plan_estimated_visits || ""} onChange={(e) => setForm({ ...form, treatment_plan_estimated_visits: e.target.value })} /></div>
-                <div><Label>Estimated Cost</Label><Input type="number" value={form.treatment_plan_estimated_cost || ""} onChange={(e) => setForm({ ...form, treatment_plan_estimated_cost: e.target.value })} /></div>
-              </div>
-            </div>
-          </CollapsibleSection>
-
-          <CollapsibleSection title="15. Clinical Notes">
-            <textarea value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[80px]" />
-          </CollapsibleSection>
-
-          <CollapsibleSection title="16. Patient Instructions">
-            <textarea value={form.patient_instructions || ""} onChange={(e) => setForm({ ...form, patient_instructions: e.target.value })}
-              className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[80px]"
-              placeholder="Maintain oral hygiene. Brush twice daily. Avoid hard food. Take prescribed medicines..." />
-          </CollapsibleSection>
-
-          <CollapsibleSection title="17. Medicines Prescribed">
-            <textarea value={form.medicines_prescribed || ""} onChange={(e) => setForm({ ...form, medicines_prescribed: e.target.value })}
-              className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[80px]"
-              placeholder="Medicine, Dosage, Frequency, Duration..." />
-          </CollapsibleSection>
-
-          <CollapsibleSection title="18. Follow-Up">
-            <div className="space-y-3">
-              <textarea value={form.follow_up_instructions || ""} onChange={(e) => setForm({ ...form, follow_up_instructions: e.target.value })}
-                className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[60px]"
-                placeholder="Return for follow-up if pain or swelling develops..." />
-              <div>
-                <Label>Next Review Date</Label>
-                <Input type="date" value={form.next_review_date ? (typeof form.next_review_date === 'string' ? form.next_review_date.split('T')[0] : '') : ""} onChange={(e) => setForm({ ...form, next_review_date: e.target.value })} />
-              </div>
-            </div>
-          </CollapsibleSection>
-
-          {/* Save button */}
-          <div className="sticky bottom-4 flex gap-3 bg-background/95 backdrop-blur p-3 rounded-lg border shadow-lg">
-            <Button variant="outline" className="flex-1" onClick={() => setEditing(false)}>Cancel</Button>
-            <Button className="flex-1" onClick={handleSave} disabled={saving}>
-              {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              <Save className="h-4 w-4 mr-2" /> Save Changes
-            </Button>
-          </div>
-        </div>
+        <CaseReportForm
+          mode="edit"
+          initialData={{
+            chief_complaint: c.chief_complaint || "",
+            chief_complaint_duration: c.chief_complaint_duration || "",
+            chief_complaint_severity: c.chief_complaint_severity || "",
+            chief_complaint_associated_symptoms: c.chief_complaint_associated_symptoms || "",
+            hpi: c.hpi || "",
+            personal_history: c.personal_history || "",
+            family_history: c.family_history || "",
+            medical_history: c.medical_history || "",
+            dental_history: c.dental_history || "",
+            extra_oral_examination: c.extra_oral_examination || "",
+            intra_oral_examination: c.intra_oral_examination || "",
+            clinical_findings_summary: c.clinical_findings_summary || "",
+            periodontal_examination: c.periodontal_examination || "",
+            investigations: c.investigations || "",
+            provisional_diagnosis: c.provisional_diagnosis || "",
+            final_diagnosis: c.final_diagnosis || "",
+            diagnosis: c.diagnosis || "",
+            initial_treatment_plan: c.initial_treatment_plan || "",
+            treatment_plan_estimated_cost: c.treatment_plan_estimated_cost || "",
+            treatment_plan_estimated_visits: c.treatment_plan_estimated_visits || "",
+            patient_instructions: c.patient_instructions || "",
+            medicines_prescribed: c.medicines_prescribed || "",
+            follow_up_instructions: c.follow_up_instructions || "",
+            next_review_date: c.next_review_date || "",
+            doctor_registration_number: c.doctor_registration_number || "",
+            doctor_specialization: c.doctor_specialization || "",
+            notes: c.notes || "",
+            doctor_id: c.doctor_id || "",
+          }}
+          initialFindings={(c.findings || []).map(apiToFinding)}
+          onSubmit={handleSave}
+          onCancel={() => setEditing(false)}
+          patientName={c?.patient_name}
+          opNumber={c?.patient?.op_no ?? undefined}
+          doctorName={c?.doctor_name}
+          visitDate={c?.created_at ? format(new Date(c.created_at), "dd MMM yyyy") : undefined}
+        />
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="flex-wrap">

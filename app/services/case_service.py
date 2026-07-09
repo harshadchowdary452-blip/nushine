@@ -44,6 +44,7 @@ FIELD_ACTION_MAP = {
     "treatment_plan_estimated_cost": "Estimated Cost Updated",
     "treatment_plan_estimated_visits": "Estimated Visits Updated",
     "doctor_registration_number": "Doctor Reg Number Updated",
+    "doctor_qualification": "Doctor Qualification Updated",
     "doctor_specialization": "Doctor Specialization Updated",
     "notes": "Clinical Notes Updated",
     "patient_instructions": "Patient Instructions Updated",
@@ -90,6 +91,8 @@ class CaseService:
                     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Doctor with id {doctor_id} not found")
                 if not data.get("doctor_registration_number"):
                     data["doctor_registration_number"] = doctor.license_number
+                if not data.get("doctor_qualification"):
+                    data["doctor_qualification"] = doctor.qualification
                 if not data.get("doctor_specialization"):
                     data["doctor_specialization"] = doctor.specialization
             if not doctor_id and user_id:
@@ -157,6 +160,8 @@ class CaseService:
         if case.appointment:
             case.appointment_date = case.appointment.appointment_date
             case.appointment_time = case.appointment.appointment_time
+        if case.patient:
+            case.hospital = case.patient.hospital
         return case
 
     async def get(self, case_id: str) -> Optional[Case]:
@@ -194,6 +199,8 @@ class CaseService:
                 if new_doc:
                     if "doctor_registration_number" not in data or not data.get("doctor_registration_number"):
                         data["doctor_registration_number"] = new_doc.license_number
+                    if "doctor_qualification" not in data or not data.get("doctor_qualification"):
+                        data["doctor_qualification"] = new_doc.qualification
                     if "doctor_specialization" not in data or not data.get("doctor_specialization"):
                         data["doctor_specialization"] = new_doc.specialization
 

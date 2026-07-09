@@ -3,7 +3,8 @@ import os
 import json
 import io
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
-from fastapi.responses import FileResponse
+from fastapi.responses import StreamingResponse
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
 from sqlalchemy.orm import selectinload
@@ -16,6 +17,7 @@ from app.config import settings
 from fpdf import FPDF
 from app.services.odontogram_renderer import render_odontogram, FindingData
 
+
 logger = logging.getLogger(__name__)
 from app.services.case_service import CaseService
 from app.schemas.case import CaseCreate, CaseUpdate, CaseResponse, CaseTimelineResponse
@@ -27,18 +29,19 @@ from app.models.user import User
 from app.services.status_automation import StatusAutomationService
 from app.services.timeline_helper import record_timeline_event, build_changes
 
-router = APIRouter(prefix="/cases", tags=["Case History"])
+router = APIRouter(prefix="/cases", tags=["Case Reports"])
 
 
 async def _load_case_with_findings(db: AsyncSession, case_id: str) -> Case:
     result = await db.execute(
         select(Case).where(Case.id == case_id).options(
             selectinload(Case.findings),
-            selectinload(Case.patient),
+            selectinload(Case.patient).selectinload(Patient.hospital),
             selectinload(Case.doctor),
             selectinload(Case.created_by),
             selectinload(Case.updated_by),
             selectinload(Case.appointment),
+            selectinload(Case.treatment_plans),
         )
     )
     case = result.scalar_one_or_none()
@@ -59,9 +62,9 @@ async def create_case(data: CaseCreate, db: AsyncSession = Depends(get_db), curr
     await db.commit()
     await record_timeline_event(
         db, current_user=current_user, patient_id=case.patient_id,
-        action="Case History Created",
-        description=f"Case history created: {case.chief_complaint or 'No chief complaint'}",
-        module="Case History",
+        action="Case Report Created",
+        description=f"Case report created: {case.chief_complaint or 'No chief complaint'}",
+        module="Case Reports",
     )
     case = await _load_case_with_findings(db, case.id)
     return case
@@ -89,7 +92,7 @@ async def get_cases(
         verify_permission(current_user, Permission.MANAGE_CASES, Permission.VIEW_ALL_PATIENTS)
         service = CaseService(db)
         q = select(Case).options(
-            selectinload(Case.patient),
+            selectinload(Case.patient).selectinload(Patient.hospital),
             selectinload(Case.doctor),
             selectinload(Case.created_by),
             selectinload(Case.updated_by),
@@ -160,13 +163,47 @@ async def get_cases(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Internal Server Error: {str(e)}")
 
 
+@router.get("/{case_id}/pdf")
+async def generate_case_pdf(
+    case_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Generate a proper PDF for a case report.
+
+    The backend fetches the case data and renders HTML matching CaseReportPrint.tsx,
+    then converts to a real PDF via WeasyPrint — no screenshot, no rasterization.
+    """
+    verify_permission(current_user, Permission.MANAGE_CASES)
+    case = await _load_case_with_findings(db, case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    from app.utils.case_report_html import render_case_to_html
+    html = render_case_to_html(case)
+
+    from app.utils.case_pdf import html_to_pdf
+    pdf_bytes = await html_to_pdf(html)
+    if pdf_bytes is None:
+        raise HTTPException(status_code=500, detail="PDF generation failed")
+
+    filename = f"CaseReport_{case_id.replace('/', '_')}.pdf"
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Length": str(len(pdf_bytes)),
+        },
+    )
+
+
 @router.get("/{case_id}", response_model=CaseResponse)
 async def get_case(case_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_CASES, Permission.VIEW_ALL_PATIENTS)
-    service = CaseService(db)
-    case = await service.get(case_id)
+    case = await _load_case_with_findings(db, case_id)
     if not case:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case History not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case Report not found")
     await verify_tenant_access(current_user, case, "case", db)
     return case
 
@@ -177,7 +214,7 @@ async def update_case(case_id: str, data: CaseUpdate, db: AsyncSession = Depends
     service = CaseService(db)
     case = await service.get(case_id)
     if not case:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case History not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case Report not found")
     await verify_tenant_access(current_user, case, "case", db)
     old_data = {"chief_complaint": case.chief_complaint, "diagnosis": case.diagnosis, "status": case.status.value if hasattr(case.status, 'value') else case.status, "notes": case.notes}
     updated = await service.update(case_id, data.model_dump(exclude_none=True), user_id=current_user.get("sub"), user_role=current_user.get("role"))
@@ -185,9 +222,9 @@ async def update_case(case_id: str, data: CaseUpdate, db: AsyncSession = Depends
     changes = build_changes(old_data, new_data)
     await record_timeline_event(
         db, current_user=current_user, patient_id=updated.patient_id,
-        action="Case History Updated",
-        description="Case history updated",
-        module="Case History",
+        action="Case Report Updated",
+        description="Case report updated",
+        module="Case Reports",
         changes=changes,
     )
     return updated
@@ -199,7 +236,7 @@ async def assign_consultant(case_id: str, consultant_id: str = Query(...), db: A
     service = CaseService(db)
     case = await service.get(case_id)
     if not case:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case History not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case Report not found")
     await verify_tenant_access(current_user, case, "case", db)
     old_consultant_id = case.consultant_id
     updated = await service.assign_consultant(case_id, consultant_id, user_id=current_user.get("sub"), user_role=current_user.get("role"))
@@ -207,7 +244,7 @@ async def assign_consultant(case_id: str, consultant_id: str = Query(...), db: A
         db, current_user=current_user, patient_id=updated.patient_id,
         action="Consultant Assigned",
         description=f"Consultant changed from {old_consultant_id or 'None'} to {consultant_id}",
-        module="Case History",
+        module="Case Reports",
         changes=[{"field": "consultant_id", "old_value": old_consultant_id, "new_value": consultant_id}],
     )
     return updated
@@ -219,7 +256,7 @@ async def complete_case(case_id: str, db: AsyncSession = Depends(get_db), curren
     service = CaseService(db)
     case = await service.get(case_id)
     if not case:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case History not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case Report not found")
     await verify_tenant_access(current_user, case, "case", db)
     patient_id = case.patient_id
     updated = await service.complete(case_id, user_id=current_user.get("sub"), user_role=current_user.get("role"))
@@ -228,9 +265,9 @@ async def complete_case(case_id: str, db: AsyncSession = Depends(get_db), curren
     await db.commit()
     await record_timeline_event(
         db, current_user=current_user, patient_id=patient_id,
-        action="Case History Completed",
-        description="Case history completed",
-        module="Case History",
+        action="Case Report Completed",
+        description="Case report completed",
+        module="Case Reports",
     )
     updated = await _load_case_with_findings(db, case.id)
     return updated
@@ -242,17 +279,17 @@ async def delete_case(case_id: str, db: AsyncSession = Depends(get_db), current_
     service = CaseService(db)
     case = await service.get(case_id)
     if not case:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case History not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case Report not found")
     await verify_tenant_access(current_user, case, "case", db)
     patient_id = case.patient_id
     await service.delete(case_id, user_id=current_user.get("sub"))
     await record_timeline_event(
         db, current_user=current_user, patient_id=patient_id,
-        action="Case History Deleted",
-        description="Case history deleted",
-        module="Case History",
+        action="Case Report Deleted",
+        description="Case report deleted",
+        module="Case Reports",
     )
-    return MessageResponse(message="Case History deleted successfully")
+    return MessageResponse(message="Case Report deleted successfully")
 
 
 @router.post("/{case_id}/status", response_model=CaseResponse)
@@ -261,7 +298,7 @@ async def update_case_status(case_id: str, status: str = Query(...), db: AsyncSe
     service = CaseService(db)
     case = await service.get(case_id)
     if not case:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case History not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case Report not found")
     await verify_tenant_access(current_user, case, "case", db)
     old_status = case.status.value if hasattr(case.status, 'value') else case.status
     updated = await service.update(case_id, {"status": status}, user_id=current_user.get("sub"), user_role=current_user.get("role"))
@@ -270,9 +307,9 @@ async def update_case_status(case_id: str, status: str = Query(...), db: AsyncSe
     await db.commit()
     await record_timeline_event(
         db, current_user=current_user, patient_id=updated.patient_id,
-        action="Case History Status Changed",
+        action="Case Report Status Changed",
         description=f"Status changed from {old_status} to {status}",
-        module="Case History",
+        module="Case Reports",
         changes=[{"field": "status", "old_value": old_status, "new_value": status}],
     )
     updated = await _load_case_with_findings(db, case.id)
@@ -285,7 +322,7 @@ async def get_case_timeline(case_id: str, skip: int = Query(0, ge=0), limit: int
     service = CaseService(db)
     case = await service.get(case_id)
     if not case:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case History not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case Report not found")
     await verify_tenant_access(current_user, case, "case", db)
     entries = await service.get_timeline(case_id, skip=skip, limit=limit)
     return entries
@@ -297,7 +334,7 @@ async def get_case_odontogram(case_id: str, db: AsyncSession = Depends(get_db), 
     from app.services.odontogram_renderer import render_odontogram, FindingData
     case = await _load_case_with_findings(db, case_id)
     if not case:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case History not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case Report not found")
     findings = case.findings or []
     fd_list = [
         FindingData(finding_type=f.finding_type, tooth_number=f.tooth_number, notes=f.notes)
@@ -308,13 +345,3 @@ async def get_case_odontogram(case_id: str, db: AsyncSession = Depends(get_db), 
         return Response(content=img_bytes, media_type="image/png")
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Odontogram render failed: {str(e)}")
-
-
-@router.get("/{case_id}/pdf")
-async def export_case_pdf(case_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    verify_permission(current_user, Permission.MANAGE_CASES)
-    from app.services.case_pdf_service import generate_case_pdf
-    pdf_path = await generate_case_pdf(case_id, db)
-    if not pdf_path:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case History not found")
-    return FileResponse(pdf_path, media_type="application/pdf", filename=f"case_history_{case_id}.pdf")

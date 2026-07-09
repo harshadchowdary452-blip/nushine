@@ -196,11 +196,12 @@ export default function PatientDetail() {
     enabled: !!id,
   });
 
-  const { data: followUpHistory } = useQuery({
-    queryKey: ["patient-follow-up-history", id],
-    queryFn: () => crmApi.patientFollowUpHistory(id!),
+  const { data: consentFormsData } = useQuery({
+    queryKey: ["patient-consent-forms-count", id],
+    queryFn: () => consentFormsApi.getByPatient(id!),
     enabled: !!id,
   });
+  const consentFormsList: any[] = Array.isArray(consentFormsData) ? consentFormsData : [];
 
   const [timelineModule, setTimelineModule] = useState<string>("all");
   const [timelineSearch, setTimelineSearch] = useState("");
@@ -354,15 +355,14 @@ export default function PatientDetail() {
 
   const tabs: { value: string; label: string; icon: any; getCount?: () => number | null }[] = [
     { value: "overview", label: "Overview", icon: User },
-    { value: "cases", label: "Cases", icon: FileText, getCount: () => casesList.length },
+    { value: "cases", label: "Case Reports", icon: FileText, getCount: () => casesList.length },
     { value: "appointments", label: "Appointments", icon: Calendar, getCount: () => appointmentsList.length },
     { value: "treatments", label: "Treatments", icon: Activity, getCount: () => treatmentPlansList.length },
     { value: "billing", label: "Billing", icon: CreditCard, getCount: () => billingsList.length },
-    { value: "responses", label: "Responses", icon: MessageSquare, getCount: () => followUpResponsesList.length },
-    { value: "follow-ups", label: "Follow-Ups", icon: CalendarDays, getCount: () => followUpHistory?.length || 0 },
-    { value: "timeline", label: "Timeline", icon: Clock },
     { value: "images", label: "Images", icon: Camera },
-    { value: "consent-forms", label: "Consent Forms", icon: ScrollText },
+    { value: "responses", label: "Responses", icon: MessageSquare, getCount: () => followUpResponsesList.length },
+    { value: "consent-forms", label: "Consent Forms", icon: ScrollText, getCount: () => consentFormsList.length },
+    { value: "timeline", label: "Timeline", icon: Clock },
   ];
 
   return (
@@ -830,10 +830,10 @@ export default function PatientDetail() {
       </Card>
 
       {/* Sticky Responsive Tab Navigation */}
-      <div className="sticky top-[57px] z-20 bg-background border-b border-border -mx-6 px-6 mb-6 shadow-sm">
+      <div className="sticky top-[57px] z-20 bg-white border-b border-gray-200 -mx-6 px-6 mb-6 shadow-sm">
         <div
           ref={tabBarRef}
-          className="flex items-center gap-1 overflow-x-auto scrollbar-hide scroll-smooth py-2.5"
+          className="flex items-center gap-1 overflow-x-auto scrollbar-hide scroll-smooth py-2"
           onWheel={(e) => {
             const el = e.currentTarget;
             if (el.scrollWidth > el.clientWidth) {
@@ -856,23 +856,23 @@ export default function PatientDetail() {
                 data-active={isActive ? "true" : undefined}
                 onClick={() => setActiveTab(tab.value)}
                 className={`
-                  relative flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium
-                  whitespace-nowrap transition-all duration-200 min-h-[44px] flex-shrink-0
-                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2
+                  flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium
+                  whitespace-nowrap shrink-0 transition-all duration-200
+                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2
                   ${isActive
-                    ? "bg-primary text-white shadow-md shadow-primary/20"
-                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
                   }
                 `}
               >
                 <Icon className="h-4 w-4 shrink-0" />
-                <span className="truncate max-w-[90px] sm:max-w-none">{tab.label}</span>
+                <span className="truncate max-w-[100px] sm:max-w-none">{tab.label}</span>
                 {count != null && count > 0 && (
                   <span
                     className={`
                       inline-flex items-center justify-center rounded-full text-xs font-semibold
                       px-1.5 py-0.5 min-w-[20px] h-5 leading-none
-                      ${isActive ? "bg-white/20 text-white" : "bg-muted/50 text-muted-foreground"}
+                      ${isActive ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"}
                     `}
                   >
                     {count}
@@ -1220,19 +1220,6 @@ export default function PatientDetail() {
               </div>
             )}
           </Card>
-        </div>
-      )}
-
-      {activeTab === "follow-ups" && (
-        <div className="overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 320px)" }}>
-          {followUpHistory && followUpHistory.length > 0 ? (
-            <FollowUpHistory patientId={id!} />
-          ) : (
-            <Card className="p-12 text-center border-border shadow-card">
-              <CalendarDays className="h-12 w-12 text-text-muted mx-auto mb-3" />
-              <p className="text-text-secondary">No follow-ups found</p>
-            </Card>
-          )}
         </div>
       )}
 

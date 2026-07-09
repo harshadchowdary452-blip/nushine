@@ -2,12 +2,13 @@ from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime, date, time
 from app.schemas.patient import PatientResponse
+from app.schemas.hospital import HospitalBrief
+from app.schemas.treatment_plan import TreatmentPlanResponse
 
 
 class ClinicalFindingCreate(BaseModel):
     finding_type: str
     tooth_number: Optional[str] = None
-    severity: Optional[str] = None
     dentition_type: Optional[str] = None
     surface: Optional[str] = None
     notes: Optional[str] = None
@@ -18,7 +19,6 @@ class ClinicalFindingResponse(BaseModel):
     case_id: str
     finding_type: str
     tooth_number: Optional[str] = None
-    severity: Optional[str] = None
     dentition_type: Optional[str] = None
     surface: Optional[str] = None
     notes: Optional[str] = None
@@ -58,6 +58,7 @@ class CaseCreate(BaseModel):
     follow_up_instructions: Optional[str] = None
     next_review_date: Optional[datetime] = None
     doctor_registration_number: Optional[str] = None
+    doctor_qualification: Optional[str] = None
     doctor_specialization: Optional[str] = None
     notes: Optional[str] = None
     findings: Optional[List[ClinicalFindingCreate]] = None
@@ -89,6 +90,7 @@ class CaseUpdate(BaseModel):
     follow_up_instructions: Optional[str] = None
     next_review_date: Optional[datetime] = None
     doctor_registration_number: Optional[str] = None
+    doctor_qualification: Optional[str] = None
     doctor_specialization: Optional[str] = None
     status: Optional[str] = None
     consultant_id: Optional[str] = None
@@ -103,6 +105,7 @@ class UserBrief(BaseModel):
     role: Optional[str] = None
     phone: Optional[str] = None
     specialization: Optional[str] = None
+    qualification: Optional[str] = None
     license_number: Optional[str] = None
 
     model_config = {"from_attributes": True}
@@ -118,6 +121,7 @@ class CaseResponse(BaseModel):
     patient: Optional[PatientResponse] = None
     patient_name: Optional[str] = None
     doctor: Optional[UserBrief] = None
+    hospital: Optional[HospitalBrief] = None
     doctor_name: Optional[str] = None
     created_by: Optional[UserBrief] = None
     updated_by: Optional[UserBrief] = None
@@ -148,11 +152,13 @@ class CaseResponse(BaseModel):
     follow_up_instructions: Optional[str] = None
     next_review_date: Optional[datetime] = None
     doctor_registration_number: Optional[str] = None
+    doctor_qualification: Optional[str] = None
     doctor_specialization: Optional[str] = None
     status: str
     notes: Optional[str]
     is_active: bool
     findings: Optional[List[ClinicalFindingResponse]] = None
+    treatment_plans: Optional[List[TreatmentPlanResponse]] = None
     created_at: datetime
     updated_at: datetime
 

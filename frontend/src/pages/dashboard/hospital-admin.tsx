@@ -3,7 +3,7 @@ import { motion } from "framer-motion"
 import { useQuery } from "@tanstack/react-query"
 import { Calendar, Users, FolderOpen, Award, Activity, Sparkles, FileText, DollarSign, TrendingUp, IndianRupee, PieChart } from "lucide-react"
 import { useAuthStore } from "@/store/authStore"
-import { dashboardApi, consentFormsApi } from "@/services/endpoints"
+import { dashboardApi, consentFormsApi, doctorsApi } from "@/services/endpoints"
 import { Skeleton } from "@/components/ui/skeleton"
 import KpiCard from "@/components/layout/kpi-card"
 import { Button } from "@/components/ui/button"
@@ -11,7 +11,7 @@ import { useToast } from "@/components/ui/toast"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import Leaderboard from "@/components/ui/leaderboard"
 import QuickViewDrawer from "@/components/ui/quick-view-drawer"
-import DateFilterBar from "@/components/ui/date-filter-bar"
+import DashboardFilterBar, { defaultFilters, type DashboardFilters } from "@/components/ui/dashboard-filter-bar"
 import AnalyticsDrawer from "@/components/analytics-drawer"
 const FinancialDashboard = lazy(() => import("@/components/dashboard/financial-dashboard"))
 import { formatIndianRupees, formatIndianNumber } from "@/lib/currency"
@@ -30,10 +30,17 @@ export default function HospitalAdminDashboard() {
   const { user } = useAuthStore()
   const [quickView, setQuickView] = useState<{ type: "admin-group" | "hospital" | "doctor" | "patient"; id: string; name: string } | null>(null)
   const [drawerMetric, setDrawerMetric] = useState<string | null>(null)
-  const [period, setPeriod] = useState("this_month")
-  const [startDate, setStartDate] = useState("")
-  const [endDate, setEndDate] = useState("")
+  const [filters, setFilters] = useState<DashboardFilters>(defaultFilters)
   const { addToast } = useToast()
+
+  const { data: doctorsList } = useQuery({
+    queryKey: ["doctors", "dashboard-filter"],
+    queryFn: async () => {
+      const res = await doctorsApi.list({ page_size: 500 })
+      const items = Array.isArray(res) ? res : res?.items || []
+      return items.map((d: any) => ({ id: d.id, name: d.full_name }))
+    },
+  })
 
   const onApptClick = useCallback(() => setDrawerMetric("appointments"), [])
   const onPatientClick = useCallback(() => setDrawerMetric("patients"), [])
@@ -42,11 +49,17 @@ export default function HospitalAdminDashboard() {
   const onQuickViewClose = useCallback(() => setQuickView(null), [])
 
   const dashParams = useMemo(() => {
-    const p: Record<string, string> = { period }
-    if (period === "custom" && startDate) p.start_date = startDate
-    if (period === "custom" && endDate) p.end_date = endDate
+    const p: Record<string, string> = { period: filters.period }
+    if (filters.period === "custom" && filters.startDate) p.start_date = filters.startDate
+    if (filters.period === "custom" && filters.endDate) p.end_date = filters.endDate
+    if (filters.doctorId && filters.doctorId !== "all") p.doctor_id = filters.doctorId
+    if (filters.patientStatus && filters.patientStatus !== "all") p.patient_status = filters.patientStatus
+    if (filters.caseStatus && filters.caseStatus !== "all") p.case_status = filters.caseStatus
+    if (filters.paymentStatus && filters.paymentStatus !== "all") p.payment_status = filters.paymentStatus
+    if (filters.treatmentStatus && filters.treatmentStatus !== "all") p.treatment_status = filters.treatmentStatus
+    if (filters.appointmentStatus && filters.appointmentStatus !== "all") p.appointment_status = filters.appointmentStatus
     return p
-  }, [period, startDate, endDate])
+  }, [filters])
 
   const { data: stats, isLoading } = useQuery({
     queryKey: ["dash", "hospital", user?.id, dashParams],
@@ -113,10 +126,12 @@ export default function HospitalAdminDashboard() {
                 <p className="text-sm font-bold text-white">{stats?.total_patients || 0}</p>
               </div>
             </div>
-            <DateFilterBar period={period} onPeriodChange={setPeriod} startDate={startDate} endDate={endDate} onStartDateChange={setStartDate} onEndDateChange={setEndDate} />
           </div>
         </div>
       </div>
+
+      {/* Common Dashboard Filter */}
+      <DashboardFilterBar filters={filters} onChange={setFilters} doctors={doctorsList} />
 
       {/* Operational KPI cards */}
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
@@ -238,8 +253,6 @@ export default function HospitalAdminDashboard() {
       <AnalyticsDrawer
         open={!!drawerMetric}
         onClose={onDrawerClose}
-        period={period}
-        onPeriodChange={setPeriod}
         title={
           drawerMetric === "revenue" ? "Total Revenue" :
           drawerMetric === "monthly-revenue" ? "Monthly Revenue" :

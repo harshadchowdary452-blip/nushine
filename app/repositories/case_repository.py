@@ -14,13 +14,14 @@ class CaseRepository(BaseRepository[Case]):
 
     async def get(self, id: Any) -> Optional[Case]:
         query = select(self.model).where(self.model.id == id).options(
-            selectinload(self.model.patient),
+            selectinload(self.model.patient).selectinload(Patient.hospital),
             selectinload(self.model.doctor),
             selectinload(self.model.created_by),
             selectinload(self.model.updated_by),
             selectinload(self.model.consultant),
             selectinload(self.model.appointment),
             selectinload(self.model.findings),
+            selectinload(self.model.treatment_plans),
         )
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
