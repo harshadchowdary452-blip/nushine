@@ -123,7 +123,7 @@ def verify_permission(current_user: dict, *permissions: Permission):
     logger = logging.getLogger(__name__)
     user_role = current_user.get("role")
     user_sub = current_user.get("sub", "unknown")
-    logger.warning("VERIFY_PERMISSION sub=%s role=%s checking=%s", user_sub, user_role, [p.value for p in permissions])
+    logger.debug("VERIFY_PERMISSION sub=%s role=%s checking=%s", user_sub, user_role, [p.value for p in permissions])
     if user_role not in [r.value for r in Role]:
         logger.error("VERIFY_PERMISSION FAIL: role '%s' not in %s", user_role, [r.value for r in Role])
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Invalid role: '{user_role}'")
@@ -132,7 +132,7 @@ def verify_permission(current_user: dict, *permissions: Permission):
     if not has_any:
         logger.error("VERIFY_PERMISSION FAIL: role=%s missing %s, user_permissions=%s", user_role, [p.value for p in permissions], [p.value for p in user_permissions])
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Missing required permission: {', '.join(p.value for p in permissions)}")
-    logger.warning("VERIFY_PERMISSION OK: sub=%s role=%s", user_sub, user_role)
+    logger.debug("VERIFY_PERMISSION OK: sub=%s role=%s", user_sub, user_role)
 
 
 async def verify_tenant_access(current_user: dict, entity: object, entity_type: str, db=None):

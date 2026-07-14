@@ -11,6 +11,7 @@ const PERIODS = [
   { value: "this_month", label: "This Month" },
   { value: "last_month", label: "Last Month" },
   { value: "this_quarter", label: "This Quarter" },
+  { value: "last_quarter", label: "Last Quarter" },
   { value: "this_year", label: "This Year" },
   { value: "custom", label: "Custom Range" },
 ]
@@ -22,11 +23,15 @@ interface DateFilterBarProps {
   endDate?: string
   onStartDateChange?: (date: string) => void
   onEndDateChange?: (date: string) => void
+  doctorId?: string
+  onDoctorIdChange?: (id: string) => void
+  doctors?: { id: string; full_name: string }[]
   compact?: boolean
 }
 
 function DateFilterBar({
   period, onPeriodChange, startDate, endDate, onStartDateChange, onEndDateChange,
+  doctorId, onDoctorIdChange, doctors,
 }: DateFilterBarProps) {
   return (
     <div className="flex flex-wrap items-end gap-3">
@@ -68,6 +73,22 @@ function DateFilterBar({
             />
           </div>
         </>
+      )}
+      {doctors && doctors.length > 0 && (
+        <div className="space-y-1">
+          <Label htmlFor="doctor-filter" className="text-xs text-muted-foreground">Doctor</Label>
+          <Select value={doctorId || "__all__"} onValueChange={(v) => onDoctorIdChange?.(v === "__all__" ? "" : v)}>
+            <SelectTrigger id="doctor-filter" aria-label="Filter by doctor" className="w-[170px] h-9 text-sm">
+              <SelectValue placeholder="All Doctors" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All Doctors</SelectItem>
+              {doctors.map((d) => (
+                <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       )}
     </div>
   )

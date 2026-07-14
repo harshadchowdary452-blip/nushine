@@ -1,0 +1,46 @@
+import { describe, it, expect, vi } from "vitest"
+import { render, screen } from "@testing-library/react"
+import { ErrorBoundary } from "@/components/error-boundary"
+
+function ThrowingComponent() {
+  throw new Error("Test error")
+  return null
+}
+
+function GoodComponent() {
+  return <div>Works</div>
+}
+
+describe("ErrorBoundary", () => {
+  it("renders children when no error", () => {
+    render(
+      <ErrorBoundary>
+        <GoodComponent />
+      </ErrorBoundary>
+    )
+    expect(screen.getByText("Works")).toBeInTheDocument()
+  })
+
+  it("renders fallback UI when child throws", () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+    render(
+      <ErrorBoundary>
+        <ThrowingComponent />
+      </ErrorBoundary>
+    )
+    expect(screen.getByText("Something went wrong")).toBeInTheDocument()
+    expect(screen.getByText("Test error")).toBeInTheDocument()
+    consoleSpy.mockRestore()
+  })
+
+  it("renders custom fallback when provided", () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+    render(
+      <ErrorBoundary fallback={<div>Custom error</div>}>
+        <ThrowingComponent />
+      </ErrorBoundary>
+    )
+    expect(screen.getByText("Custom error")).toBeInTheDocument()
+    consoleSpy.mockRestore()
+  })
+})

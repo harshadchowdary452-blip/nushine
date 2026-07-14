@@ -60,6 +60,15 @@ def get_date_range(period: str = "this_month", start_date: Optional[str] = None,
         else:
             quarter_end = quarter_start.replace(month=quarter_end_month, day=1)
         return quarter_start, quarter_end
+    elif period == "last_quarter":
+        current_quarter_month = ((now.month - 1) // 3) * 3 + 1
+        last_quarter_end = today.replace(month=current_quarter_month, day=1)
+        last_quarter_start_month = current_quarter_month - 3
+        if last_quarter_start_month < 1:
+            last_quarter_start = last_quarter_end.replace(year=last_quarter_end.year - 1, month=last_quarter_start_month + 12, day=1)
+        else:
+            last_quarter_start = last_quarter_end.replace(month=last_quarter_start_month, day=1)
+        return last_quarter_start, last_quarter_end
     elif period == "this_year":
         year_start = today.replace(month=1, day=1)
         return year_start, year_start.replace(year=year_start.year + 1, month=1, day=1)

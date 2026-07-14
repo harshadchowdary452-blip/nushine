@@ -172,7 +172,7 @@ export const dashboardApi = {
     api.get("/dashboards/super-admin", { params }).then((r) => r.data),
   groupAdmin: (params?: { period?: string; start_date?: string; end_date?: string; hospital_id?: string }) =>
     api.get("/dashboards/group-admin", { params }).then((r) => r.data),
-  hospitalAdmin: (params?: { period?: string; start_date?: string; end_date?: string }) =>
+  hospitalAdmin: (params?: { period?: string; start_date?: string; end_date?: string; doctor_id?: string }) =>
     api.get("/dashboards/hospital-admin", { params }).then((r) => r.data),
   doctor: (params?: { period?: string; start_date?: string; end_date?: string }) =>
     api.get("/dashboards/doctor", { params }).then((r) => r.data),
@@ -361,7 +361,8 @@ export const crmApi = {
       staff_notes?: string; response_summary?: string; response_status?: string;
       next_action?: string; contact_channel?: string;
       follow_up_date?: string; follow_up_time?: string;
-      appointment_id?: string;
+      appointment_id?: string; interested_to_visit_again?: boolean | string;
+      whatsapp_message?: string;
     }) => api.put(`/crm/follow-ups/${id}`, data).then((r) => r.data),
     delete: (id: string) => api.delete(`/crm/follow-ups/${id}`).then((r) => r.data),
     feedback: (id: string, data: {

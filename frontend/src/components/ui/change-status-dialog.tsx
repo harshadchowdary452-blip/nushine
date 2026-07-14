@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { api } from "@/lib/api"
+import api from "@/services/api"
 
 interface ChangeStatusDialogProps {
   entityType: "patient" | "case" | "appointment" | "treatment" | "follow_up" | "billing"
@@ -42,7 +42,7 @@ export function ChangeStatusDialog({
         new_status: newStatus,
         reason: reason.trim(),
       })
-      if (response.success) {
+      if (response.status === 200 || response.status === 201) {
         setOpen(false)
         onStatusChanged?.()
       }

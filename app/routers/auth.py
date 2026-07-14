@@ -1,5 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.services.auth_service import AuthService
@@ -8,18 +10,21 @@ from app.schemas.common import MessageResponse
 from app.repositories.user_repository import UserRepository
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post("/login", response_model=LoginResponse)
-async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/minute")
+async def login(request: Request, login_request: LoginRequest, db: AsyncSession = Depends(get_db)):
     service = AuthService(db)
-    return await service.login(request.email, request.password)
+    return await service.login(login_request.email, login_request.password)
 
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh_token(request: RefreshTokenRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("10/minute")
+async def refresh_token(request: Request, refresh_request: RefreshTokenRequest, db: AsyncSession = Depends(get_db)):
     service = AuthService(db)
-    return await service.refresh_access_token(request.refresh_token)
+    return await service.refresh_access_token(refresh_request.refresh_token)
 
 
 @router.post("/logout", response_model=MessageResponse)
@@ -65,6 +70,7 @@ async def update_profile(request: UpdateProfileRequest, current_user: dict = Dep
 
 
 @router.post("/change-password", response_model=MessageResponse)
-async def change_password(request: ChangePasswordRequest, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+@limiter.limit("3/minute")
+async def change_password(request: Request, change_request: ChangePasswordRequest, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     service = AuthService(db)
-    return await service.change_password(current_user.get("sub"), request.current_password, request.new_password)
+    return await service.change_password(current_user.get("sub"), change_request.current_password, change_request.new_password)

@@ -165,6 +165,8 @@ export const TOOTH_NAMES: Record<number, string> = {
   32: 'Lower Right 3rd Molar',
 }
 
+export const MOCK_FINDINGS: ToothFinding[] = []
+
 export function getToothType(toothNumber: number): string {
   const map: Record<number, string> = {
     1: 'wisdom', 16: 'wisdom', 17: 'wisdom', 32: 'wisdom',

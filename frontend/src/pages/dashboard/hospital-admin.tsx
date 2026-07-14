@@ -11,7 +11,7 @@ import {
   PieChart as RePieChart, Pie, Cell,
 } from "recharts"
 import { useAuthStore } from "@/store/authStore"
-import { dashboardApi, consentFormsApi } from "@/services/endpoints"
+import { dashboardApi, consentFormsApi, doctorsApi } from "@/services/endpoints"
 import { Skeleton } from "@/components/ui/skeleton"
 import KpiCard from "@/components/layout/kpi-card"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -67,13 +67,15 @@ export default function HospitalAdminDashboard() {
   const [period, setPeriod] = useState("this_month")
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
+  const [doctorId, setDoctorId] = useState("")
 
   const dashParams = useMemo(() => {
     const p: Record<string, string> = { period }
     if (period === "custom" && startDate) p.start_date = startDate
     if (period === "custom" && endDate) p.end_date = endDate
+    if (doctorId) p.doctor_id = doctorId
     return p
-  }, [period, startDate, endDate])
+  }, [period, startDate, endDate, doctorId])
 
   const { data: stats, isLoading } = useQuery({
     queryKey: ["dash", "hospital", user?.id, dashParams],
@@ -84,8 +86,14 @@ export default function HospitalAdminDashboard() {
   })
 
   const { data: consentStats } = useQuery({
-    queryKey: ["consent-form-stats", user?.hospital_id],
+    queryKey: ["consent-form-stats", user?.hospital_id, period, doctorId],
     queryFn: () => consentFormsApi.getStats(user?.hospital_id || ""),
+    enabled: !!user?.hospital_id,
+  })
+
+  const { data: doctorsList } = useQuery({
+    queryKey: ["doctors-list", user?.hospital_id],
+    queryFn: () => doctorsApi.list({ page: 1, page_size: 100 }),
     enabled: !!user?.hospital_id,
   })
 
@@ -163,6 +171,8 @@ export default function HospitalAdminDashboard() {
           period={period} onPeriodChange={setPeriod}
           startDate={startDate} endDate={endDate}
           onStartDateChange={setStartDate} onEndDateChange={setEndDate}
+          doctorId={doctorId} onDoctorIdChange={setDoctorId}
+          doctors={doctorsList?.items || doctorsList || []}
         />
       </motion.div>
 

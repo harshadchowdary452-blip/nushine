@@ -3,7 +3,9 @@ export type Role = "SUPER_ADMIN" | "GROUP_ADMIN" | "HOSPITAL_ADMIN" | "DOCTOR";
 export interface User {
   id: string;
   hospital_id: string | null;
+  hospital_name?: string | null;
   admin_group_id: string | null;
+  admin_group_name?: string | null;
   email: string;
   full_name: string;
   phone: string | null;

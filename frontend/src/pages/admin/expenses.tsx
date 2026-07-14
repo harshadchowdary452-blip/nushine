@@ -358,7 +358,7 @@ export default function AdminExpenses() {
           <CardHeader><CardTitle className="text-sm">Expense by Category</CardTitle></CardHeader>
           <CardContent className="p-4 pt-0">
             <div className="space-y-2">
-              {analytics.category_breakdown.slice(0, 5).map((cat) => {
+              {analytics.category_breakdown.slice(0, 5).map((cat: { category: string; amount: number }) => {
                 const pct = analytics.total_expenses > 0 ? (cat.amount / analytics.total_expenses * 100) : 0
                 const Icon = CATEGORY_ICONS[cat.category] || MoreHorizontal
                 return (

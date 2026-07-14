@@ -8,12 +8,28 @@ const api = axios.create({
   timeout: 30000,
 });
 
+// Request ID correlation
+let requestCounter = 0;
 api.interceptors.request.use((config) => {
   const state = useAuthStore.getState();
   if (state._hasHydrated && state.accessToken) {
     config.headers.Authorization = "Bearer " + state.accessToken;
   }
+  // Attach request ID for server-side correlation
+  config.headers["X-Request-ID"] = `req-${++requestCounter}-${Date.now().toString(36)}`;
   return config;
+});
+
+// Expose request ID from response for debugging
+api.interceptors.response.use((response) => {
+  const requestId = response.headers["x-request-id"];
+  const responseTime = response.headers["x-response-time"];
+  if (requestId && responseTime) {
+    // Attach for dev tools visibility
+    (response as any).requestId = requestId;
+    (response as any).responseTime = responseTime;
+  }
+  return response;
 });
 
 let refreshPromise: Promise<string> | null = null;

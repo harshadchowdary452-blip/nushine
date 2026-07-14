@@ -1,28 +1,32 @@
 import asyncio
-import traceback
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import text
 from alembic import command
 from alembic.config import Config
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from starlette.exceptions import HTTPException as StarletteHTTPException
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from app.config import settings
-from app.database import engine
+from app.database import engine, async_session_factory
 from app.core.security import hash_password
 from app.core.permissions import Role
+from app.core.logging import setup_logging, correlation_id, generate_correlation_id
+from app.core.middleware import RequestIDMiddleware
 from app.utils.scheduler import check_appointment_reminders, check_same_day_appointments, check_missed_appointments
 from app.routers import auth, admin_groups, hospitals, doctors, consultants, patients, cases, consultant_notes, treatment_plans, treatment_sittings, appointments, billings, pre_ops, post_ops, dashboards, whatsapp_messaging, whatsapp_config, notifications, hospital_monthly_expenses, reports, crm, calendar, status_audit, campaigns, campaign_templates, leads, doctor_working_hours, doctor_availability, doctor_leaves, doctor_blocked_slots, consent_forms, enquiries, treatment_follow_ups, recalls, crm_settings, exports, treatment_types, crm_opd_settings
 
+setup_logging(settings.ENVIRONMENT)
 logger = logging.getLogger("app")
-fh = logging.FileHandler("server_errors.log", mode="a")
-fh.setLevel(logging.DEBUG)
-fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
-logger.addHandler(fh)
+
+# Rate limiter
+limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"], storage_uri=settings.REDIS_URL if settings.REDIS_URL else "memory://")
 
 
 def run_migrations():
@@ -34,57 +38,43 @@ def run_migrations():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("[STARTUP] Running Alembic migrations...")
+    logger.info("Running Alembic migrations...")
     try:
         await asyncio.to_thread(run_migrations)
-        print("[STARTUP] Migrations completed")
+        logger.info("Migrations completed")
     except Exception as e:
-        print(f"[STARTUP] Migration warning (non-fatal): {e}")
+        logger.warning(f"Migration warning (non-fatal): {e}")
 
-    print("[STARTUP] Seeding super admin...")
+    logger.info("Seeding super admin...")
     await seed_super_admin()
 
-    print("[STARTUP] Pre-launching Playwright browser for PDF generation...")
     try:
         from app.utils.case_pdf import _ensure_browser
         await _ensure_browser()
-        print("[STARTUP] Playwright browser ready")
+        logger.info("Playwright browser ready")
     except Exception as e:
-        print(f"[STARTUP] Playwright pre-launch skipped: {e}")
+        logger.warning(f"Playwright pre-launch skipped: {e}")
 
-    print("[STARTUP] Starting appointment reminder scheduler...")
     reminder_task = asyncio.create_task(check_appointment_reminders())
-
-    print("[STARTUP] Starting same-day appointment reminder scheduler...")
     same_day_task = asyncio.create_task(check_same_day_appointments())
-
-    print("[STARTUP] Starting missed appointment scheduler...")
     missed_task = asyncio.create_task(check_missed_appointments())
 
-    print("[STARTUP] Application startup complete!")
+    logger.info("Application startup complete!")
     yield
 
-    print("[SHUTDOWN] Shutting down...")
+    logger.info("Shutting down...")
     from app.utils.case_pdf import _cleanup
     await _cleanup()
 
-    reminder_task.cancel()
-    same_day_task.cancel()
-    missed_task.cancel()
-    try:
-        await reminder_task
-    except Exception:
-        pass
-    try:
-        await same_day_task
-    except Exception:
-        pass
-    try:
-        await missed_task
-    except Exception:
-        pass
+    for task in [reminder_task, same_day_task, missed_task]:
+        task.cancel()
+        try:
+            await task
+        except (asyncio.CancelledError, Exception):
+            pass
+
     await engine.dispose()
-    print("[SHUTDOWN] Shutdown complete")
+    logger.info("Shutdown complete")
 
 
 app = FastAPI(
@@ -92,27 +82,35 @@ app = FastAPI(
     description="Modern Dental Practice Management Platform",
     version="1.0.0",
     lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url="/docs" if settings.DEBUG else None,
+    redoc_url="/redoc" if settings.DEBUG else None,
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 @app.exception_handler(IntegrityError)
 async def integrity_error_handler(request: Request, exc: IntegrityError):
-    tb = traceback.format_exc()
-    with open("server_errors.log", "a") as f:
-        f.write(f"\n===== 409 on {request.method} {request.url.path} =====\n")
-        f.write(f"{tb}\n")
-    return JSONResponse(status_code=409, content={"detail": "Operation failed: this record has related data and cannot be deleted. Try deactivating it instead."})
+    cid = correlation_id.get("")
+    logger.error(f"IntegrityError on {request.method} {request.url.path}", exc_info=True, extra={"correlation_id": cid})
+    return JSONResponse(
+        status_code=409,
+        content={"detail": "Operation failed: this record has related data and cannot be deleted. Try deactivating it instead.", "correlation_id": cid},
+    )
+
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    tb = traceback.format_exc()
-    with open("server_errors.log", "a") as f:
-        f.write(f"\n===== 500 on {request.method} {request.url.path} =====\n")
-        f.write(f"{tb}\n")
-    return JSONResponse(status_code=500, content={"detail": f"Internal Server Error: {repr(exc)}", "path": request.url.path})
+    cid = correlation_id.get("")
+    logger.error(f"Unhandled exception on {request.method} {request.url.path}", exc_info=True, extra={"correlation_id": cid})
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error", "correlation_id": cid, "path": request.url.path},
+    )
 
+
+app.add_middleware(RequestIDMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -171,13 +169,38 @@ async def root():
 
 
 @app.get("/health")
-async def health():
-    return {"status": "healthy"}
+@limiter.exempt
+async def health(request: Request):
+    checks = {"status": "healthy", "version": "1.0.0", "timestamp": "", "checks": {}}
+    from datetime import datetime, timezone
+    checks["timestamp"] = datetime.now(timezone.utc).isoformat()
+
+    # Database check
+    try:
+        async with async_session_factory() as db:
+            await db.execute(text("SELECT 1"))
+        checks["checks"]["database"] = "ok"
+    except Exception as e:
+        checks["checks"]["database"] = f"error: {type(e).__name__}"
+        checks["status"] = "degraded"
+
+    # Redis check
+    try:
+        import redis.asyncio as aioredis
+        r = aioredis.from_url(settings.REDIS_URL)
+        await r.ping()
+        await r.aclose()
+        checks["checks"]["redis"] = "ok"
+    except Exception:
+        checks["checks"]["redis"] = "unavailable"
+        # Redis is optional, don't degrade for it
+
+    status_code = 200 if checks["status"] == "healthy" else 503
+    return JSONResponse(status_code=status_code, content=checks)
 
 
 async def seed_super_admin():
     from sqlalchemy import select
-    from app.database import async_session_factory
     from app.models.user import User
     async with async_session_factory() as db:
         query = select(User).where(User.email == settings.SUPER_ADMIN_EMAIL)
@@ -193,6 +216,6 @@ async def seed_super_admin():
             )
             db.add(super_admin)
             await db.commit()
-            print(f"[SEED] Created super admin: {settings.SUPER_ADMIN_EMAIL}")
+            logger.info(f"Created super admin: {settings.SUPER_ADMIN_EMAIL}")
         else:
-            print("[SEED] Super admin already exists")
+            logger.info("Super admin already exists")

@@ -41,8 +41,9 @@ export default function CasePrintPreview() {
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
-    } catch (err: any) {
-      alert("PDF download failed: " + (err?.message || "Unknown error"))
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error"
+      alert("PDF download failed: " + msg)
     }
   }
 

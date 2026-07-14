@@ -48,78 +48,114 @@ async def _get_case_ids_for_patients(db: AsyncSession, patient_ids: list[str]) -
     return [row[0] for row in r.all()]
 
 
-async def _monthly_revenue_trend(db: AsyncSession, case_ids: list[str] | None = None) -> list:
-    now = datetime.now(timezone.utc)
-    twelve_months_ago = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0) - timedelta(days=365)
-    twelve_months_ago = twelve_months_ago.replace(day=1)
+async def _monthly_revenue_trend(db: AsyncSession, case_ids: list[str] | None = None,
+                                 date_start: datetime | None = None, date_end: datetime | None = None) -> list:
+    if not date_start:
+        now = datetime.now(timezone.utc)
+        date_start = (now.replace(day=1, hour=0, minute=0, second=0, microsecond=0) - timedelta(days=365)).replace(day=1)
+    if not date_end:
+        date_end = datetime.now(timezone.utc)
+
+    range_days = (date_end - date_start).days
+    if range_days <= 1:
+        fmt = 'YYYY-MM-DD HH24:00'
+    elif range_days <= 90:
+        fmt = 'YYYY-MM-DD'
+    else:
+        fmt = 'YYYY-MM'
 
     query = select(
-        func.to_char(Billing.updated_at, 'YYYY-MM').label('month'),
+        func.to_char(Billing.updated_at, fmt).label('month'),
         func.sum(Billing.paid_amount).label('revenue'),
-    ).where(
-        Billing.updated_at >= twelve_months_ago,
-    )
+    ).where(Billing.updated_at >= date_start, Billing.updated_at < date_end)
     if case_ids is not None:
         query = query.where(Billing.case_id.in_(case_ids))
     query = query.group_by(text("month")).order_by(text("month"))
 
     r = await db.execute(query)
-    rows = r.all()
-    return [{"month": row[0], "revenue": float(row[1] or 0)} for row in rows]
+    return [{"month": row[0], "revenue": float(row[1] or 0)} for row in r.all()]
 
 
-async def _monthly_patient_trend(db: AsyncSession, hospital_ids: list[str] | None = None) -> list:
-    now = datetime.now(timezone.utc)
-    twelve_months_ago = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0) - timedelta(days=365)
-    twelve_months_ago = twelve_months_ago.replace(day=1)
+async def _monthly_patient_trend(db: AsyncSession, hospital_ids: list[str] | None = None,
+                                 date_start: datetime | None = None, date_end: datetime | None = None) -> list:
+    if not date_start:
+        now = datetime.now(timezone.utc)
+        date_start = (now.replace(day=1, hour=0, minute=0, second=0, microsecond=0) - timedelta(days=365)).replace(day=1)
+    if not date_end:
+        date_end = datetime.now(timezone.utc)
+
+    range_days = (date_end - date_start).days
+    if range_days <= 1:
+        fmt = 'YYYY-MM-DD HH24:00'
+    elif range_days <= 90:
+        fmt = 'YYYY-MM-DD'
+    else:
+        fmt = 'YYYY-MM'
 
     query = select(
-        func.to_char(Patient.created_at, 'YYYY-MM').label('month'),
+        func.to_char(Patient.created_at, fmt).label('month'),
         func.count(Patient.id).label('count'),
-    ).where(
-        Patient.created_at >= twelve_months_ago,
-    )
+    ).where(Patient.created_at >= date_start, Patient.created_at < date_end)
     if hospital_ids is not None:
         query = query.where(Patient.hospital_id.in_(hospital_ids))
     query = query.group_by(text("month")).order_by(text("month"))
 
     r = await db.execute(query)
-    rows = r.all()
-    return [{"month": row[0], "count": row[1]} for row in rows]
+    return [{"month": row[0], "count": row[1]} for row in r.all()]
 
 
-async def _monthly_case_trend(db: AsyncSession, case_ids: list[str] | None = None) -> list:
-    now = datetime.now(timezone.utc)
-    twelve_months_ago = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0) - timedelta(days=365)
-    twelve_months_ago = twelve_months_ago.replace(day=1)
+async def _monthly_case_trend(db: AsyncSession, case_ids: list[str] | None = None,
+                              date_start: datetime | None = None, date_end: datetime | None = None) -> list:
+    if not date_start:
+        now = datetime.now(timezone.utc)
+        date_start = (now.replace(day=1, hour=0, minute=0, second=0, microsecond=0) - timedelta(days=365)).replace(day=1)
+    if not date_end:
+        date_end = datetime.now(timezone.utc)
+
+    range_days = (date_end - date_start).days
+    if range_days <= 1:
+        fmt = 'YYYY-MM-DD HH24:00'
+    elif range_days <= 90:
+        fmt = 'YYYY-MM-DD'
+    else:
+        fmt = 'YYYY-MM'
 
     query = select(
-        func.to_char(Case.created_at, 'YYYY-MM').label('month'),
+        func.to_char(Case.created_at, fmt).label('month'),
         func.count(Case.id).label('count'),
-    ).where(
-        Case.created_at >= twelve_months_ago,
-    )
+    ).where(Case.created_at >= date_start, Case.created_at < date_end)
     if case_ids is not None:
         query = query.where(Case.id.in_(case_ids))
     query = query.group_by(text("month")).order_by(text("month"))
 
     r = await db.execute(query)
-    rows = r.all()
-    return [{"month": row[0], "count": row[1]} for row in rows]
+    return [{"month": row[0], "count": row[1]} for row in r.all()]
 
 
-async def _monthly_appointment_trend(db: AsyncSession, hospital_ids: list[str] | None = None) -> list:
-    now = datetime.now(timezone.utc)
-    twelve_months_ago = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0) - timedelta(days=365)
-    twelve_months_ago = twelve_months_ago.replace(day=1)
+async def _monthly_appointment_trend(db: AsyncSession, hospital_ids: list[str] | None = None,
+                                     doctor_id: str | None = None,
+                                     date_start: datetime | None = None, date_end: datetime | None = None) -> list:
+    if not date_start:
+        now = datetime.now(timezone.utc)
+        date_start = (now.replace(day=1, hour=0, minute=0, second=0, microsecond=0) - timedelta(days=365)).replace(day=1)
+    if not date_end:
+        date_end = datetime.now(timezone.utc)
+
+    range_days = (date_end - date_start).days
+    if range_days <= 1:
+        fmt = 'YYYY-MM-DD HH24:00'
+    elif range_days <= 90:
+        fmt = 'YYYY-MM-DD'
+    else:
+        fmt = 'YYYY-MM'
 
     query = select(
-        func.to_char(Appointment.created_at, 'YYYY-MM').label('month'),
+        func.to_char(Appointment.created_at, fmt).label('month'),
         func.count(Appointment.id).label('count'),
-    ).where(
-        Appointment.created_at >= twelve_months_ago,
-    )
-    if hospital_ids is not None:
+    ).where(Appointment.created_at >= date_start, Appointment.created_at < date_end)
+    if doctor_id:
+        query = query.where(Appointment.doctor_id == doctor_id)
+    elif hospital_ids is not None:
         pids_r = await db.execute(select(Patient.id).where(Patient.hospital_id.in_(hospital_ids)))
         pids = [row[0] for row in pids_r.all()]
         if not pids:
@@ -128,8 +164,7 @@ async def _monthly_appointment_trend(db: AsyncSession, hospital_ids: list[str] |
     query = query.group_by(text("month")).order_by(text("month"))
 
     r = await db.execute(query)
-    rows = r.all()
-    return [{"month": row[0], "count": row[1]} for row in rows]
+    return [{"month": row[0], "count": row[1]} for row in r.all()]
 
 
 async def _get_top_performers(db: AsyncSession, field_name: str, field_id: str,
@@ -524,9 +559,10 @@ async def group_admin_dashboard(
 
 @router.get("/hospital-admin")
 async def hospital_admin_dashboard(
-    period: str = Query("this_month", description="today, this_week, this_month, this_quarter, this_year, custom"),
+    period: str = Query("this_month", description="today, yesterday, last_7_days, last_30_days, this_month, last_month, this_quarter, last_quarter, this_year, custom"),
     start_date: Optional[str] = Query(None, description="Custom range start (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="Custom range end (YYYY-MM-DD)"),
+    doctor_id: Optional[str] = Query(None, description="Filter by doctor ID"),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
@@ -541,78 +577,81 @@ async def hospital_admin_dashboard(
             "revenue_trend": [], "patient_growth_trend": [], "appointment_count_trend": [], "case_count_trend": [],
             "monthly_growth_trend": [], "doctor_performance": [], "treatment_performance": [],
             "revenue_expense_trend": [], "expense_trend": [], "profit_trend": [],
-            "total_pending_billing": 0,
-            "total_follow_ups": 0,
-            "pending_follow_ups": 0,
-            "completed_follow_ups": 0,
-            "missed_follow_ups": 0,
-            "expense_breakdown": [],
-            "capacity_most_booked_doctors": [],
-            "capacity_peak_hours": [],
-            "comparison": {},
+            "total_pending_billing": 0, "total_follow_ups": 0, "pending_follow_ups": 0,
+            "completed_follow_ups": 0, "missed_follow_ups": 0, "expense_breakdown": [],
+            "capacity_most_booked_doctors": [], "capacity_peak_hours": [], "comparison": {},
+            "today_appointments_list": [], "pending_actions": {"follow_ups": 0, "billings_count": 0, "billings_amount": 0},
+            "recent_activity": [], "revenue_sources": [],
+            "crm_insights": {"total_leads": 0, "new_leads": 0, "converted_leads": 0, "conversion_rate": 0, "leads_by_source": []},
         }
 
     now = datetime.now(timezone.utc)
     current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     current_year_start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    today = date.today()
 
-    total_patients = (await db.execute(
-        select(func.count(Patient.id)).where(Patient.hospital_id == hospital_id)
-    )).scalar() or 0
+    # Period date range (used by all period-filtered queries)
+    date_start, date_end = get_date_range(period, start_date, end_date)
+    sd = date_start.date() if hasattr(date_start, 'date') else date_start
+    ed = date_end.date() if hasattr(date_end, 'date') else date_end
 
-    patient_ids = await _get_patient_ids_for_hospitals(db, [hospital_id])
-    case_ids = await _get_case_ids_for_patients(db, patient_ids)
+    # --- Build scoped IDs (respecting doctor_id filter) ---
+    if doctor_id:
+        # Doctor scope: only patients/cases/appointments for this doctor in this hospital
+        patient_ids_r = await db.execute(
+            select(Patient.id).where(Patient.hospital_id == hospital_id, Patient.doctor_id == doctor_id)
+        )
+        patient_ids = [row[0] for row in patient_ids_r.all()]
+        case_ids_r = await db.execute(
+            select(Case.id).where(Case.patient_id.in_(patient_ids) if patient_ids else Case.id == None, Case.doctor_id == doctor_id)
+        )
+        case_ids = [row[0] for row in case_ids_r.all()]
+    else:
+        patient_ids = await _get_patient_ids_for_hospitals(db, [hospital_id])
+        case_ids = await _get_case_ids_for_patients(db, patient_ids)
 
-    total_cases = len(case_ids)
+    # --- All-time totals (always hospital-wide, not period-filtered) ---
+    total_patients_q = select(func.count(Patient.id)).where(Patient.hospital_id == hospital_id)
+    if doctor_id:
+        total_patients_q = total_patients_q.where(Patient.doctor_id == doctor_id)
+    total_patients = (await db.execute(total_patients_q)).scalar() or 0
+
+    total_cases_q = select(func.count(Case.id)).where(Case.patient_id.in_(patient_ids)) if patient_ids else select(func.count(Case.id)).where(Case.id == None)
+    total_cases = (await db.execute(total_cases_q)).scalar() or 0
+
     active_case_statuses = [s.value for s in CaseStatus if s not in (CaseStatus.COMPLETED, CaseStatus.CANCELLED)]
     total_active_cases = 0
     if case_ids:
-        total_active_cases = (await db.execute(
-            select(func.count(Case.id)).where(Case.id.in_(case_ids), Case.status.in_(active_case_statuses))
-        )).scalar() or 0
+        active_q = select(func.count(Case.id)).where(Case.id.in_(case_ids), Case.status.in_(active_case_statuses))
+        total_active_cases = (await db.execute(active_q)).scalar() or 0
 
-    today = date.today()
-    today_appointments = 0
-    if patient_ids:
-        today_appointments = (await db.execute(
-            select(func.count(Appointment.id)).where(
-                Appointment.patient_id.in_(patient_ids),
-                Appointment.appointment_date == today,
-            )
-        )).scalar() or 0
+    # Today's appointments count
+    today_appt_q = select(func.count(Appointment.id)).where(
+        Appointment.patient_id.in_(patient_ids) if patient_ids else Appointment.id == None,
+        Appointment.appointment_date == today,
+    )
+    if doctor_id:
+        today_appt_q = today_appt_q.where(Appointment.doctor_id == doctor_id)
+    today_appointments = (await db.execute(today_appt_q)).scalar() or 0
 
+    # --- All-time revenue/expenses ---
     total_revenue = 0.0
     monthly_revenue = 0.0
     yearly_revenue = 0.0
-    if case_ids:
-        total_revenue = float((await db.execute(
-            select(func.sum(Billing.paid_amount)).where(Billing.case_id.in_(case_ids))
-        )).scalar() or 0)
-        monthly_revenue = float((await db.execute(
-            select(func.sum(Billing.paid_amount)).where(
-                Billing.case_id.in_(case_ids), Billing.updated_at >= current_month_start
-            )
-        )).scalar() or 0)
-        yearly_revenue = float((await db.execute(
-            select(func.sum(Billing.paid_amount)).where(
-                Billing.case_id.in_(case_ids), Billing.updated_at >= current_year_start
-            )
-        )).scalar() or 0)
-
     total_pending_billing = 0.0
     if case_ids:
-        total_pending_billing = float((await db.execute(
-            select(func.sum(Billing.pending_amount)).where(Billing.case_id.in_(case_ids))
-        )).scalar() or 0)
+        total_revenue = float((await db.execute(select(func.sum(Billing.paid_amount)).where(Billing.case_id.in_(case_ids)))).scalar() or 0)
+        monthly_revenue = float((await db.execute(select(func.sum(Billing.paid_amount)).where(Billing.case_id.in_(case_ids), Billing.updated_at >= current_month_start))).scalar() or 0)
+        yearly_revenue = float((await db.execute(select(func.sum(Billing.paid_amount)).where(Billing.case_id.in_(case_ids), Billing.updated_at >= current_year_start))).scalar() or 0)
+        total_pending_billing = float((await db.execute(select(func.sum(Billing.pending_amount)).where(Billing.case_id.in_(case_ids)))).scalar() or 0)
 
+    # --- Period-filtered financials ---
     period_revenue = await calculate_revenue(db, case_ids, period=period, start_date=start_date, end_date=end_date)
-    date_start, date_end = get_date_range(period, start_date, end_date)
     total_expenses = await calculate_expenses_for_date_range(db, [hospital_id], date_start=date_start, date_end=date_end)
     net_profit = await calculate_profit(period_revenue, total_expenses)
     profit_margin = await calculate_profit_margin(period_revenue, net_profit)
 
-    sd = date_start.date() if hasattr(date_start, 'date') else date_start
-    ed = date_end.date() if hasattr(date_end, 'date') else date_end
+    # Expense breakdown (period-filtered)
     cat_r = await db.execute(
         select(HospitalMonthlyExpense.expense_category, func.coalesce(func.sum(HospitalMonthlyExpense.amount), 0).label("total"))
         .where(HospitalMonthlyExpense.hospital_id == hospital_id, HospitalMonthlyExpense.expense_date >= sd, HospitalMonthlyExpense.expense_date < ed)
@@ -620,91 +659,77 @@ async def hospital_admin_dashboard(
     )
     expense_breakdown = [{"category": row[0], "amount": float(row[1])} for row in cat_r.all()]
 
-    revenue_trend = await _monthly_revenue_trend(db, case_ids if case_ids else [])
-    patient_growth_trend = await _monthly_patient_trend(db, [hospital_id])
+    # --- Trend data (PERIOD-FILTERED) ---
+    revenue_trend = await _monthly_revenue_trend(db, case_ids if case_ids else [], date_start=date_start, date_end=date_end)
+    patient_growth_trend = await _monthly_patient_trend(db, [hospital_id], date_start=date_start, date_end=date_end)
+    appointment_count_trend = await _monthly_appointment_trend(db, [hospital_id] if not doctor_id else None, doctor_id=doctor_id, date_start=date_start, date_end=date_end)
+    case_count_trend = await _monthly_case_trend(db, case_ids if case_ids else [], date_start=date_start, date_end=date_end)
 
-    # Doctor performance — revenue only from this hospital's cases
+    # --- Doctor performance (PERIOD-FILTERED) ---
     doctor_performance = []
     if case_ids:
-        # Single grouped query: sum billing paid_amount per doctor within this hospital's cases
-        doctor_rev_r = await db.execute(
-            select(
-                Case.doctor_id,
-                func.sum(Billing.paid_amount).label("revenue"),
-            )
-            .select_from(Billing)
-            .join(Case, Billing.case_id == Case.id)
-            .where(Billing.case_id.in_(case_ids), Case.doctor_id.isnot(None))
-            .group_by(Case.doctor_id)
-            .order_by(text("revenue DESC"))
+        dr_q = (
+            select(Case.doctor_id, func.sum(Billing.paid_amount).label("revenue"))
+            .select_from(Billing).join(Case, Billing.case_id == Case.id)
+            .where(Billing.case_id.in_(case_ids), Case.doctor_id.isnot(None),
+                   Billing.updated_at >= date_start, Billing.updated_at < date_end)
+            .group_by(Case.doctor_id).order_by(text("revenue DESC"))
         )
-        for row in doctor_rev_r.all():
-            did = row[0]
-            rev = float(row[1] or 0)
+        for row in (await db.execute(dr_q)).all():
+            did, rev = row[0], float(row[1] or 0)
             if rev > 0:
-                dname_r = await db.execute(select(User.full_name).where(User.id == did))
-                dname = dname_r.scalar() or did
+                dname = (await db.execute(select(User.full_name).where(User.id == did))).scalar() or did
                 doctor_performance.append({"id": did, "name": dname, "value": rev})
 
-    # Treatment performance
+    # --- Treatment performance (PERIOD-FILTERED) ---
     treatment_performance = []
     if case_ids:
-        tp_r = await db.execute(
+        tp_q = (
             select(TreatmentPlan.treatment_name, func.count(TreatmentPlan.id).label('cnt'))
-            .where(TreatmentPlan.case_id.in_(case_ids))
-            .group_by(TreatmentPlan.treatment_name)
-            .order_by(text("cnt DESC"))
-            .limit(5)
+            .where(TreatmentPlan.case_id.in_(case_ids),
+                   TreatmentPlan.created_at >= date_start, TreatmentPlan.created_at < date_end)
+            .group_by(TreatmentPlan.treatment_name).order_by(text("cnt DESC")).limit(5)
         )
-        for row in tp_r.all():
+        for row in (await db.execute(tp_q)).all():
             treatment_performance.append({"name": row[0], "value": row[1]})
 
-    # Trend data for non-financial metrics
-    appointment_count_trend = await _monthly_appointment_trend(db, [hospital_id])
-    case_count_trend = await _monthly_case_trend(db, case_ids if case_ids else [])
-
-    # Period-over-period comparison
+    # --- Period-over-period comparison ---
     prev_start, prev_end = get_previous_date_range(period, start_date, end_date)
 
-    # Current period counts
     period_patient_count = (await db.execute(
         select(func.count(Patient.id)).where(Patient.hospital_id == hospital_id, Patient.created_at >= date_start, Patient.created_at < date_end)
     )).scalar() or 0
+
     period_appointment_count = 0
     if patient_ids:
-        period_appointment_count = (await db.execute(
-            select(func.count(Appointment.id)).where(
-                Appointment.patient_id.in_(patient_ids),
-                Appointment.appointment_date >= date_start.date(),
-                Appointment.appointment_date < date_end.date(),
-            )
-        )).scalar() or 0
+        appt_date_filter = [Appointment.patient_id.in_(patient_ids), Appointment.appointment_date >= sd, Appointment.appointment_date < ed]
+        if doctor_id:
+            appt_date_filter.append(Appointment.doctor_id == doctor_id)
+        period_appointment_count = (await db.execute(select(func.count(Appointment.id)).where(*appt_date_filter))).scalar() or 0
+
     period_active_case_count = 0
     if case_ids:
         period_active_case_count = (await db.execute(
-            select(func.count(Case.id)).where(Case.id.in_(case_ids), Case.status.in_(active_case_statuses),
-                                               Case.created_at >= date_start, Case.created_at < date_end)
+            select(func.count(Case.id)).where(Case.id.in_(case_ids), Case.status.in_(active_case_statuses), Case.created_at >= date_start, Case.created_at < date_end)
         )).scalar() or 0
 
-    # Previous period counts
     prev_patient_count = (await db.execute(
         select(func.count(Patient.id)).where(Patient.hospital_id == hospital_id, Patient.created_at >= prev_start, Patient.created_at < prev_end)
     )).scalar() or 0
+
     prev_appointment_count = 0
     if patient_ids:
-        prev_appointment_count = (await db.execute(
-            select(func.count(Appointment.id)).where(
-                Appointment.patient_id.in_(patient_ids),
-                Appointment.appointment_date >= prev_start.date(),
-                Appointment.appointment_date < prev_end.date(),
-            )
-        )).scalar() or 0
+        prev_appt_filter = [Appointment.patient_id.in_(patient_ids), Appointment.appointment_date >= prev_start.date(), Appointment.appointment_date < prev_end.date()]
+        if doctor_id:
+            prev_appt_filter.append(Appointment.doctor_id == doctor_id)
+        prev_appointment_count = (await db.execute(select(func.count(Appointment.id)).where(*prev_appt_filter))).scalar() or 0
+
     prev_active_case_count = 0
     if case_ids:
         prev_active_case_count = (await db.execute(
-            select(func.count(Case.id)).where(Case.id.in_(case_ids), Case.status.in_(active_case_statuses),
-                                               Case.created_at >= prev_start, Case.created_at < prev_end)
+            select(func.count(Case.id)).where(Case.id.in_(case_ids), Case.status.in_(active_case_statuses), Case.created_at >= prev_start, Case.created_at < prev_end)
         )).scalar() or 0
+
     prev_period_revenue = await calculate_revenue(db, case_ids, period="custom", start_date=prev_start.isoformat(), end_date=prev_end.isoformat())
 
     def pct_change(current: float, previous: float) -> float:
@@ -712,191 +737,125 @@ async def hospital_admin_dashboard(
             return 100.0 if current > 0 else 0.0
         return round(((current - previous) / previous) * 100, 1)
 
-    # Follow-Up stats
-    total_follow_ups = (await db.execute(
-        select(func.count(FollowUp.id)).where(FollowUp.hospital_id == hospital_id)
-    )).scalar() or 0
-    pending_follow_ups = (await db.execute(
-        select(func.count(FollowUp.id)).where(
-            FollowUp.hospital_id == hospital_id,
-            FollowUp.status == FollowUpStatus.PENDING.value,
-        )
-    )).scalar() or 0
-    completed_follow_ups = (await db.execute(
-        select(func.count(FollowUp.id)).where(
-            FollowUp.hospital_id == hospital_id,
-            FollowUp.status == FollowUpStatus.COMPLETED.value,
-        )
-    )).scalar() or 0
-    missed_follow_ups = (await db.execute(
-        select(func.count(FollowUp.id)).where(
-            FollowUp.hospital_id == hospital_id,
-            FollowUp.status == FollowUpStatus.LOST.value,
-        )
-    )).scalar() or 0
+    # --- Follow-up stats (PERIOD-FILTERED) ---
+    fu_base = [FollowUp.hospital_id == hospital_id, FollowUp.created_at >= date_start, FollowUp.created_at < date_end]
+    if doctor_id:
+        fu_base.append(FollowUp.doctor_id == doctor_id)
+    total_follow_ups = (await db.execute(select(func.count(FollowUp.id)).where(*fu_base))).scalar() or 0
+    pending_follow_ups = (await db.execute(select(func.count(FollowUp.id)).where(*fu_base, FollowUp.status == FollowUpStatus.PENDING.value))).scalar() or 0
+    completed_follow_ups = (await db.execute(select(func.count(FollowUp.id)).where(*fu_base, FollowUp.status == FollowUpStatus.COMPLETED.value))).scalar() or 0
+    missed_follow_ups = (await db.execute(select(func.count(FollowUp.id)).where(*fu_base, FollowUp.status == FollowUpStatus.LOST.value))).scalar() or 0
 
-    # Monthly growth trend with expenses (respect period)
+    # Revenue vs expenses trend (period-filtered)
     combined_trend = await revenue_trend_with_expenses(db, case_ids if case_ids else [], [hospital_id], period=period, start_date=start_date, end_date=end_date)
 
-    # --- New fields for enterprise dashboard ---
-
-    # Today's appointments list with patient/doctor names
+    # --- Today's appointments list ---
     today_appt_list = []
     if patient_ids:
-        appt_rows = await db.execute(
-            select(
-                Appointment.id, Appointment.appointment_time, Appointment.status,
-                Appointment.appointment_type, Appointment.notes,
-                Patient.full_name.label("patient_name"),
-                User.full_name.label("doctor_name"),
-            )
+        appt_q = (
+            select(Appointment.id, Appointment.appointment_time, Appointment.status,
+                   Appointment.appointment_type, Appointment.notes,
+                   Patient.full_name.label("patient_name"), User.full_name.label("doctor_name"))
             .join(Patient, Appointment.patient_id == Patient.id)
             .join(User, Appointment.doctor_id == User.id, isouter=True)
-            .where(
-                Appointment.patient_id.in_(patient_ids),
-                Appointment.appointment_date == today,
-            )
-            .order_by(Appointment.appointment_time)
+            .where(Appointment.patient_id.in_(patient_ids), Appointment.appointment_date == today)
         )
-        for row in appt_rows.all():
+        if doctor_id:
+            appt_q = appt_q.where(Appointment.doctor_id == doctor_id)
+        appt_q = appt_q.order_by(Appointment.appointment_time)
+        for row in (await db.execute(appt_q)).all():
             today_appt_list.append({
-                "id": row[0],
-                "time": str(row[1])[:5] if row[1] else "",
+                "id": row[0], "time": str(row[1])[:5] if row[1] else "",
                 "status": row[2].value if hasattr(row[2], 'value') else str(row[2]),
                 "type": row[3].value if hasattr(row[3], 'value') else str(row[3]) if row[3] else "CONSULTATION",
-                "notes": row[4] or "",
-                "patient_name": row[5] or "",
-                "doctor_name": row[6] or "Unassigned",
+                "notes": row[4] or "", "patient_name": row[5] or "", "doctor_name": row[6] or "Unassigned",
             })
 
-    # Pending actions summary
+    # --- Pending actions ---
     pending_billings_count = 0
     pending_billings_amount = 0.0
     if case_ids:
-        pending_billings_r = await db.execute(
-            select(
-                func.count(Billing.id),
-                func.coalesce(func.sum(Billing.pending_amount), 0),
-            )
-            .where(
-                Billing.case_id.in_(case_ids),
-                Billing.payment_status.in_([PaymentStatus.PARTIAL.value, PaymentStatus.OVERDUE.value]),
-            )
+        pb_r = await db.execute(
+            select(func.count(Billing.id), func.coalesce(func.sum(Billing.pending_amount), 0))
+            .where(Billing.case_id.in_(case_ids), Billing.payment_status.in_([PaymentStatus.PARTIAL.value, PaymentStatus.OVERDUE.value]))
         )
-        pb_row = pending_billings_r.one_or_none()
+        pb_row = pb_r.one_or_none()
         pending_billings_count = pb_row[0] if pb_row else 0
         pending_billings_amount = float(pb_row[1]) if pb_row else 0.0
+    pending_actions = {"follow_ups": pending_follow_ups, "billings_count": pending_billings_count, "billings_amount": pending_billings_amount}
 
-    pending_actions = {
-        "follow_ups": pending_follow_ups,
-        "billings_count": pending_billings_count,
-        "billings_amount": pending_billings_amount,
-    }
+    # --- Recent activity (uses period range, capped at 30 days for activity) ---
+    activity_start = date_start
+    activity_end = date_end
+    range_days = (date_end - date_start).days
+    if range_days > 30:
+        activity_start = datetime.now(timezone.utc) - timedelta(days=30)
 
-    # Recent activity (last 7 days)
-    seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
-    recent_patients_r = await db.execute(
-        select(Patient.id, Patient.full_name, Patient.created_at)
-        .where(Patient.hospital_id == hospital_id, Patient.created_at >= seven_days_ago)
-        .order_by(Patient.created_at.desc()).limit(5)
+    recent_patients_q = select(Patient.id, Patient.full_name, Patient.created_at).where(
+        Patient.hospital_id == hospital_id, Patient.created_at >= activity_start, Patient.created_at < activity_end
     )
+    if doctor_id:
+        recent_patients_q = recent_patients_q.where(Patient.doctor_id == doctor_id)
+    recent_patients_r = await db.execute(recent_patients_q.order_by(Patient.created_at.desc()).limit(5))
+
     recent_activities = []
     for row in recent_patients_r.all():
-        recent_activities.append({
-            "type": "patient_registered",
-            "description": f"New patient: {row[1]}",
-            "date": row[2].isoformat() if row[2] else "",
-        })
+        recent_activities.append({"type": "patient_registered", "description": f"New patient: {row[1]}", "date": row[2].isoformat() if row[2] else ""})
 
     if patient_ids:
-        recent_appts_r = await db.execute(
-            select(
-                Appointment.id, Appointment.appointment_date, Appointment.status,
-                Patient.full_name.label("patient_name"),
-            )
+        recent_appt_q = (
+            select(Appointment.id, Appointment.appointment_date, Appointment.status, Patient.full_name.label("patient_name"))
             .join(Patient, Appointment.patient_id == Patient.id)
-            .where(
-                Appointment.patient_id.in_(patient_ids),
-                Appointment.created_at >= seven_days_ago,
-            )
-            .order_by(Appointment.created_at.desc()).limit(5)
+            .where(Appointment.patient_id.in_(patient_ids), Appointment.created_at >= activity_start, Appointment.created_at < activity_end)
         )
-        for row in recent_appts_r.all():
+        if doctor_id:
+            recent_appt_q = recent_appt_q.where(Appointment.doctor_id == doctor_id)
+        for row in (await db.execute(recent_appt_q.order_by(Appointment.created_at.desc()).limit(5))).all():
             status_val = row[2].value if hasattr(row[2], 'value') else str(row[2])
-            recent_activities.append({
-                "type": "appointment_created",
-                "description": f"Appointment for {row[3]} - {status_val}",
-                "date": str(row[1]) if row[1] else "",
-            })
-
+            recent_activities.append({"type": "appointment_created", "description": f"Appointment for {row[3]} - {status_val}", "date": str(row[1]) if row[1] else ""})
     recent_activities.sort(key=lambda x: x.get("date", ""), reverse=True)
     recent_activities = recent_activities[:10]
 
-    # Revenue sources (by payment method)
+    # --- Revenue sources (PERIOD-FILTERED) ---
     revenue_sources = []
     if case_ids:
-        rev_src_r = await db.execute(
-            select(
-                func.coalesce(Billing.payment_method, 'Other').label("method"),
-                func.sum(Billing.paid_amount).label("total"),
-            )
-            .where(Billing.case_id.in_(case_ids), Billing.paid_amount > 0)
-            .group_by(text("method"))
-            .order_by(text("total DESC"))
+        rev_src_q = (
+            select(func.coalesce(Billing.payment_method, 'Other').label("method"), func.sum(Billing.paid_amount).label("total"))
+            .where(Billing.case_id.in_(case_ids), Billing.paid_amount > 0,
+                   Billing.updated_at >= date_start, Billing.updated_at < date_end)
+            .group_by(text("method")).order_by(text("total DESC"))
         )
-        for row in rev_src_r.all():
+        for row in (await db.execute(rev_src_q)).all():
             revenue_sources.append({"method": row[0], "amount": float(row[1] or 0)})
 
-    # CRM insights
-    total_leads = (await db.execute(
-        select(func.count(Lead.id)).where(Lead.hospital_id == hospital_id)
-    )).scalar() or 0
-    new_leads = (await db.execute(
-        select(func.count(Lead.id)).where(Lead.hospital_id == hospital_id, Lead.status == "NEW")
-    )).scalar() or 0
-    converted_leads = (await db.execute(
-        select(func.count(Lead.id)).where(Lead.hospital_id == hospital_id, Lead.status == "CONVERTED")
-    )).scalar() or 0
+    # --- CRM insights (PERIOD-FILTERED) ---
+    crm_base = [Lead.hospital_id == hospital_id, Lead.created_at >= date_start, Lead.created_at < date_end]
+    total_leads = (await db.execute(select(func.count(Lead.id)).where(*crm_base))).scalar() or 0
+    new_leads = (await db.execute(select(func.count(Lead.id)).where(*crm_base, Lead.status == "NEW"))).scalar() or 0
+    converted_leads = (await db.execute(select(func.count(Lead.id)).where(*crm_base, Lead.status == "CONVERTED"))).scalar() or 0
     conversion_rate = round((converted_leads / total_leads * 100), 1) if total_leads > 0 else 0.0
 
     leads_by_source = []
     lead_src_r = await db.execute(
         select(Lead.source, func.count(Lead.id).label("cnt"))
-        .where(Lead.hospital_id == hospital_id)
-        .group_by(Lead.source).order_by(text("cnt DESC")).limit(5)
+        .where(*crm_base).group_by(Lead.source).order_by(text("cnt DESC")).limit(5)
     )
     for row in lead_src_r.all():
         leads_by_source.append({"source": row[0], "count": row[1]})
 
-    crm_insights = {
-        "total_leads": total_leads,
-        "new_leads": new_leads,
-        "converted_leads": converted_leads,
-        "conversion_rate": conversion_rate,
-        "leads_by_source": leads_by_source,
-    }
+    crm_insights = {"total_leads": total_leads, "new_leads": new_leads, "converted_leads": converted_leads, "conversion_rate": conversion_rate, "leads_by_source": leads_by_source}
 
     return {
         "today_appointments": today_appointments,
         "today_appointments_list": today_appt_list,
-        "total_follow_ups": total_follow_ups,
-        "pending_follow_ups": pending_follow_ups,
-        "completed_follow_ups": completed_follow_ups,
-        "missed_follow_ups": missed_follow_ups,
-        "total_revenue": total_revenue,
-        "monthly_revenue": monthly_revenue,
-        "yearly_revenue": yearly_revenue,
-        "period_revenue": period_revenue,
-        "total_expenses": total_expenses,
-        "net_profit": net_profit,
-        "profit_margin": profit_margin,
-        "total_patients": total_patients,
-        "total_cases": total_cases,
-        "total_active_cases": total_active_cases,
-        "revenue_trend": revenue_trend,
-        "patient_growth_trend": patient_growth_trend,
-        "appointment_count_trend": appointment_count_trend,
-        "case_count_trend": case_count_trend,
+        "total_follow_ups": total_follow_ups, "pending_follow_ups": pending_follow_ups,
+        "completed_follow_ups": completed_follow_ups, "missed_follow_ups": missed_follow_ups,
+        "total_revenue": total_revenue, "monthly_revenue": monthly_revenue, "yearly_revenue": yearly_revenue,
+        "period_revenue": period_revenue, "total_expenses": total_expenses,
+        "net_profit": net_profit, "profit_margin": profit_margin,
+        "total_patients": total_patients, "total_cases": total_cases, "total_active_cases": total_active_cases,
+        "revenue_trend": revenue_trend, "patient_growth_trend": patient_growth_trend,
+        "appointment_count_trend": appointment_count_trend, "case_count_trend": case_count_trend,
         "monthly_growth_trend": [{"month": t["month"], "revenue": t["revenue"], "patients": 0} for t in combined_trend],
         "revenue_expense_trend": combined_trend,
         "expense_trend": [{"month": t["month"], "expenses": t["expenses"]} for t in combined_trend],

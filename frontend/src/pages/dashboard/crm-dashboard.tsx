@@ -306,7 +306,7 @@ export default function CrmDashboardPage() {
             <Clock className="h-4 w-4 text-amber-500" /> Today's Work Queue
             <Badge variant="secondary" className="ml-2 text-[10px]">{workQueue.length}</Badge>
           </h2>
-          <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={navToCalendar}>
+          <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => navToCalendar()}>
             View All <ChevronRight className="h-3 w-3" />
           </Button>
         </div>
@@ -444,7 +444,7 @@ export default function CrmDashboardPage() {
           {responses.length > 0 ? (
             <ResponsiveContainer width="100%" height={260}>
               <RePieChart>
-                <Pie data={responses} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                <Pie data={responses} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} label={({ name, percent }: any) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}>
                   {responses.map((_: any, i: number) => <Cell key={i} fill={COLORS_RESPONSE[i % COLORS_RESPONSE.length]} />)}
                 </Pie>
                 <Tooltip />
@@ -562,7 +562,7 @@ export default function CrmDashboardPage() {
             {acquisition.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
                 <RePieChart>
-                  <Pie data={acquisition} dataKey="patients" nameKey="source" cx="50%" cy="50%" outerRadius={80} label={({ source, percent }) => `${source} ${(percent * 100).toFixed(0)}%`}>
+                  <Pie data={acquisition} dataKey="patients" nameKey="source" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }: any) => `${name ?? ""} ${((percent ?? 0) * 100).toFixed(0)}%`}>
                     {acquisition.map((_: any, i: number) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                   </Pie>
                   <Tooltip />

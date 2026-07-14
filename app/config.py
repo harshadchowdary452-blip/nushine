@@ -1,5 +1,6 @@
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
 from typing import List
 
 
@@ -35,7 +36,7 @@ class Settings(BaseSettings):
             return self.DATABASE_URL.replace("+asyncpg", "+psycopg2").replace("postgresql+psycopg2", "postgresql")
         return self.DATABASE_URL_SYNC
 
-    SECRET_KEY: str = "change-this-in-production"
+    SECRET_KEY: str = "CHANGE-ME-IN-PRODUCTION"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -59,7 +60,23 @@ class Settings(BaseSettings):
     EMAIL_FROM: str = "noreply@dentalhospital.com"
 
     SUPER_ADMIN_EMAIL: str = "superadmin@dental.com"
-    SUPER_ADMIN_PASSWORD: str = "SuperAdmin@123"
+    SUPER_ADMIN_PASSWORD: str = "CHANGE-ME-IN-PRODUCTION"
+
+    @field_validator("SECRET_KEY")
+    @classmethod
+    def validate_secret_key(cls, v: str) -> str:
+        import os
+        if os.environ.get("ENVIRONMENT") == "production" and v in ("CHANGE-ME-IN-PRODUCTION", "change-this-in-production"):
+            raise ValueError("SECRET_KEY must be set to a secure value in production")
+        return v
+
+    @field_validator("SUPER_ADMIN_PASSWORD")
+    @classmethod
+    def validate_admin_password(cls, v: str) -> str:
+        import os
+        if os.environ.get("ENVIRONMENT") == "production" and v == "CHANGE-ME-IN-PRODUCTION":
+            raise ValueError("SUPER_ADMIN_PASSWORD must be set in production")
+        return v
 
 
 settings = Settings()

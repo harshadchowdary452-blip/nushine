@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
-  DialogHeader, DialogTitle,
+  DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog"
 
 interface AlertDialogProps {
@@ -20,7 +20,7 @@ function AlertDialog({ open, onOpenChange, children }: AlertDialogProps) {
   )
 }
 
-const AlertDialogTrigger = Dialog.Trigger
+const AlertDialogTrigger = DialogTrigger
 
 function AlertDialogContent({ className, children, ...props }: React.ComponentProps<typeof DialogContent>) {
   return (
