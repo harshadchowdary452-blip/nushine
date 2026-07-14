@@ -9,6 +9,7 @@ from app.dependencies import get_current_user
 from app.core.permissions import verify_permission, verify_tenant_access, Permission, Role
 from app.services.appointment_service import AppointmentService
 from app.schemas.appointment import AppointmentCreate, AppointmentUpdate, AppointmentResponse, ReassignDoctorRequest, DoctorSlotResponse
+from app.schemas.common import PaginatedResponse
 from app.schemas.common import MessageResponse
 from app.models.patient import Patient
 from app.models.hospital import Hospital
@@ -224,12 +225,53 @@ async def check_appointment_availability(
 
 
 @router.get("/")
-async def get_appointments(skip: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=200), patient_id: Optional[str] = Query(None), doctor_id: Optional[str] = Query(None), status_filter: Optional[str] = Query(None), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+async def get_appointments(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=200),
+    patient_id: Optional[str] = Query(None),
+    doctor_id: Optional[str] = Query(None),
+    status_filter: Optional[str] = Query(None, alias="status"),
+    type_filter: Optional[str] = Query(None, alias="type"),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    patient_name: Optional[str] = Query(None),
+    op_no: Optional[str] = Query(None),
+    mobile: Optional[str] = Query(None),
+    abha_id: Optional[str] = Query(None),
+    payment_status: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    sort_by: Optional[str] = Query(None),
+    sort_order: Optional[str] = Query(None, pattern="^(asc|desc)$"),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
     verify_permission(current_user, Permission.MANAGE_APPOINTMENTS)
     service = AppointmentService(db)
     filters = {}
     if status_filter:
         filters["status"] = status_filter
+    if type_filter:
+        filters["appointment_type"] = type_filter
+    if date_from:
+        filters["date_from"] = date_from
+    if date_to:
+        filters["date_to"] = date_to
+    if patient_name:
+        filters["patient_name"] = patient_name
+    if op_no:
+        filters["op_no"] = op_no
+    if mobile:
+        filters["mobile"] = mobile
+    if abha_id:
+        filters["abha_id"] = abha_id
+    if payment_status:
+        filters["payment_status"] = payment_status
+    if search:
+        filters["search"] = search
+    if sort_by:
+        filters["sort_by"] = sort_by
+    if sort_order:
+        filters["sort_order"] = sort_order
     result = await _scope_appointments_by_role(db, current_user, filters, patient_id, doctor_id)
     if result == []:
         return []
@@ -245,6 +287,103 @@ async def get_upcoming_appointments(db: AsyncSession = Depends(get_db), current_
     if result == []:
         return []
     return await service.get_upcoming(filters=filters if filters else None)
+
+
+@router.get("/search")
+async def search_appointments(
+    search: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    type: Optional[str] = Query(None),
+    doctor_id: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    time_from: Optional[str] = Query(None),
+    time_to: Optional[str] = Query(None),
+    patient_name: Optional[str] = Query(None),
+    op_no: Optional[str] = Query(None),
+    mobile: Optional[str] = Query(None),
+    abha_id: Optional[str] = Query(None),
+    payment_status: Optional[str] = Query(None),
+    created_by_id: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
+    sort_by: Optional[str] = Query("appointment_date"),
+    sort_order: Optional[str] = Query("desc", pattern="^(asc|desc)$"),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    verify_permission(current_user, Permission.MANAGE_APPOINTMENTS)
+    filters = {}
+    if search:
+        filters["search"] = search
+    if status:
+        filters["status"] = status
+    if type:
+        filters["appointment_type"] = type
+    if date_from:
+        filters["date_from"] = date_from
+    if date_to:
+        filters["date_to"] = date_to
+    if time_from:
+        filters["time_from"] = time_from
+    if time_to:
+        filters["time_to"] = time_to
+    if patient_name:
+        filters["patient_name"] = patient_name
+    if op_no:
+        filters["op_no"] = op_no
+    if mobile:
+        filters["mobile"] = mobile
+    if abha_id:
+        filters["abha_id"] = abha_id
+    if payment_status:
+        filters["payment_status"] = payment_status
+    if created_by_id:
+        filters["created_by_id"] = created_by_id
+
+    role = current_user.get("role")
+    if role == Role.DOCTOR.value:
+        filters["doctor_id"] = current_user.get("sub")
+    elif doctor_id:
+        filters["doctor_id"] = doctor_id
+    elif role == Role.HOSPITAL_ADMIN.value:
+        hid = current_user.get("hospital_id")
+        if hid:
+            patient_result = await db.execute(select(Patient.id).where(Patient.hospital_id == hid))
+            pids = [row[0] for row in patient_result.all()]
+            if not pids:
+                return {"items": [], "total": 0, "page": 1, "size": page_size, "pages": 0}
+            filters["patient_id__in"] = pids
+    elif role == Role.GROUP_ADMIN.value:
+        agid = current_user.get("admin_group_id")
+        if agid:
+            hosp_result = await db.execute(select(Hospital.id).where(Hospital.admin_group_id == agid))
+            hids = [row[0] for row in hosp_result.all()]
+            if not hids:
+                return {"items": [], "total": 0, "page": 1, "size": page_size, "pages": 0}
+            patient_result = await db.execute(select(Patient.id).where(Patient.hospital_id.in_(hids)))
+            pids = [row[0] for row in patient_result.all()]
+            if not pids:
+                return {"items": [], "total": 0, "page": 1, "size": page_size, "pages": 0}
+            filters["patient_id__in"] = pids
+
+    skip = (page - 1) * page_size
+    service = AppointmentService(db)
+    repo = service.repo
+    count_filters = {k: v for k, v in filters.items()}
+    total = await repo.count(filters=count_filters or None)
+    descending = sort_order == "desc"
+    appointments = await repo.get_all(skip=skip, limit=page_size, filters=filters or None, order_by=sort_by, descending=descending)
+    for a in appointments:
+        await service._attach_names(a)
+    total_pages = (total + page_size - 1) // page_size if total > 0 else 0
+    return {
+        "items": appointments,
+        "total": total,
+        "page": page,
+        "size": page_size,
+        "pages": total_pages,
+    }
 
 
 @router.get("/{appointment_id}", response_model=AppointmentResponse)

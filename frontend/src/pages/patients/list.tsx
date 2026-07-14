@@ -5,15 +5,12 @@ import {
   useReactTable,
   getCoreRowModel,
   getSortedRowModel,
-  getPaginationRowModel,
-  getFilteredRowModel,
   flexRender,
   type ColumnDef,
   type SortingState,
-  type ColumnFiltersState,
 } from "@tanstack/react-table"
 import { motion } from "framer-motion"
-import { Plus, Search, Eye, Edit, Trash2, Users, UserPlus, Download, FileSpreadsheet, File as FilePdf } from "lucide-react"
+import { Plus, Eye, Edit, Trash2, Users, UserPlus, SlidersHorizontal } from "lucide-react"
 import { format } from "date-fns"
 import PageHeader from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
@@ -22,39 +19,26 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import SearchableSelect from "@/components/ui/searchable-select"
-import { patientsApi } from "@/services/endpoints"
+import { patientsApi, doctorsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
 import DentalEmptyState from "@/components/ui/dental-empty-state"
 import QuickExport from "@/components/ui/quick-export"
-import type { Patient, PatientStatus } from "@/types"
+import { useServerFilters } from "@/hooks/useServerFilters"
+import { FilterChips } from "@/components/ui/filter-bar"
+import PatientFilterBar from "./filter-bar"
+import type { Patient, PaginatedResponse, User } from "@/types"
 import { useAuthStore } from "@/store/authStore"
 
-function StatusBadge({ status }: { status: string }) {
-  const cls = `status-badge status-badge-${status?.toLowerCase().replace(/_/g, "_")}`;
-  return <span className={cls}>{status?.replace(/_/g, " ")}</span>;
-}
+const DATE_PRESET_KEYS = new Set(["date_preset"])
 
 const genderBadgeVariant: Record<string, "default" | "secondary" | "outline" | "destructive" | "success" | "warning"> = {
-  MALE: "default",
-  FEMALE: "success",
-  OTHER: "secondary",
+  MALE: "default", FEMALE: "success", OTHER: "secondary",
 }
 
 const SOURCE_OPTIONS = [
@@ -65,24 +49,10 @@ const SOURCE_OPTIONS = [
 ]
 
 interface PatientForm {
-  full_name: string
-  email: string
-  phone: string
-  gender: string
-  age: string
-  patient_source: string
-  source_campaign_name: string
-  source_campaign_id: string
-  source_campaign_date: string
-  address: string
-  medical_history: string
-  abha_id: string
-  height: string
-  weight: string
-  bp: string
-  sugar: string
-  spo2: string
-  op_no: string
+  full_name: string; email: string; phone: string; gender: string; age: string;
+  patient_source: string; source_campaign_name: string; source_campaign_id: string;
+  source_campaign_date: string; address: string; medical_history: string; abha_id: string;
+  height: string; weight: string; bp: string; sugar: string; spo2: string; op_no: string
 }
 
 function getEmptyForm(): PatientForm {
@@ -105,27 +75,69 @@ function stripEmptyFormFields(data: PatientForm): Record<string, unknown> {
   return cleaned
 }
 
+function StatusBadge({ status }: { status: string }) {
+  const cls = `status-badge status-badge-${status?.toLowerCase().replace(/_/g, "_")}`
+  return <span className={cls}>{status?.replace(/_/g, " ")}</span>
+}
+
 export default function PatientList() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { addToast } = useToast()
-  const [sorting, setSorting] = useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-  const [globalFilter, setGlobalFilter] = useState("")
-  const [genderFilter, setGenderFilter] = useState<string>("all")
-  const [statusFilter, setStatusFilter] = useState<string>("all")
+
+  const {
+    filters, setFilter, resetFilters, queryKey, activeFilters, hasActiveFilters,
+    page, setPage, sortField, sortDir, toggleSort, activeChips,
+  } = useServerFilters({ defaultSort: "created_at", defaultSortDir: "desc" })
+
   const [dialogOpen, setDialogOpen] = useState(false)
   const [form, setForm] = useState<PatientForm>(getEmptyForm)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deletingPatient, setDeletingPatient] = useState<Patient | null>(null)
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
 
   const currentUser = useAuthStore((s) => s.user)
-  const { data, isLoading } = useQuery<Patient[]>({
-    queryKey: ["patients", { search: globalFilter }],
-    queryFn: () => patientsApi.list({ search: globalFilter, page_size: 100, hospital_id: currentUser?.hospital_id || undefined }),
-    refetchOnMount: true,
-    staleTime: 0,
+
+  const { data, isLoading } = useQuery<PaginatedResponse<Patient>>({
+    queryKey: ["patients", "search", queryKey],
+    queryFn: () => {
+      const params: Record<string, any> = {
+        page, page_size: 10,
+        sort_by: sortField, sort_order: sortDir,
+      }
+      for (const [k, v] of Object.entries(filters)) {
+        if (v !== "" && v !== undefined && !DATE_PRESET_KEYS.has(k)) params[k] = v
+      }
+      return patientsApi.searchAdvanced(params)
+    },
+    placeholderData: (prev) => prev,
   })
+
+  const { data: doctorsData } = useQuery<PaginatedResponse<User>>({
+    queryKey: ["doctors", "filter-dropdown"],
+    queryFn: () => doctorsApi.list({ page_size: 200, admin_group_id: currentUser?.admin_group_id || undefined }),
+  })
+
+  const doctors: User[] = useMemo(() => {
+    if (!doctorsData) return []
+    if (Array.isArray(doctorsData)) return doctorsData
+    return doctorsData?.items || []
+  }, [doctorsData])
+
+  const patients: Patient[] = useMemo(() => {
+    if (Array.isArray(data)) return data
+    return data?.items || []
+  }, [data])
+
+  const totalCount = useMemo(() => {
+    if (Array.isArray(data)) return data.length
+    return data?.total || 0
+  }, [data])
+
+  const totalPages = useMemo(() => {
+    if (Array.isArray(data)) return 1
+    return data?.total_pages || 1
+  }, [data])
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => patientsApi.delete(id),
@@ -134,25 +146,15 @@ export default function PatientList() {
       queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" })
       queryClient.invalidateQueries({ queryKey: ["crm"] })
       addToast({ title: "Success", description: "Patient deleted successfully", variant: "success" })
-      setDeleteDialogOpen(false)
-      setDeletingPatient(null)
+      setDeleteDialogOpen(false); setDeletingPatient(null)
     },
     onError: (err: any) => {
-      const msg = err?.response?.data?.detail || "Failed to delete patient"
-      addToast({ title: "Error", description: msg, variant: "destructive" })
+      addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to delete patient", variant: "destructive" })
     },
   })
 
-  function confirmDelete(patient: Patient) {
-    setDeletingPatient(patient)
-    setDeleteDialogOpen(true)
-  }
-
-  function handleDelete() {
-    if (deletingPatient) {
-      deleteMutation.mutate(deletingPatient.id)
-    }
-  }
+  function confirmDelete(patient: Patient) { setDeletingPatient(patient); setDeleteDialogOpen(true) }
+  function handleDelete() { if (deletingPatient) deleteMutation.mutate(deletingPatient.id) }
 
   const createMutation = useMutation({
     mutationFn: (data: any) => patientsApi.create(data),
@@ -168,54 +170,36 @@ export default function PatientList() {
     },
   })
 
-  function resetForm() {
-    setForm(getEmptyForm())
-    setDialogOpen(false)
-  }
-
-  function openDialog() {
-    setForm(getEmptyForm())
-    setDialogOpen(true)
-  }
-
-  const patients = useMemo(() => {
-    if (!data) return []
-    let filtered = data
-    if (genderFilter !== "all") {
-      filtered = filtered.filter((p: Patient) => p.gender === genderFilter)
-    }
-    if (statusFilter !== "all") {
-      filtered = filtered.filter((p: Patient) => p.status === statusFilter)
-    }
-    return filtered
-  }, [data, genderFilter, statusFilter])
+  function resetForm() { setForm(getEmptyForm()); setDialogOpen(false) }
+  function openDialog() { setForm(getEmptyForm()); setDialogOpen(true) }
+  function handleDialogOpenChange(open: boolean) { if (!open) resetForm(); setDialogOpen(open) }
 
   const columns = useMemo<ColumnDef<Patient>[]>(
     () => [
       {
         accessorKey: "full_name",
-        header: "Name",
-        cell: ({ row }) => (
-          <span className="font-medium">{row.getValue("full_name")}</span>
+        header: () => (
+          <button onClick={() => toggleSort("full_name")} className="flex items-center gap-1 hover:text-foreground">
+            Name {sortField === "full_name" ? (sortDir === "asc" ? "↑" : "↓") : ""}
+          </button>
         ),
+        cell: ({ row }) => <span className="font-medium">{row.getValue("full_name")}</span>,
       },
       {
         accessorKey: "gender",
         header: "Gender",
         cell: ({ row }) => {
           const gender = row.getValue("gender") as string
-          return gender ? (
-            <Badge variant={genderBadgeVariant[gender] || "secondary"}>
-              {gender}
-            </Badge>
-          ) : (
-            <span className="text-muted-foreground">—</span>
-          )
+          return gender ? <Badge variant={genderBadgeVariant[gender] || "secondary"}>{gender}</Badge> : <span className="text-muted-foreground">—</span>
         },
       },
       {
         accessorKey: "status",
-        header: "Status",
+        header: () => (
+          <button onClick={() => toggleSort("status")} className="flex items-center gap-1 hover:text-foreground">
+            Status {sortField === "status" ? (sortDir === "asc" ? "↑" : "↓") : ""}
+          </button>
+        ),
         cell: ({ row }) => {
           const status = row.getValue("status") as string
           return status ? <StatusBadge status={status} /> : <span className="text-muted-foreground">—</span>
@@ -238,7 +222,11 @@ export default function PatientList() {
       },
       {
         accessorKey: "created_at",
-        header: "Created At",
+        header: () => (
+          <button onClick={() => toggleSort("created_at")} className="flex items-center gap-1 hover:text-foreground">
+            Created {sortField === "created_at" ? (sortDir === "asc" ? "↑" : "↓") : ""}
+          </button>
+        ),
         cell: ({ row }) => {
           const val = row.getValue("created_at") as string
           return val ? format(new Date(val), "MMM dd, yyyy") : "—"
@@ -249,11 +237,7 @@ export default function PatientList() {
         header: "Actions",
         cell: ({ row }) => (
           <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate(`/patients/${row.original.id}`)}
-            >
+            <Button variant="ghost" size="icon" onClick={() => navigate(`/patients/${row.original.id}`)}>
               <Eye className="h-4 w-4" />
             </Button>
             <Button variant="ghost" size="icon">
@@ -266,21 +250,14 @@ export default function PatientList() {
         ),
       },
     ],
-    [navigate]
+    [navigate, sortField, sortDir, toggleSort]
   )
 
   const table = useReactTable({
     data: patients,
     columns,
-    state: { sorting, columnFilters, globalFilter },
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    initialState: { pagination: { pageSize: 10 } },
   })
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -292,73 +269,76 @@ export default function PatientList() {
     createMutation.mutate(stripEmptyFormFields(form))
   }
 
-  function handleDialogOpenChange(open: boolean) {
-    if (!open) resetForm()
-    setDialogOpen(open)
-  }
-
   return (
     <div className="space-y-6">
       <PageHeader title="Patients" description="Manage patient records">
         {currentUser?.role !== "DOCTOR" && (
-          <Button onClick={openDialog}>
-            <Plus className="h-4 w-4" /> Add Patient
-          </Button>
+          <Button onClick={openDialog}><Plus className="h-4 w-4" /> Add Patient</Button>
         )}
         <QuickExport module="patients" label="patients" />
       </PageHeader>
 
       <Card>
         <CardContent className="p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-4">
-            <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search patients..."
-                value={globalFilter}
-                onChange={(e) => setGlobalFilter(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {["all", "MALE", "FEMALE", "OTHER"].map((g) => (
-                <Button
-                  key={g}
-                  variant={genderFilter === g ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setGenderFilter(g)}
-                >
-                  {g === "all" ? "All" : g.charAt(0) + g.slice(1).toLowerCase()}
+          {/* Mobile filter trigger */}
+          <div className="lg:hidden mb-4">
+            <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" className="w-full">
+                  <SlidersHorizontal className="h-4 w-4 mr-2" />
+                  Filters {activeFilters > 0 && `(${activeFilters})`}
                 </Button>
-              ))}
-            </div>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-[300px] sm:w-[360px] p-0">
+                <SheetHeader className="p-4 pb-2 border-b">
+                  <SheetTitle>Filters</SheetTitle>
+                </SheetHeader>
+                <div className="p-4 overflow-y-auto h-[calc(100%-60px)]">
+                  <PatientFilterBar
+                    filters={filters} setFilter={setFilter} resetFilters={resetFilters}
+                    activeCount={activeFilters} doctors={doctors}
+                  />
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
-          <div className="flex flex-wrap items-center gap-2 mt-2">
-            <span className="text-xs text-muted-foreground mr-1">Status:</span>
-            {["all", "NEW", "ACTIVE", "INACTIVE", "UNDER_TREATMENT", "TREATMENT_ONGOING", "FOLLOW_UP", "COMPLETED", "OPD", "LOST", "ARCHIVED"].map((s) => (
-              <Button
-                key={s}
-                variant={statusFilter === s ? "default" : "outline"}
-                size="sm"
-                onClick={() => setStatusFilter(s)}
-              >
-                {s === "all" ? "All" : s.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}
-              </Button>
-            ))}
+
+          {/* Desktop filter bar */}
+          <div className="hidden lg:block mb-4">
+            <PatientFilterBar
+              filters={filters} setFilter={setFilter} resetFilters={resetFilters}
+              activeCount={activeFilters} doctors={doctors}
+            />
+          </div>
+
+          {/* Active filter chips */}
+          <div className="mb-4">
+            <FilterChips chips={activeChips} onRemove={(k) => setFilter(k, "")} onClearAll={resetFilters} />
+          </div>
+
+          {/* Results count */}
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm text-muted-foreground">
+              {totalCount} patient{totalCount !== 1 ? "s" : ""} found
+            </p>
           </div>
 
           {isLoading ? (
             <div className="space-y-3">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
+              {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
             </div>
           ) : patients.length === 0 ? (
             <DentalEmptyState
               icon={Users}
-              title="No patients yet"
-              description="Begin your patient journey by registering the first patient in your dental practice."
-              action={currentUser?.role !== "DOCTOR" ? <Button onClick={openDialog}><UserPlus className="h-4 w-4" /> Add Patient</Button> : undefined}
+              title={hasActiveFilters ? "No patients match your filters" : "No patients yet"}
+              description={hasActiveFilters ? "Try adjusting or clearing your filters." : "Begin your patient journey by registering the first patient in your dental practice."}
+              action={
+                hasActiveFilters ? (
+                  <Button variant="outline" onClick={resetFilters}>Clear Filters</Button>
+                ) : currentUser?.role !== "DOCTOR" ? (
+                  <Button onClick={openDialog}><UserPlus className="h-4 w-4" /> Add Patient</Button>
+                ) : undefined
+              }
             />
           ) : (
             <>
@@ -368,18 +348,8 @@ export default function PatientList() {
                     {table.getHeaderGroups().map((hg) => (
                       <tr key={hg.id} className="border-b bg-muted/50">
                         {hg.headers.map((header) => (
-                          <th
-                            key={header.id}
-                            className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer select-none"
-                            onClick={header.column.getToggleSortingHandler()}
-                          >
-                            <div className="flex items-center gap-1">
-                              {flexRender(header.column.columnDef.header, header.getContext())}
-                              {{
-                                asc: " ↑",
-                                desc: " ↓",
-                              }[header.column.getIsSorted() as string] ?? null}
-                            </div>
+                          <th key={header.id} className="px-4 py-3 text-left font-medium text-muted-foreground">
+                            {flexRender(header.column.columnDef.header, header.getContext())}
                           </th>
                         ))}
                       </tr>
@@ -387,13 +357,9 @@ export default function PatientList() {
                   </thead>
                   <tbody>
                     {table.getRowModel().rows.map((row) => (
-                      <motion.tr
-                        key={row.id}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
+                      <motion.tr key={row.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                         className="border-b transition-colors hover:bg-muted/50 cursor-pointer"
-                        onClick={() => navigate(`/patients/${row.original.id}`)}
-                      >
+                        onClick={() => navigate(`/patients/${row.original.id}`)}>
                         {row.getVisibleCells().map((cell) => {
                           const header = cell.column.columnDef.header
                           const label = typeof header === "string" ? header : cell.column.id
@@ -411,24 +377,13 @@ export default function PatientList() {
 
               <div className="flex items-center justify-between mt-4">
                 <p className="text-sm text-muted-foreground">
-                  Page {table.getState().pagination.pageIndex + 1} of{" "}
-                  {table.getPageCount()}
+                  Page {page} of {totalPages} ({totalCount} total)
                 </p>
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => table.previousPage()}
-                    disabled={!table.getCanPreviousPage()}
-                  >
+                  <Button variant="outline" size="sm" onClick={() => setPage(page - 1)} disabled={page <= 1}>
                     Previous
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => table.nextPage()}
-                    disabled={!table.getCanNextPage()}
-                  >
+                  <Button variant="outline" size="sm" onClick={() => setPage(page + 1)} disabled={page >= totalPages}>
                     Next
                   </Button>
                 </div>
@@ -438,145 +393,86 @@ export default function PatientList() {
         </CardContent>
       </Card>
 
+      {/* Create Dialog */}
       <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
         <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
           <DialogHeader className="px-6 pt-6 pb-0 shrink-0">
             <DialogTitle>Add Patient</DialogTitle>
-            <DialogDescription>
-              Fill in the details to register a new patient.
-            </DialogDescription>
+            <DialogDescription>Fill in the details to register a new patient.</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
             <div className="overflow-y-auto px-6 py-4 space-y-4 flex-1">
               <div className="grid gap-2">
                 <Label htmlFor="name">Full Name</Label>
-                <Input
-                  id="name"
-                  value={form.full_name}
-                  onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-                  required
-                />
+                <Input id="name" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} required />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  />
+                  <Input id="email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="phone">Phone</Label>
-                  <Input
-                    id="phone"
-                    value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                  />
+                  <Input id="phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="gender">Gender</Label>
-                  <Select
-                    value={form.gender}
-                    onValueChange={(v) => setForm({ ...form, gender: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select gender" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="MALE">Male</SelectItem>
-                      <SelectItem value="FEMALE">Female</SelectItem>
-                      <SelectItem value="OTHER">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <select id="gender" value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                    <option value="">Select gender</option>
+                    <option value="MALE">Male</option>
+                    <option value="FEMALE">Female</option>
+                    <option value="OTHER">Other</option>
+                  </select>
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="age">Age</Label>
-                  <Input
-                    id="age"
-                    type="number"
-                    value={form.age}
-                    onChange={(e) => setForm({ ...form, age: e.target.value })}
-                  />
+                  <Input id="age" type="number" value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} />
                 </div>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="source">How Did You Hear About Us?</Label>
-                <SearchableSelect
-                  value={form.patient_source}
-                  onValueChange={(v) => setForm({ ...form, patient_source: v })}
-                  options={SOURCE_OPTIONS}
-                  placeholder="Search or select source..."
-                />
+                <SearchableSelect value={form.patient_source} onValueChange={(v) => setForm({ ...form, patient_source: v })}
+                  options={SOURCE_OPTIONS} placeholder="Search or select source..." />
               </div>
               {form.patient_source === "Campaign" && (
                 <div className="grid grid-cols-3 gap-3 rounded-lg border border-blue-100 bg-blue-50 p-3">
                   <div className="grid gap-1">
                     <Label htmlFor="campaign_name" className="text-xs">Campaign Name</Label>
-                    <Input
-                      id="campaign_name" className="h-8 text-xs" placeholder="Campaign name"
-                      value={form.source_campaign_name}
-                      onChange={(e) => setForm({ ...form, source_campaign_name: e.target.value })}
-                    />
+                    <Input id="campaign_name" className="h-8 text-xs" placeholder="Campaign name"
+                      value={form.source_campaign_name} onChange={(e) => setForm({ ...form, source_campaign_name: e.target.value })} />
                   </div>
                   <div className="grid gap-1">
                     <Label htmlFor="campaign_id" className="text-xs">Campaign ID</Label>
-                    <Input
-                      id="campaign_id" className="h-8 text-xs" placeholder="Campaign ID"
-                      value={form.source_campaign_id}
-                      onChange={(e) => setForm({ ...form, source_campaign_id: e.target.value })}
-                    />
+                    <Input id="campaign_id" className="h-8 text-xs" placeholder="Campaign ID"
+                      value={form.source_campaign_id} onChange={(e) => setForm({ ...form, source_campaign_id: e.target.value })} />
                   </div>
                   <div className="grid gap-1">
                     <Label htmlFor="campaign_date" className="text-xs">Campaign Date</Label>
-                    <Input
-                      id="campaign_date" type="date" className="h-8 text-xs"
-                      value={form.source_campaign_date}
-                      onChange={(e) => setForm({ ...form, source_campaign_date: e.target.value })}
-                    />
+                    <Input id="campaign_date" type="date" className="h-8 text-xs"
+                      value={form.source_campaign_date} onChange={(e) => setForm({ ...form, source_campaign_date: e.target.value })} />
                   </div>
                 </div>
               )}
               <div className="grid gap-2">
                 <Label htmlFor="address">Address</Label>
-                <Input
-                  id="address"
-                  value={form.address}
-                  onChange={(e) => setForm({ ...form, address: e.target.value })}
-                />
+                <Input id="address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="op_no">OP No.</Label>
-                  <Input
-                    id="op_no"
-                    value={form.op_no}
-                    onChange={(e) => setForm({ ...form, op_no: e.target.value })}
-                    placeholder="e.g. OP-2024-001"
-                  />
+                  <Input id="op_no" value={form.op_no} onChange={(e) => setForm({ ...form, op_no: e.target.value })} placeholder="e.g. OP-2024-001" />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="abha_id">ABHA ID</Label>
-                  <Input
-                    id="abha_id"
-                    value={form.abha_id}
-                    onChange={(e) => setForm({ ...form, abha_id: e.target.value })}
-                    placeholder="14-digit ABHA number"
-                    maxLength={20}
-                  />
+                  <Input id="abha_id" value={form.abha_id} onChange={(e) => setForm({ ...form, abha_id: e.target.value })} placeholder="14-digit ABHA number" maxLength={20} />
                 </div>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="medical_history">Medical History</Label>
-                <Textarea
-                  id="medical_history"
-                  value={form.medical_history}
-                  onChange={(e) => setForm({ ...form, medical_history: e.target.value })}
-                  placeholder="Past medical history, allergies, medications..."
-                />
+                <Textarea id="medical_history" value={form.medical_history} onChange={(e) => setForm({ ...form, medical_history: e.target.value })} placeholder="Past medical history, allergies, medications..." />
               </div>
               <div className="border-t pt-4 mt-2">
                 <p className="text-xs font-semibold text-muted-foreground mb-3">Vitals</p>
@@ -605,29 +501,22 @@ export default function PatientList() {
               </div>
             </div>
             <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-gray-100">
-              <Button type="button" variant="outline" onClick={resetForm}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending ? "Saving..." : "Save"}
-              </Button>
+              <Button type="button" variant="outline" onClick={resetForm}>Cancel</Button>
+              <Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? "Saving..." : "Save"}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
+      {/* Delete Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle>Delete Patient</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete "{deletingPatient?.full_name}"? This action cannot be undone.
-            </DialogDescription>
+            <DialogDescription>Are you sure you want to delete "{deletingPatient?.full_name}"? This action cannot be undone.</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setDeleteDialogOpen(false)}>
-              Cancel
-            </Button>
+            <Button type="button" variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
             <Button type="button" variant="destructive" onClick={handleDelete} disabled={deleteMutation.isPending}>
               {deleteMutation.isPending ? "Deleting..." : "Delete"}
             </Button>

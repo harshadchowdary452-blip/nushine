@@ -59,6 +59,7 @@ export const doctorsApi = {
 
 export const patientsApi = {
   list: (params?: PaginationParams) => api.get("/patients", { params: withPagination(params) }).then((r) => r.data),
+  searchAdvanced: (params?: Record<string, unknown>) => api.get("/patients/search-advanced", { params }).then((r) => r.data),
   get: (id: string) => api.get(`/patients/${id}`).then((r) => r.data),
   create: (data: any) => api.post("/patients", data).then((r) => r.data),
   update: (id: string, data: any) => api.put(`/patients/${id}`, data).then((r) => r.data),
@@ -83,6 +84,7 @@ export const casesApi = {
 
 export const appointmentsApi = {
   list: (params?: PaginationParams) => api.get("/appointments", { params: withPagination(params) }).then((r) => r.data),
+  search: (params?: Record<string, unknown>) => api.get("/appointments/search", { params }).then((r) => r.data),
   get: (id: string) => api.get(`/appointments/${id}`).then((r) => r.data),
   create: (data: any) => api.post("/appointments", data).then((r) => r.data),
   update: (id: string, data: any) => api.put(`/appointments/${id}`, data).then((r) => r.data),

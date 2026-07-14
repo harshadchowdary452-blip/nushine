@@ -454,7 +454,13 @@ class AppointmentService:
         return appointment
 
     async def get_all(self, skip: int = 0, limit: int = 100, filters: dict = None) -> List[Appointment]:
-        appointments = await self.repo.get_all(skip=skip, limit=limit, filters=filters)
+        sort_by = None
+        descending = False
+        if filters:
+            sort_by = filters.pop("sort_by", None)
+            descending = filters.get("sort_order") == "desc" if filters.get("sort_order") else False
+            filters.pop("sort_order", None)
+        appointments = await self.repo.get_all(skip=skip, limit=limit, filters=filters, order_by=sort_by, descending=descending)
         for a in appointments:
             await self._attach_names(a)
         return appointments

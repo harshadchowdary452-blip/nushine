@@ -47,14 +47,73 @@ async def create_patient(data: PatientCreate, db: AsyncSession = Depends(get_db)
 
 
 @router.get("/")
-async def get_patients(skip: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=200), hospital_id: Optional[str] = Query(None), doctor_id: Optional[str] = Query(None), status_filter: Optional[str] = Query(None, alias="status"), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+async def get_patients(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=200),
+    hospital_id: Optional[str] = Query(None),
+    doctor_id: Optional[str] = Query(None),
+    status_filter: Optional[str] = Query(None, alias="status"),
+    gender: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    op_no: Optional[str] = Query(None),
+    phone: Optional[str] = Query(None),
+    abha_id: Optional[str] = Query(None),
+    patient_source: Optional[str] = Query(None),
+    age_from: Optional[int] = Query(None),
+    age_to: Optional[int] = Query(None),
+    case_status: Optional[str] = Query(None),
+    treatment_status: Optional[str] = Query(None),
+    billing_status: Optional[str] = Query(None),
+    created_at_from: Optional[str] = Query(None),
+    created_at_to: Optional[str] = Query(None),
+    last_visit_from: Optional[str] = Query(None),
+    last_visit_to: Optional[str] = Query(None),
+    sort_by: Optional[str] = Query(None),
+    sort_order: Optional[str] = Query(None, pattern="^(asc|desc)$"),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
     verify_permission(current_user, Permission.MANAGE_PATIENTS, Permission.VIEW_ALL_PATIENTS)
     service = PatientService(db)
     filters = {}
+    if search:
+        filters["search"] = search
     if doctor_id:
         filters["doctor_id"] = doctor_id
     if status_filter:
         filters["status"] = status_filter
+    if gender:
+        filters["gender"] = gender
+    if op_no:
+        filters["op_no"] = op_no
+    if phone:
+        filters["phone"] = phone
+    if abha_id:
+        filters["abha_id"] = abha_id
+    if patient_source:
+        filters["patient_source"] = patient_source
+    if age_from is not None:
+        filters["age_from"] = age_from
+    if age_to is not None:
+        filters["age_to"] = age_to
+    if case_status:
+        filters["case_status"] = case_status
+    if treatment_status:
+        filters["treatment_status"] = treatment_status
+    if billing_status:
+        filters["billing_status"] = billing_status
+    if created_at_from:
+        filters["created_at_from"] = created_at_from
+    if created_at_to:
+        filters["created_at_to"] = created_at_to
+    if last_visit_from:
+        filters["last_visit_from"] = last_visit_from
+    if last_visit_to:
+        filters["last_visit_to"] = last_visit_to
+    if sort_by:
+        filters["sort_by"] = sort_by
+    if sort_order:
+        filters["sort_order"] = sort_order
     role = current_user.get("role")
     if role == Role.DOCTOR.value:
         if current_user.get("sub"):
@@ -113,6 +172,125 @@ async def search_patients(q: str = Query(..., min_length=1), hospital_id: Option
             if hospital_ids:
                 return await service.search(q, hospital_ids_in=hospital_ids, doctor_id=effective_doctor_id, status_filter=status_filter)
     return await service.search(q, hospital_id=effective_hospital_id, doctor_id=effective_doctor_id, status_filter=status_filter)
+
+
+@router.get("/search-advanced")
+async def search_patients_advanced(
+    search: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    gender: Optional[str] = Query(None),
+    doctor_id: Optional[str] = Query(None),
+    op_no: Optional[str] = Query(None),
+    phone: Optional[str] = Query(None),
+    abha_id: Optional[str] = Query(None),
+    patient_source: Optional[str] = Query(None),
+    age_from: Optional[int] = Query(None),
+    age_to: Optional[int] = Query(None),
+    case_status: Optional[str] = Query(None),
+    treatment_status: Optional[str] = Query(None),
+    billing_status: Optional[str] = Query(None),
+    created_at_from: Optional[str] = Query(None),
+    created_at_to: Optional[str] = Query(None),
+    last_visit_from: Optional[str] = Query(None),
+    last_visit_to: Optional[str] = Query(None),
+    created_by_id: Optional[str] = Query(None),
+    updated_by_id: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
+    sort_by: Optional[str] = Query("created_at"),
+    sort_order: Optional[str] = Query("desc", pattern="^(asc|desc)$"),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    verify_permission(current_user, Permission.MANAGE_PATIENTS, Permission.VIEW_ALL_PATIENTS)
+    filters = {}
+    if search:
+        filters["search"] = search
+    if status:
+        filters["status"] = status
+    if gender:
+        filters["gender"] = gender
+    if op_no:
+        filters["op_no"] = op_no
+    if phone:
+        filters["phone"] = phone
+    if abha_id:
+        filters["abha_id"] = abha_id
+    if patient_source:
+        filters["patient_source"] = patient_source
+    if age_from is not None:
+        filters["age_from"] = age_from
+    if age_to is not None:
+        filters["age_to"] = age_to
+    if case_status:
+        filters["case_status"] = case_status
+    if treatment_status:
+        filters["treatment_status"] = treatment_status
+    if billing_status:
+        filters["billing_status"] = billing_status
+    if created_at_from:
+        filters["created_at_from"] = created_at_from
+    if created_at_to:
+        filters["created_at_to"] = created_at_to
+    if last_visit_from:
+        filters["last_visit_from"] = last_visit_from
+    if last_visit_to:
+        filters["last_visit_to"] = last_visit_to
+    if created_by_id:
+        filters["created_by_id"] = created_by_id
+    if updated_by_id:
+        filters["updated_by_id"] = updated_by_id
+
+    role = current_user.get("role")
+    if role == Role.DOCTOR.value:
+        if current_user.get("sub"):
+            did = current_user.get("sub")
+            direct_ids = select(Patient.id).where(Patient.doctor_id == did)
+            appt_ids = select(Appointment.patient_id).where(Appointment.doctor_id == did, Appointment.is_active == True)
+            case_ids = select(Case.patient_id).where(Case.doctor_id == did)
+            union_query = direct_ids.union(appt_ids, case_ids)
+            result = await db.execute(union_query)
+            pids = [row[0] for row in result.all()]
+            if pids:
+                filters["id__in"] = pids
+            else:
+                return {"items": [], "total": 0, "page": 1, "size": page_size, "pages": 0}
+        elif current_user.get("hospital_id"):
+            filters["hospital_id"] = current_user.get("hospital_id")
+    elif role == Role.HOSPITAL_ADMIN.value:
+        if current_user.get("hospital_id"):
+            filters["hospital_id"] = current_user.get("hospital_id")
+    elif role == Role.GROUP_ADMIN.value:
+        from app.models.hospital import Hospital
+        agid = current_user.get("admin_group_id")
+        if agid:
+            hospital_result = await db.execute(select(Hospital.id).where(Hospital.admin_group_id == agid))
+            hids = [row[0] for row in hospital_result.all()]
+            if hids:
+                filters["hospital_id__in"] = hids
+            else:
+                return {"items": [], "total": 0, "page": 1, "size": page_size, "pages": 0}
+    else:
+        pass
+
+    if doctor_id:
+        filters["doctor_id"] = doctor_id
+
+    skip = (page - 1) * page_size
+    service = PatientService(db)
+    repo = service.repo
+    count_filters = {k: v for k, v in filters.items()}
+    total = await repo.count(filters=count_filters or None)
+    descending = sort_order == "desc"
+    patients = await repo.get_all(skip=skip, limit=page_size, filters=filters or None, order_by=sort_by, descending=descending)
+    total_pages = (total + page_size - 1) // page_size if total > 0 else 0
+    return {
+        "items": patients,
+        "total": total,
+        "page": page,
+        "size": page_size,
+        "pages": total_pages,
+    }
 
 
 @router.get("/{patient_id}", response_model=PatientResponse)

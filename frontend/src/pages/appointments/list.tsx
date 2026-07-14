@@ -5,81 +5,49 @@ import {
   useReactTable,
   getCoreRowModel,
   getSortedRowModel,
-  getPaginationRowModel,
-  getFilteredRowModel,
   flexRender,
   type ColumnDef,
   type SortingState,
 } from "@tanstack/react-table"
 import { motion } from "framer-motion"
 import {
-  Plus,
-  Search,
-  Eye,
-  Trash2,
-  Calendar,
-  List,
-  ChevronLeft,
-  ChevronRight,
-  CalendarDays,
-  User as UserIcon,
-  BadgeCheck,
-  X,
-  Clock,
+  Plus, Search, Eye, Trash2, Calendar, List, ChevronLeft, ChevronRight,
+  CalendarDays, User as UserIcon, X, Clock, SlidersHorizontal,
 } from "lucide-react"
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay } from "date-fns"
+import { format, eachDayOfInterval, startOfMonth, endOfMonth, getDay, isSameDay } from "date-fns"
 import PageHeader from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
+import { Label } from "@/components/ui/label"
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
-
-import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { appointmentsApi, patientsApi, doctorsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
 import QuickExport from "@/components/ui/quick-export"
-import type { Appointment, Patient, User, PaginatedResponse, TimeSlot, DoctorSlotResponse } from "@/types"
+import { useServerFilters } from "@/hooks/useServerFilters"
+import { FilterChips } from "@/components/ui/filter-bar"
+import AppointmentFilterBar from "./filter-bar"
+import type { Appointment, Patient, User, PaginatedResponse, DoctorSlotResponse } from "@/types"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/store/authStore"
 
-function StatusBadge({ status }: { status: string }) {
-  const cls = `status-badge status-badge-${status?.toLowerCase().replace(/_/g, "_")}`;
-  return <span className={cls}>{status?.replace(/_/g, " ")}</span>;
-}
+const DATE_PRESET_KEYS = new Set(["date_preset"])
 
-const statusVariant: Record<string, "default" | "secondary" | "outline" | "destructive" | "success" | "warning"> = {
-  SCHEDULED: "default",
-  CONFIRMED: "success",
-  IN_PROGRESS: "warning",
-  COMPLETED: "secondary",
-  CANCELLED: "destructive",
-  NO_SHOW: "outline",
+function StatusBadge({ status }: { status: string }) {
+  const cls = `status-badge status-badge-${status?.toLowerCase().replace(/_/g, "_")}`
+  return <span className={cls}>{status?.replace(/_/g, " ")}</span>
 }
 
 interface AppointmentForm {
-  patient_id: string
-  doctor_id: string
-  appointment_date: string
-  appointment_time: string
-  notes: string
-  appointment_type: string
-  duration_minutes: number
+  patient_id: string; doctor_id: string; appointment_date: string;
+  appointment_time: string; notes: string; appointment_type: string; duration_minutes: number
 }
 
 const APPOINTMENT_TYPES = [
@@ -107,11 +75,8 @@ const SLOT_COLORS: Record<string, string> = {
 }
 
 interface SlotGridProps {
-  doctorId: string
-  date: string
-  durationMinutes: number
-  selectedTime: string
-  onSelect: (time: string) => void
+  doctorId: string; date: string; durationMinutes: number;
+  selectedTime: string; onSelect: (time: string) => void
 }
 
 function SlotGrid({ doctorId, date, durationMinutes, selectedTime, onSelect }: SlotGridProps) {
@@ -138,9 +103,6 @@ function SlotGrid({ doctorId, date, durationMinutes, selectedTime, onSelect }: S
       <div className="rounded-xl border border-red-200 bg-red-50 p-4 space-y-2">
         <p className="text-sm text-red-600 font-medium">Failed to load slots</p>
         <p className="text-xs text-red-500">{(error as any)?.response?.data?.detail || (error as any)?.message || "Unknown error"}</p>
-        {date && doctorId && (
-          <p className="text-xs text-red-400">doctor_id={doctorId} date={date} duration={durationMinutes}</p>
-        )}
       </div>
     )
   }
@@ -157,11 +119,9 @@ function SlotGrid({ doctorId, date, durationMinutes, selectedTime, onSelect }: S
           </span>
         )}
       </div>
-
       {data.working_hours && (
         <p className="text-xs text-muted-foreground mb-2">Working hours: {data.working_hours}</p>
       )}
-
       {data.slots.length === 0 ? (
         <p className="text-sm text-muted-foreground py-4 text-center">No slots available for this date.</p>
       ) : (
@@ -181,23 +141,14 @@ function SlotGrid({ doctorId, date, durationMinutes, selectedTime, onSelect }: S
                   key={slot.time}
                   type="button"
                   disabled={slot.status !== "available" && !isSelected}
-                  onClick={() => {
-                    if (slot.status === "available") onSelect(slot.time)
-                  }}
-                  className={cn(
-                    "px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors",
-                    colorClass,
-                  )}
+                  onClick={() => { if (slot.status === "available") onSelect(slot.time) }}
+                  className={cn("px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors", colorClass)}
                   title={
-                    slot.status === "booked"
-                      ? `Booked by ${slot.patient_name || "someone"}${slot.appointment_type ? ` (${slot.appointment_type})` : ""}`
-                      : slot.status === "blocked"
-                        ? "Blocked"
-                        : slot.status === "leave"
-                          ? "Doctor on leave"
-                          : slot.status === "past"
-                            ? "Past time"
-                            : `${slot.time} - Available`
+                    slot.status === "booked" ? `Booked by ${slot.patient_name || "someone"}${slot.appointment_type ? ` (${slot.appointment_type})` : ""}`
+                    : slot.status === "blocked" ? "Blocked"
+                    : slot.status === "leave" ? "Doctor on leave"
+                    : slot.status === "past" ? "Past time"
+                    : `${slot.time} - Available`
                   }
                 >
                   <div className="flex items-center gap-1">
@@ -218,24 +169,39 @@ export default function AppointmentList() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { addToast } = useToast()
-  const [sorting, setSorting] = useState<SortingState>([])
-  const [globalFilter, setGlobalFilter] = useState("")
+
+  const {
+    filters, setFilter, resetFilters, queryKey, activeFilters, hasActiveFilters,
+    page, setPage, sortField, sortDir, toggleSort, activeChips,
+  } = useServerFilters({ defaultSort: "appointment_date", defaultSortDir: "desc" })
+
   const [view, setView] = useState<"list" | "calendar">("list")
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deletingAppointment, setDeletingAppointment] = useState<Appointment | null>(null)
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [form, setForm] = useState<AppointmentForm>(getEmptyAppointmentForm)
-
-  const { data, isLoading } = useQuery<PaginatedResponse<Appointment>>({
-    queryKey: ["appointments"],
-    queryFn: () => appointmentsApi.list({ page_size: 100 }),
-  })
+  const [patientSearch, setPatientSearch] = useState("")
+  const patientSearchRef = useRef<HTMLInputElement>(null)
+  const [availability, setAvailability] = useState<{ available: boolean; current_count: number; max_allowed: number; message?: string } | null>(null)
+  const [checkingAvailability, setCheckingAvailability] = useState(false)
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
 
   const currentUser = useAuthStore((s) => s.user)
-  const { data: patientsData } = useQuery<PaginatedResponse<Patient>>({
-    queryKey: ["patients", "dropdown"],
-    queryFn: () => patientsApi.list({ page_size: 200, hospital_id: currentUser?.hospital_id || undefined }),
+
+  const { data, isLoading } = useQuery<PaginatedResponse<Appointment>>({
+    queryKey: ["appointments", "search", queryKey],
+    queryFn: () => {
+      const params: Record<string, any> = {
+        page, page_size: 10,
+        sort_by: sortField, sort_order: sortDir,
+      }
+      for (const [k, v] of Object.entries(filters)) {
+        if (v !== "" && v !== undefined && !DATE_PRESET_KEYS.has(k)) params[k] = v
+      }
+      return appointmentsApi.search(params)
+    },
+    placeholderData: (prev) => prev,
   })
 
   const { data: doctorsData } = useQuery<PaginatedResponse<User>>({
@@ -243,43 +209,46 @@ export default function AppointmentList() {
     queryFn: () => doctorsApi.list({ page_size: 200, admin_group_id: currentUser?.admin_group_id || undefined }),
   })
 
-  const [patientSearch, setPatientSearch] = useState("")
-  const patientSearchRef = useRef<HTMLInputElement>(null)
-  const patientResultsRef = useRef<HTMLDivElement>(null)
-  const [availability, setAvailability] = useState<{ available: boolean; current_count: number; max_allowed: number; message?: string } | null>(null)
-  const [checkingAvailability, setCheckingAvailability] = useState(false)
+  const doctors: User[] = useMemo(() => {
+    if (Array.isArray(doctorsData)) return doctorsData
+    return doctorsData?.items || []
+  }, [doctorsData])
 
-  const patients: Patient[] = useMemo(
-    () => {
-      if (Array.isArray(patientsData)) return patientsData
-      return patientsData?.items || []
-    },
-    [patientsData]
-  )
+  const appointments: Appointment[] = useMemo(() => {
+    if (Array.isArray(data)) return data
+    return data?.items || []
+  }, [data])
 
-  const doctors: User[] = useMemo(
-    () => {
-      if (Array.isArray(doctorsData)) return doctorsData
-      return doctorsData?.items || []
-    },
-    [doctorsData]
-  )
+  const totalCount = useMemo(() => {
+    if (Array.isArray(data)) return data.length
+    return data?.total || 0
+  }, [data])
+
+  const totalPages = useMemo(() => {
+    if (Array.isArray(data)) return 1
+    return data?.total_pages || 1
+  }, [data])
+
+  // Patient data for create dialog
+  const { data: patientsData } = useQuery<PaginatedResponse<Patient>>({
+    queryKey: ["patients", "dropdown"],
+    queryFn: () => patientsApi.list({ page_size: 200, hospital_id: currentUser?.hospital_id || undefined }),
+  })
+
+  const patients: Patient[] = useMemo(() => {
+    if (Array.isArray(patientsData)) return patientsData
+    return patientsData?.items || []
+  }, [patientsData])
 
   const filteredPatients = useMemo(() => {
     if (!patientSearch) return patients
     const q = patientSearch.toLowerCase()
     return patients.filter(
-      (p) =>
-        p.full_name.toLowerCase().includes(q) ||
-        (p.phone && p.phone.includes(q)) ||
-        p.id.toLowerCase().includes(q)
+      (p) => p.full_name.toLowerCase().includes(q) || (p.phone && p.phone.includes(q)) || p.id.toLowerCase().includes(q)
     )
   }, [patients, patientSearch])
 
-  const selectedPatient = useMemo(
-    () => patients.find((p) => p.id === form.patient_id),
-    [patients, form.patient_id]
-  )
+  const selectedPatient = useMemo(() => patients.find((p) => p.id === form.patient_id), [patients, form.patient_id])
 
   useEffect(() => {
     if (form.doctor_id && form.appointment_date && form.appointment_time) {
@@ -288,16 +257,10 @@ export default function AppointmentList() {
       const timer = setTimeout(async () => {
         try {
           const res = await appointmentsApi.checkAvailability({
-            doctor_id: form.doctor_id,
-            appointment_date: form.appointment_date,
-            appointment_time: form.appointment_time,
+            doctor_id: form.doctor_id, appointment_date: form.appointment_date, appointment_time: form.appointment_time,
           })
           setAvailability(res)
-        } catch {
-          setAvailability(null)
-        } finally {
-          setCheckingAvailability(false)
-        }
+        } catch { setAvailability(null) } finally { setCheckingAvailability(false) }
       }, 400)
       return () => clearTimeout(timer)
     } else {
@@ -306,14 +269,8 @@ export default function AppointmentList() {
     }
   }, [form.doctor_id, form.appointment_date, form.appointment_time])
 
-  function handlePatientSelect(patientId: string) {
-    setForm({ ...form, patient_id: patientId })
-    setPatientSearch("")
-  }
-
-  function clearPatientSelection() {
-    setForm({ ...form, patient_id: "" })
-  }
+  function handlePatientSelect(patientId: string) { setForm({ ...form, patient_id: patientId }); setPatientSearch("") }
+  function clearPatientSelection() { setForm({ ...form, patient_id: "" }) }
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => appointmentsApi.delete(id),
@@ -323,25 +280,15 @@ export default function AppointmentList() {
       queryClient.invalidateQueries({ queryKey: ["patients"], refetchType: "all" })
       queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" })
       addToast({ title: "Success", description: "Appointment deleted successfully", variant: "success" })
-      setDeleteDialogOpen(false)
-      setDeletingAppointment(null)
+      setDeleteDialogOpen(false); setDeletingAppointment(null)
     },
     onError: (err: any) => {
-      const msg = err?.response?.data?.detail || "Failed to delete appointment"
-      addToast({ title: "Error", description: msg, variant: "destructive" })
+      addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to delete appointment", variant: "destructive" })
     },
   })
 
-  function confirmDelete(appointment: Appointment) {
-    setDeletingAppointment(appointment)
-    setDeleteDialogOpen(true)
-  }
-
-  function handleDelete() {
-    if (deletingAppointment) {
-      deleteMutation.mutate(deletingAppointment.id)
-    }
-  }
+  function confirmDelete(appointment: Appointment) { setDeletingAppointment(appointment); setDeleteDialogOpen(true) }
+  function handleDelete() { if (deletingAppointment) deleteMutation.mutate(deletingAppointment.id) }
 
   const createMutation = useMutation({
     mutationFn: (data: any) => appointmentsApi.create(data),
@@ -360,50 +307,41 @@ export default function AppointmentList() {
     },
   })
 
-  function resetForm() {
-    setForm(getEmptyAppointmentForm())
-    setPatientSearch("")
-    setDialogOpen(false)
-  }
-
-  function openDialog() {
-    setForm(getEmptyAppointmentForm())
-    setPatientSearch("")
-    setDialogOpen(true)
-  }
-
-  function handleDialogOpenChange(open: boolean) {
-    if (!open) resetForm()
-    setDialogOpen(open)
-  }
-
-  const appointments: Appointment[] = useMemo(
-    () => {
-      if (Array.isArray(data)) return data
-      return data?.items || []
-    },
-    [data]
-  )
+  function resetForm() { setForm(getEmptyAppointmentForm()); setPatientSearch(""); setDialogOpen(false) }
+  function openDialog() { setForm(getEmptyAppointmentForm()); setPatientSearch(""); setDialogOpen(true) }
+  function handleDialogOpenChange(open: boolean) { if (!open) resetForm(); setDialogOpen(open) }
 
   const columns = useMemo<ColumnDef<Appointment>[]>(
     () => [
       {
         accessorKey: "patient_name",
-        header: "Patient Name",
-        cell: ({ row }) => (
-          <span className="font-medium">{row.original.patient_name || "—"}</span>
+        header: () => (
+          <button onClick={() => toggleSort("patient_name")} className="flex items-center gap-1 hover:text-foreground">
+            Patient Name
+            {sortField === "patient_name" ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
+          </button>
         ),
+        cell: ({ row }) => <span className="font-medium">{row.original.patient_name || "—"}</span>,
       },
       {
         accessorKey: "doctor_name",
-        header: "Doctor",
+        header: () => (
+          <button onClick={() => toggleSort("doctor_name")} className="flex items-center gap-1 hover:text-foreground">
+            Doctor
+            {sortField === "doctor_name" ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
+          </button>
+        ),
         cell: ({ row }) => row.original.doctor_name || "—",
       },
       {
         accessorKey: "appointment_date",
-        header: "Date",
-        cell: ({ row }) =>
-          format(new Date(row.original.appointment_date), "MMM dd, yyyy"),
+        header: () => (
+          <button onClick={() => toggleSort("appointment_date")} className="flex items-center gap-1 hover:text-foreground">
+            Date
+            {sortField === "appointment_date" ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
+          </button>
+        ),
+        cell: ({ row }) => format(new Date(row.original.appointment_date), "MMM dd, yyyy"),
       },
       {
         accessorKey: "appointment_time",
@@ -412,7 +350,12 @@ export default function AppointmentList() {
       },
       {
         accessorKey: "status",
-        header: "Status",
+        header: () => (
+          <button onClick={() => toggleSort("status")} className="flex items-center gap-1 hover:text-foreground">
+            Status
+            {sortField === "status" ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
+          </button>
+        ),
         cell: ({ row }) => <StatusBadge status={row.original.status} />,
       },
       {
@@ -430,32 +373,19 @@ export default function AppointmentList() {
         ),
       },
     ],
-    []
+    [navigate, sortField, sortDir, toggleSort]
   )
 
   const table = useReactTable({
     data: appointments,
     columns,
-    state: { sorting, globalFilter },
-    onSortingChange: setSorting,
-    onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    initialState: { pagination: { pageSize: 10 } },
   })
 
-  const monthDays = eachDayOfInterval({
-    start: startOfMonth(currentMonth),
-    end: endOfMonth(currentMonth),
-  })
-
+  const monthDays = eachDayOfInterval({ start: startOfMonth(currentMonth), end: endOfMonth(currentMonth) })
   const startDay = getDay(startOfMonth(currentMonth))
-  const calendarDays: (Date | null)[] = [
-    ...Array.from({ length: startDay }, () => null),
-    ...monthDays,
-  ]
+  const calendarDays: (Date | null)[] = [...Array.from({ length: startDay }, () => null), ...monthDays]
 
   const appointmentsByDate = useMemo(() => {
     const map: Record<string, number> = {}
@@ -468,110 +398,99 @@ export default function AppointmentList() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.patient_id) {
-      addToast({ title: "Validation Error", description: "Please select a patient", variant: "destructive" })
-      return
-    }
-    if (!form.appointment_date || !form.appointment_time) {
-      addToast({ title: "Validation Error", description: "Please select both date and time", variant: "destructive" })
-      return
-    }
+    if (!form.patient_id) { addToast({ title: "Validation Error", description: "Please select a patient", variant: "destructive" }); return }
+    if (!form.appointment_date || !form.appointment_time) { addToast({ title: "Validation Error", description: "Please select both date and time", variant: "destructive" }); return }
     const cleaned: Record<string, unknown> = {}
-    for (const [key, value] of Object.entries(form)) {
-      if (value !== "" && value !== undefined) {
-        cleaned[key] = value
-      }
-    }
+    for (const [key, value] of Object.entries(form)) { if (value !== "" && value !== undefined) cleaned[key] = value }
     createMutation.mutate(cleaned)
   }
+
+  const FilterBarDesktop = (
+    <AppointmentFilterBar
+      filters={filters} setFilter={setFilter} resetFilters={resetFilters}
+      activeCount={activeFilters} doctors={doctors}
+    />
+  )
 
   return (
     <div className="space-y-6">
       <PageHeader title="Appointments" description="Manage appointments">
         {currentUser?.role !== "DOCTOR" && (
-          <Button onClick={openDialog}>
-            <Plus className="h-4 w-4" /> New Appointment
-          </Button>
+          <Button onClick={openDialog}><Plus className="h-4 w-4" /> New Appointment</Button>
         )}
         <QuickExport module="appointments" label="appointments" />
       </PageHeader>
 
       <Card>
         <CardContent className="p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-4">
-            <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search appointments..."
-                value={globalFilter}
-                onChange={(e) => setGlobalFilter(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+          {/* Mobile filter trigger */}
+          <div className="lg:hidden mb-4">
+            <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" className="w-full">
+                  <SlidersHorizontal className="h-4 w-4 mr-2" />
+                  Filters {activeFilters > 0 && `(${activeFilters})`}
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-[300px] sm:w-[360px] p-0">
+                <SheetHeader className="p-4 pb-2 border-b">
+                  <SheetTitle>Filters</SheetTitle>
+                </SheetHeader>
+                <div className="p-4 overflow-y-auto h-[calc(100%-60px)]">
+                  <AppointmentFilterBar
+                    filters={filters} setFilter={setFilter} resetFilters={resetFilters}
+                    activeCount={activeFilters} doctors={doctors}
+                  />
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
+
+          {/* Desktop filter bar */}
+          <div className="hidden lg:block mb-4">
+            {FilterBarDesktop}
+          </div>
+
+          {/* Active filter chips */}
+          <div className="mb-4">
+            <FilterChips chips={activeChips} onRemove={(k) => setFilter(k, "")} onClearAll={resetFilters} />
+          </div>
+
+          {/* View toggle + results count */}
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm text-muted-foreground">
+              {totalCount} appointment{totalCount !== 1 ? "s" : ""} found
+            </p>
             <div className="flex items-center gap-2">
-              <Button
-                variant={view === "list" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setView("list")}
-              >
+              <Button variant={view === "list" ? "default" : "outline"} size="sm" onClick={() => setView("list")}>
                 <List className="h-4 w-4" />
               </Button>
-              <Button
-                variant={view === "calendar" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setView("calendar")}
-              >
+              <Button variant={view === "calendar" ? "default" : "outline"} size="sm" onClick={() => setView("calendar")}>
                 <Calendar className="h-4 w-4" />
               </Button>
             </div>
           </div>
 
+          {/* Calendar View */}
           {view === "calendar" && (
             <div className="mb-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">
-                  {format(currentMonth, "MMMM yyyy")}
-                </h3>
+                <h3 className="text-lg font-semibold">{format(currentMonth, "MMMM yyyy")}</h3>
                 <div className="flex items-center gap-1">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() =>
-                      setCurrentMonth(
-                        new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1)
-                      )
-                    }
-                  >
+                  <Button variant="outline" size="icon" onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))}>
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setCurrentMonth(new Date())}
-                  >
+                  <Button variant="outline" size="icon" onClick={() => setCurrentMonth(new Date())}>
                     <CalendarDays className="h-4 w-4" />
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() =>
-                      setCurrentMonth(
-                        new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1)
-                      )
-                    }
-                  >
+                  <Button variant="outline" size="icon" onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))}>
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
               <div className="grid grid-cols-7 gap-1">
                 {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-                  <div
-                    key={d}
-                    className="py-2 text-center text-xs font-medium text-muted-foreground"
-                  >
-                    {d}
-                  </div>
+                  <div key={d} className="py-2 text-center text-xs font-medium text-muted-foreground">{d}</div>
                 ))}
                 {calendarDays.map((day, i) => {
                   if (!day) return <div key={`empty-${i}`} />
@@ -579,18 +498,13 @@ export default function AppointmentList() {
                   const count = appointmentsByDate[key]
                   const isToday = isSameDay(day, new Date())
                   return (
-                    <div
-                      key={key}
-                      className={cn(
-                        "relative flex h-16 flex-col items-center justify-center rounded-lg border text-sm transition-colors hover:bg-muted/50 cursor-pointer",
-                        isToday && "border-primary bg-primary/5"
-                      )}
-                    >
+                    <div key={key} className={cn(
+                      "relative flex h-16 flex-col items-center justify-center rounded-lg border text-sm transition-colors hover:bg-muted/50 cursor-pointer",
+                      isToday && "border-primary bg-primary/5"
+                    )}>
                       <span className="text-xs">{format(day, "d")}</span>
                       {count && (
-                        <span className="mt-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] text-primary-foreground">
-                          {count}
-                        </span>
+                        <span className="mt-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] text-primary-foreground">{count}</span>
                       )}
                     </div>
                   )
@@ -599,28 +513,27 @@ export default function AppointmentList() {
             </div>
           )}
 
+          {/* List View */}
           {view === "list" && (
             <>
               {isLoading ? (
                 <div className="space-y-3">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Skeleton key={i} className="h-12 w-full" />
-                  ))}
+                  {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
                 </div>
               ) : appointments.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                   <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-muted">
                     <CalendarDays className="h-10 w-10 text-muted-foreground" />
                   </div>
-                  <h3 className="text-lg font-semibold">No appointments yet</h3>
+                  <h3 className="text-lg font-semibold">No appointments found</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Schedule your first appointment.
+                    {hasActiveFilters ? "Try adjusting your filters." : "Schedule your first appointment."}
                   </p>
-                  {currentUser?.role !== "DOCTOR" && (
-                    <Button className="mt-4" onClick={openDialog}>
-                      <Plus className="h-4 w-4" /> New Appointment
-                    </Button>
-                  )}
+                  {hasActiveFilters ? (
+                    <Button className="mt-4" variant="outline" onClick={resetFilters}>Clear Filters</Button>
+                  ) : currentUser?.role !== "DOCTOR" ? (
+                    <Button className="mt-4" onClick={openDialog}><Plus className="h-4 w-4" /> New Appointment</Button>
+                  ) : null}
                 </div>
               ) : (
                 <>
@@ -630,18 +543,8 @@ export default function AppointmentList() {
                         {table.getHeaderGroups().map((hg) => (
                           <tr key={hg.id} className="border-b bg-muted/50">
                             {hg.headers.map((header) => (
-                              <th
-                                key={header.id}
-                                className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer select-none"
-                                onClick={header.column.getToggleSortingHandler()}
-                              >
-                                <div className="flex items-center gap-1">
-                                  {flexRender(header.column.columnDef.header, header.getContext())}
-                                  {{
-                                    asc: " ↑",
-                                    desc: " ↓",
-                                  }[header.column.getIsSorted() as string] ?? null}
-                                </div>
+                              <th key={header.id} className="px-4 py-3 text-left font-medium text-muted-foreground">
+                                {flexRender(header.column.columnDef.header, header.getContext())}
                               </th>
                             ))}
                           </tr>
@@ -649,12 +552,8 @@ export default function AppointmentList() {
                       </thead>
                       <tbody>
                         {table.getRowModel().rows.map((row) => (
-                          <motion.tr
-                            key={row.id}
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            className="border-b transition-colors hover:bg-muted/50"
-                          >
+                          <motion.tr key={row.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                            className="border-b transition-colors hover:bg-muted/50">
                             {row.getVisibleCells().map((cell) => {
                               const header = cell.column.columnDef.header
                               const label = typeof header === "string" ? header : cell.column.id
@@ -670,25 +569,16 @@ export default function AppointmentList() {
                     </table>
                   </div>
 
+                  {/* Server-side pagination */}
                   <div className="flex items-center justify-between mt-4">
                     <p className="text-sm text-muted-foreground">
-                      Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+                      Page {page} of {totalPages} ({totalCount} total)
                     </p>
                     <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => table.previousPage()}
-                        disabled={!table.getCanPreviousPage()}
-                      >
+                      <Button variant="outline" size="sm" onClick={() => setPage(page - 1)} disabled={page <= 1}>
                         Previous
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => table.nextPage()}
-                        disabled={!table.getCanNextPage()}
-                      >
+                      <Button variant="outline" size="sm" onClick={() => setPage(page + 1)} disabled={page >= totalPages}>
                         Next
                       </Button>
                     </div>
@@ -700,13 +590,12 @@ export default function AppointmentList() {
         </CardContent>
       </Card>
 
+      {/* Create Dialog */}
       <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
         <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
           <DialogHeader className="px-6 pt-6 pb-0 shrink-0">
             <DialogTitle>New Appointment</DialogTitle>
-            <DialogDescription>
-              Schedule a new appointment for a patient.
-            </DialogDescription>
+            <DialogDescription>Schedule a new appointment for a patient.</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
             <div className="overflow-y-auto px-6 py-4 space-y-4 flex-1">
@@ -733,45 +622,34 @@ export default function AppointmentList() {
                       {selectedPatient.gender && <span>Gender: {selectedPatient.gender}</span>}
                       {selectedPatient.phone && <span>Phone: {selectedPatient.phone}</span>}
                     </div>
-                    <div className="mt-2">
-                      <StatusBadge status={selectedPatient.status} />
-                    </div>
+                    <div className="mt-2"><StatusBadge status={selectedPatient.status} /></div>
                   </div>
                 ) : (
                   <div className="space-y-2">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
-                      <Input
-                        ref={patientSearchRef}
-                        placeholder="Search by Name / Phone"
-                        value={patientSearch}
+                      <Input ref={patientSearchRef} placeholder="Search by Name / Phone" value={patientSearch}
                         onChange={(e) => setPatientSearch(e.target.value)}
-                        className="pl-10 bg-white dark:bg-[#1E293B] border-[#E2E8F0] dark:border-[#334155] text-[#0F172A] dark:text-[#F8FAFC]"
-                      />
+                        className="pl-10 bg-white dark:bg-[#1E293B] border-[#E2E8F0] dark:border-[#334155] text-[#0F172A] dark:text-[#F8FAFC]" />
                     </div>
                     {patientSearch && (
-                      <div ref={patientResultsRef} className="max-h-[260px] overflow-y-auto rounded-xl border border-[#E2E8F0] dark:border-[#334155] bg-white dark:bg-[#1E293B]">
+                      <div className="max-h-[260px] overflow-y-auto rounded-xl border border-[#E2E8F0] dark:border-[#334155] bg-white dark:bg-[#1E293B]">
                         {filteredPatients.length === 0 ? (
                           <div className="p-6 text-center text-sm text-[#64748B]">No patients found</div>
-                        ) : (
-                          filteredPatients.map((p) => (
-                            <button
-                              key={p.id}
-                              type="button"
-                              className="w-full px-4 py-3 text-left border-b border-[#E2E8F0] dark:border-[#334155] last:border-0 hover:bg-gray-50 dark:hover:bg-[#334155] transition-colors"
-                              onClick={() => handlePatientSelect(p.id)}
-                            >
-                              <div className="flex items-center justify-between">
-                                <span className="font-medium text-sm text-[#0F172A] dark:text-[#F8FAFC]">{p.full_name}</span>
-                                <StatusBadge status={p.status} />
-                              </div>
-                              <div className="flex items-center gap-3 text-xs text-[#64748B] dark:text-[#CBD5E1] mt-1">
-                                {p.phone && <span>{p.phone}</span>}
-                                <span>ID: {p.id.slice(0, 8)}</span>
-                              </div>
-                            </button>
-                          ))
-                        )}
+                        ) : filteredPatients.map((p) => (
+                          <button key={p.id} type="button"
+                            className="w-full px-4 py-3 text-left border-b border-[#E2E8F0] dark:border-[#334155] last:border-0 hover:bg-gray-50 dark:hover:bg-[#334155] transition-colors"
+                            onClick={() => handlePatientSelect(p.id)}>
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium text-sm text-[#0F172A] dark:text-[#F8FAFC]">{p.full_name}</span>
+                              <StatusBadge status={p.status} />
+                            </div>
+                            <div className="flex items-center gap-3 text-xs text-[#64748B] dark:text-[#CBD5E1] mt-1">
+                              {p.phone && <span>{p.phone}</span>}
+                              <span>ID: {p.id.slice(0, 8)}</span>
+                            </div>
+                          </button>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -779,127 +657,65 @@ export default function AppointmentList() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="doctor">Doctor</Label>
-                <Select
-                  value={form.doctor_id}
-                  onValueChange={(v) => setForm({ ...form, doctor_id: v })}
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select doctor" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {doctors.map((d) => (
-                      <SelectItem key={d.id} value={d.id}>
-                        {d.full_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+                <Select value={form.doctor_id} onValueChange={(v) => setForm({ ...form, doctor_id: v })} required>
+                  <SelectTrigger><SelectValue placeholder="Select doctor" /></SelectTrigger>
+                  <SelectContent>{doctors.map((d) => <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="appointment_type">Appointment Type</Label>
-                <Select
-                  value={form.appointment_type}
-                  onValueChange={(v) => {
-                    const t = APPOINTMENT_TYPES.find((t) => t.value === v)
-                    setForm({ ...form, appointment_type: v, duration_minutes: t?.duration || 30, appointment_time: "" })
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {APPOINTMENT_TYPES.map((t) => (
-                      <SelectItem key={t.value} value={t.value}>
-                        {t.label} ({t.duration} min)
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+                <Select value={form.appointment_type} onValueChange={(v) => {
+                  const t = APPOINTMENT_TYPES.find((t) => t.value === v)
+                  setForm({ ...form, appointment_type: v, duration_minutes: t?.duration || 30, appointment_time: "" })
+                }}>
+                  <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                  <SelectContent>{APPOINTMENT_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label} ({t.duration} min)</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="date">Date</Label>
-                  <Input
-                    id="date"
-                    type="date"
-                    value={form.appointment_date}
-                    onChange={(e) =>
-                      setForm({ ...form, appointment_date: e.target.value, appointment_time: "" })
-                    }
-                    required
-                  />
+                  <Input id="date" type="date" value={form.appointment_date}
+                    onChange={(e) => setForm({ ...form, appointment_date: e.target.value, appointment_time: "" })} required />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="duration">Duration (min)</Label>
-                  <Select
-                    value={String(form.duration_minutes)}
-                    onValueChange={(v) => {
-                      setForm({ ...form, duration_minutes: Number(v), appointment_time: "" })
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                  <Select value={String(form.duration_minutes)} onValueChange={(v) => setForm({ ...form, duration_minutes: Number(v), appointment_time: "" })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="15">15 min</SelectItem>
-                      <SelectItem value="30">30 min</SelectItem>
-                      <SelectItem value="45">45 min</SelectItem>
-                      <SelectItem value="60">60 min</SelectItem>
-                      <SelectItem value="90">90 min</SelectItem>
-                      <SelectItem value="120">120 min</SelectItem>
+                      <SelectItem value="15">15 min</SelectItem><SelectItem value="30">30 min</SelectItem>
+                      <SelectItem value="45">45 min</SelectItem><SelectItem value="60">60 min</SelectItem>
+                      <SelectItem value="90">90 min</SelectItem><SelectItem value="120">120 min</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
-
-              {/* Slot Grid */}
               {form.doctor_id && form.appointment_date && (
-                <SlotGrid
-                  doctorId={form.doctor_id}
-                  date={form.appointment_date}
-                  durationMinutes={form.duration_minutes}
-                  selectedTime={form.appointment_time}
-                  onSelect={(time) => setForm({ ...form, appointment_time: time })}
-                />
+                <SlotGrid doctorId={form.doctor_id} date={form.appointment_date} durationMinutes={form.duration_minutes}
+                  selectedTime={form.appointment_time} onSelect={(time) => setForm({ ...form, appointment_time: time })} />
               )}
               <div className="grid gap-2">
                 <Label htmlFor="notes">Notes</Label>
-                <Input
-                  id="notes"
-                  value={form.notes}
-                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                />
+                <Input id="notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
               </div>
             </div>
             <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-gray-100">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={resetForm}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending ? "Saving..." : "Save"}
-              </Button>
+              <Button type="button" variant="outline" onClick={resetForm}>Cancel</Button>
+              <Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? "Saving..." : "Save"}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
+      {/* Delete Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle>Delete Appointment</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete this appointment? This action cannot be undone.
-            </DialogDescription>
+            <DialogDescription>Are you sure you want to delete this appointment? This action cannot be undone.</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setDeleteDialogOpen(false)}>
-              Cancel
-            </Button>
+            <Button type="button" variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
             <Button type="button" variant="destructive" onClick={handleDelete} disabled={deleteMutation.isPending}>
               {deleteMutation.isPending ? "Deleting..." : "Delete"}
             </Button>

@@ -60,7 +60,13 @@ class PatientService:
         return await self.repo.get(patient_id)
 
     async def get_all(self, skip: int = 0, limit: int = 100, filters: dict = None) -> List[Patient]:
-        return await self.repo.get_all(skip=skip, limit=limit, filters=filters)
+        sort_by = None
+        descending = False
+        if filters:
+            sort_by = filters.pop("sort_by", None)
+            descending = filters.get("sort_order") == "desc" if filters.get("sort_order") else False
+            filters.pop("sort_order", None)
+        return await self.repo.get_all(skip=skip, limit=limit, filters=filters, order_by=sort_by, descending=descending)
 
     async def search(self, query: str, hospital_id: str = None, doctor_id: str = None, status_filter: str = None, hospital_ids_in: list = None) -> List[Patient]:
         filters = {}

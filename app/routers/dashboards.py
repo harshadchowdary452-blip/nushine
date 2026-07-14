@@ -20,6 +20,7 @@ from app.models.pre_op import PreOp
 from app.models.post_op import PostOp
 from app.models.treatment_sitting import TreatmentSitting
 from app.models.hospital_monthly_expense import HospitalMonthlyExpense
+from app.models.lead import Lead
 from app.utils.dashboard_helpers import (
     get_date_range, get_previous_date_range, calculate_revenue, calculate_expenses_for_date_range,
     calculate_profit, calculate_profit_margin, revenue_trend_with_expenses
@@ -737,8 +738,147 @@ async def hospital_admin_dashboard(
     # Monthly growth trend with expenses (respect period)
     combined_trend = await revenue_trend_with_expenses(db, case_ids if case_ids else [], [hospital_id], period=period, start_date=start_date, end_date=end_date)
 
+    # --- New fields for enterprise dashboard ---
+
+    # Today's appointments list with patient/doctor names
+    today_appt_list = []
+    if patient_ids:
+        appt_rows = await db.execute(
+            select(
+                Appointment.id, Appointment.appointment_time, Appointment.status,
+                Appointment.appointment_type, Appointment.notes,
+                Patient.full_name.label("patient_name"),
+                User.full_name.label("doctor_name"),
+            )
+            .join(Patient, Appointment.patient_id == Patient.id)
+            .join(User, Appointment.doctor_id == User.id, isouter=True)
+            .where(
+                Appointment.patient_id.in_(patient_ids),
+                Appointment.appointment_date == today,
+            )
+            .order_by(Appointment.appointment_time)
+        )
+        for row in appt_rows.all():
+            today_appt_list.append({
+                "id": row[0],
+                "time": str(row[1])[:5] if row[1] else "",
+                "status": row[2].value if hasattr(row[2], 'value') else str(row[2]),
+                "type": row[3].value if hasattr(row[3], 'value') else str(row[3]) if row[3] else "CONSULTATION",
+                "notes": row[4] or "",
+                "patient_name": row[5] or "",
+                "doctor_name": row[6] or "Unassigned",
+            })
+
+    # Pending actions summary
+    pending_billings_count = 0
+    pending_billings_amount = 0.0
+    if case_ids:
+        pending_billings_r = await db.execute(
+            select(
+                func.count(Billing.id),
+                func.coalesce(func.sum(Billing.pending_amount), 0),
+            )
+            .where(
+                Billing.case_id.in_(case_ids),
+                Billing.payment_status.in_([PaymentStatus.PARTIAL.value, PaymentStatus.OVERDUE.value]),
+            )
+        )
+        pb_row = pending_billings_r.one_or_none()
+        pending_billings_count = pb_row[0] if pb_row else 0
+        pending_billings_amount = float(pb_row[1]) if pb_row else 0.0
+
+    pending_actions = {
+        "follow_ups": pending_follow_ups,
+        "billings_count": pending_billings_count,
+        "billings_amount": pending_billings_amount,
+    }
+
+    # Recent activity (last 7 days)
+    seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
+    recent_patients_r = await db.execute(
+        select(Patient.id, Patient.full_name, Patient.created_at)
+        .where(Patient.hospital_id == hospital_id, Patient.created_at >= seven_days_ago)
+        .order_by(Patient.created_at.desc()).limit(5)
+    )
+    recent_activities = []
+    for row in recent_patients_r.all():
+        recent_activities.append({
+            "type": "patient_registered",
+            "description": f"New patient: {row[1]}",
+            "date": row[2].isoformat() if row[2] else "",
+        })
+
+    if patient_ids:
+        recent_appts_r = await db.execute(
+            select(
+                Appointment.id, Appointment.appointment_date, Appointment.status,
+                Patient.full_name.label("patient_name"),
+            )
+            .join(Patient, Appointment.patient_id == Patient.id)
+            .where(
+                Appointment.patient_id.in_(patient_ids),
+                Appointment.created_at >= seven_days_ago,
+            )
+            .order_by(Appointment.created_at.desc()).limit(5)
+        )
+        for row in recent_appts_r.all():
+            status_val = row[2].value if hasattr(row[2], 'value') else str(row[2])
+            recent_activities.append({
+                "type": "appointment_created",
+                "description": f"Appointment for {row[3]} - {status_val}",
+                "date": str(row[1]) if row[1] else "",
+            })
+
+    recent_activities.sort(key=lambda x: x.get("date", ""), reverse=True)
+    recent_activities = recent_activities[:10]
+
+    # Revenue sources (by payment method)
+    revenue_sources = []
+    if case_ids:
+        rev_src_r = await db.execute(
+            select(
+                func.coalesce(Billing.payment_method, 'Other').label("method"),
+                func.sum(Billing.paid_amount).label("total"),
+            )
+            .where(Billing.case_id.in_(case_ids), Billing.paid_amount > 0)
+            .group_by(text("method"))
+            .order_by(text("total DESC"))
+        )
+        for row in rev_src_r.all():
+            revenue_sources.append({"method": row[0], "amount": float(row[1] or 0)})
+
+    # CRM insights
+    total_leads = (await db.execute(
+        select(func.count(Lead.id)).where(Lead.hospital_id == hospital_id)
+    )).scalar() or 0
+    new_leads = (await db.execute(
+        select(func.count(Lead.id)).where(Lead.hospital_id == hospital_id, Lead.status == "NEW")
+    )).scalar() or 0
+    converted_leads = (await db.execute(
+        select(func.count(Lead.id)).where(Lead.hospital_id == hospital_id, Lead.status == "CONVERTED")
+    )).scalar() or 0
+    conversion_rate = round((converted_leads / total_leads * 100), 1) if total_leads > 0 else 0.0
+
+    leads_by_source = []
+    lead_src_r = await db.execute(
+        select(Lead.source, func.count(Lead.id).label("cnt"))
+        .where(Lead.hospital_id == hospital_id)
+        .group_by(Lead.source).order_by(text("cnt DESC")).limit(5)
+    )
+    for row in lead_src_r.all():
+        leads_by_source.append({"source": row[0], "count": row[1]})
+
+    crm_insights = {
+        "total_leads": total_leads,
+        "new_leads": new_leads,
+        "converted_leads": converted_leads,
+        "conversion_rate": conversion_rate,
+        "leads_by_source": leads_by_source,
+    }
+
     return {
         "today_appointments": today_appointments,
+        "today_appointments_list": today_appt_list,
         "total_follow_ups": total_follow_ups,
         "pending_follow_ups": pending_follow_ups,
         "completed_follow_ups": completed_follow_ups,
@@ -765,6 +905,10 @@ async def hospital_admin_dashboard(
         "treatment_performance": treatment_performance[:5],
         "expense_breakdown": expense_breakdown,
         "total_pending_billing": total_pending_billing,
+        "pending_actions": pending_actions,
+        "recent_activity": recent_activities,
+        "revenue_sources": revenue_sources,
+        "crm_insights": crm_insights,
         "capacity_most_booked_doctors": await _get_most_booked_doctors(db, hospital_id, today),
         "capacity_peak_hours": await _get_peak_hours(db, hospital_id, today),
         "comparison": {
