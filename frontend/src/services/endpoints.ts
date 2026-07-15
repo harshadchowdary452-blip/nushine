@@ -79,7 +79,12 @@ export const casesApi = {
     api.get(`/cases/${id}/timeline`, { params }).then((r) => r.data),
   getOdontogramBlob: (id: string) =>
     api.get(`/cases/${id}/odontogram`, { responseType: "blob" }).then((r) => r.data),
-
+  submitTreatmentPlan: (id: string) =>
+    api.post(`/cases/${id}/submit-treatment-plan`).then((r) => r.data),
+  approveTreatmentPlan: (id: string) =>
+    api.post(`/cases/${id}/approve-treatment-plan`).then((r) => r.data),
+  rejectTreatmentPlan: (id: string, reason: string) =>
+    api.post(`/cases/${id}/reject-treatment-plan`, null, { params: { reason } }).then((r) => r.data),
 };
 
 export const appointmentsApi = {
@@ -89,12 +94,19 @@ export const appointmentsApi = {
   create: (data: any) => api.post("/appointments", data).then((r) => r.data),
   update: (id: string, data: any) => api.put(`/appointments/${id}`, data).then((r) => r.data),
   delete: (id: string) => api.delete(`/appointments/${id}`).then((r) => r.data),
+  cancel: (id: string, data: { reason?: string }) =>
+    api.post(`/appointments/${id}/cancel`, data).then((r) => r.data),
+  complete: (id: string, data?: { notes?: string }) =>
+    api.post(`/appointments/${id}/complete`, data || {}).then((r) => r.data),
+  reschedule: (id: string, data: { appointment_date: string; appointment_time: string; reason?: string }) =>
+    api.post(`/appointments/${id}/reschedule`, data).then((r) => r.data),
   checkAvailability: (params: { doctor_id: string; appointment_date: string; appointment_time: string }) =>
     api.get("/appointments/availability", { params }).then((r) => r.data),
   reassignDoctor: (id: string, data: { doctor_id: string; reason?: string }) =>
     api.post(`/appointments/${id}/reassign-doctor`, data).then((r) => r.data),
   slots: (params: { doctor_id: string; date: string; duration_minutes?: number }) =>
     api.get("/appointments/slots", { params }).then((r) => r.data),
+  fullDetail: (id: string) => api.get(`/appointments/${id}/full-detail`).then((r) => r.data),
 };
 
 export const doctorWorkingHoursApi = {
@@ -140,10 +152,37 @@ export const consultantNotesApi = {
 export const treatmentApi = {
   list: (params?: PaginationParams) => api.get("/treatment-plans", { params: withPagination(params) }).then((r) => r.data),
   get: (id: string) => api.get(`/treatment-plans/${id}`).then((r) => r.data),
+  listByCase: (caseId: string) => api.get(`/treatment-plans/by-case/${caseId}`).then((r) => r.data),
   create: (data: any) => api.post("/treatment-plans", data).then((r) => r.data),
   update: (id: string, data: any) => api.put(`/treatment-plans/${id}`, data).then((r) => r.data),
   updateStatus: (id: string, status: string) => api.put(`/treatment-plans/${id}/status`, null, { params: { status } }).then((r) => r.data),
+  start: (id: string) => api.post(`/treatment-plans/${id}/start`).then((r) => r.data),
+  complete: (id: string) => api.post(`/treatment-plans/${id}/complete`).then((r) => r.data),
+  setWaiting: (id: string, waitingType: string) => api.post(`/treatment-plans/${id}/set-waiting`, null, { params: { waiting_type: waitingType } }).then((r) => r.data),
+  reportOverdue: (id: string, params: { reason: string; delay_type: string }) => api.post(`/treatment-plans/${id}/report-overdue`, null, { params }).then((r) => r.data),
+  suggestAppointment: (id: string) => api.get(`/treatment-plans/${id}/suggest-appointment`).then((r) => r.data),
+  checkDependency: (id: string) => api.get(`/treatment-plans/${id}/check-dependency`).then((r) => r.data),
   delete: (id: string) => api.delete(`/treatment-plans/${id}`).then((r) => r.data),
+};
+
+export const treatmentPlanItemsApi = {
+  listByCase: (caseId: string, params?: { version?: number }) =>
+    api.get(`/treatment-plan-items/by-case/${caseId}`, { params }).then((r) => r.data),
+  getVersions: (caseId: string) =>
+    api.get(`/treatment-plan-items/versions/${caseId}`).then((r) => r.data),
+  create: (data: { case_id: string; items: any[] }) =>
+    api.post("/treatment-plan-items/", data).then((r) => r.data),
+  update: (id: string, data: any) =>
+    api.put(`/treatment-plan-items/${id}`, data).then((r) => r.data),
+  delete: (id: string) =>
+    api.delete(`/treatment-plan-items/${id}`).then((r) => r.data),
+  assignDoctors: (assignments: { item_id: string; assigned_doctor_id?: string; assistant_doctor_id?: string }[]) =>
+    api.post("/treatment-plan-items/assign-doctors", { assignments }).then((r) => r.data),
+};
+
+export const doctorQueueApi = {
+  get: (doctorId: string, params?: { hospital_id?: string }) =>
+    api.get(`/doctor-queue/${doctorId}`, { params }).then((r) => r.data),
 };
 
 export const treatmentSittingsApi = {
@@ -558,7 +597,7 @@ export const exportsApi = {
   exportData: (module: string, format: string, params?: Record<string, string>) =>
     api.get(`/exports/${module}`, { params: { format, ...params }, responseType: "blob" }).then((r) => r.data),
   exportBackground: (module: string, format: string, params?: Record<string, string>) =>
-    api.get(`/exports/${module}`, { params: { format, background: "true", ...params } }).then((r) => r.data),
+    api.get(`/exports/${module}`, { params: { format, background: "true", ...params }, responseType: "blob" }).then((r) => r.data),
   getJob: (jobId: string) => api.get(`/exports/jobs/${jobId}`).then((r) => r.data),
   downloadJob: (jobId: string) =>
     api.post(`/exports/jobs/${jobId}/download`, {}, { responseType: "blob" }).then((r) => r.data),
@@ -568,6 +607,11 @@ export const exportsApi = {
     api.get("/exports/financial/pdf", { params, responseType: "blob" }).then((r) => r.data),
   exportMonthlyPdf: (params?: Record<string, string>) =>
     api.get("/exports/monthly/pdf", { params, responseType: "blob" }).then((r) => r.data),
+};
+
+export const auditLogApi = {
+  getForEntity: (entityType: string, entityId: string, limit?: number) =>
+    api.get("/status/audit-logs", { params: { entity_type: entityType, entity_id: entityId, limit: limit || 50 } }).then((r) => r.data),
 };
 
 

@@ -175,6 +175,14 @@ export interface Case {
   patient?: Patient;
   doctor?: User;
   consultant?: Consultant;
+  treatment_plans?: any[] | null;
+  treatment_plan_items?: TreatmentPlanItem[] | null;
+  treatment_plan_status?: string | null;
+  treatment_plan_version?: number;
+  treatment_plan_approved?: boolean;
+  treatment_plan_approved_by_id?: string | null;
+  treatment_plan_approved_at?: string | null;
+  treatment_plan_rejection_reason?: string | null;
 }
 
 export interface CaseTimeline {
@@ -213,7 +221,30 @@ export interface ConsultantNote {
   consultant?: Consultant;
 }
 
-export type TreatmentPlanStatus = "PLANNED" | "SCHEDULED" | "IN_PROGRESS" | "FOLLOW_UP" | "COMPLETED" | "CANCELLED";
+export type TreatmentPlanStatus = "GENERATED" | "ASSIGNED" | "SCHEDULED" | "IN_PROGRESS" | "WAITING_PATIENT" | "WAITING_LAB" | "ON_HOLD" | "COMPLETED" | "CANCELLED" | "OVERDUE";
+
+export interface TreatmentPlanItem {
+  id: string;
+  case_id: string;
+  version: number;
+  is_current: boolean;
+  procedure_name: string;
+  tooth_numbers: string[] | null;
+  estimated_visits: number;
+  estimated_cost: number;
+  remarks: string | null;
+  sequence_order: number;
+  dependency_item_id: string | null;
+  generated_treatment_id: string | null;
+  assigned_doctor_id: string | null;
+  assistant_doctor_id: string | null;
+  created_by_id: string | null;
+  assigned_doctor_name?: string | null;
+  assistant_doctor_name?: string | null;
+  created_by_name?: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface TreatmentPlan {
   id: string;
@@ -238,6 +269,21 @@ export interface TreatmentPlan {
   patient_name?: string;
   patient_id?: string;
   doctor_name?: string;
+  assigned_doctor_id?: string | null;
+  assistant_doctor_id?: string | null;
+  assigned_doctor_name?: string | null;
+  assistant_doctor_name?: string | null;
+  tooth_numbers?: string[] | null;
+  priority?: string | null;
+  sequence_order?: number;
+  dependency_treatment_id?: string | null;
+  treatment_plan_item_id?: string | null;
+  overdue_reason?: string | null;
+  overdue_delay_type?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  auto_created?: boolean;
+  treatment_type_name?: string | null;
   case_number?: string;
   case_status?: string;
   hospital_name?: string;
@@ -252,19 +298,38 @@ export interface TreatmentSitting {
   id: string;
   treatment_plan_id: string;
   sitting_number: number;
+  sitting_date?: string | null;
+  doctor_id?: string | null;
   work_done: string | null;
   status: TreatmentSittingStatus;
   doctor_notes: string | null;
+  procedure_performed?: string | null;
+  clinical_notes?: string | null;
+  prescription?: string | null;
   next_appointment_date: string | null;
   next_appointment_time: string | null;
+  next_visit_required?: boolean;
+  materials_used?: string | null;
+  duration_minutes?: number | null;
+  attachments_json?: string | null;
+  images_json?: string | null;
+  digital_signature_url?: string | null;
+  lab_tracking_status?: string | null;
+  lab_tracking_notes?: string | null;
+  lab_tracking_due_date?: string | null;
+  completed_by_id?: string | null;
+  completed_at?: string | null;
+  doctor_name?: string | null;
+  completed_by_name?: string | null;
   created_at: string;
   updated_at: string;
 }
 
-export type AppointmentStatus = "SCHEDULED" | "CONFIRMED" | "CHECKED_IN" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED" | "NO_SHOW" | "RESCHEDULED";
+export type AppointmentStatus = "SCHEDULED" | "COMPLETED" | "CANCELLED" | "RESCHEDULED";
 
 export interface Appointment {
   id: string;
+  appointment_number?: string;
   patient_id: string;
   doctor_id: string;
   patient_name?: string;
@@ -279,6 +344,18 @@ export interface Appointment {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  created_by_name?: string;
+  updated_by_name?: string;
+  previous_date?: string;
+  previous_time?: string;
+  rescheduled_by_name?: string;
+  rescheduled_at?: string;
+  reschedule_reason?: string;
+  cancelled_by_name?: string;
+  cancelled_at?: string;
+  cancellation_reason?: string;
+  completed_by_name?: string;
+  completed_at?: string;
   patient?: Patient;
   doctor?: User;
 }
@@ -801,4 +878,70 @@ export interface ConsentForm {
   is_deleted: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface AppointmentFullDetail {
+  appointment: Appointment
+  patient: Patient
+  cases: CaseReport[]
+  treatments: TreatmentPlanSummary[]
+  billings: BillingSummary[]
+  timeline: TimelineEvent[]
+  related_appointments: RelatedAppointment[]
+}
+
+export interface CaseReport {
+  id: string
+  case_number: string | null
+  chief_complaint: string
+  status: string
+  created_at: string
+  doctor_name: string | null
+  diagnosis: string | null
+}
+
+export interface TreatmentPlanSummary {
+  id: string
+  treatment_number: string | null
+  treatment_name: string
+  status: string
+  cost: number
+  paid_amount: number
+  total_sittings: number
+  completed_sittings: number
+  case_id: string
+  case_number: string | null
+  doctor_name: string | null
+}
+
+export interface BillingSummary {
+  id: string
+  invoice_number: string | null
+  total_amount: number
+  paid_amount: number
+  pending_amount: number
+  payment_status: string
+  created_at: string
+  case_number: string | null
+}
+
+export interface TimelineEvent {
+  id: string
+  action: string
+  description: string | null
+  module: string | null
+  user_name: string | null
+  created_at: string
+  changes: any
+}
+
+export interface RelatedAppointment {
+  id: string
+  appointment_number: string | null
+  appointment_date: string
+  appointment_time: string
+  status: string
+  appointment_type: string
+  doctor_name: string | null
+  case_number: string | null
 }

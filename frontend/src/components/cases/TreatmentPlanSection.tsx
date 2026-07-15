@@ -1,19 +1,18 @@
 import { useState, useRef, useEffect, useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { Plus, X, Search, Check } from "lucide-react"
+import { Plus, X, Search, Check, Activity, IndianRupee, Stethoscope, Hash } from "lucide-react"
 import { treatmentTypesApi } from "@/services/endpoints"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import ToothNumberPicker from "./ToothNumberPicker"
 
 export interface TreatmentItem {
   id: string
   name: string
-  priority: string
+  toothNumbers: string[]
   estimatedVisits: number | ""
   estimatedCost: number | ""
-  status: string
   remarks: string
 }
 
@@ -30,15 +29,6 @@ let treatmentCounter = 0
 function nextId() {
   treatmentCounter += 1
   return `tx-${Date.now()}-${treatmentCounter}`
-}
-
-const PRIORITY_OPTIONS = ["LOW", "MEDIUM", "HIGH"]
-const STATUS_OPTIONS = ["PLANNED", "SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED"]
-
-const priorityColors: Record<string, string> = {
-  LOW: "bg-gray-100 text-gray-700 border-gray-300",
-  MEDIUM: "bg-amber-50 text-amber-700 border-amber-300",
-  HIGH: "bg-red-50 text-red-700 border-red-300",
 }
 
 export default function TreatmentPlanSection({
@@ -80,15 +70,36 @@ export default function TreatmentPlanSection({
     n.toLowerCase().includes(search.toLowerCase())
   ).sort()
 
+  const totals = useMemo(() => {
+    let totalVisits = 0
+    let totalCost = 0
+    const allTeeth = new Set<string>()
+    for (const t of treatments) {
+      totalVisits += typeof t.estimatedVisits === "number" ? t.estimatedVisits : 0
+      totalCost += typeof t.estimatedCost === "number" ? t.estimatedCost : 0
+      for (const tooth of t.toothNumbers) allTeeth.add(tooth)
+    }
+    return {
+      procedures: treatments.length,
+      teeth: allTeeth.size,
+      visits: totalVisits,
+      cost: totalCost,
+    }
+  }, [treatments])
+
+  useEffect(() => {
+    onEstimatedVisitsChange(String(totals.visits))
+    onEstimatedCostChange(String(totals.cost))
+  }, [totals.visits, totals.cost])
+
   function addTreatment(name: string) {
     if (treatments.some((t) => t.name === name)) return
     onChange([...treatments, {
       id: nextId(),
       name,
-      priority: "MEDIUM",
-      estimatedVisits: "",
-      estimatedCost: "",
-      status: "PLANNED",
+      toothNumbers: [],
+      estimatedVisits: 1,
+      estimatedCost: 0,
       remarks: "",
     }])
     setSearch("")
@@ -182,10 +193,8 @@ export default function TreatmentPlanSection({
               {/* Card Header */}
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/50">
                 <div className="flex items-center gap-2 min-w-0">
+                  <Stethoscope className="h-4 w-4 text-blue-600 shrink-0" />
                   <span className="text-sm font-semibold text-gray-900 truncate">{t.name}</span>
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${priorityColors[t.priority] || "bg-gray-100 text-gray-700 border-gray-300"}`}>
-                    {t.priority}
-                  </span>
                 </div>
                 <button
                   type="button"
@@ -198,46 +207,32 @@ export default function TreatmentPlanSection({
               </div>
 
               {/* Card Body */}
-              <div className="p-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="p-4 space-y-3">
+                {/* Tooth Selection */}
+                <div>
+                  <Label className="text-xs font-medium text-gray-500 mb-1.5 block">
+                    Tooth Number <span className="text-red-500">*</span>
+                  </Label>
+                  <ToothNumberPicker
+                    selected={t.toothNumbers}
+                    onChange={(teeth) => updateTreatment(t.id, "toothNumbers", teeth)}
+                  />
+                </div>
+
+                {/* Visits + Cost + Remarks */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <Label className="text-xs font-medium text-gray-500 mb-1 block">Priority</Label>
-                    <Select value={t.priority} onValueChange={(v) => updateTreatment(t.id, "priority", v)}>
-                      <SelectTrigger className="h-9 text-sm bg-white border-gray-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-white border-gray-200">
-                        {PRIORITY_OPTIONS.map((p) => (
-                          <SelectItem key={p} value={p} className="text-sm text-gray-800">{p}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-xs font-medium text-gray-500 mb-1 block">Status</Label>
-                    <Select value={t.status} onValueChange={(v) => updateTreatment(t.id, "status", v)}>
-                      <SelectTrigger className="h-9 text-sm bg-white border-gray-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-white border-gray-200">
-                        {STATUS_OPTIONS.map((s) => (
-                          <SelectItem key={s} value={s} className="text-sm text-gray-800">{s}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-xs font-medium text-gray-500 mb-1 block">Est. Visits</Label>
+                    <Label className="text-xs font-medium text-gray-500 mb-1 block">Est. Visits <span className="text-red-500">*</span></Label>
                     <Input
                       type="number" min="1"
                       value={t.estimatedVisits}
                       onChange={(e) => updateTreatment(t.id, "estimatedVisits", e.target.value ? Number(e.target.value) : "")}
                       className="h-9 text-sm bg-white border-gray-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                      placeholder="0"
+                      placeholder="1"
                     />
                   </div>
                   <div>
-                    <Label className="text-xs font-medium text-gray-500 mb-1 block">Est. Cost (₹)</Label>
+                    <Label className="text-xs font-medium text-gray-500 mb-1 block">Est. Cost (₹) <span className="text-red-500">*</span></Label>
                     <Input
                       type="number" min="0"
                       value={t.estimatedCost}
@@ -246,16 +241,15 @@ export default function TreatmentPlanSection({
                       placeholder="0"
                     />
                   </div>
-                </div>
-                <div className="mt-3">
-                  <Label className="text-xs font-medium text-gray-500 mb-1 block">Remarks</Label>
-                  <textarea
-                    value={t.remarks}
-                    onChange={(e) => updateTreatment(t.id, "remarks", e.target.value)}
-                    className="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 min-h-[40px] focus:border-blue-400 focus:ring-2 focus:ring-blue-100 focus:outline-none"
-                    placeholder="Notes about this procedure..."
-                    rows={2}
-                  />
+                  <div>
+                    <Label className="text-xs font-medium text-gray-500 mb-1 block">Remarks</Label>
+                    <Input
+                      value={t.remarks}
+                      onChange={(e) => updateTreatment(t.id, "remarks", e.target.value)}
+                      className="h-9 text-sm bg-white border-gray-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                      placeholder="Optional notes..."
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -269,31 +263,29 @@ export default function TreatmentPlanSection({
         </div>
       )}
 
-      {/* Overall Estimates */}
-      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-        <h4 className="text-sm font-semibold text-gray-900 mb-3">Summary Estimates</h4>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <Label className="text-xs font-medium text-gray-500 mb-1 block">Total Estimated Visits</Label>
-            <Input
-              type="number" min="1"
-              value={estimatedVisits}
-              onChange={(e) => onEstimatedVisitsChange(e.target.value)}
-              className="h-10 text-sm bg-white border-gray-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-              placeholder="Total visits"
-            />
-          </div>
-          <div>
-            <Label className="text-xs font-medium text-gray-500 mb-1 block">Total Estimated Cost (₹)</Label>
-            <Input
-              type="number" min="0"
-              value={estimatedCost}
-              onChange={(e) => onEstimatedCostChange(e.target.value)}
-              className="h-10 text-sm bg-white border-gray-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-              placeholder="Total cost"
-            />
+      {/* Summary Card */}
+      {treatments.length > 0 && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-4">
+          <h4 className="text-sm font-semibold text-blue-900 mb-3">Treatment Summary</h4>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <SummaryItem icon={<Stethoscope className="h-4 w-4" />} label="Total Procedures" value={totals.procedures} />
+            <SummaryItem icon={<Hash className="h-4 w-4" />} label="Total Teeth Involved" value={totals.teeth} />
+            <SummaryItem icon={<Activity className="h-4 w-4" />} label="Est. Total Visits" value={totals.visits} />
+            <SummaryItem icon={<IndianRupee className="h-4 w-4" />} label="Est. Total Cost" value={`₹${totals.cost.toLocaleString("en-IN")}`} />
           </div>
         </div>
+      )}
+    </div>
+  )
+}
+
+function SummaryItem({ icon, label, value }: { icon: React.ReactNode; label: string; value: number | string }) {
+  return (
+    <div className="flex items-center gap-2.5 rounded-md bg-white border border-blue-100 px-3 py-2.5">
+      <div className="text-blue-600 shrink-0">{icon}</div>
+      <div className="min-w-0">
+        <div className="text-[10px] text-gray-500 uppercase tracking-wide leading-tight">{label}</div>
+        <div className="text-sm font-bold text-gray-900 leading-tight">{value}</div>
       </div>
     </div>
   )

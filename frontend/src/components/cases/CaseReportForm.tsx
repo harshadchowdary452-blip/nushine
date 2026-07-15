@@ -129,7 +129,25 @@ export default function CaseReportForm({
   doctorName,
   visitDate,
 }: CaseReportFormProps) {
-  const [form, setForm] = useState<Record<string, any>>(initialData || {})
+  const [form, setForm] = useState<Record<string, any>>(() => {
+    const data = initialData || {}
+    if (!data.treatment_plan_items && data.initial_treatment_plan && typeof data.initial_treatment_plan === "string" && data.initial_treatment_plan.startsWith("_JSON_")) {
+      try {
+        const parsed = JSON.parse(data.initial_treatment_plan.slice(6))
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          data.treatment_plan_items = parsed.map((t: any, i: number) => ({
+            id: `loaded-${i}-${Date.now()}`,
+            name: t.name || "",
+            toothNumbers: t.toothNumbers || [],
+            estimatedVisits: t.estimatedVisits ?? "",
+            estimatedCost: t.estimatedCost ?? "",
+            remarks: t.remarks || "",
+          }))
+        }
+      } catch { /* keep original */ }
+    }
+    return data
+  })
   const [findings, setFindings] = useState<ToothFinding[]>(initialFindings || [])
   const [saving, setSaving] = useState(false)
 
@@ -157,7 +175,25 @@ export default function CaseReportForm({
   const doctorsList: any[] = Array.isArray(doctors) ? doctors : []
 
   useEffect(() => {
-    if (initialData) setForm(initialData)
+    if (initialData) {
+      const data = { ...initialData }
+      if (!data.treatment_plan_items && data.initial_treatment_plan && typeof data.initial_treatment_plan === "string" && data.initial_treatment_plan.startsWith("_JSON_")) {
+        try {
+          const parsed = JSON.parse(data.initial_treatment_plan.slice(6))
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            data.treatment_plan_items = parsed.map((t: any, i: number) => ({
+              id: `loaded-${i}-${Date.now()}`,
+              name: t.name || "",
+              toothNumbers: t.toothNumbers || [],
+              estimatedVisits: t.estimatedVisits ?? "",
+              estimatedCost: t.estimatedCost ?? "",
+              remarks: t.remarks || "",
+            }))
+          }
+        } catch { /* keep original */ }
+      }
+      setForm(data)
+    }
   }, [initialData])
 
   useEffect(() => {
@@ -181,10 +217,9 @@ export default function CaseReportForm({
       const serializedPlan = txItems.length > 0
         ? "_JSON_" + JSON.stringify(txItems.map((t: TreatmentItem) => ({
             name: t.name,
-            priority: t.priority || "MEDIUM",
+            toothNumbers: t.toothNumbers || [],
             estimatedVisits: t.estimatedVisits || "",
             estimatedCost: t.estimatedCost || "",
-            status: t.status || "PLANNED",
             remarks: t.remarks || "",
           })))
         : form.initial_treatment_plan || ""
@@ -344,10 +379,12 @@ export default function CaseReportForm({
           visitDate={visitDate}
         />
         <div className={compact ? "mt-2" : "mt-4"}>
-          <Label className={compact ? "text-[10px]" : undefined}>Clinical Findings Summary</Label>
-          <textarea value={form.clinical_findings_summary || findingsSummary} onChange={(e) => setV("clinical_findings_summary", e.target.value)}
-            className={`flex w-full rounded-md border border-input bg-transparent ${compact ? "text-xs min-h-[40px] px-2 py-1.5" : "text-sm min-h-[60px] px-3 py-2 font-mono text-xs mt-1"}`}
-            placeholder="Auto-generated from findings above. Edit if needed." />
+          <Label className={compact ? "text-[10px]" : undefined}>Clinical Findings Summary (auto-generated)</Label>
+          <div
+            className={`w-full rounded-md border border-input bg-muted/30 whitespace-pre-wrap ${compact ? "text-xs min-h-[40px] px-2 py-1.5" : "text-sm min-h-[60px] px-3 py-2 font-mono text-xs mt-1"}`}
+          >
+            {findingsSummary || <span className="text-muted-foreground italic">No findings recorded yet.</span>}
+          </div>
         </div>
       </CollapsibleSection>
 

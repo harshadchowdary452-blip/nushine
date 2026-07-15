@@ -8,14 +8,21 @@ from app.database import get_db
 from app.dependencies import get_current_user
 from app.core.permissions import verify_permission, verify_tenant_access, Permission, Role
 from app.services.appointment_service import AppointmentService
-from app.schemas.appointment import AppointmentCreate, AppointmentUpdate, AppointmentResponse, ReassignDoctorRequest, DoctorSlotResponse
-from app.schemas.common import PaginatedResponse
-from app.schemas.common import MessageResponse
+from app.schemas.appointment import (
+    AppointmentCreate, AppointmentUpdate, AppointmentResponse,
+    ReassignDoctorRequest, RescheduleRequest, CompleteRequest, CancelRequest,
+    DoctorSlotResponse,
+)
+from app.schemas.common import PaginatedResponse, MessageResponse
 from app.models.patient import Patient
 from app.models.hospital import Hospital
 from app.models.user import User
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.audit_log import AuditLog
+from app.models.case import Case
+from app.models.treatment_plan import TreatmentPlan
+from app.models.billing import Billing
+from app.models.patient_timeline import PatientTimeline
 from app.services.status_automation import StatusAutomationService
 from app.services.timeline_helper import record_timeline_event, build_changes
 
@@ -54,6 +61,14 @@ async def _scope_appointments_by_role(db: AsyncSession, current_user: dict, filt
     return filters
 
 
+async def _resolve_user_name(db: AsyncSession, user_id: Optional[str]) -> Optional[str]:
+    if not user_id:
+        return None
+    result = await db.execute(select(User.full_name).where(User.id == user_id))
+    row = result.one_or_none()
+    return row[0] if row else None
+
+
 @router.get("/slots", response_model=DoctorSlotResponse)
 async def get_doctor_slots(
     doctor_id: str = Query(...),
@@ -62,9 +77,7 @@ async def get_doctor_slots(
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    """Get available time slots for a doctor on a given date."""
     from datetime import date as date_type
-    from app.services.appointment_service import AppointmentService
     try:
         appointment_date = date_type.fromisoformat(date)
     except ValueError:
@@ -75,133 +88,54 @@ async def get_doctor_slots(
 
 @router.post("/", response_model=AppointmentResponse, status_code=status.HTTP_201_CREATED)
 async def create_appointment(data: AppointmentCreate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    """
-    Create appointment with TENANT ISOLATION validation.
-    - Verify permission
-    - Verify current user hospital matches patient & doctor
-    - Verify patient and doctor belong to same hospital
-    """
     verify_permission(current_user, Permission.CREATE_APPOINTMENT)
-    
-    logger.warning("=" * 60)
-    logger.warning("POST /appointments - TENANT ISOLATION CHECK")
-    logger.warning("=" * 60)
-    logger.warning(f"Current User: {current_user.get('sub')}")
-    logger.warning(f"Current User Role: {current_user.get('role')}")
-    logger.warning(f"Current User Hospital: {current_user.get('hospital_id')}")
-    logger.warning(f"Patient ID: {data.patient_id}")
-    logger.warning(f"Doctor ID: {data.doctor_id}")
-    
+
     role = current_user.get("role")
     current_user_hospital_id = current_user.get("hospital_id")
-    
-    # ===== HOSPITAL_ADMIN TENANT ISOLATION =====
+
     if role == Role.HOSPITAL_ADMIN.value:
-        logger.warning("Validating HOSPITAL_ADMIN tenant isolation...")
-
         if not current_user_hospital_id:
-            logger.warning("FAIL: HOSPITAL_ADMIN has no hospital_id assigned")
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admin has no hospital assigned"
-            )
-
-        # Verify patient belongs to admin's hospital
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin has no hospital assigned")
         patient_result = await db.execute(select(Patient.hospital_id).where(Patient.id == data.patient_id))
         patient_row = patient_result.one_or_none()
         if not patient_row:
-            logger.warning(f"FAIL: Patient {data.patient_id} not found")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
-
-        patient_hospital_id = patient_row[0]
-        if patient_hospital_id != current_user_hospital_id:
-            logger.warning(f"FAIL: Patient hospital {patient_hospital_id} != Admin hospital {current_user_hospital_id}")
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Patient belongs to different hospital"
-            )
-        logger.warning(f"✓ Patient hospital matches: {patient_hospital_id}")
-
-        # Verify doctor is in admin's admin group (group-level doctor sharing)
+        if patient_row[0] != current_user_hospital_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Patient belongs to different hospital")
         doctor_result = await db.execute(select(User.admin_group_id).where(User.id == data.doctor_id))
         doctor_row = doctor_result.one_or_none()
         if not doctor_row:
-            logger.warning(f"FAIL: Doctor {data.doctor_id} not found")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor not found")
-
-        doctor_admin_group_id = doctor_row[0]
-        # Resolve admin_group_id: prefer hospital's, fall back to user's
         admin_hosp_result = await db.execute(select(Hospital.admin_group_id).where(Hospital.id == current_user_hospital_id))
         admin_hosp_row = admin_hosp_result.one_or_none()
         admin_group_id = admin_hosp_row[0] if admin_hosp_row else current_user.get("admin_group_id")
+        if not admin_group_id or doctor_row[0] != admin_group_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Doctor not in your admin group")
 
-        if not admin_group_id or doctor_admin_group_id != admin_group_id:
-            logger.warning(f"FAIL: Doctor admin_group {doctor_admin_group_id} != expected {admin_group_id}")
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Doctor not in your admin group"
-            )
-        logger.warning(f"✓ Doctor in same admin group: {admin_group_id}")
-
-    # ===== GROUP_ADMIN TENANT ISOLATION =====
     elif role == Role.GROUP_ADMIN.value:
-        logger.warning("Validating GROUP_ADMIN tenant isolation...")
-
         admin_group_id = current_user.get("admin_group_id")
         if not admin_group_id:
-            logger.warning("FAIL: GROUP_ADMIN has no admin_group_id assigned")
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admin has no group assigned"
-            )
-
-        # Verify patient's hospital belongs to admin's group
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin has no group assigned")
         patient_result = await db.execute(select(Patient.hospital_id).where(Patient.id == data.patient_id))
         patient_row = patient_result.one_or_none()
         if not patient_row:
-            logger.warning(f"FAIL: Patient {data.patient_id} not found")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
-
-        patient_hospital_id = patient_row[0]
-        hosp_result = await db.execute(select(Hospital.admin_group_id).where(Hospital.id == patient_hospital_id))
+        hosp_result = await db.execute(select(Hospital.admin_group_id).where(Hospital.id == patient_row[0]))
         hosp_row = hosp_result.one_or_none()
-        patient_admin_group_id = hosp_row[0] if hosp_row else None
-
-        if patient_admin_group_id != admin_group_id:
-            logger.warning(f"FAIL: Patient admin_group {patient_admin_group_id} != Group Admin group {admin_group_id}")
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Patient not in your admin group"
-            )
-        logger.warning(f"✓ Patient in same admin group: {admin_group_id}")
-
-        # Verify doctor belongs to admin's group (direct admin_group_id check)
+        if not hosp_row or hosp_row[0] != admin_group_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Patient not in your admin group")
         doctor_result = await db.execute(select(User.admin_group_id).where(User.id == data.doctor_id))
         doctor_row = doctor_result.one_or_none()
-        if not doctor_row:
-            logger.warning(f"FAIL: Doctor {data.doctor_id} not found")
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor not found")
+        if not doctor_row or doctor_row[0] != admin_group_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Doctor not in your admin group")
 
-        doctor_admin_group_id = doctor_row[0]
-        if doctor_admin_group_id != admin_group_id:
-            logger.warning(f"FAIL: Doctor admin_group {doctor_admin_group_id} != Admin group {admin_group_id}")
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Doctor not in your admin group"
-            )
-        logger.warning(f"✓ Doctor in same admin group: {admin_group_id}")
-    
-    logger.warning("=" * 60)
-    logger.warning("Tenant isolation checks PASSED - Creating appointment")
-    logger.warning("=" * 60)
-    
     service = AppointmentService(db)
     appointment = await service.create(data.model_dump(), user_id=current_user.get("sub"))
 
     await record_timeline_event(
         db, current_user=current_user, patient_id=data.patient_id,
-        action="Appointment Created",
-        description=f"Appointment created for patient",
+        action="Appointment Scheduled",
+        description=f"Appointment scheduled for {data.appointment_date} at {data.appointment_time}",
         module="Appointments",
     )
 
@@ -246,7 +180,6 @@ async def get_appointments(
     current_user: dict = Depends(get_current_user),
 ):
     verify_permission(current_user, Permission.MANAGE_APPOINTMENTS)
-    service = AppointmentService(db)
     filters = {}
     if status_filter:
         filters["status"] = status_filter
@@ -275,17 +208,17 @@ async def get_appointments(
     result = await _scope_appointments_by_role(db, current_user, filters, patient_id, doctor_id)
     if result == []:
         return []
-    return await service.get_all(skip=skip, limit=limit, filters=filters or None)
+    return await service_get_all(db, skip=skip, limit=limit, filters=filters or None)
 
 
 @router.get("/upcoming")
 async def get_upcoming_appointments(db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_APPOINTMENTS)
-    service = AppointmentService(db)
     filters = {}
     result = await _scope_appointments_by_role(db, current_user, filters, None, None)
     if result == []:
         return []
+    service = AppointmentService(db)
     return await service.get_upcoming(filters=filters if filters else None)
 
 
@@ -386,6 +319,203 @@ async def search_appointments(
     }
 
 
+@router.get("/{appointment_id}/full-detail")
+async def get_appointment_full_detail(appointment_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.MANAGE_APPOINTMENTS)
+    service = AppointmentService(db)
+    appointment = await service.get(appointment_id)
+    if not appointment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
+    await verify_tenant_access(current_user, appointment, "appointment", db)
+    await service._attach_names(appointment)
+
+    patient = appointment.patient
+    patient_id = appointment.patient_id
+
+    patient_data = {
+        "id": patient.id,
+        "full_name": patient.full_name,
+        "op_no": patient.op_no,
+        "phone": patient.phone,
+        "email": patient.email,
+        "gender": patient.gender,
+        "age": patient.age,
+        "date_of_birth": str(patient.date_of_birth) if patient.date_of_birth else None,
+        "status": patient.status.value if hasattr(patient.status, "value") else patient.status,
+        "hospital_id": patient.hospital_id,
+        "doctor_id": patient.doctor_id,
+        "created_at": patient.created_at.isoformat() if patient.created_at else None,
+        "medical_history": patient.medical_history,
+    }
+
+    cases_result = await db.execute(select(Case).where(Case.patient_id == patient_id))
+    cases = cases_result.scalars().all()
+
+    case_ids = [c.id for c in cases]
+    doctor_ids = {c.doctor_id for c in cases if c.doctor_id}
+
+    doctor_names = {}
+    if doctor_ids:
+        users_result = await db.execute(select(User.id, User.full_name).where(User.id.in_(doctor_ids)))
+        for row in users_result.all():
+            doctor_names[row[0]] = row[1]
+
+    cases_data = [
+        {
+            "id": c.id,
+            "case_number": c.case_number,
+            "chief_complaint": c.chief_complaint,
+            "status": c.status.value if hasattr(c.status, "value") else c.status,
+            "created_at": c.created_at.isoformat() if c.created_at else None,
+            "doctor_name": doctor_names.get(c.doctor_id),
+            "diagnosis": c.diagnosis,
+        }
+        for c in cases
+    ]
+
+    treatments_data = []
+    if case_ids:
+        treatments_result = await db.execute(select(TreatmentPlan).where(TreatmentPlan.case_id.in_(case_ids)))
+        treatments = treatments_result.scalars().all()
+
+        case_doctor_name_map = {c.id: doctor_names.get(c.doctor_id) for c in cases}
+        case_number_map = {c.id: c.case_number for c in cases}
+
+        treatments_data = [
+            {
+                "id": t.id,
+                "treatment_number": t.treatment_number,
+                "treatment_name": t.treatment_name,
+                "status": t.status.value if hasattr(t.status, "value") else t.status,
+                "cost": t.cost,
+                "paid_amount": t.paid_amount,
+                "total_sittings": t.total_sittings,
+                "completed_sittings": t.completed_sittings,
+                "case_id": t.case_id,
+                "case_number": case_number_map.get(t.case_id),
+                "doctor_name": case_doctor_name_map.get(t.case_id),
+            }
+            for t in treatments
+        ]
+
+    billings_data = []
+    if case_ids:
+        billings_result = await db.execute(select(Billing).where(Billing.case_id.in_(case_ids)))
+        billings = billings_result.scalars().all()
+
+        case_number_map = {c.id: c.case_number for c in cases}
+
+        billings_data = [
+            {
+                "id": b.id,
+                "invoice_number": b.invoice_number,
+                "total_amount": b.total_amount,
+                "paid_amount": b.paid_amount,
+                "pending_amount": b.pending_amount,
+                "payment_status": b.payment_status.value if hasattr(b.payment_status, "value") else b.payment_status,
+                "created_at": b.created_at.isoformat() if b.created_at else None,
+                "case_number": case_number_map.get(b.case_id),
+            }
+            for b in billings
+        ]
+
+    timeline_result = await db.execute(
+        select(PatientTimeline).where(PatientTimeline.patient_id == patient_id).order_by(PatientTimeline.created_at.desc()).limit(50)
+    )
+    timeline_entries = timeline_result.scalars().all()
+
+    timeline_data = [
+        {
+            "id": t.id,
+            "action": t.action,
+            "description": t.description,
+            "module": t.module,
+            "user_name": t.user_name,
+            "created_at": t.created_at.isoformat() if t.created_at else None,
+            "changes": t.changes,
+        }
+        for t in timeline_entries
+    ]
+
+    related_result = await db.execute(
+        select(Appointment).where(
+            Appointment.patient_id == patient_id,
+            Appointment.id != appointment_id,
+        ).order_by(Appointment.appointment_date.desc())
+    )
+    related_appointments = related_result.scalars().all()
+
+    related_case_ids = {a.id for a in related_appointments if a.id}
+    related_case_number_map = {}
+    if related_case_ids:
+        rel_cases_result = await db.execute(
+            select(Case.appointment_id, Case.case_number).where(Case.appointment_id.in_(related_case_ids))
+        )
+        for row in rel_cases_result.all():
+            related_case_number_map[row[0]] = row[1]
+
+    related_doctor_ids = {a.doctor_id for a in related_appointments if a.doctor_id}
+    if related_doctor_ids - doctor_names.keys():
+        extra_users = await db.execute(select(User.id, User.full_name).where(User.id.in_(related_doctor_ids - doctor_names.keys())))
+        for row in extra_users.all():
+            doctor_names[row[0]] = row[1]
+
+    related_appointments_data = [
+        {
+            "id": a.id,
+            "appointment_number": a.appointment_number,
+            "appointment_date": str(a.appointment_date) if a.appointment_date else None,
+            "appointment_time": str(a.appointment_time) if a.appointment_time else None,
+            "status": a.status.value if hasattr(a.status, "value") else a.status,
+            "appointment_type": a.appointment_type.value if hasattr(a.appointment_type, "value") else a.appointment_type,
+            "doctor_name": doctor_names.get(a.doctor_id),
+            "case_number": related_case_number_map.get(a.id),
+        }
+        for a in related_appointments
+    ]
+
+    appointment_data = {
+        "id": appointment.id,
+        "appointment_number": appointment.appointment_number,
+        "patient_id": appointment.patient_id,
+        "doctor_id": appointment.doctor_id,
+        "patient_name": appointment.patient_name if hasattr(appointment, "patient_name") else None,
+        "doctor_name": appointment.doctor_name if hasattr(appointment, "doctor_name") else None,
+        "appointment_date": str(appointment.appointment_date) if appointment.appointment_date else None,
+        "appointment_time": str(appointment.appointment_time) if appointment.appointment_time else None,
+        "duration_minutes": appointment.duration_minutes,
+        "end_time": str(appointment.end_time) if appointment.end_time else None,
+        "appointment_type": appointment.appointment_type.value if hasattr(appointment.appointment_type, "value") else appointment.appointment_type,
+        "status": appointment.status.value if hasattr(appointment.status, "value") else appointment.status,
+        "notes": appointment.notes,
+        "is_active": appointment.is_active,
+        "created_at": appointment.created_at.isoformat() if appointment.created_at else None,
+        "updated_at": appointment.updated_at.isoformat() if appointment.updated_at else None,
+        "created_by_name": appointment.created_by.full_name if appointment.created_by else None,
+        "updated_by_name": appointment.updated_by.full_name if appointment.updated_by else None,
+        "previous_date": str(appointment.previous_date) if appointment.previous_date else None,
+        "previous_time": str(appointment.previous_time) if appointment.previous_time else None,
+        "rescheduled_by_name": appointment.rescheduled_by.full_name if appointment.rescheduled_by else None,
+        "rescheduled_at": appointment.rescheduled_at.isoformat() if appointment.rescheduled_at else None,
+        "reschedule_reason": appointment.reschedule_reason,
+        "cancelled_by_name": appointment.cancelled_by.full_name if appointment.cancelled_by else None,
+        "cancelled_at": appointment.cancelled_at.isoformat() if appointment.cancelled_at else None,
+        "cancellation_reason": appointment.cancellation_reason,
+        "completed_by_name": appointment.completed_by.full_name if appointment.completed_by else None,
+        "completed_at": appointment.completed_at.isoformat() if appointment.completed_at else None,
+    }
+
+    return {
+        "appointment": appointment_data,
+        "patient": patient_data,
+        "cases": cases_data,
+        "treatments": treatments_data,
+        "billings": billings_data,
+        "timeline": timeline_data,
+        "related_appointments": related_appointments_data,
+    }
+
+
 @router.get("/{appointment_id}", response_model=AppointmentResponse)
 async def get_appointment(appointment_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_APPOINTMENTS)
@@ -394,6 +524,7 @@ async def get_appointment(appointment_id: str, db: AsyncSession = Depends(get_db
     if not appointment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
     await verify_tenant_access(current_user, appointment, "appointment", db)
+    await service._attach_names(appointment)
     return appointment
 
 
@@ -407,11 +538,6 @@ async def update_appointment(appointment_id: str, data: AppointmentUpdate, db: A
     await verify_tenant_access(current_user, appointment, "appointment", db)
     old_data = {"status": appointment.status.value if hasattr(appointment.status, 'value') else appointment.status, "appointment_date": str(appointment.appointment_date) if appointment.appointment_date else None, "appointment_time": str(appointment.appointment_time) if appointment.appointment_time else None, "notes": appointment.notes}
     updated = await service.update(appointment_id, data.model_dump(exclude_none=True), user_id=current_user.get("sub"))
-    if data.status is not None:
-        from app.models.appointment import AppointmentStatus
-        svc = StatusAutomationService(db)
-        await svc.update_appointment_status(appointment_id, AppointmentStatus(data.status))
-        await db.commit()
     new_data = {"status": updated.status.value if hasattr(updated.status, 'value') else updated.status, "appointment_date": str(updated.appointment_date) if updated.appointment_date else None, "appointment_time": str(updated.appointment_time) if updated.appointment_time else None, "notes": updated.notes}
     changes = build_changes(old_data, new_data)
     await record_timeline_event(
@@ -433,7 +559,7 @@ async def delete_appointment(appointment_id: str, db: AsyncSession = Depends(get
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
     await verify_tenant_access(current_user, appointment, "appointment", db)
     patient_id = appointment.patient_id
-    deleted = await service.delete(appointment_id, user_id=current_user.get("sub"))
+    await service.delete(appointment_id, user_id=current_user.get("sub"))
     await record_timeline_event(
         db, current_user=current_user, patient_id=patient_id,
         action="Appointment Deleted",
@@ -443,28 +569,147 @@ async def delete_appointment(appointment_id: str, db: AsyncSession = Depends(get
     return MessageResponse(message="Appointment deleted successfully")
 
 
+# ── CANCEL ──────────────────────────────────────────────────────────────
 @router.post("/{appointment_id}/cancel", response_model=MessageResponse)
-async def cancel_appointment(appointment_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+async def cancel_appointment(appointment_id: str, req: CancelRequest, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_APPOINTMENTS)
     service = AppointmentService(db)
     appointment = await service.get(appointment_id)
     if not appointment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
     await verify_tenant_access(current_user, appointment, "appointment", db)
-    patient_id = appointment.patient_id
-    appointment = await service.cancel(appointment_id, user_id=current_user.get("sub"))
+
+    now = datetime.now(timezone.utc)
+    appointment.status = AppointmentStatus.CANCELLED
+    appointment.cancelled_by_id = current_user.get("sub")
+    appointment.cancelled_at = now
+    appointment.cancellation_reason = req.reason
+    appointment.updated_at = now
+    appointment.updated_by_id = current_user.get("sub")
+
+    audit = AuditLog(
+        user_id=current_user.get("sub"),
+        action="CANCEL_APPOINTMENT",
+        entity_type="APPOINTMENT",
+        entity_id=appointment_id,
+        details=f"Appointment cancelled. Reason: {req.reason or 'Not specified'}",
+    )
+    db.add(audit)
+    await db.commit()
+    await db.refresh(appointment)
+
+    cancelled_by_name = await _resolve_user_name(db, current_user.get("sub"))
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=appointment.patient_id,
+        action="Appointment Cancelled",
+        description=f"Appointment on {appointment.appointment_date} cancelled by {cancelled_by_name or 'system'}{': ' + req.reason if req.reason else ''}",
+        module="Appointments",
+        changes=[{"field": "status", "old_value": "SCHEDULED", "new_value": "CANCELLED"}],
+    )
+
+    return MessageResponse(message="Appointment cancelled successfully")
+
+
+# ── COMPLETE ────────────────────────────────────────────────────────────
+@router.post("/{appointment_id}/complete", response_model=AppointmentResponse)
+async def complete_appointment(appointment_id: str, req: CompleteRequest, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.MANAGE_APPOINTMENTS)
+    service = AppointmentService(db)
+    appointment = await service.get(appointment_id)
     if not appointment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
-    svc = StatusAutomationService(db)
-    await svc.update_appointment_status(appointment_id, AppointmentStatus.CANCELLED)
-    await db.commit()
-    await record_timeline_event(
-        db, current_user=current_user, patient_id=patient_id,
-        action="Appointment Cancelled",
-        description=f"Appointment on {appointment.appointment_date} cancelled",
-        module="Appointments",
+    await verify_tenant_access(current_user, appointment, "appointment", db)
+
+    now = datetime.now(timezone.utc)
+    appointment.status = AppointmentStatus.COMPLETED
+    appointment.completed_by_id = current_user.get("sub")
+    appointment.completed_at = now
+    if req.notes:
+        appointment.notes = req.notes
+    appointment.updated_at = now
+    appointment.updated_by_id = current_user.get("sub")
+
+    audit = AuditLog(
+        user_id=current_user.get("sub"),
+        action="COMPLETE_APPOINTMENT",
+        entity_type="APPOINTMENT",
+        entity_id=appointment_id,
+        details="Appointment marked as completed",
     )
-    return MessageResponse(message="Appointment cancelled successfully")
+    db.add(audit)
+
+    svc = StatusAutomationService(db)
+    await svc.update_appointment_status(appointment_id, AppointmentStatus.COMPLETED)
+    await db.commit()
+    await db.refresh(appointment)
+
+    completed_by_name = await _resolve_user_name(db, current_user.get("sub"))
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=appointment.patient_id,
+        action="Appointment Completed",
+        description=f"Appointment on {appointment.appointment_date} completed by {completed_by_name or 'system'}",
+        module="Appointments",
+        changes=[{"field": "status", "old_value": "SCHEDULED", "new_value": "COMPLETED"}],
+    )
+
+    await service._attach_names(appointment)
+    return appointment
+
+
+# ── RESCHEDULE ──────────────────────────────────────────────────────────
+@router.post("/{appointment_id}/reschedule", response_model=AppointmentResponse)
+async def reschedule_appointment(appointment_id: str, req: RescheduleRequest, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.MANAGE_APPOINTMENTS)
+    service = AppointmentService(db)
+    appointment = await service.get(appointment_id)
+    if not appointment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
+    await verify_tenant_access(current_user, appointment, "appointment", db)
+
+    old_date = appointment.appointment_date
+    old_time = appointment.appointment_time
+    now = datetime.now(timezone.utc)
+
+    appointment.previous_date = old_date
+    appointment.previous_time = old_time
+    appointment.appointment_date = req.appointment_date
+    appointment.appointment_time = req.appointment_time
+    appointment.status = AppointmentStatus.RESCHEDULED
+    appointment.rescheduled_by_id = current_user.get("sub")
+    appointment.rescheduled_at = now
+    appointment.reschedule_reason = req.reason
+    appointment.updated_at = now
+    appointment.updated_by_id = current_user.get("sub")
+
+    # Recalculate end_time
+    from datetime import timedelta
+    appointment.end_time = (datetime.min + timedelta(minutes=appointment.duration_minutes)).time()
+
+    audit = AuditLog(
+        user_id=current_user.get("sub"),
+        action="RESCHEDULE_APPOINTMENT",
+        entity_type="APPOINTMENT",
+        entity_id=appointment_id,
+        details=f"Rescheduled from {old_date} {old_time} to {req.appointment_date} {req.appointment_time}. Reason: {req.reason or 'Not specified'}",
+    )
+    db.add(audit)
+    await db.commit()
+    await db.refresh(appointment)
+
+    rescheduled_by_name = await _resolve_user_name(db, current_user.get("sub"))
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=appointment.patient_id,
+        action="Appointment Rescheduled",
+        description=f"Rescheduled from {old_date} {old_time} to {req.appointment_date} {req.appointment_time} by {rescheduled_by_name or 'system'}{': ' + req.reason if req.reason else ''}",
+        module="Appointments",
+        changes=[
+            {"field": "appointment_date", "old_value": str(old_date), "new_value": str(req.appointment_date)},
+            {"field": "appointment_time", "old_value": str(old_time), "new_value": str(req.appointment_time)},
+        ],
+    )
+
+    await service._attach_names(appointment)
+    return appointment
 
 
 @router.post("/{appointment_id}/reassign-doctor")
@@ -518,3 +763,9 @@ async def reassign_appointment_doctor(
         "new_doctor_name": new_doctor.full_name,
         "reason": req.reason,
     }
+
+
+# ── Helper: get_all with service ────────────────────────────────────────
+async def service_get_all(db: AsyncSession, skip=0, limit=100, filters=None):
+    service = AppointmentService(db)
+    return await service.get_all(skip=skip, limit=limit, filters=filters)

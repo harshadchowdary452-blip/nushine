@@ -7,12 +7,16 @@ from enum import Enum
 
 
 class TreatmentPlanStatus(str, Enum):
-    PLANNED = "PLANNED"
+    GENERATED = "GENERATED"
+    ASSIGNED = "ASSIGNED"
     SCHEDULED = "SCHEDULED"
     IN_PROGRESS = "IN_PROGRESS"
-    FOLLOW_UP = "FOLLOW_UP"
+    WAITING_PATIENT = "WAITING_PATIENT"
+    WAITING_LAB = "WAITING_LAB"
+    ON_HOLD = "ON_HOLD"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
+    OVERDUE = "OVERDUE"
 
 
 class TreatmentPlan(Base):
@@ -33,11 +37,29 @@ class TreatmentPlan(Base):
     start_date: Mapped[date] = mapped_column(Date, nullable=True)
     expected_completion_date: Mapped[date] = mapped_column(Date, nullable=True)
     next_appointment_date: Mapped[date] = mapped_column(Date, nullable=True)
-    status: Mapped[TreatmentPlanStatus] = mapped_column(SAEnum(TreatmentPlanStatus, create_constraint=False), default=TreatmentPlanStatus.PLANNED, nullable=False)
+    status: Mapped[TreatmentPlanStatus] = mapped_column(SAEnum(TreatmentPlanStatus, create_constraint=False), default=TreatmentPlanStatus.ASSIGNED, nullable=False)
     notes: Mapped[str] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    assigned_doctor_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
+    assistant_doctor_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
+    tooth_numbers: Mapped[str] = mapped_column(Text, nullable=True)
+    priority: Mapped[str] = mapped_column(String(20), nullable=True)
+    sequence_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    dependency_treatment_id: Mapped[str] = mapped_column(String(36), ForeignKey("treatment_plans.id"), nullable=True)
+    treatment_plan_item_id: Mapped[str] = mapped_column(String(36), ForeignKey("treatment_plan_items.id"), nullable=True)
+    overdue_reason: Mapped[str] = mapped_column(Text, nullable=True)
+    overdue_delay_type: Mapped[str] = mapped_column(String(30), nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
+    auto_created: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     case = relationship("Case", back_populates="treatment_plans", lazy="selectin")
     sittings = relationship("TreatmentSitting", back_populates="treatment_plan", cascade="all, delete-orphan", lazy="selectin")
     treatment_type = relationship("TreatmentType", foreign_keys=[treatment_type_id], lazy="selectin")
+    assigned_doctor = relationship("User", foreign_keys=[assigned_doctor_id], lazy="selectin")
+    assistant_doctor = relationship("User", foreign_keys=[assistant_doctor_id], lazy="selectin")
+    dependency_treatment = relationship("TreatmentPlan", remote_side="TreatmentPlan.id", foreign_keys=[dependency_treatment_id], lazy="selectin")
+    treatment_plan_item = relationship("TreatmentPlanItem", foreign_keys=[treatment_plan_item_id], lazy="selectin")
+    created_by = relationship("User", foreign_keys=[created_by_id], lazy="selectin")

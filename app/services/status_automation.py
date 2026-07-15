@@ -281,7 +281,7 @@ class StatusAutomationService:
             await self._auto_create_invoice_on_completion(tp.case_id)
             await self._check_case_completion(tp.case_id)
 
-        elif new_status == TreatmentPlanStatus.PLANNED:
+        elif new_status == TreatmentPlanStatus.GENERATED:
             case = await self.db.get(Case, tp.case_id)
             if case and case.status in (CaseStatus.OPEN,):
                 case.status = CaseStatus.ON_HOLD
@@ -656,8 +656,8 @@ class StatusAutomationService:
             elif any_in_progress:
                 case.status = CaseStatus.IN_PROGRESS
             else:
-                has_planned = any(p.status == TreatmentPlanStatus.PLANNED for p in plans)
-                if has_planned:
+                has_generated = any(p.status == TreatmentPlanStatus.GENERATED for p in plans)
+                if has_generated:
                     case.status = CaseStatus.ON_HOLD
         await self.db.flush()
         await self.update_patient_status(patient_id)

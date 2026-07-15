@@ -127,6 +127,8 @@ class TreatmentSittingService:
             plan.remaining_sittings = max(0, plan.total_sittings - actual_completed)
             if plan.remaining_sittings <= 0 and plan.total_sittings > 0:
                 plan.status = TreatmentPlanStatus.COMPLETED
+                from datetime import datetime, timezone
+                plan.completed_at = datetime.now(timezone.utc)
             elif plan.status == TreatmentPlanStatus.COMPLETED and plan.remaining_sittings > 0:
                 plan.status = TreatmentPlanStatus.IN_PROGRESS
             await self.db.flush()

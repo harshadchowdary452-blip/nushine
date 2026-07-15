@@ -345,3 +345,78 @@ async def get_case_odontogram(case_id: str, db: AsyncSession = Depends(get_db), 
         return Response(content=img_bytes, media_type="image/png")
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Odontogram render failed: {str(e)}")
+
+
+@router.post("/{case_id}/approve-treatment-plan", response_model=CaseResponse)
+async def approve_treatment_plan(case_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.APPROVE_TREATMENT_PLAN)
+    service = CaseService(db)
+    case = await service.get(case_id)
+    if not case:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
+    await verify_tenant_access(current_user, case, "case", db)
+    from app.models.case import CaseTreatmentPlanStatus
+    case.treatment_plan_status = CaseTreatmentPlanStatus.APPROVED
+    case.treatment_plan_approved = True
+    case.treatment_plan_approved_by_id = current_user.get("sub")
+    case.treatment_plan_approved_at = datetime.now(timezone.utc)
+    await db.flush()
+    from app.services.treatment_generator import TreatmentGenerator
+    from app.services.treatment_plan_item_service import TreatmentPlanItemService
+    item_svc = TreatmentPlanItemService(db)
+    items = await item_svc.get_current_items(case_id)
+    generator = TreatmentGenerator(db)
+    await generator.generate_from_items(items, user_id=current_user.get("sub"))
+    await db.commit()
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=case.patient_id,
+        action="Treatment Plan Approved",
+        description=f"Treatment plan approved — {len(items)} item(s) generated as treatments",
+        module="Treatments",
+    )
+    case = await _load_case_with_findings(db, case_id)
+    return case
+
+
+@router.post("/{case_id}/reject-treatment-plan", response_model=CaseResponse)
+async def reject_treatment_plan(case_id: str, reason: str = Query(..., min_length=1), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.APPROVE_TREATMENT_PLAN)
+    service = CaseService(db)
+    case = await service.get(case_id)
+    if not case:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
+    await verify_tenant_access(current_user, case, "case", db)
+    from app.models.case import CaseTreatmentPlanStatus
+    case.treatment_plan_status = CaseTreatmentPlanStatus.REJECTED
+    case.treatment_plan_approved = False
+    case.treatment_plan_rejection_reason = reason
+    await db.commit()
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=case.patient_id,
+        action="Treatment Plan Rejected",
+        description=f"Treatment plan rejected: {reason}",
+        module="Treatments",
+    )
+    case = await _load_case_with_findings(db, case_id)
+    return case
+
+
+@router.post("/{case_id}/submit-treatment-plan", response_model=CaseResponse)
+async def submit_treatment_plan(case_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.CREATE_TREATMENT_PLAN)
+    service = CaseService(db)
+    case = await service.get(case_id)
+    if not case:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
+    await verify_tenant_access(current_user, case, "case", db)
+    from app.models.case import CaseTreatmentPlanStatus
+    case.treatment_plan_status = CaseTreatmentPlanStatus.PENDING_APPROVAL
+    await db.commit()
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=case.patient_id,
+        action="Treatment Plan Submitted for Approval",
+        description="Treatment plan submitted for approval",
+        module="Treatments",
+    )
+    case = await _load_case_with_findings(db, case_id)
+    return case

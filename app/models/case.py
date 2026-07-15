@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import String, DateTime, Text, Boolean, ForeignKey, Enum as SAEnum
+from sqlalchemy import String, DateTime, Text, Boolean, Integer, ForeignKey, Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 from enum import Enum
@@ -12,6 +12,13 @@ class CaseStatus(str, Enum):
     ON_HOLD = "ON_HOLD"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
+
+
+class CaseTreatmentPlanStatus(str, Enum):
+    DRAFT = "DRAFT"
+    PENDING_APPROVAL = "PENDING_APPROVAL"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
 
 
 class ClinicalFinding(Base):
@@ -81,6 +88,13 @@ class Case(Base):
     # Follow-up
     follow_up_instructions: Mapped[str] = mapped_column(Text, nullable=True)
     next_review_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Treatment Plan Approval
+    treatment_plan_status: Mapped[CaseTreatmentPlanStatus] = mapped_column(SAEnum(CaseTreatmentPlanStatus, create_constraint=False), default=CaseTreatmentPlanStatus.DRAFT, nullable=False)
+    treatment_plan_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    treatment_plan_approved: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    treatment_plan_approved_by_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
+    treatment_plan_approved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    treatment_plan_rejection_reason: Mapped[str] = mapped_column(Text, nullable=True)
     # Status
     status: Mapped[CaseStatus] = mapped_column(SAEnum(CaseStatus, create_constraint=False), default=CaseStatus.OPEN, nullable=False)
     notes: Mapped[str] = mapped_column(Text, nullable=True)
@@ -97,6 +111,8 @@ class Case(Base):
     consultant = relationship("Consultant", back_populates="cases")
     appointment = relationship("Appointment", back_populates="cases")
     treatment_plans = relationship("TreatmentPlan", back_populates="case", cascade="all, delete-orphan")
+    treatment_plan_items = relationship("TreatmentPlanItem", back_populates="case", cascade="all, delete-orphan", order_by="TreatmentPlanItem.version.desc(), TreatmentPlanItem.sequence_order")
+    treatment_plan_approved_by = relationship("User", foreign_keys=[treatment_plan_approved_by_id], lazy="selectin")
     billings = relationship("Billing", back_populates="case", cascade="all, delete-orphan")
     pre_ops = relationship("PreOp", back_populates="case", cascade="all, delete-orphan")
     post_ops = relationship("PostOp", back_populates="case", cascade="all, delete-orphan")

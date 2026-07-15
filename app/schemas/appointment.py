@@ -31,6 +31,20 @@ class AppointmentUpdate(BaseModel):
     duration_minutes: Optional[int] = None
 
 
+class RescheduleRequest(BaseModel):
+    appointment_date: date
+    appointment_time: time
+    reason: Optional[str] = None
+
+
+class CompleteRequest(BaseModel):
+    notes: Optional[str] = None
+
+
+class CancelRequest(BaseModel):
+    reason: Optional[str] = None
+
+
 class ReassignDoctorRequest(BaseModel):
     doctor_id: str
     reason: Optional[str] = None
@@ -38,6 +52,7 @@ class ReassignDoctorRequest(BaseModel):
 
 class AppointmentResponse(BaseModel):
     id: str
+    appointment_number: Optional[str] = None
     patient_id: str
     doctor_id: str
     patient_name: Optional[str] = None
@@ -52,6 +67,24 @@ class AppointmentResponse(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+    created_by_name: Optional[str] = None
+    updated_by_name: Optional[str] = None
+
+    # Reschedule tracking
+    previous_date: Optional[date] = None
+    previous_time: Optional[time] = None
+    rescheduled_by_name: Optional[str] = None
+    rescheduled_at: Optional[datetime] = None
+    reschedule_reason: Optional[str] = None
+
+    # Cancel tracking
+    cancelled_by_name: Optional[str] = None
+    cancelled_at: Optional[datetime] = None
+    cancellation_reason: Optional[str] = None
+
+    # Complete tracking
+    completed_by_name: Optional[str] = None
+    completed_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 

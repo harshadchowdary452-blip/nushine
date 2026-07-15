@@ -10,6 +10,89 @@ from app.models.user import User
 from app.models.billing import Billing
 
 
+def _to_date(value: Any) -> date:
+    if isinstance(value, date):
+        return value
+    if isinstance(value, str):
+        return date.fromisoformat(value)
+    return value
+
+
+def _to_time(value: Any) -> time:
+    if isinstance(value, time):
+        return value
+    if isinstance(value, str):
+        parts = value.split(":")
+        return time(int(parts[0]), int(parts[1]), int(parts[2]) if len(parts) > 2 else 0)
+    return value
+
+
+def _apply_common_filters(query, filters: Dict[str, Any]):
+    for key, value in filters.items():
+        if value is None or value == "":
+            continue
+        if key in ("sort_by", "sort_order"):
+            continue
+        if key == "search" and value:
+            search_val = f"%{value}%"
+            query = query.where(
+                or_(
+                    Patient.full_name.ilike(search_val),
+                    Appointment.notes.ilike(search_val),
+                    Appointment.appointment_number.ilike(search_val),
+                    Patient.phone.ilike(search_val),
+                    Patient.op_no.ilike(search_val),
+                    Patient.abha_id.ilike(search_val),
+                )
+            )
+        elif key == "patient_name" and value:
+            query = query.where(Patient.full_name.ilike(f"%{value}%"))
+        elif key == "op_no" and value:
+            query = query.where(Patient.op_no.ilike(f"%{value}%"))
+        elif key == "mobile" and value:
+            query = query.where(Patient.phone.ilike(f"%{value}%"))
+        elif key == "abha_id" and value:
+            query = query.where(Patient.abha_id.ilike(f"%{value}%"))
+        elif key == "date_from" and value:
+            query = query.where(Appointment.appointment_date >= _to_date(value))
+        elif key == "date_to" and value:
+            query = query.where(Appointment.appointment_date <= _to_date(value))
+        elif key == "time_from" and value:
+            query = query.where(Appointment.appointment_time >= _to_time(value))
+        elif key == "time_to" and value:
+            query = query.where(Appointment.appointment_time <= _to_time(value))
+        elif key == "payment_status" and value:
+            from app.models.case import Case as CaseModel
+            query = (
+                query.join(CaseModel, CaseModel.appointment_id == Appointment.id, isouter=True)
+                .join(Billing, Billing.case_id == CaseModel.id, isouter=True)
+                .where(Billing.payment_status == value)
+            )
+        elif key.endswith("__in") and isinstance(value, (list, tuple)):
+            attr_name = key[:-4]
+            if hasattr(Appointment, attr_name):
+                query = query.where(getattr(Appointment, attr_name).in_(value))
+        elif key.endswith("__ge"):
+            attr_name = key[:-4]
+            if hasattr(Appointment, attr_name):
+                query = query.where(getattr(Appointment, attr_name) >= value)
+        elif key.endswith("__gt"):
+            attr_name = key[:-4]
+            if hasattr(Appointment, attr_name):
+                query = query.where(getattr(Appointment, attr_name) > value)
+        elif key.endswith("__le"):
+            attr_name = key[:-4]
+            if hasattr(Appointment, attr_name):
+                query = query.where(getattr(Appointment, attr_name) <= value)
+        elif key.endswith("__lt"):
+            attr_name = key[:-4]
+            if hasattr(Appointment, attr_name):
+                query = query.where(getattr(Appointment, attr_name) < value)
+        elif hasattr(Appointment, key) and value is not None:
+            query = query.where(getattr(Appointment, key) == value)
+    return query
+
+
 class AppointmentRepository(BaseRepository[Appointment]):
     def __init__(self, db: AsyncSession):
         super().__init__(Appointment, db)
@@ -29,66 +112,7 @@ class AppointmentRepository(BaseRepository[Appointment]):
         ).join(Patient, Appointment.patient_id == Patient.id, isouter=True)
 
         if filters:
-            for key, value in filters.items():
-                if value is None or value == "":
-                    continue
-                if key == "search" and value:
-                    search_val = f"%{value}%"
-                    query = query.where(
-                        or_(
-                            Patient.full_name.ilike(search_val),
-                            Appointment.notes.ilike(search_val),
-                            Appointment.appointment_number.ilike(search_val),
-                            Patient.phone.ilike(search_val),
-                            Patient.op_no.ilike(search_val),
-                            Patient.abha_id.ilike(search_val),
-                        )
-                    )
-                elif key == "patient_name" and value:
-                    query = query.where(Patient.full_name.ilike(f"%{value}%"))
-                elif key == "op_no" and value:
-                    query = query.where(Patient.op_no.ilike(f"%{value}%"))
-                elif key == "mobile" and value:
-                    query = query.where(Patient.phone.ilike(f"%{value}%"))
-                elif key == "abha_id" and value:
-                    query = query.where(Patient.abha_id.ilike(f"%{value}%"))
-                elif key == "date_from" and value:
-                    query = query.where(Appointment.appointment_date >= value)
-                elif key == "date_to" and value:
-                    query = query.where(Appointment.appointment_date <= value)
-                elif key == "time_from" and value:
-                    query = query.where(Appointment.appointment_time >= value)
-                elif key == "time_to" and value:
-                    query = query.where(Appointment.appointment_time <= value)
-                elif key == "payment_status" and value:
-                    from app.models.case import Case as CaseModel
-                    query = (
-                        query.join(CaseModel, CaseModel.appointment_id == Appointment.id, isouter=True)
-                        .join(Billing, Billing.case_id == CaseModel.id, isouter=True)
-                        .where(Billing.payment_status == value)
-                    )
-                elif key.endswith("__in") and isinstance(value, (list, tuple)):
-                    attr_name = key[:-4]
-                    if hasattr(self.model, attr_name):
-                        query = query.where(getattr(self.model, attr_name).in_(value))
-                elif key.endswith("__ge"):
-                    attr_name = key[:-4]
-                    if hasattr(self.model, attr_name):
-                        query = query.where(getattr(self.model, attr_name) >= value)
-                elif key.endswith("__gt"):
-                    attr_name = key[:-4]
-                    if hasattr(self.model, attr_name):
-                        query = query.where(getattr(self.model, attr_name) > value)
-                elif key.endswith("__le"):
-                    attr_name = key[:-4]
-                    if hasattr(self.model, attr_name):
-                        query = query.where(getattr(self.model, attr_name) <= value)
-                elif key.endswith("__lt"):
-                    attr_name = key[:-4]
-                    if hasattr(self.model, attr_name):
-                        query = query.where(getattr(self.model, attr_name) < value)
-                elif hasattr(self.model, key) and value is not None:
-                    query = query.where(getattr(self.model, key) == value)
+            query = _apply_common_filters(query, filters)
 
         if order_by and hasattr(self.model, order_by):
             order_col = getattr(self.model, order_by)
@@ -103,49 +127,6 @@ class AppointmentRepository(BaseRepository[Appointment]):
     async def count(self, filters: Optional[Dict[str, Any]] = None) -> int:
         query = select(self.model.id).join(Patient, Appointment.patient_id == Patient.id, isouter=True)
         if filters:
-            for key, value in filters.items():
-                if value is None or value == "":
-                    continue
-                if key == "search" and value:
-                    search_val = f"%{value}%"
-                    query = query.where(
-                        or_(
-                            Patient.full_name.ilike(search_val),
-                            Appointment.notes.ilike(search_val),
-                            Appointment.appointment_number.ilike(search_val),
-                            Patient.phone.ilike(search_val),
-                            Patient.op_no.ilike(search_val),
-                            Patient.abha_id.ilike(search_val),
-                        )
-                    )
-                elif key == "patient_name" and value:
-                    query = query.where(Patient.full_name.ilike(f"%{value}%"))
-                elif key == "op_no" and value:
-                    query = query.where(Patient.op_no.ilike(f"%{value}%"))
-                elif key == "mobile" and value:
-                    query = query.where(Patient.phone.ilike(f"%{value}%"))
-                elif key == "abha_id" and value:
-                    query = query.where(Patient.abha_id.ilike(f"%{value}%"))
-                elif key == "date_from" and value:
-                    query = query.where(Appointment.appointment_date >= value)
-                elif key == "date_to" and value:
-                    query = query.where(Appointment.appointment_date <= value)
-                elif key == "time_from" and value:
-                    query = query.where(Appointment.appointment_time >= value)
-                elif key == "time_to" and value:
-                    query = query.where(Appointment.appointment_time <= value)
-                elif key == "payment_status" and value:
-                    from app.models.case import Case as CaseModel
-                    query = (
-                        query.join(CaseModel, CaseModel.appointment_id == Appointment.id, isouter=True)
-                        .join(Billing, Billing.case_id == CaseModel.id, isouter=True)
-                        .where(Billing.payment_status == value)
-                    )
-                elif key.endswith("__in") and isinstance(value, (list, tuple)):
-                    attr_name = key[:-4]
-                    if hasattr(self.model, attr_name):
-                        query = query.where(getattr(self.model, attr_name).in_(value))
-                elif hasattr(self.model, key) and value is not None:
-                    query = query.where(getattr(self.model, key) == value)
+            query = _apply_common_filters(query, filters)
         result = await self.db.execute(query)
         return len(result.all())

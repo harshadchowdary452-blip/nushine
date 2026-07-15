@@ -157,6 +157,10 @@ class CaseResponse(BaseModel):
     status: str
     notes: Optional[str]
     is_active: bool
+    treatment_plan_status: Optional[str] = None
+    treatment_plan_version: Optional[int] = None
+    treatment_plan_approved: Optional[bool] = None
+    treatment_plan_rejection_reason: Optional[str] = None
     findings: Optional[List[ClinicalFindingResponse]] = None
     treatment_plans: Optional[List[TreatmentPlanResponse]] = None
     created_at: datetime

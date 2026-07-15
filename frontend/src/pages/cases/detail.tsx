@@ -2,7 +2,7 @@ import { useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
-  Loader2, Printer, PenLine, ArrowLeft
+  Loader2, Printer, PenLine, ArrowLeft, Send
 } from "lucide-react"
 import { format } from "date-fns"
 import { casesApi } from "@/services/endpoints"
@@ -79,6 +79,20 @@ export default function CaseReportDetail() {
           <Button variant="outline" size="sm" onClick={() => navigate(`/cases/${id}/print`)}>
             <Printer className="h-4 w-4 mr-1" /> Print Preview
           </Button>
+          {(() => {
+            const hasTreatmentPlan =
+              (c.treatment_plan_items && c.treatment_plan_items.length > 0) ||
+              (c.treatment_plans && c.treatment_plans.length > 0) ||
+              (c.initial_treatment_plan && c.initial_treatment_plan.length > 0)
+            return hasTreatmentPlan && !c.treatment_plan_approved ? (
+              <Button size="sm" onClick={() => navigate(`/treatments/approve/${id}`)}>
+                <Send className="h-4 w-4 mr-1" /> Submit for Approval
+              </Button>
+            ) : null
+          })()}
+          {c.treatment_plan_approved && (
+            <span className="inline-flex items-center rounded-full bg-green-100 text-green-800 px-2 py-1 text-xs font-medium">Treatment Approved</span>
+          )}
           <Button size="sm" onClick={() => setEditing(!editing)}>
             <PenLine className="h-4 w-4 mr-1" /> {editing ? "Cancel" : "Edit"}
           </Button>
@@ -148,7 +162,7 @@ export default function CaseReportDetail() {
             dental_history: c.dental_history || "",
             extra_oral_examination: c.extra_oral_examination || "",
             intra_oral_examination: c.intra_oral_examination || "",
-            clinical_findings_summary: c.clinical_findings_summary || "",
+            clinical_findings_summary: "",
             periodontal_examination: c.periodontal_examination || "",
             investigations: c.investigations || "",
             provisional_diagnosis: c.provisional_diagnosis || "",
@@ -222,16 +236,7 @@ export default function CaseReportDetail() {
           </TabsContent>
 
           <TabsContent value="treatment" className="mt-4 space-y-4">
-            {c.initial_treatment_plan && <SectionCard title="Treatment Plan" content={c.initial_treatment_plan} />}
-            {(c.treatment_plan_estimated_visits || c.treatment_plan_estimated_cost) && (
-              <Card>
-                <CardHeader className="py-3"><CardTitle className="text-sm">Plan Details</CardTitle></CardHeader>
-                <CardContent className="text-sm space-y-1">
-                  {c.treatment_plan_estimated_visits && <p>Estimated Visits: <strong>{c.treatment_plan_estimated_visits}</strong></p>}
-                  {c.treatment_plan_estimated_cost && <p>Estimated Cost: <strong>₹{c.treatment_plan_estimated_cost}</strong></p>}
-                </CardContent>
-              </Card>
-            )}
+            <TreatmentPlanView caseData={c} />
             {c.patient_instructions && <SectionCard title="Patient Instructions" content={c.patient_instructions} />}
             {c.medicines_prescribed && <SectionCard title="Medicines Prescribed" content={c.medicines_prescribed} />}
             {c.follow_up_instructions && <SectionCard title="Follow-Up Instructions" content={c.follow_up_instructions} />}
@@ -260,6 +265,101 @@ function SectionCard({ title, content }: { title: string; content: string }) {
       <CardHeader className="py-3"><CardTitle className="text-sm">{title}</CardTitle></CardHeader>
       <CardContent className="py-2">
         <p className="text-sm whitespace-pre-wrap">{content}</p>
+      </CardContent>
+    </Card>
+  )
+}
+
+function parseTreatmentItems(c: Case): any[] {
+  if (c.treatment_plan_items && c.treatment_plan_items.length > 0) {
+    return c.treatment_plan_items.map((item: any) => ({
+      name: item.procedure_name || "—",
+      toothNumbers: Array.isArray(item.tooth_numbers) ? item.tooth_numbers : (typeof item.tooth_numbers === "string" ? (() => { try { return JSON.parse(item.tooth_numbers) } catch { return [] } })() : []),
+      estimatedVisits: item.estimated_visits || "",
+      estimatedCost: item.estimated_cost || "",
+      remarks: item.remarks || "",
+      status: c.treatment_plan_status || "DRAFT",
+      assignedDoctor: item.assigned_doctor_name || null,
+    }))
+  }
+  const raw = c.initial_treatment_plan
+  if (raw && typeof raw === "string" && raw.startsWith("_JSON_")) {
+    try {
+      const parsed = JSON.parse(raw.slice(6))
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed
+    } catch { /* ignore */ }
+  }
+  if (c.treatment_plans && c.treatment_plans.length > 0) {
+    return c.treatment_plans.map((tp: any) => ({
+      name: tp.treatment_name || "—",
+      toothNumbers: [],
+      estimatedVisits: tp.total_sittings || "",
+      estimatedCost: tp.cost || "",
+      remarks: tp.notes || "",
+    }))
+  }
+  return []
+}
+
+function TreatmentPlanView({ caseData }: { caseData: Case }) {
+  const items = parseTreatmentItems(caseData)
+  if (items.length === 0 && !caseData.initial_treatment_plan) return null
+
+  const allTeeth = new Set<string>()
+  const totalVisits = items.reduce((s: number, it: any) => s + (parseInt(it.estimatedVisits) || 0), 0)
+  const totalCost = items.reduce((s: number, it: any) => s + (parseFloat(it.estimatedCost) || 0), 0)
+  items.forEach((it: any) => (it.toothNumbers || []).forEach((t: string) => allTeeth.add(t)))
+
+  return (
+    <Card>
+      <CardHeader className="py-3 flex flex-row items-center justify-between">
+        <CardTitle className="text-sm">Treatment Plan</CardTitle>
+        {caseData.treatment_plan_approved && (
+          <span className="inline-flex items-center rounded-full bg-green-100 text-green-800 px-2 py-0.5 text-xs font-medium">Approved</span>
+        )}
+      </CardHeader>
+      <CardContent className="py-2 space-y-3">
+        {items.length > 0 ? (
+          <>
+            <div className="space-y-2">
+              {items.map((it: any, i: number) => (
+                <div key={i} className="flex items-start justify-between gap-4 rounded-md border border-gray-100 bg-gray-50/50 px-3 py-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-900">{it.name || "—"}</span>
+                      {it.status && (
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${it.status === "APPROVED" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
+                          {it.status}
+                        </span>
+                      )}
+                    </div>
+                    {it.toothNumbers && it.toothNumbers.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {it.toothNumbers.map((t: string) => (
+                          <span key={t} className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-800 border border-blue-200">{t}</span>
+                        ))}
+                      </div>
+                    )}
+                    {it.assignedDoctor && <div className="text-xs text-blue-600 mt-0.5">Dr. {it.assignedDoctor}</div>}
+                    {it.remarks && <div className="text-xs text-gray-500 mt-0.5">{it.remarks}</div>}
+                  </div>
+                  <div className="text-right shrink-0 text-xs text-gray-600 space-y-0.5">
+                    {it.estimatedVisits ? <div>{it.estimatedVisits} visit{Number(it.estimatedVisits) !== 1 ? "s" : ""}</div> : null}
+                    {it.estimatedCost ? <div className="font-medium text-gray-900">₹{Number(it.estimatedCost).toLocaleString("en-IN")}</div> : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-4 pt-2 border-t border-gray-100 text-xs text-gray-600">
+              <span><strong className="text-gray-900">{items.length}</strong> procedure{items.length !== 1 ? "s" : ""}</span>
+              {allTeeth.size > 0 && <span><strong className="text-gray-900">{allTeeth.size}</strong> tooth{allTeeth.size !== 1 ? "teeth" : ""}</span>}
+              {totalVisits > 0 && <span><strong className="text-gray-900">{totalVisits}</strong> estimated visit{totalVisits !== 1 ? "s" : ""}</span>}
+              {totalCost > 0 && <span><strong className="text-gray-900">₹{totalCost.toLocaleString("en-IN")}</strong> estimated cost</span>}
+            </div>
+          </>
+        ) : (
+          <p className="text-sm text-gray-500">{caseData.initial_treatment_plan || "No treatment plan recorded."}</p>
+        )}
       </CardContent>
     </Card>
   )

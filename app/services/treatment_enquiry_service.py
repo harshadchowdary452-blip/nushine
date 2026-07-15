@@ -209,6 +209,48 @@ class TreatmentEnquiryService:
         logger.info("Created enquiry %s for plan %s", enquiry.id, plan.id)
         return enquiry
 
+    async def create_waiting_patient_task(self, plan_id: str, patient_id: str, follow_up_date_str: str) -> None:
+        ctx = await self._get_plan_context(plan_id)
+        if not ctx:
+            return
+        plan = ctx["plan"]
+        follow_up_date = date.fromisoformat(follow_up_date_str) if isinstance(follow_up_date_str, str) else follow_up_date_str
+        fu = FollowUp(
+            patient_id=patient_id, hospital_id=ctx["hospital_id"],
+            doctor_id=ctx["doctor_id"], case_id=plan.case_id,
+            treatment_id=plan_id, treatment_name=plan.treatment_name,
+            treatment_type_id=plan.treatment_type_id,
+            follow_up_date=follow_up_date,
+            follow_up_time=time(10, 0),
+            follow_up_type=FollowUpType.ONE_DAY_FOLLOW_UP.value,
+            status=FollowUpStatus.PENDING.value,
+            notes=f"Auto-generated: Follow-up for waiting patient on treatment '{plan.treatment_name}'",
+        )
+        self.db.add(fu)
+        await self.db.flush()
+        logger.info("Created waiting patient task for plan %s, follow-up date %s", plan_id, follow_up_date)
+
+    async def create_waiting_lab_task(self, plan_id: str, patient_id: str, follow_up_date_str: str) -> None:
+        ctx = await self._get_plan_context(plan_id)
+        if not ctx:
+            return
+        plan = ctx["plan"]
+        follow_up_date = date.fromisoformat(follow_up_date_str) if isinstance(follow_up_date_str, str) else follow_up_date_str
+        fu = FollowUp(
+            patient_id=patient_id, hospital_id=ctx["hospital_id"],
+            doctor_id=ctx["doctor_id"], case_id=plan.case_id,
+            treatment_id=plan_id, treatment_name=plan.treatment_name,
+            treatment_type_id=plan.treatment_type_id,
+            follow_up_date=follow_up_date,
+            follow_up_time=time(10, 0),
+            follow_up_type=FollowUpType.ONE_DAY_FOLLOW_UP.value,
+            status=FollowUpStatus.PENDING.value,
+            notes=f"Auto-generated: Lab follow-up for treatment '{plan.treatment_name}'",
+        )
+        self.db.add(fu)
+        await self.db.flush()
+        logger.info("Created waiting lab task for plan %s, follow-up date %s", plan_id, follow_up_date)
+
     async def on_sitting_completed(self, plan_id: str, sitting_number: int = 0) -> None:
         ctx = await self._get_plan_context(plan_id)
         if not ctx:

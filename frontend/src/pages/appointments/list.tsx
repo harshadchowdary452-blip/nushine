@@ -41,8 +41,17 @@ import { useAuthStore } from "@/store/authStore"
 const DATE_PRESET_KEYS = new Set(["date_preset"])
 
 function StatusBadge({ status }: { status: string }) {
-  const cls = `status-badge status-badge-${status?.toLowerCase().replace(/_/g, "_")}`
-  return <span className={cls}>{status?.replace(/_/g, " ")}</span>
+  const colors: Record<string, string> = {
+    SCHEDULED: "bg-blue-50 text-blue-700 border-blue-200",
+    COMPLETED: "bg-green-50 text-green-700 border-green-200",
+    CANCELLED: "bg-red-50 text-red-700 border-red-200",
+    RESCHEDULED: "bg-orange-50 text-orange-700 border-orange-200",
+  }
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${colors[status] || "bg-gray-50 text-gray-600 border-gray-200"}`}>
+      {status?.replace(/_/g, " ")}
+    </span>
+  )
 }
 
 interface AppointmentForm {

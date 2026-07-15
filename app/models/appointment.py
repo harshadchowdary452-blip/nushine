@@ -8,12 +8,8 @@ from enum import Enum
 
 class AppointmentStatus(str, Enum):
     SCHEDULED = "SCHEDULED"
-    CONFIRMED = "CONFIRMED"
-    CHECKED_IN = "CHECKED_IN"
-    IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
-    NO_SHOW = "NO_SHOW"
     RESCHEDULED = "RESCHEDULED"
 
 
@@ -52,8 +48,28 @@ class Appointment(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     created_by_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
     updated_by_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
+
+    # Reschedule tracking
+    previous_date: Mapped[date] = mapped_column(Date, nullable=True)
+    previous_time: Mapped[time] = mapped_column(Time, nullable=True)
+    rescheduled_by_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
+    rescheduled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    reschedule_reason: Mapped[str] = mapped_column(Text, nullable=True)
+
+    # Cancel tracking
+    cancelled_by_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
+    cancelled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    cancellation_reason: Mapped[str] = mapped_column(Text, nullable=True)
+
+    # Complete tracking
+    completed_by_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
+    completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+
     patient = relationship("Patient", back_populates="appointments")
     doctor = relationship("User", back_populates="appointments", foreign_keys=[doctor_id])
     created_by = relationship("User", foreign_keys=[created_by_id], backref="created_appointments")
     updated_by = relationship("User", foreign_keys=[updated_by_id], backref="updated_appointments")
+    rescheduled_by = relationship("User", foreign_keys=[rescheduled_by_id], backref="rescheduled_appointments")
+    cancelled_by = relationship("User", foreign_keys=[cancelled_by_id], backref="cancelled_appointments")
+    completed_by = relationship("User", foreign_keys=[completed_by_id], backref="completed_appointments")
     cases = relationship("Case", back_populates="appointment")

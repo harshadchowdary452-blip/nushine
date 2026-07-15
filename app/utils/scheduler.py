@@ -41,6 +41,16 @@ async def check_same_day_appointments():
         await asyncio.sleep(1800)
 
 
+async def check_overdue_treatments():
+    while True:
+        try:
+            from app.services.overdue_detection import check_overdue_treatments as _check
+            await _check()
+        except Exception:
+            pass
+        await asyncio.sleep(3600)
+
+
 async def check_missed_appointments():
     while True:
         try:

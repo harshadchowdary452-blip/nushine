@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime, date
 from enum import Enum
 
@@ -10,13 +10,10 @@ class TreatmentPlanCreate(BaseModel):
     treatment_type_id: Optional[str] = None
     description: Optional[str] = None
     cost: float = Field(default=0.0, ge=0)
-    paid_amount: Optional[float] = Field(default=0.0, ge=0)
     total_sittings: int = Field(default=1, ge=1)
     duration_minutes: Optional[int] = None
     start_date: Optional[date] = None
     expected_completion_date: Optional[date] = None
-    next_appointment_date: Optional[date] = None
-    status: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -25,14 +22,14 @@ class TreatmentPlanUpdate(BaseModel):
     treatment_type_id: Optional[str] = None
     description: Optional[str] = None
     cost: Optional[float] = None
-    paid_amount: Optional[float] = None
     total_sittings: Optional[int] = None
     duration_minutes: Optional[int] = None
     start_date: Optional[date] = None
     expected_completion_date: Optional[date] = None
-    next_appointment_date: Optional[date] = None
     status: Optional[str] = None
     notes: Optional[str] = None
+    overdue_reason: Optional[str] = None
+    overdue_delay_type: Optional[str] = None
 
 
 class TreatmentPlanResponse(BaseModel):
@@ -59,7 +56,20 @@ class TreatmentPlanResponse(BaseModel):
     progress: float = 0.0
     patient_name: Optional[str] = None
     patient_id: Optional[str] = None
-    doctor_name: Optional[str] = None
+    assigned_doctor_id: Optional[str] = None
+    assigned_doctor_name: Optional[str] = None
+    assistant_doctor_id: Optional[str] = None
+    assistant_doctor_name: Optional[str] = None
+    tooth_numbers: Optional[List[str]] = None
+    priority: Optional[str] = None
+    sequence_order: int = 0
+    dependency_treatment_id: Optional[str] = None
+    treatment_plan_item_id: Optional[str] = None
+    overdue_reason: Optional[str] = None
+    overdue_delay_type: Optional[str] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    auto_created: bool = False
     case_number: Optional[str] = None
     case_status: Optional[str] = None
     hospital_name: Optional[str] = None

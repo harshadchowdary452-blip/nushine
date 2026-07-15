@@ -14,6 +14,7 @@ from app.models.user import User
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.billing import Billing
 from app.models.treatment_plan import TreatmentPlan
+from app.models.treatment_plan_item import TreatmentPlanItem
 from app.models.treatment_sitting import TreatmentSitting
 from app.models.pre_op import PreOp
 from app.models.post_op import PostOp
@@ -211,7 +212,8 @@ class CaseService:
                     if old_val != data[field]:
                         await self._add_timeline(case_id, action,
                             field_name=field, old_value=str(old_val) if old_val else None,
-                            new_value=data[field], user_id=user_id, performer_role=user_role)
+                            new_value=str(data[field]) if data[field] is not None else None,
+                            user_id=user_id, performer_role=user_role)
 
             findings_data = data.pop("findings", None)
             if findings_data is not None:
@@ -305,6 +307,7 @@ class CaseService:
             await self.db.execute(sa_delete(PreOp).where(PreOp.case_id == case_id))
             await self.db.execute(sa_delete(PostOp).where(PostOp.case_id == case_id))
             await self.db.execute(sa_delete(ConsultantNote).where(ConsultantNote.case_id == case_id))
+            await self.db.execute(sa_delete(TreatmentPlanItem).where(TreatmentPlanItem.case_id == case_id))
             tps = (await self.db.execute(select(TreatmentPlan).where(TreatmentPlan.case_id == case_id))).scalars().all()
             for tp in tps:
                 await self.db.execute(sa_delete(TreatmentSitting).where(TreatmentSitting.treatment_plan_id == tp.id))

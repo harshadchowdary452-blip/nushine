@@ -17,8 +17,7 @@ interface AppointmentFilterBarProps {
 }
 
 const STATUS_OPTIONS = [
-  "SCHEDULED", "CONFIRMED", "CHECKED_IN", "IN_PROGRESS",
-  "COMPLETED", "CANCELLED", "NO_SHOW", "RESCHEDULED",
+  "SCHEDULED", "COMPLETED", "CANCELLED", "RESCHEDULED",
 ]
 
 export default function AppointmentFilterBar({

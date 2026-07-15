@@ -7,6 +7,7 @@ from app.models.case import Case, ClinicalFinding
 from app.models.case_timeline import CaseTimeline
 from app.models.consultant_note import ConsultantNote
 from app.models.treatment_plan import TreatmentPlan
+from app.models.treatment_plan_item import TreatmentPlanItem
 from app.models.treatment_sitting import TreatmentSitting
 from app.models.appointment import Appointment, AppointmentStatus, AppointmentType, TREATMENT_DURATIONS
 from app.models.doctor_working_hour import DoctorWorkingHour, WEEKDAYS
@@ -45,7 +46,7 @@ from app.models.patient_timeline import PatientTimeline
 
 __all__ = [
     "AdminGroup", "Hospital", "User", "Patient", "Consultant",
-    "ConsultantNote", "TreatmentPlan", "TreatmentSitting",
+    "ConsultantNote", "TreatmentPlan", "TreatmentPlanItem", "TreatmentSitting",
     "Appointment", "PreOp", "PostOp", "Billing", "RefreshToken", "AuditLog", "PaymentTransaction",
     "HospitalMonthlyExpense",
     "CommunicationLog", "CommunicationChannel", "CommunicationStatus", "MessageType",

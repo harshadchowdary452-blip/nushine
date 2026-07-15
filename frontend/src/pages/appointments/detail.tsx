@@ -2,7 +2,12 @@ import { useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { format } from "date-fns"
-import { ArrowLeft, Calendar, Clock, User, Stethoscope, FileText, Edit, X, FilePlus, RotateCcw } from "lucide-react"
+import {
+  ArrowLeft, Calendar, Clock, User, Stethoscope, FileText, FilePlus,
+  RotateCcw, CheckCircle2, XCircle, CalendarClock, ExternalLink,
+  Activity, CreditCard, ClipboardList, History, UserCircle,
+  Phone, Mail, Droplets, ShieldCheck, Hash, ArrowUpRight,
+} from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,20 +16,47 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
 import PageHeader from "@/components/layout/page-header"
 import { appointmentsApi, casesApi, doctorsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
-import type { Appointment } from "@/types"
+import type { AppointmentFullDetail, Appointment } from "@/types"
 
-const statusVariant: Record<string, "default" | "secondary" | "outline" | "destructive" | "success" | "warning"> = {
-  SCHEDULED: "default",
-  CONFIRMED: "success",
-  IN_PROGRESS: "warning",
-  COMPLETED: "secondary",
-  CANCELLED: "destructive",
-  NO_SHOW: "outline",
+const STATUS_COLORS: Record<string, string> = {
+  SCHEDULED: "bg-blue-50 text-blue-700 border-blue-200",
+  COMPLETED: "bg-green-50 text-green-700 border-green-200",
+  CANCELLED: "bg-red-50 text-red-700 border-red-200",
+  RESCHEDULED: "bg-orange-50 text-orange-700 border-orange-200",
+  IN_PROGRESS: "bg-purple-50 text-purple-700 border-purple-200",
+  PLANNED: "bg-gray-50 text-gray-700 border-gray-200",
+  OPEN: "bg-blue-50 text-blue-700 border-blue-200",
+  ON_HOLD: "bg-yellow-50 text-yellow-700 border-yellow-200",
+  PAID: "bg-green-50 text-green-700 border-green-200",
+  PARTIAL: "bg-yellow-50 text-yellow-700 border-yellow-200",
+  DRAFT: "bg-gray-50 text-gray-700 border-gray-200",
+  OVERDUE: "bg-red-50 text-red-700 border-red-200",
+}
+
+function StatusBadge({ status }: { status: string }) {
+  return (
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${STATUS_COLORS[status] || "bg-gray-50 text-gray-600 border-gray-200"}`}>
+      {status?.replace(/_/g, " ")}
+    </span>
+  )
+}
+
+function InfoRow({ icon: Icon, label, value, onClick }: { icon: any; label: string; value: React.ReactNode; onClick?: () => void }) {
+  return (
+    <div className={`flex items-start gap-3 py-2 ${onClick ? "cursor-pointer hover:bg-muted/50 -mx-2 px-2 rounded" : ""}`} onClick={onClick}>
+      <Icon className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="text-sm font-medium">{value || "—"}</p>
+      </div>
+      {onClick && <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />}
+    </div>
+  )
 }
 
 export default function AppointmentDetail() {
@@ -32,18 +64,25 @@ export default function AppointmentDetail() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { addToast } = useToast()
-  const [editOpen, setEditOpen] = useState(false)
-  const [editStatus, setEditStatus] = useState("")
-  const [editNotes, setEditNotes] = useState("")
-  const [createCaseOpen, setCreateCaseOpen] = useState(false)
-  const [caseComplaint, setCaseComplaint] = useState("")
+
+  const [rescheduleOpen, setRescheduleOpen] = useState(false)
+  const [completeOpen, setCompleteOpen] = useState(false)
+  const [cancelOpen, setCancelOpen] = useState(false)
   const [reassignOpen, setReassignOpen] = useState(false)
+  const [createCaseOpen, setCreateCaseOpen] = useState(false)
+
+  const [rescheduleDate, setRescheduleDate] = useState("")
+  const [rescheduleTime, setRescheduleTime] = useState("")
+  const [rescheduleReason, setRescheduleReason] = useState("")
+  const [completeNotes, setCompleteNotes] = useState("")
+  const [cancelReason, setCancelReason] = useState("")
   const [newDoctorId, setNewDoctorId] = useState("")
   const [reassignReason, setReassignReason] = useState("")
+  const [caseComplaint, setCaseComplaint] = useState("")
 
-  const { data: appointment, isLoading } = useQuery<Appointment>({
-    queryKey: ["appointment", id],
-    queryFn: () => appointmentsApi.get(id!),
+  const { data: detail, isLoading } = useQuery<AppointmentFullDetail>({
+    queryKey: ["appointment-full-detail", id],
+    queryFn: () => appointmentsApi.fullDetail(id!),
     enabled: !!id,
   })
 
@@ -51,302 +90,391 @@ export default function AppointmentDetail() {
     queryKey: ["doctors", "reassign"],
     queryFn: () => doctorsApi.list({ page_size: 200 }),
   })
-  const doctorList: any[] = doctors?.items || doctors || []
+  const doctorList: any[] = Array.isArray(doctors) ? doctors : doctors?.items || []
 
-  const updateMutation = useMutation({
-    mutationFn: (data: Record<string, unknown>) => appointmentsApi.update(id!, data),
+  const rescheduleMutation = useMutation({
+    mutationFn: (data: { appointment_date: string; appointment_time: string; reason?: string }) =>
+      appointmentsApi.reschedule(id!, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["appointment", id] })
+      queryClient.invalidateQueries({ queryKey: ["appointment-full-detail", id] })
       queryClient.invalidateQueries({ queryKey: ["appointments"] })
       queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" })
-      addToast({ title: "Success", description: "Appointment updated", variant: "success" })
-      setEditOpen(false)
+      addToast({ title: "Appointment Rescheduled", variant: "success" })
+      setRescheduleOpen(false); setRescheduleDate(""); setRescheduleTime(""); setRescheduleReason("")
     },
-    onError: () => {
-      addToast({ title: "Error", description: "Failed to update appointment", variant: "destructive" })
+    onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed", variant: "destructive" }),
+  })
+
+  const completeMutation = useMutation({
+    mutationFn: (data: { notes?: string }) => appointmentsApi.complete(id!, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["appointment-full-detail", id] })
+      queryClient.invalidateQueries({ queryKey: ["appointments"] })
+      addToast({ title: "Appointment Completed", variant: "success" })
+      setCompleteOpen(false); setCompleteNotes("")
     },
+    onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed", variant: "destructive" }),
+  })
+
+  const cancelMutation = useMutation({
+    mutationFn: (data: { reason?: string }) => appointmentsApi.cancel(id!, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["appointment-full-detail", id] })
+      queryClient.invalidateQueries({ queryKey: ["appointments"] })
+      addToast({ title: "Appointment Cancelled", variant: "success" })
+      setCancelOpen(false); setCancelReason("")
+    },
+    onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed", variant: "destructive" }),
   })
 
   const reassignMutation = useMutation({
-    mutationFn: (data: { doctor_id: string; reason?: string }) =>
-      appointmentsApi.reassignDoctor(id!, data),
+    mutationFn: (data: { doctor_id: string; reason?: string }) => appointmentsApi.reassignDoctor(id!, data),
     onSuccess: (resp: any) => {
-      queryClient.invalidateQueries({ queryKey: ["appointment", id] })
-      queryClient.invalidateQueries({ queryKey: ["appointments"] })
-      queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" })
-      addToast({
-        title: "Doctor Reassigned",
-        description: `Changed to ${resp.new_doctor_name}`,
-        variant: "success"
-      })
+      queryClient.invalidateQueries({ queryKey: ["appointment-full-detail", id] })
+      addToast({ title: "Doctor Reassigned", description: `Changed to ${resp.new_doctor_name}`, variant: "success" })
       setReassignOpen(false); setNewDoctorId(""); setReassignReason("")
     },
-    onError: () => {
-      addToast({ title: "Error", description: "Failed to reassign doctor", variant: "destructive" })
-    },
+    onError: () => addToast({ title: "Error", description: "Failed to reassign doctor", variant: "destructive" }),
   })
 
   const createCaseMutation = useMutation({
-    mutationFn: (data: { patient_id: string; doctor_id: string; appointment_id: string; chief_complaint: string }) =>
-      casesApi.create(data),
+    mutationFn: (data: any) => casesApi.create(data),
     onSuccess: (newCase: any) => {
-      addToast({ title: "Success", description: "Case created from appointment", variant: "success" })
-      setCreateCaseOpen(false)
-      setCaseComplaint("")
+      addToast({ title: "Case Created", variant: "success" })
+      setCreateCaseOpen(false); setCaseComplaint("")
       navigate(`/cases/${newCase.id}`)
     },
-    onError: () => {
-      addToast({ title: "Error", description: "Failed to create case", variant: "destructive" })
-    },
+    onError: () => addToast({ title: "Error", description: "Failed to create case", variant: "destructive" }),
   })
 
   if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-8 w-32" />
-        <Skeleton className="h-48 w-full rounded-xl" />
-      </div>
-    )
+    return <div className="space-y-6"><Skeleton className="h-8 w-32" /><Skeleton className="h-64 w-full rounded-xl" /></div>
   }
-
-  if (!appointment) {
+  if (!detail) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
         <p className="text-muted-foreground">Appointment not found</p>
-        <Button variant="outline" className="mt-4" onClick={() => navigate("/appointments")}>
-          Back to Appointments
-        </Button>
+        <Button variant="outline" className="mt-4" onClick={() => navigate("/appointments")}>Back to Appointments</Button>
       </div>
     )
   }
 
+  const { appointment: a, patient, cases, treatments, billings, timeline, related_appointments } = detail
+  const isScheduled = a.status === "SCHEDULED"
+
   return (
     <div className="space-y-6">
-      <PageHeader title="Appointment" description="View and manage appointment details">
+      {/* Header */}
+      <PageHeader title="Appointment" description={`${a.appointment_number || a.id.slice(0, 8)} — ${patient.full_name}`}>
         <Button variant="outline" onClick={() => navigate("/appointments")}>
           <ArrowLeft className="h-4 w-4" /> Back
         </Button>
       </PageHeader>
 
+      {/* Status + Actions Banner */}
       <Card>
         <CardContent className="p-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div>
-                <h2 className="text-xl font-bold">Appointment</h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  ID: {appointment.id.slice(0, 8)}...
-                </p>
-              </div>
-              <Badge variant={statusVariant[appointment.status] || "default"}>
-                {appointment.status.replace(/_/g, " ")}
-              </Badge>
+            <div>
+              <h2 className="text-xl font-bold">{patient.full_name}</h2>
+              <p className="text-sm text-muted-foreground">{a.appointment_number} · {a.appointment_type?.replace(/_/g, " ")}</p>
             </div>
-            {appointment.status === "COMPLETED" && (
-              <Button variant="outline" size="sm" onClick={() => { setCaseComplaint(""); setCreateCaseOpen(true) }}>
+            <div className="flex items-center gap-2 flex-wrap">
+              <StatusBadge status={a.status} />
+              {isScheduled && (
+                <>
+                  <Button size="sm" onClick={() => setCompleteOpen(true)}>
+                    <CheckCircle2 className="h-4 w-4 mr-1" /> Complete
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => {
+                    setRescheduleDate(a.appointment_date); setRescheduleTime(a.appointment_time); setRescheduleOpen(true)
+                  }}>
+                    <CalendarClock className="h-4 w-4 mr-1" /> Reschedule
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setCancelOpen(true)}>
+                    <XCircle className="h-4 w-4 mr-1" /> Cancel
+                  </Button>
+                </>
+              )}
+              <Button size="sm" variant="outline" onClick={() => { setCaseComplaint(""); setCreateCaseOpen(true) }}>
                 <FilePlus className="h-4 w-4 mr-1" /> Create Case
               </Button>
-            )}
-            <Dialog open={editOpen} onOpenChange={setEditOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Edit className="h-4 w-4 mr-1" /> Update Status
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Update Appointment</DialogTitle>
-                </DialogHeader>
-                <div className="px-6 py-4 space-y-4 overflow-y-auto flex-1">
-                  <div className="grid gap-2">
-                    <Label>Status</Label>
-                    <Select value={editStatus} onValueChange={setEditStatus}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="SCHEDULED">Scheduled</SelectItem>
-                        <SelectItem value="CONFIRMED">Confirmed</SelectItem>
-                        <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-                        <SelectItem value="COMPLETED">Completed</SelectItem>
-                        <SelectItem value="CANCELLED">Cancelled</SelectItem>
-                        <SelectItem value="NO_SHOW">No Show</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Notes</Label>
-                    <Textarea value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Add notes..." />
-                  </div>
-                </div>
-                <div className="flex justify-end gap-2 px-6 py-4 border-t">
-                  <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
-                  <Button
-                    onClick={() => {
-                      const data: Record<string, unknown> = {}
-                      if (editStatus) data.status = editStatus
-                      if (editNotes) data.notes = editNotes
-                      updateMutation.mutate(data)
-                    }}
-                    disabled={updateMutation.isPending}
-                  >
-                    {updateMutation.isPending ? "Saving..." : "Save"}
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-primary" />
-              Appointment Details
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <dl className="space-y-4">
-              <div className="flex justify-between items-center">
-                <dt className="text-sm text-muted-foreground flex items-center gap-2">
-                  <Calendar className="h-3.5 w-3.5" /> Date
-                </dt>
-                <dd className="text-sm font-medium">
-                  {appointment.appointment_date
-                    ? format(new Date(appointment.appointment_date), "MMM dd, yyyy")
-                    : "—"}
-                </dd>
-              </div>
-              <Separator />
-              <div className="flex justify-between items-center">
-                <dt className="text-sm text-muted-foreground flex items-center gap-2">
-                  <Clock className="h-3.5 w-3.5" /> Time
-                </dt>
-                <dd className="text-sm font-medium">{appointment.appointment_time || "—"}</dd>
-              </div>
-              <Separator />
-              <div className="flex justify-between items-center">
-                <dt className="text-sm text-muted-foreground flex items-center gap-2">
-                  <Clock className="h-3.5 w-3.5" /> Duration
-                </dt>
-                <dd className="text-sm font-medium">{appointment.duration_minutes || 30} min</dd>
-              </div>
-              <Separator />
-              <div className="flex justify-between items-center">
-                <dt className="text-sm text-muted-foreground flex items-center gap-2">
-                  <Clock className="h-3.5 w-3.5" /> End Time
-                </dt>
-                <dd className="text-sm font-medium">{appointment.end_time || "—"}</dd>
-              </div>
-              <Separator />
-              <div className="flex justify-between items-center">
-                <dt className="text-sm text-muted-foreground flex items-center gap-2">
-                  <FileText className="h-3.5 w-3.5" /> Type
-                </dt>
-                <dd className="text-sm font-medium">{appointment.appointment_type || "—"}</dd>
-              </div>
-              <Separator />
-              <div className="flex justify-between items-center">
-                <dt className="text-sm text-muted-foreground flex items-center gap-2">
-                  <FileText className="h-3.5 w-3.5" /> Status
-                </dt>
-                <dd>
-                  <Badge variant={statusVariant[appointment.status] || "default"}>
-                    {appointment.status.replace(/_/g, " ")}
-                  </Badge>
-                </dd>
-              </div>
-            </dl>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="h-4 w-4 text-primary" />
-              People
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <dl className="space-y-4">
-              {appointment.patient_name && (
-                <>
-                  <div className="flex justify-between items-center">
-                    <dt className="text-sm text-muted-foreground flex items-center gap-2">
-                      <User className="h-3.5 w-3.5" /> Patient
-                    </dt>
-                    <dd className="text-sm font-medium">{appointment.patient_name}</dd>
-                  </div>
-                  <Separator />
-                </>
-              )}
-              {appointment.doctor_name && (
-                <div className="flex justify-between items-center">
-                  <dt className="text-sm text-muted-foreground flex items-center gap-2">
-                    <Stethoscope className="h-3.5 w-3.5" /> Doctor
-                  </dt>
-                  <dd className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{appointment.doctor_name}</span>
-                    <Button variant="ghost" size="icon-sm" className="text-muted-foreground"
-                      onClick={() => { setNewDoctorId(""); setReassignReason(""); setReassignOpen(true) }}
-                      title="Change Doctor">
-                      <RotateCcw className="h-3 w-3" />
-                    </Button>
-                  </dd>
-                </div>
-              )}
-            </dl>
-          </CardContent>
-        </Card>
-
-        {appointment.notes && (
-          <Card className="md:col-span-2">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-primary" />
-                Notes
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{appointment.notes}</p>
-            </CardContent>
-          </Card>
+      {/* Quick Actions */}
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" onClick={() => navigate(`/patients/${patient.id}`)}>
+          <UserCircle className="h-3.5 w-3.5 mr-1" /> Patient Profile
+        </Button>
+        {cases.length > 0 && (
+          <Button variant="outline" size="sm" onClick={() => navigate(`/cases/${cases[0].id}`)}>
+            <ClipboardList className="h-3.5 w-3.5 mr-1" /> Case Report
+          </Button>
         )}
+        <Button variant="outline" size="sm" onClick={() => navigate(`/billing?patient_id=${patient.id}`)}>
+          <CreditCard className="h-3.5 w-3.5 mr-1" /> Billing
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => navigate(`/patients/${patient.id}?tab=timeline`)}>
+          <Activity className="h-3.5 w-3.5 mr-1" /> Timeline
+        </Button>
       </div>
 
-      <Dialog open={createCaseOpen} onOpenChange={setCreateCaseOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create Case from Appointment</DialogTitle>
-          </DialogHeader>
-          <div className="px-6 py-4 space-y-4 overflow-y-auto flex-1">
-            <div className="grid gap-2">
-              <Label>Patient</Label>
-              <p className="text-sm font-medium text-gray-900">{appointment.patient_name || appointment.patient_id}</p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* ── Patient Profile ──────────────────────────────────── */}
+        <Card>
+          <CardHeader className="py-3"><CardTitle className="text-sm flex items-center gap-2"><User className="h-4 w-4" /> Patient Profile</CardTitle></CardHeader>
+          <CardContent className="py-1">
+            <InfoRow icon={User} label="Patient Name" value={patient.full_name} onClick={() => navigate(`/patients/${patient.id}`)} />
+            <Separator />
+            <InfoRow icon={Hash} label="OP Number" value={patient.op_no || "—"} />
+            <Separator />
+            <InfoRow icon={Phone} label="Mobile" value={patient.phone || "—"} />
+            <Separator />
+            <InfoRow icon={Droplets} label="Gender" value={patient.gender || "—"} />
+            <Separator />
+            <InfoRow icon={Calendar} label="Age" value={patient.age ? `${patient.age} years` : "—"} />
+            <Separator />
+            <InfoRow icon={Stethoscope} label="Assigned Doctor" value={patient.doctor_id ? (a.doctor_name || "—") : "—"} />
+            <Separator />
+            <InfoRow icon={Calendar} label="Registration Date" value={patient.created_at ? format(new Date(patient.created_at), "MMM dd, yyyy") : "—"} />
+            <Separator />
+            <InfoRow icon={ShieldCheck} label="Patient Status" value={<StatusBadge status={patient.status} />} />
+          </CardContent>
+        </Card>
+
+        {/* ── Appointment Info ─────────────────────────────────── */}
+        <Card>
+          <CardHeader className="py-3"><CardTitle className="text-sm flex items-center gap-2"><Calendar className="h-4 w-4" /> Appointment Information</CardTitle></CardHeader>
+          <CardContent className="py-1">
+            <InfoRow icon={Calendar} label="Date" value={a.appointment_date ? format(new Date(a.appointment_date), "EEEE, MMM dd, yyyy") : "—"} />
+            <Separator />
+            <InfoRow icon={Clock} label="Time" value={`${a.appointment_time || "—"} — ${a.end_time || "—"}`} />
+            <Separator />
+            <InfoRow icon={Clock} label="Duration" value={`${a.duration_minutes || 30} minutes`} />
+            <Separator />
+            <InfoRow icon={FileText} label="Type" value={a.appointment_type?.replace(/_/g, " ") || "—"} />
+            <Separator />
+            <InfoRow icon={Stethoscope} label="Doctor" value={
+              <span className="flex items-center gap-2">
+                {a.doctor_name || "—"}
+                {isScheduled && (
+                  <button className="text-muted-foreground hover:text-foreground" onClick={() => { setNewDoctorId(""); setReassignReason(""); setReassignOpen(true) }} title="Change Doctor">
+                    <RotateCcw className="h-3 w-3" />
+                  </button>
+                )}
+              </span>
+            } />
+            {a.notes && <><Separator /><InfoRow icon={FileText} label="Notes" value={a.notes} /></>}
+            <Separator />
+            <InfoRow icon={UserCircle} label="Created by" value={a.created_by_name || "—"} />
+            <InfoRow icon={UserCircle} label="Updated by" value={a.updated_by_name || "—"} />
+          </CardContent>
+        </Card>
+
+        {/* ── Case Reports ─────────────────────────────────────── */}
+        <Card>
+          <CardHeader className="py-3"><CardTitle className="text-sm flex items-center gap-2"><ClipboardList className="h-4 w-4" /> Case Reports ({cases.length})</CardTitle></CardHeader>
+          <CardContent className="py-1 space-y-2">
+            {cases.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-2">No case reports for this patient.</p>
+            ) : cases.map((c) => (
+              <div key={c.id} className="flex items-center justify-between p-2 rounded-lg border hover:bg-muted/50 cursor-pointer" onClick={() => navigate(`/cases/${c.id}`)}>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">{c.case_number || c.id.slice(0, 8)}</p>
+                  <p className="text-xs text-muted-foreground truncate">{c.chief_complaint || "—"}</p>
+                  {c.diagnosis && <p className="text-xs text-muted-foreground">Dx: {c.diagnosis}</p>}
+                </div>
+                <div className="flex items-center gap-2 shrink-0 ml-2">
+                  <StatusBadge status={c.status} />
+                  <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* ── Treatments ───────────────────────────────────────── */}
+        <Card>
+          <CardHeader className="py-3"><CardTitle className="text-sm flex items-center gap-2"><Stethoscope className="h-4 w-4" /> Treatments ({treatments.length})</CardTitle></CardHeader>
+          <CardContent className="py-1 space-y-2">
+            {treatments.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-2">No treatments for this patient.</p>
+            ) : treatments.map((t) => (
+              <div key={t.id} className="p-2 rounded-lg border hover:bg-muted/50 cursor-pointer" onClick={() => navigate(`/treatment-plans/${t.id}`)}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">{t.treatment_name}</p>
+                    {t.case_number && <p className="text-xs text-muted-foreground">Case: {t.case_number}</p>}
+                  </div>
+                  <StatusBadge status={t.status} />
+                </div>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1.5">
+                  {t.cost != null && <span>Cost: ₹{Number(t.cost).toLocaleString("en-IN")}</span>}
+                  {t.total_sittings > 0 && <span>Sittings: {t.completed_sittings}/{t.total_sittings}</span>}
+                  {t.paid_amount != null && t.paid_amount > 0 && <span>Paid: ₹{Number(t.paid_amount).toLocaleString("en-IN")}</span>}
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* ── Billing ──────────────────────────────────────────── */}
+        <Card>
+          <CardHeader className="py-3"><CardTitle className="text-sm flex items-center gap-2"><CreditCard className="h-4 w-4" /> Billing ({billings.length})</CardTitle></CardHeader>
+          <CardContent className="py-1 space-y-2">
+            {billings.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-2">No billing records for this patient.</p>
+            ) : billings.map((b) => (
+              <div key={b.id} className="flex items-center justify-between p-2 rounded-lg border hover:bg-muted/50 cursor-pointer" onClick={() => navigate(`/billing/${b.id}`)}>
+                <div>
+                  <p className="text-sm font-medium">{b.invoice_number || "—"}</p>
+                  <p className="text-xs text-muted-foreground">{b.created_at ? format(new Date(b.created_at), "MMM dd, yyyy") : "—"}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-medium">₹{Number(b.total_amount).toLocaleString("en-IN")}</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Paid: ₹{Number(b.paid_amount).toLocaleString("en-IN")}</span>
+                    <StatusBadge status={b.payment_status} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* ── Patient Timeline ─────────────────────────────────── */}
+        <Card className="lg:col-span-2">
+          <CardHeader className="py-3"><CardTitle className="text-sm flex items-center gap-2"><History className="h-4 w-4" /> Patient Timeline ({timeline.length} events)</CardTitle></CardHeader>
+          <CardContent className="py-1">
+            {timeline.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-2">No timeline events for this patient.</p>
+            ) : (
+              <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                {timeline.map((event) => (
+                  <div key={event.id} className="flex gap-3 items-start">
+                    <div className="w-2 h-2 rounded-full bg-primary mt-2 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-medium">{event.action}</p>
+                        {event.module && <Badge variant="outline" className="text-[10px]">{event.module}</Badge>}
+                      </div>
+                      {event.description && <p className="text-xs text-muted-foreground mt-0.5">{event.description}</p>}
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                        {event.user_name && <span>by {event.user_name}</span>}
+                        <span>{event.created_at ? format(new Date(event.created_at), "MMM dd, HH:mm") : "—"}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* ── Related Appointments ─────────────────────────────── */}
+        <Card className="lg:col-span-2">
+          <CardHeader className="py-3"><CardTitle className="text-sm flex items-center gap-2"><CalendarClock className="h-4 w-4" /> Related Appointments ({related_appointments.length})</CardTitle></CardHeader>
+          <CardContent className="py-1">
+            {related_appointments.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-2">No other appointments for this patient.</p>
+            ) : (
+              <div className="space-y-2">
+                {related_appointments.map((ra) => (
+                  <div key={ra.id} className="flex items-center justify-between p-2 rounded-lg border hover:bg-muted/50 cursor-pointer" onClick={() => navigate(`/appointments/${ra.id}`)}>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div>
+                        <p className="text-sm font-medium">{ra.appointment_number || "—"}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {ra.appointment_date ? format(new Date(ra.appointment_date), "MMM dd, yyyy") : "—"} at {ra.appointment_time || "—"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-xs text-muted-foreground hidden sm:inline">{ra.doctor_name || "—"}</span>
+                      <StatusBadge status={ra.status} />
+                      <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Reschedule Dialog */}
+      <Dialog open={rescheduleOpen} onOpenChange={setRescheduleOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader><DialogTitle>Reschedule Appointment</DialogTitle></DialogHeader>
+          <div className="space-y-4 px-1">
+            <div className="p-3 rounded-lg bg-muted/50 text-sm">
+              <p className="text-muted-foreground">Current: <span className="font-medium">{format(new Date(a.appointment_date), "MMM dd, yyyy")} at {a.appointment_time}</span></p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>New Date *</Label>
+                <Input type="date" value={rescheduleDate} onChange={(e) => setRescheduleDate(e.target.value)} required />
+              </div>
+              <div className="grid gap-2">
+                <Label>New Time *</Label>
+                <Input type="time" value={rescheduleTime} onChange={(e) => setRescheduleTime(e.target.value)} required />
+              </div>
             </div>
             <div className="grid gap-2">
-              <Label>Doctor</Label>
-              <p className="text-sm font-medium text-gray-900">{appointment.doctor_name || appointment.doctor_id}</p>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="complaint">Chief Complaint</Label>
-              <Input id="complaint" placeholder="e.g. Tooth pain, routine checkup" value={caseComplaint} onChange={(e) => setCaseComplaint(e.target.value)} required />
+              <Label>Reason (optional)</Label>
+              <Textarea value={rescheduleReason} onChange={(e) => setRescheduleReason(e.target.value)} rows={2} placeholder="Why is this appointment being rescheduled?" />
             </div>
           </div>
-          <div className="flex justify-end gap-2 px-6 py-4 border-t">
-            <Button variant="outline" onClick={() => setCreateCaseOpen(false)}>Cancel</Button>
-            <Button
-              onClick={() => createCaseMutation.mutate({
-                patient_id: appointment.patient_id,
-                doctor_id: appointment.doctor_id,
-                appointment_id: appointment.id,
-                chief_complaint: caseComplaint || `Follow-up from ${appointment.appointment_date}`,
-              })}
-              disabled={createCaseMutation.isPending}
-            >
-              {createCaseMutation.isPending ? "Creating..." : "Create Case"}
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={() => setRescheduleOpen(false)}>Cancel</Button>
+            <Button onClick={() => rescheduleMutation.mutate({ appointment_date: rescheduleDate, appointment_time: rescheduleTime, reason: rescheduleReason || undefined })}
+              disabled={!rescheduleDate || !rescheduleTime || rescheduleMutation.isPending}>
+              {rescheduleMutation.isPending ? "Rescheduling..." : "Confirm Reschedule"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Complete Dialog */}
+      <Dialog open={completeOpen} onOpenChange={setCompleteOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader><DialogTitle>Mark Appointment as Completed</DialogTitle></DialogHeader>
+          <div className="space-y-4 px-1">
+            <p className="text-sm text-muted-foreground">Patient: <span className="font-medium text-foreground">{patient.full_name}</span></p>
+            <div className="grid gap-2">
+              <Label>Notes (optional)</Label>
+              <Textarea value={completeNotes} onChange={(e) => setCompleteNotes(e.target.value)} rows={2} placeholder="Any treatment notes..." />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={() => setCompleteOpen(false)}>Cancel</Button>
+            <Button onClick={() => completeMutation.mutate({ notes: completeNotes || undefined })}
+              disabled={completeMutation.isPending} className="bg-green-600 hover:bg-green-700">
+              {completeMutation.isPending ? "Completing..." : "Mark Completed"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel Dialog */}
+      <Dialog open={cancelOpen} onOpenChange={setCancelOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader><DialogTitle>Cancel Appointment</DialogTitle></DialogHeader>
+          <div className="space-y-4 px-1">
+            <p className="text-sm text-muted-foreground">Patient: <span className="font-medium text-foreground">{patient.full_name}</span> · {format(new Date(a.appointment_date), "MMM dd, yyyy")}</p>
+            <div className="grid gap-2">
+              <Label>Reason for cancellation *</Label>
+              <Textarea value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} rows={2} placeholder="Why is this appointment being cancelled?" required />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={() => setCancelOpen(false)}>Keep Appointment</Button>
+            <Button variant="destructive" onClick={() => cancelMutation.mutate({ reason: cancelReason || undefined })}
+              disabled={!cancelReason || cancelMutation.isPending}>
+              {cancelMutation.isPending ? "Cancelling..." : "Cancel Appointment"}
             </Button>
           </div>
         </DialogContent>
@@ -354,49 +482,60 @@ export default function AppointmentDetail() {
 
       {/* Reassign Doctor Dialog */}
       <Dialog open={reassignOpen} onOpenChange={setReassignOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Change Doctor</DialogTitle>
-          </DialogHeader>
-          <div className="px-6 py-4 space-y-4 overflow-y-auto flex-1">
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader><DialogTitle>Change Doctor</DialogTitle></DialogHeader>
+          <div className="space-y-4 px-1">
             <div className="grid gap-2">
               <Label>Current Doctor</Label>
-              <p className="text-sm font-medium text-gray-900">{appointment.doctor_name || appointment.doctor_id}</p>
+              <p className="text-sm font-medium">{a.doctor_name || a.doctor_id}</p>
             </div>
             <div className="grid gap-2">
               <Label>New Doctor *</Label>
               <Select value={newDoctorId} onValueChange={setNewDoctorId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a doctor..." />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select a doctor..." /></SelectTrigger>
                 <SelectContent>
-                  {doctorList.map((d: any) => (
-                    <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>
-                  ))}
+                  {doctorList.map((d: any) => <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label>Reason for change</Label>
-              <Textarea value={reassignReason} onChange={(e) => setReassignReason(e.target.value)}
-                rows={2} placeholder="e.g. Doctor unavailable, schedule conflict..." />
+              <Label>Reason</Label>
+              <Textarea value={reassignReason} onChange={(e) => setReassignReason(e.target.value)} rows={2} placeholder="Reason for change..." />
             </div>
           </div>
-          <div className="flex justify-end gap-2 px-6 py-4 border-t">
-            <Button variant="outline" onClick={() => { setReassignOpen(false); setNewDoctorId(""); setReassignReason("") }}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                if (!newDoctorId) {
-                  addToast({ title: "Required", description: "New Doctor ID is required", variant: "destructive" })
-                  return
-                }
-                reassignMutation.mutate({ doctor_id: newDoctorId, reason: reassignReason || undefined })
-              }}
-              disabled={reassignMutation.isPending || !newDoctorId}
-            >
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={() => setReassignOpen(false)}>Cancel</Button>
+            <Button onClick={() => reassignMutation.mutate({ doctor_id: newDoctorId, reason: reassignReason || undefined })}
+              disabled={!newDoctorId || reassignMutation.isPending}>
               {reassignMutation.isPending ? "Reassigning..." : "Reassign Doctor"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Case Dialog */}
+      <Dialog open={createCaseOpen} onOpenChange={setCreateCaseOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader><DialogTitle>Create Case from Appointment</DialogTitle></DialogHeader>
+          <div className="space-y-4 px-1">
+            <div className="grid gap-2">
+              <Label>Patient</Label>
+              <p className="text-sm font-medium">{patient.full_name}</p>
+            </div>
+            <div className="grid gap-2">
+              <Label>Doctor</Label>
+              <p className="text-sm font-medium">{a.doctor_name || a.doctor_id}</p>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="complaint">Chief Complaint</Label>
+              <Input id="complaint" placeholder="e.g. Tooth pain, routine checkup" value={caseComplaint} onChange={(e) => setCaseComplaint(e.target.value)} required />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={() => setCreateCaseOpen(false)}>Cancel</Button>
+            <Button onClick={() => createCaseMutation.mutate({ patient_id: patient.id, doctor_id: a.doctor_id, appointment_id: a.id, chief_complaint: caseComplaint || `Follow-up from ${a.appointment_date}` })}
+              disabled={!caseComplaint || createCaseMutation.isPending}>
+              {createCaseMutation.isPending ? "Creating..." : "Create Case"}
             </Button>
           </div>
         </DialogContent>

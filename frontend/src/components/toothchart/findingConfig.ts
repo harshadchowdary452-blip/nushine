@@ -19,7 +19,8 @@ export const FINDING_TYPES: FindingTypeConfig[] = [
   { name: 'Restoration',   label: 'Restoration',   color: '#9CA3AF',  order: 10, isQuick: true },
   { name: 'Implant',       label: 'Implant',       color: '#6B7280',  order: 11, isQuick: true },
   { name: 'Veneers',       label: 'Veneers',       color: '#FCD34D',  order: 12, isQuick: true },
-  { name: 'Others',        label: 'Others',        color: '#94A3B8',  order: 13, isQuick: false },
+  { name: 'Impaction',     label: 'Impaction',     color: '#8B5CF6',  order: 14, isQuick: true },
+  { name: 'Others',        label: 'Others',        color: '#94A3B8',  order: 15, isQuick: false },
 ]
 
 export const FINDING_COLORS_MAP: Record<string, string> = {}

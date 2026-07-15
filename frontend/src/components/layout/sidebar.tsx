@@ -6,7 +6,7 @@ import {
   UserCog, Settings, ChevronLeft, X, Building2, Shield, MessageSquare,
   Activity, Menu, IndianRupee, TrendingUp, Bell, Mail, BarChart3, FileText,
   Phone, ClipboardList, Calendar, Megaphone, Clock, UserPlus, Send,
-  Search, Star, ChevronRight, LogOut, Download,
+  Search, Star, ChevronRight, LogOut, Download, LayoutList, Kanban,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useSidebarStore } from "@/store/sidebarStore"
@@ -33,6 +33,9 @@ const roleNav: Record<string, NavSection[]> = {
       { label: "Hospitals", icon: Building2, path: "/admin/hospitals" },
       { label: "Doctors", icon: Stethoscope, path: "/admin/doctors" },
     ]},
+    { label: "Clinical", items: [
+      { label: "Workflow Board", icon: Kanban, path: "/treatments/workflow" },
+    ]},
     { label: "Finance", items: [
       { label: "Expenses", icon: IndianRupee, path: "/admin/expenses" },
     ]},
@@ -45,6 +48,7 @@ const roleNav: Record<string, NavSection[]> = {
       { label: "Appointments", icon: CalendarDays, path: "/appointments" },
       { label: "Case Reports", icon: FolderOpen, path: "/cases" },
       { label: "Treatments", icon: Activity, path: "/treatments" },
+      { label: "Workflow Board", icon: Kanban, path: "/treatments/workflow" },
       { label: "Billing", icon: Receipt, path: "/billing" },
       { label: "Consent Forms", icon: FileText, path: "/consent-forms" },
     ]},
@@ -78,6 +82,7 @@ const roleNav: Record<string, NavSection[]> = {
       { label: "Appointments", icon: CalendarDays, path: "/appointments" },
       { label: "Case Reports", icon: FolderOpen, path: "/cases" },
       { label: "Treatments", icon: Activity, path: "/treatments" },
+      { label: "My Queue", icon: LayoutList, path: "/treatments/queue" },
       { label: "Billing", icon: Receipt, path: "/billing" },
       { label: "Consent Forms", icon: FileText, path: "/consent-forms" },
     ]},

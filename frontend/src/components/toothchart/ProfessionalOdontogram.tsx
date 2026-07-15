@@ -178,8 +178,9 @@ function Summary({ findings, onUpdate }: { findings: ToothFinding[]; onUpdate?: 
         <span style={{ fontSize: 10, fontWeight: 600, color: '#374151' }}>
           Clinical Summary ({findings.length} finding{findings.length !== 1 ? 's' : ''})
         </span>
-        <input type="text" placeholder="Search..." value={q} onChange={(e) => setQ(e.target.value)}
-          style={{ padding: '2px 8px', borderRadius: 4, border: '1px solid #D1D5DB', fontSize: 10, width: 160, outline: 'none', background: '#FFF' }} />
+          <input type="text" placeholder="Search..." value={q} onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
+            style={{ padding: '2px 8px', borderRadius: 4, border: '1px solid #D1D5DB', fontSize: 10, width: 160, outline: 'none', background: '#FFF' }} />
       </div>
       <div style={{ overflowX: 'auto', maxHeight: 200 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -205,6 +206,7 @@ function Summary({ findings, onUpdate }: { findings: ToothFinding[]; onUpdate?: 
                   <input type="text" value={(rem[r.k] ?? r.f.description) || ''}
                     onChange={(e) => setRem((p) => ({ ...p, [r.k]: e.target.value }))}
                     onBlur={() => commitRemark(r.k)}
+                    onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
                     placeholder="Add remarks..."
                     style={{ border: 'none', background: 'transparent', width: '100%', fontSize: 10, outline: 'none', color: '#6B7280', borderBottom: '1px dotted #E5E7EB' }} />
                 </td>
@@ -285,7 +287,7 @@ function RightPanel({ n, fings, ro, onAdd, onRemove, onUpdateFinding, onClose }:
             </div>
             <div style={{ fontSize: 9, color: '#9CA3AF' }}>Quadrant {quad(n)}</div>
           </div>
-          <button onClick={onClose} style={{
+          <button type="button" onClick={onClose} style={{
             width: 22, height: 22, borderRadius: '50%', border: '1px solid #E5E7EB',
             background: '#FFF', cursor: 'pointer', fontSize: 11, color: '#6B7280',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -318,12 +320,12 @@ function RightPanel({ n, fings, ro, onAdd, onRemove, onUpdateFinding, onClose }:
                 {!ro && (
                   <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
                     {editId !== f.id && (
-                      <button onClick={() => startEdit(f)} style={{
+                      <button type="button" onClick={() => startEdit(f)} style={{
                         background: 'none', border: 'none', cursor: 'pointer', color: '#3B82F6',
                         fontSize: 10, padding: 0,
                       }}>✎</button>
                     )}
-                    <button onClick={() => onRemove(f.id)} style={{
+                    <button type="button" onClick={() => onRemove(f.id)} style={{
                       background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444',
                       fontSize: 11, padding: 0,
                     }}>✕</button>
@@ -341,7 +343,7 @@ function RightPanel({ n, fings, ro, onAdd, onRemove, onUpdateFinding, onClose }:
           <div style={{ fontSize: 9, fontWeight: 600, color: '#374151', marginBottom: 5, letterSpacing: '0.03em' }}>QUICK FINDINGS</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
             {QUICK_FINDINGS.map((ft) => (
-              <button key={ft.name} onClick={() => handleQuick(ft.name)} style={{
+              <button type="button" key={ft.name} onClick={() => handleQuick(ft.name)} style={{
                 fontSize: 8, fontWeight: 500, padding: '1px 5px', borderRadius: 3, lineHeight: '16px',
                 border: `1px solid ${ft.color}40`, background: '#FFF', color: ft.color, cursor: 'pointer', whiteSpace: 'nowrap',
               }}
@@ -367,20 +369,21 @@ function RightPanel({ n, fings, ro, onAdd, onRemove, onUpdateFinding, onClose }:
               {FINDING_TYPES.map((ft) => <option key={ft.name} value={ft.name}>{ft.label}</option>)}
             </select>
           </div>
-          <input type="text" placeholder="Clinical notes / remarks..." value={desc} onChange={(e) => setDesc(e.target.value)} style={inp} />
+          <input type="text" placeholder="Clinical notes / remarks..." value={desc} onChange={(e) => setDesc(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAdd() } }} style={inp} />
           {editId ? (
             <div style={{ display: 'flex', gap: 4 }}>
-              <button onClick={saveEdit} style={{
+              <button type="button" onClick={saveEdit} style={{
                 flex: 1, padding: '5px', borderRadius: 4, border: 'none',
                 background: '#2563EB', color: '#FFF', fontSize: 9, fontWeight: 600, cursor: 'pointer',
               }}>Save</button>
-              <button onClick={cancelEdit} style={{
+              <button type="button" onClick={cancelEdit} style={{
                 padding: '5px 10px', borderRadius: 4, border: '1px solid #D1D5DB',
                 background: '#FFF', color: '#374151', fontSize: 9, fontWeight: 500, cursor: 'pointer',
               }}>Cancel</button>
             </div>
           ) : (
-            <button onClick={handleAdd} disabled={!findingType} style={{
+            <button type="button" onClick={handleAdd} disabled={!findingType} style={{
               width: '100%', padding: '5px', borderRadius: 4, border: 'none',
               background: !findingType ? '#E5E7EB' : '#2563EB',
               color: !findingType ? '#9CA3AF' : '#FFF',
@@ -521,7 +524,9 @@ export default function ProfessionalOdontogram(props: Props) {
               padding: '2px 6px', borderRadius: 3, fontSize: 9, fontWeight: 600,
               background: isChild ? '#FEF3C7' : '#DBEAFE', color: isChild ? '#92400E' : '#1E40AF',
             }}>{isChild ? 'Primary' : 'Permanent'}</span>
-            <button onClick={() => { setIsChild(!isChild); setSel(null) }} style={chip}>Child</button>
+            <button type="button" onClick={() => { setIsChild(!isChild); setSel(null) }} style={chip}>
+              {isChild ? 'Switch to Permanent' : 'Switch to Primary'}
+            </button>
           </div>
         </div>
 

@@ -15,7 +15,7 @@ from app.models.case import Case, CaseStatus
 from app.models.appointment import Appointment, AppointmentStatus, AppointmentType
 from app.models.follow_up import FollowUp, FollowUpStatus
 from app.models.billing import Billing, PaymentStatus
-from app.models.treatment_plan import TreatmentPlan
+from app.models.treatment_plan import TreatmentPlan, TreatmentPlanStatus
 from app.models.pre_op import PreOp
 from app.models.post_op import PostOp
 from app.models.treatment_sitting import TreatmentSitting
@@ -555,6 +555,14 @@ async def group_admin_dashboard(
         "total_pending_billing": total_pending_billing,
         "hospital_performance": hospital_performance[:5],
         "doctor_performance": doctor_performance[:5],
+        "treatment_kpis": {
+            "active_treatments": (await db.execute(select(func.count(TreatmentPlan.id)).where(TreatmentPlan.case_id.in_(case_ids) if case_ids else text("false"), TreatmentPlan.is_active == True, TreatmentPlan.status.in_(["ASSIGNED", "SCHEDULED", "IN_PROGRESS", "WAITING_PATIENT", "WAITING_LAB", "ON_HOLD"])))).scalar() or 0 if case_ids else 0,
+            "overdue_treatments": (await db.execute(select(func.count(TreatmentPlan.id)).where(TreatmentPlan.case_id.in_(case_ids) if case_ids else text("false"), TreatmentPlan.is_active == True, TreatmentPlan.status == TreatmentPlanStatus.OVERDUE))).scalar() or 0 if case_ids else 0,
+            "completed_today": 0,
+            "waiting_patient": (await db.execute(select(func.count(TreatmentPlan.id)).where(TreatmentPlan.case_id.in_(case_ids) if case_ids else text("false"), TreatmentPlan.is_active == True, TreatmentPlan.status == TreatmentPlanStatus.WAITING_PATIENT))).scalar() or 0 if case_ids else 0,
+            "waiting_lab": (await db.execute(select(func.count(TreatmentPlan.id)).where(TreatmentPlan.case_id.in_(case_ids) if case_ids else text("false"), TreatmentPlan.is_active == True, TreatmentPlan.status == TreatmentPlanStatus.WAITING_LAB))).scalar() or 0 if case_ids else 0,
+            "completion_rate": 0.0,
+        },
     }
 
 @router.get("/hospital-admin")
@@ -583,6 +591,7 @@ async def hospital_admin_dashboard(
             "today_appointments_list": [], "pending_actions": {"follow_ups": 0, "billings_count": 0, "billings_amount": 0},
             "recent_activity": [], "revenue_sources": [],
             "crm_insights": {"total_leads": 0, "new_leads": 0, "converted_leads": 0, "conversion_rate": 0, "leads_by_source": []},
+            "treatment_kpis": {"active_treatments": 0, "overdue_treatments": 0, "completed_today": 0, "waiting_patient": 0, "waiting_lab": 0, "completed_this_month": 0, "completion_rate": 0.0, "total_treatments": 0},
         }
 
     now = datetime.now(timezone.utc)
@@ -828,6 +837,71 @@ async def hospital_admin_dashboard(
         for row in (await db.execute(rev_src_q)).all():
             revenue_sources.append({"method": row[0], "amount": float(row[1] or 0)})
 
+    # --- Treatment KPIs (hospital-wide, filtered by doctor_id if set) ---
+    from app.models.treatment_plan import TreatmentPlanStatus
+    tp_base_filters = [TreatmentPlan.is_active == True]
+    if case_ids:
+        tp_base_filters.append(TreatmentPlan.case_id.in_(case_ids))
+    elif doctor_id:
+        tp_base_filters.append(TreatmentPlan.assigned_doctor_id == doctor_id)
+
+    total_active_treatments = (await db.execute(
+        select(func.count(TreatmentPlan.id)).where(*tp_base_filters, TreatmentPlan.status.in_([
+            TreatmentPlanStatus.ASSIGNED, TreatmentPlanStatus.SCHEDULED, TreatmentPlanStatus.IN_PROGRESS,
+            TreatmentPlanStatus.WAITING_PATIENT, TreatmentPlanStatus.WAITING_LAB, TreatmentPlanStatus.ON_HOLD,
+        ]))
+    )).scalar() or 0
+
+    overdue_treatments = (await db.execute(
+        select(func.count(TreatmentPlan.id)).where(*tp_base_filters, TreatmentPlan.status == TreatmentPlanStatus.OVERDUE)
+    )).scalar() or 0
+
+    completed_today = 0
+    today_start_dt = datetime.combine(today, datetime.min.time()).replace(tzinfo=timezone.utc)
+    today_end_dt = datetime.combine(today, datetime.max.time()).replace(tzinfo=timezone.utc)
+    completed_today = (await db.execute(
+        select(func.count(TreatmentPlan.id)).where(
+            *tp_base_filters, TreatmentPlan.status == TreatmentPlanStatus.COMPLETED,
+            TreatmentPlan.completed_at >= today_start_dt, TreatmentPlan.completed_at <= today_end_dt,
+        )
+    )).scalar() or 0
+
+    waiting_patient = (await db.execute(
+        select(func.count(TreatmentPlan.id)).where(*tp_base_filters, TreatmentPlan.status == TreatmentPlanStatus.WAITING_PATIENT)
+    )).scalar() or 0
+
+    waiting_lab = (await db.execute(
+        select(func.count(TreatmentPlan.id)).where(*tp_base_filters, TreatmentPlan.status == TreatmentPlanStatus.WAITING_LAB)
+    )).scalar() or 0
+
+    completed_this_month = (await db.execute(
+        select(func.count(TreatmentPlan.id)).where(
+            *tp_base_filters, TreatmentPlan.status == TreatmentPlanStatus.COMPLETED,
+            TreatmentPlan.completed_at >= current_month_start,
+        )
+    )).scalar() or 0
+
+    total_completed_all = (await db.execute(
+        select(func.count(TreatmentPlan.id)).where(*tp_base_filters, TreatmentPlan.status == TreatmentPlanStatus.COMPLETED)
+    )).scalar() or 0
+
+    total_all_treatments = (await db.execute(
+        select(func.count(TreatmentPlan.id)).where(*tp_base_filters)
+    )).scalar() or 0
+
+    treatment_completion_rate = round((total_completed_all / total_all_treatments * 100), 1) if total_all_treatments > 0 else 0.0
+
+    treatment_kpis = {
+        "active_treatments": total_active_treatments,
+        "overdue_treatments": overdue_treatments,
+        "completed_today": completed_today,
+        "waiting_patient": waiting_patient,
+        "waiting_lab": waiting_lab,
+        "completed_this_month": completed_this_month,
+        "completion_rate": treatment_completion_rate,
+        "total_treatments": total_all_treatments,
+    }
+
     # --- CRM insights (PERIOD-FILTERED) ---
     crm_base = [Lead.hospital_id == hospital_id, Lead.created_at >= date_start, Lead.created_at < date_end]
     total_leads = (await db.execute(select(func.count(Lead.id)).where(*crm_base))).scalar() or 0
@@ -868,6 +942,7 @@ async def hospital_admin_dashboard(
         "recent_activity": recent_activities,
         "revenue_sources": revenue_sources,
         "crm_insights": crm_insights,
+        "treatment_kpis": treatment_kpis,
         "capacity_most_booked_doctors": await _get_most_booked_doctors(db, hospital_id, today),
         "capacity_peak_hours": await _get_peak_hours(db, hospital_id, today),
         "comparison": {

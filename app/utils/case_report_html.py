@@ -304,44 +304,49 @@ def render_case_to_html(case) -> str:
         for tp in tps:
             items.append({
                 "name": _esc(getattr(tp, "treatment_name", None) or "\u2014"),
+                "toothNumbers": [],
                 "estimatedVisits": str(getattr(tp, "total_sittings", "") or ""),
-                "priority": "",
-                "status": _esc(getattr(tp, "status", None) or "PLANNED"),
                 "estimatedCost": str(getattr(tp, "cost", "") or ""),
                 "remarks": _esc(getattr(tp, "notes", None) or ""),
             })
     if items:
         total_procedures = len(items)
+        all_teeth = set()
         total_visits = sum(int(it.get("estimatedVisits", 0) or 0) for it in items)
         total_cost = sum(float(it.get("estimatedCost", 0) or 0) for it in items)
+        for it in items:
+            for t in (it.get("toothNumbers") or []):
+                all_teeth.add(str(t))
         a('<div><div class="st">Treatment Plan</div>')
         a('<table class="tp-table" style="margin-top:3px">')
         a('<thead><tr>')
-        a('<th style="width:28%;text-align:left">Procedure</th>')
+        a('<th style="width:25%;text-align:left">Procedure</th>')
+        a('<th style="width:15%">Teeth</th>')
         a('<th style="width:10%">Visits</th>')
-        a('<th style="width:12%">Priority</th>')
-        a('<th style="width:14%">Status</th>')
-        a('<th style="width:16%;text-align:right">Est. Cost</th>')
+        a('<th style="width:15%;text-align:right">Est. Cost</th>')
         a('<th style="width:20%;text-align:left">Remarks</th>')
         a('</tr></thead><tbody>')
         for it in items:
             tp_name = it.get("name", "\u2014")
+            tp_teeth = it.get("toothNumbers", [])
+            tp_teeth_str = ", ".join(str(t) for t in tp_teeth) if tp_teeth else "\u2014"
             tp_sit = it.get("estimatedVisits", "")
             tp_sit_str = str(tp_sit) if tp_sit != "" and tp_sit is not None else "-"
-            tp_pri = it.get("priority", "") or "-"
-            tp_stat = it.get("status", "") or "-"
             tp_cost_val = it.get("estimatedCost", "")
             try:
                 tp_cost_str = f"\u20B9{float(tp_cost_val):,.0f}" if tp_cost_val != "" and tp_cost_val is not None else "-"
             except (ValueError, TypeError):
                 tp_cost_str = "-"
             tp_notes = it.get("remarks", "") or "-"
-            a(f'<tr class="tp-row"><td style="text-align:left;font-weight:600">{tp_name}</td><td>{tp_sit_str}</td><td>{tp_pri}</td><td>{tp_stat}</td><td style="text-align:right">{tp_cost_str}</td><td style="text-align:left;font-size:9px">{tp_notes}</td></tr>')
+            a(f'<tr class="tp-row"><td style="text-align:left;font-weight:600">{tp_name}</td><td>{tp_teeth_str}</td><td>{tp_sit_str}</td><td style="text-align:right">{tp_cost_str}</td><td style="text-align:left;font-size:9px">{tp_notes}</td></tr>')
         a('</tbody></table>')
-        a(f'<div style="margin-top:6px;padding:4px 6px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;font-size:10px">')
-        a(f'<span><span style="font-weight:600;color:#1E3A5F">Total Procedures:</span> {total_procedures}</span>')
-        a(f'<span><span style="font-weight:600;color:#1E3A5F">Estimated Visits:</span> {total_visits}</span>')
-        a(f'<span><span style="font-weight:600;color:#1E3A5F">Estimated Cost:</span> \u20B9{total_cost:,.0f}</span>')
+        summary_parts = [f'<span><span style="font-weight:600;color:#1E3A5F">Total Procedures:</span> {total_procedures}</span>']
+        if all_teeth:
+            summary_parts.append(f'<span><span style="font-weight:600;color:#1E3A5F">Teeth Involved:</span> {len(all_teeth)}</span>')
+        summary_parts.append(f'<span><span style="font-weight:600;color:#1E3A5F">Estimated Visits:</span> {total_visits}</span>')
+        summary_parts.append(f'<span><span style="font-weight:600;color:#1E3A5F">Estimated Cost:</span> \u20B9{total_cost:,.0f}</span>')
+        a(f'<div style="margin-top:6px;padding:4px 6px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;font-size:10px;flex-wrap:wrap;gap:4px">')
+        a(" ".join(summary_parts))
         a('</div></div>')
 
     # ── Medicines Prescribed ──

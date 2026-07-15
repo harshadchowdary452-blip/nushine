@@ -4,7 +4,8 @@ import { useQuery } from "@tanstack/react-query"
 import {
   Calendar, Users, FolderOpen, Activity, FileText, DollarSign, TrendingUp,
   IndianRupee, PieChart, Clock, AlertTriangle, CheckCircle2, UserPlus,
-  Phone, ArrowUpRight, BarChart3, Sparkles, Target, Eye,
+  Phone, ArrowUpRight, BarChart3, Sparkles, Target, Eye, Stethoscope,
+  PauseCircle, AlertOctagon, Timer, ClipboardCheck, LayoutList,
 } from "lucide-react"
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -191,6 +192,28 @@ export default function HospitalAdminDashboard() {
         <KpiCard icon={TrendingUp} title="Net Profit" value={formatIndianRupees(stats?.net_profit ?? 0)} color={(stats?.net_profit ?? 0) >= 0 ? "success" : "danger"} delay={0.18} />
         <KpiCard icon={PieChart} title="Profit Margin" value={stats?.profit_margin != null ? `${stats.profit_margin.toFixed(1)}%` : "0%"} color="primary" delay={0.21} />
       </motion.div>
+
+      {/* 4b. Treatment KPI Cards */}
+      {stats?.treatment_kpis && (
+        <motion.div variants={item}>
+          <div className="flex items-center gap-2 mb-2">
+            <LayoutList className="h-4 w-4 text-indigo-500" />
+            <h2 className="text-sm font-bold text-gray-800">Treatment Queue</h2>
+          </div>
+          <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+            <KpiCard icon={Stethoscope} title="Active Treatments" value={String(stats.treatment_kpis.active_treatments ?? 0)} color="info" delay={0} onClick={() => setDrawerMetric("treatments")} />
+            <KpiCard icon={AlertOctagon} title="Overdue" value={String(stats.treatment_kpis.overdue_treatments ?? 0)} color={(stats.treatment_kpis.overdue_treatments ?? 0) > 0 ? "danger" : "success"} delay={0.03} />
+            <KpiCard icon={PauseCircle} title="Waiting (Patient)" value={String(stats.treatment_kpis.waiting_patient ?? 0)} color="warning" delay={0.06} />
+            <KpiCard icon={Timer} title="Waiting (Lab)" value={String(stats.treatment_kpis.waiting_lab ?? 0)} color="warning" delay={0.09} />
+          </div>
+          <div className="grid gap-3 grid-cols-2 lg:grid-cols-4 mt-3">
+            <KpiCard icon={CheckCircle2} title="Completed Today" value={String(stats.treatment_kpis.completed_today ?? 0)} color="success" delay={0.12} />
+            <KpiCard icon={ClipboardCheck} title="Completed (Month)" value={String(stats.treatment_kpis.completed_this_month ?? 0)} color="primary" delay={0.15} />
+            <KpiCard icon={TrendingUp} title="Completion Rate" value={stats.treatment_kpis.completion_rate != null ? `${stats.treatment_kpis.completion_rate}%` : "0%"} color="primary" delay={0.18} />
+            <KpiCard icon={FolderOpen} title="Total Treatments" value={String(stats.treatment_kpis.total_treatments ?? 0)} color="info" delay={0.21} />
+          </div>
+        </motion.div>
+      )}
 
       {/* 5. Revenue vs Expenses Chart + Revenue Sources */}
       <motion.div variants={item} className="grid gap-4 lg:grid-cols-3">

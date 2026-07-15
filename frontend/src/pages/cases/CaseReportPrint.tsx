@@ -232,7 +232,7 @@ export default function CaseReportPrint({ c }: { c: any }) {
             )}
             {c.clinical_findings_summary && (
               <div className="sc" style={{ marginTop: findings.length > 0 ? 4 : 0 }}>
-                <span style={{ fontWeight: 600, color: "#1E3A5F" }}>Summary Notes: </span>{c.clinical_findings_summary}
+                {c.clinical_findings_summary}
               </div>
             )}
           </div>
@@ -271,9 +271,8 @@ export default function CaseReportPrint({ c }: { c: any }) {
             if (c.treatment_plans && c.treatment_plans.length > 0) {
               items = c.treatment_plans.map((tp: any) => ({
                 name: tp.treatment_name || "\u2014",
+                toothNumbers: [],
                 estimatedVisits: tp.total_sittings || "",
-                priority: "",
-                status: tp.status || "PLANNED",
                 estimatedCost: tp.cost || "",
                 remarks: tp.notes || "",
               }))
@@ -283,6 +282,7 @@ export default function CaseReportPrint({ c }: { c: any }) {
 
           // Compute summary
           const totalProcedures = items.length
+          const allTeeth = new Set<string>()
           const totalVisits = items.reduce((s: number, it: any) => {
             const v = parseInt(it.estimatedVisits) || 0
             return s + v
@@ -291,6 +291,7 @@ export default function CaseReportPrint({ c }: { c: any }) {
             const c = parseFloat(it.estimatedCost) || 0
             return s + c
           }, 0)
+          items.forEach((it: any) => (it.toothNumbers || []).forEach((t: string) => allTeeth.add(t)))
 
           return (
             <div>
@@ -298,11 +299,10 @@ export default function CaseReportPrint({ c }: { c: any }) {
               <table className="tp-table" style={{ marginTop: 3 }}>
                 <thead>
                   <tr>
-                    <th style={{ width: "28%", textAlign: "left" }}>Procedure</th>
+                    <th style={{ width: "25%", textAlign: "left" }}>Procedure</th>
+                    <th style={{ width: "15%" }}>Teeth</th>
                     <th style={{ width: "10%" }}>Visits</th>
-                    <th style={{ width: "12%" }}>Priority</th>
-                    <th style={{ width: "14%" }}>Status</th>
-                    <th style={{ width: "16%", textAlign: "right" }}>Est. Cost</th>
+                    <th style={{ width: "15%", textAlign: "right" }}>Est. Cost</th>
                     <th style={{ width: "20%", textAlign: "left" }}>Remarks</th>
                   </tr>
                 </thead>
@@ -310,17 +310,17 @@ export default function CaseReportPrint({ c }: { c: any }) {
                   {items.map((it: any, i: number) => (
                     <tr key={i} className="tp-row">
                       <td style={{ textAlign: "left", fontWeight: 600 }}>{it.name || "\u2014"}</td>
+                      <td>{(it.toothNumbers && it.toothNumbers.length > 0) ? it.toothNumbers.join(", ") : "\u2014"}</td>
                       <td>{it.estimatedVisits || it.estimatedVisits === 0 ? String(it.estimatedVisits) : "-"}</td>
-                      <td>{it.priority || "-"}</td>
-                      <td>{it.status || "-"}</td>
                       <td style={{ textAlign: "right" }}>{it.estimatedCost ? `\u20B9${Number(it.estimatedCost).toLocaleString("en-IN")}` : "-"}</td>
                       <td style={{ textAlign: "left", fontSize: 9, wordBreak: "break-word" }}>{it.remarks || "-"}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              <div style={{ marginTop: 6, padding: "4px 6px", borderTop: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", fontSize: 10 }}>
+              <div style={{ marginTop: 6, padding: "4px 6px", borderTop: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", fontSize: 10, flexWrap: "wrap", gap: 4 }}>
                 <span><span style={{ fontWeight: 600, color: "#1E3A5F" }}>Total Procedures:</span> {totalProcedures}</span>
+                {allTeeth.size > 0 && <span><span style={{ fontWeight: 600, color: "#1E3A5F" }}>Teeth Involved:</span> {allTeeth.size}</span>}
                 <span><span style={{ fontWeight: 600, color: "#1E3A5F" }}>Estimated Visits:</span> {totalVisits}</span>
                 <span><span style={{ fontWeight: 600, color: "#1E3A5F" }}>Estimated Cost:</span> {"\u20B9"}{totalCost.toLocaleString("en-IN")}</span>
               </div>

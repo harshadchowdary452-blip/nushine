@@ -19,6 +19,9 @@ class TreatmentPlanRepository(BaseRepository[TreatmentPlan]):
             selectinload(TreatmentPlan.sittings),
             joinedload(TreatmentPlan.case).joinedload(Case.patient),
             joinedload(TreatmentPlan.case).joinedload(Case.doctor),
+            joinedload(TreatmentPlan.assigned_doctor),
+            joinedload(TreatmentPlan.assistant_doctor),
+            joinedload(TreatmentPlan.treatment_type),
         )
 
     async def get_all(self, skip: int = 0, limit: int = 100, filters: Optional[Dict[str, Any]] = None, order_by: Optional[str] = None, descending: bool = False) -> List[TreatmentPlan]:
