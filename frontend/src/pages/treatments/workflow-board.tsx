@@ -25,7 +25,7 @@ export default function TreatmentWorkflowBoard() {
   const navigate = useNavigate()
   const { data, isLoading } = useQuery({
     queryKey: ["treatment-plans-board"],
-    queryFn: () => treatmentApi.list({ page_size: 200 }),
+    queryFn: () => treatmentApi.list({ limit: 200 }),
   })
 
   const plans = useMemo(() => (Array.isArray(data) ? data : (data?.items || [])), [data])

@@ -344,8 +344,11 @@ def main():
     # ── Step 18: Verify Treatment List endpoint ──
     print("\n[18] Verify Treatment List endpoint...")
     r = requests.get(f"{BASE}/treatment-plans/", headers=h, params={"case_id": case_id})
-    all_treatments = r.json()
+    list_resp = r.json()
+    all_treatments = list_resp.get("items", list_resp) if isinstance(list_resp, dict) else list_resp
     check("List returns treatments for case", len(all_treatments) >= 2, len(all_treatments))
+    if isinstance(list_resp, dict) and "total" in list_resp:
+        check("Response has total", list_resp["total"] >= 2, list_resp["total"])
     for t in all_treatments:
         check(f"{t['treatment_name']} has patient_name", bool(t.get("patient_name")), t.get("patient_name"))
         check(f"{t['treatment_name']} has patient_op_no", "patient_op_no" in t, t.keys())

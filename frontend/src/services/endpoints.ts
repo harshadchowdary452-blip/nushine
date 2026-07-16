@@ -150,7 +150,8 @@ export const consultantNotesApi = {
 };
 
 export const treatmentApi = {
-  list: (params?: PaginationParams) => api.get("/treatment-plans", { params: withPagination(params) }).then((r) => r.data),
+  list: (params?: { skip?: number; limit?: number; search?: string; status?: string; doctor_id?: string; hospital_id?: string; case_id?: string; patient_id?: string; date_from?: string; date_to?: string }) =>
+    api.get("/treatment-plans", { params }).then((r) => r.data),
   get: (id: string) => api.get(`/treatment-plans/${id}`).then((r) => r.data),
   listByCase: (caseId: string) => api.get(`/treatment-plans/by-case/${caseId}`).then((r) => r.data),
   create: (data: any) => api.post("/treatment-plans", data).then((r) => r.data),

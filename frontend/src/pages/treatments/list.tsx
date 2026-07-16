@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useMemo } from "react"
+import { useState, useMemo, useCallback, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
-import { Search, Filter, Stethoscope, User, Clock, FileText, ChevronDown, ChevronRight, Calendar, IndianRupee, Hash, Activity } from "lucide-react"
+import { Search, Filter, Stethoscope, Clock, FileText, ChevronDown, ChevronRight, Calendar, IndianRupee, Hash, ChevronLeft, RotateCcw } from "lucide-react"
 import PageHeader from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -14,6 +14,8 @@ import { treatmentApi } from "@/services/endpoints"
 import { formatIndianRupees } from "@/lib/currency"
 import { cn } from "@/lib/utils"
 import type { TreatmentPlan } from "@/types"
+
+const PAGE_SIZE = 20
 
 const STATUS_COLORS: Record<string, string> = {
   GENERATED: "bg-gray-100 text-gray-600",
@@ -91,34 +93,54 @@ function groupByCase(plans: TreatmentPlan[]): CaseGroup[] {
 
 export default function TreatmentList() {
   const navigate = useNavigate()
-  const [search, setSearch] = useState("")
+  const [searchInput, setSearchInput] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [page, setPage] = useState(1)
   const [expandedCases, setExpandedCases] = useState<Set<string>>(new Set())
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchInput.trim())
+      setPage(1)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchInput])
+
+  useEffect(() => {
+    setPage(1)
+  }, [statusFilter])
+
+  const skip = (page - 1) * PAGE_SIZE
+
   const { data, isLoading } = useQuery({
-    queryKey: ["treatment-plans", search, statusFilter],
-    queryFn: () => treatmentApi.list({ page_size: 200, search: search || undefined, status: statusFilter !== "all" ? statusFilter : undefined }),
+    queryKey: ["treatment-plans", debouncedSearch, statusFilter, skip],
+    queryFn: () => treatmentApi.list({
+      skip,
+      limit: PAGE_SIZE,
+      search: debouncedSearch || undefined,
+      status: statusFilter !== "all" ? statusFilter : undefined,
+    }),
   })
 
   const allPlans: TreatmentPlan[] = useMemo(() => {
-    return Array.isArray(data) ? data : (data?.items || [])
+    if (!data) return []
+    return Array.isArray(data) ? data : (data.items || [])
   }, [data])
 
-  const clientFiltered = useMemo(() => {
-    if (!search) return allPlans
-    const q = search.toLowerCase()
-    return allPlans.filter((p: any) =>
-      p.treatment_name?.toLowerCase().includes(q) ||
-      p.patient_name?.toLowerCase().includes(q) ||
-      p.case_number?.toLowerCase().includes(q) ||
-      p.assigned_doctor_name?.toLowerCase().includes(q) ||
-      p.patient_op_no?.toLowerCase().includes(q)
-    )
-  }, [allPlans, search])
+  const total: number = useMemo(() => {
+    if (!data) return 0
+    if (typeof data === "object" && !Array.isArray(data)) return data.total || 0
+    return allPlans.length
+  }, [data, allPlans])
 
-  const caseGroups = useMemo(() => groupByCase(clientFiltered), [clientFiltered])
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
-  const toggleExpand = (caseId: string, e: React.MouseEvent) => {
+  const caseGroups = useMemo(() => groupByCase(allPlans), [allPlans])
+
+  const activeTreatments = allPlans.filter((p: any) => !["COMPLETED", "CANCELLED"].includes(p.status)).length
+
+  const toggleExpand = useCallback((caseId: string, e: React.MouseEvent) => {
     e.stopPropagation()
     setExpandedCases(prev => {
       const next = new Set(prev)
@@ -126,12 +148,9 @@ export default function TreatmentList() {
       else next.add(caseId)
       return next
     })
-  }
+  }, [])
 
-  const totalTreatments = clientFiltered.length
-  const activeTreatments = clientFiltered.filter(p => !["COMPLETED", "CANCELLED"].includes(p.status)).length
-
-  if (isLoading) {
+  if (isLoading && allPlans.length === 0) {
     return (
       <div className="space-y-6 p-6">
         <Skeleton className="h-8 w-64" />
@@ -145,20 +164,19 @@ export default function TreatmentList() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Treatments" description={`${caseGroups.length} case(s) · ${totalTreatments} treatment(s) · ${activeTreatments} active`}>
+      <PageHeader title="Treatments" description={`${caseGroups.length} case(s) · ${total} treatment(s) · ${activeTreatments} active`}>
         <Button variant="outline" size="sm" onClick={() => navigate("/treatments/workflow")}>
           Workflow Board
         </Button>
       </PageHeader>
 
-      {/* Filters */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by patient, OP number, case, treatment, doctor..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Patient, OP#, case#, treatment#, doctor, status..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             className="pl-9"
           />
         </div>
@@ -169,14 +187,18 @@ export default function TreatmentList() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Statuses</SelectItem>
-            {Object.keys(STATUS_COLORS).filter(s => s !== "GENERATED").map(s => (
+            {Object.keys(STATUS_COLORS).map(s => (
               <SelectItem key={s} value={s}>{s.replace(/_/g, " ")}</SelectItem>
             ))}
           </SelectContent>
         </Select>
+        {(debouncedSearch || statusFilter !== "all") && (
+          <Button variant="ghost" size="sm" onClick={() => { setSearchInput(""); setStatusFilter("all") }}>
+            <RotateCcw className="h-4 w-4 mr-1" /> Clear
+          </Button>
+        )}
       </div>
 
-      {/* Case Cards */}
       {caseGroups.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center py-16">
@@ -192,12 +214,10 @@ export default function TreatmentList() {
 
             return (
               <Card key={group.case_id} className="overflow-hidden">
-                {/* Case Header */}
                 <div
                   className="flex items-center gap-4 p-4 hover:bg-gray-50/50 transition-colors cursor-pointer"
                   onClick={() => navigate(`/cases/${group.case_id}`)}
                 >
-                  {/* Expand toggle */}
                   <button
                     type="button"
                     onClick={(e) => toggleExpand(group.case_id, e)}
@@ -209,7 +229,6 @@ export default function TreatmentList() {
                     }
                   </button>
 
-                  {/* Patient + Case info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-semibold text-sm">{group.patient_name}</span>
@@ -228,7 +247,6 @@ export default function TreatmentList() {
                     </div>
                   </div>
 
-                  {/* Progress bar */}
                   {group.total_sittings > 0 && (
                     <div className="w-24 shrink-0">
                       <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
@@ -239,7 +257,6 @@ export default function TreatmentList() {
                   )}
                 </div>
 
-                {/* Expanded Treatment List */}
                 {isExpanded && (
                   <div className="border-t bg-gray-50/30">
                     {group.treatments.map((treatment) => (
@@ -248,7 +265,6 @@ export default function TreatmentList() {
                         className="flex items-center gap-4 px-4 py-3 ml-11 hover:bg-white transition-colors cursor-pointer border-b border-gray-100 last:border-b-0"
                         onClick={() => navigate(`/treatments/${treatment.id}`)}
                       >
-                        {/* Status dot */}
                         <div className={cn(
                           "w-2 h-2 rounded-full shrink-0",
                           treatment.status === "IN_PROGRESS" && "bg-green-500",
@@ -263,7 +279,6 @@ export default function TreatmentList() {
                           treatment.status === "GENERATED" && "bg-gray-300",
                         )} />
 
-                        {/* Treatment info */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium">{treatment.treatment_name}</span>
@@ -275,22 +290,18 @@ export default function TreatmentList() {
                           </div>
                         </div>
 
-                        {/* Doctor */}
                         <div className="text-xs text-muted-foreground shrink-0 w-32 truncate">
                           {treatment.assigned_doctor_name ? `Dr. ${treatment.assigned_doctor_name}` : "Unassigned"}
                         </div>
 
-                        {/* Visits */}
                         <div className="text-xs text-muted-foreground shrink-0 w-20 text-right">
                           {treatment.completed_sittings || 0}/{treatment.total_sittings || 0} visits
                         </div>
 
-                        {/* Cost */}
                         <div className="text-xs font-medium shrink-0 w-24 text-right">
                           {formatIndianRupees(treatment.cost || 0)}
                         </div>
 
-                        {/* Status badge */}
                         <Badge className={cn("text-[10px] px-1.5 py-0 shrink-0", STATUS_COLORS[treatment.status] || "bg-gray-100")}>
                           {treatment.status?.replace(/_/g, " ")}
                         </Badge>
@@ -303,6 +314,32 @@ export default function TreatmentList() {
               </Card>
             )
           })}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between pt-4">
+          <p className="text-sm text-muted-foreground">
+            Page {page} of {totalPages} ({total} treatments)
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page <= 1}
+              onClick={() => { setPage(p => p - 1); setExpandedCases(new Set()) }}
+            >
+              <ChevronLeft className="h-4 w-4" /> Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page >= totalPages}
+              onClick={() => { setPage(p => p + 1); setExpandedCases(new Set()) }}
+            >
+              Next <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       )}
     </div>

@@ -51,97 +51,121 @@ async def _get_patient_id_from_plan(db: AsyncSession, plan_id: str) -> str:
 
 
 
-@router.get("/", response_model=List[TreatmentPlanResponse])
-async def get_treatment_plans(skip: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=200),
-                               case_id: Optional[str] = Query(None),
-                               patient_id: Optional[str] = Query(None),
-                               hospital_id: Optional[str] = Query(None),
-                               status: Optional[str] = Query(None),
-                               search: Optional[str] = Query(None),
-                               db: AsyncSession = Depends(get_db),
-                               current_user: dict = Depends(get_current_user)):
+@router.get("/", response_model=dict)
+async def get_treatment_plans(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=200),
+    case_id: Optional[str] = Query(None),
+    patient_id: Optional[str] = Query(None),
+    hospital_id: Optional[str] = Query(None),
+    doctor_id: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
     try:
         verify_permission(current_user, Permission.CREATE_TREATMENT_PLAN, Permission.MANAGE_CASES)
-        service = TreatmentPlanService(db)
-        filters = {}
-        if case_id:
-            filters["case_id"] = case_id
-        if status:
-            filters["status"] = status
 
-        if patient_id:
-            case_result = await db.execute(select(Case.id).where(Case.patient_id == patient_id))
-            pids = [row[0] for row in case_result.all()]
-            if not pids:
-                return []
-            if "case_id__in" in filters:
-                existing = set(filters["case_id__in"])
-                filters["case_id__in"] = list(existing & set(pids))
-                if not filters["case_id__in"]:
-                    return []
-            else:
-                filters["case_id__in"] = pids
+        query = (
+            select(TreatmentPlan)
+            .join(Case, TreatmentPlan.case_id == Case.id)
+            .outerjoin(Patient, Case.patient_id == Patient.id)
+            .outerjoin(User, TreatmentPlan.assigned_doctor_id == User.id, isouter=True)
+            .options(
+                selectinload(TreatmentPlan.sittings),
+                joinedload(TreatmentPlan.case).joinedload(Case.patient).selectinload(Patient.hospital),
+                joinedload(TreatmentPlan.case).joinedload(Case.doctor),
+                joinedload(TreatmentPlan.assigned_doctor),
+                joinedload(TreatmentPlan.assistant_doctor),
+                joinedload(TreatmentPlan.treatment_type),
+            )
+        )
+
+        query = query.where(TreatmentPlan.is_active == True)
 
         role = current_user.get("role")
-        role_case_ids = None
+        uid = current_user.get("sub")
         if role == Role.DOCTOR.value:
-            if hospital_id:
-                filters["hospital_id"] = hospital_id
-            else:
-                case_result = await db.execute(select(Case.id).where(Case.doctor_id == current_user.get("sub")))
-                role_case_ids = [row[0] for row in case_result.all()]
+            query = query.where(Case.doctor_id == uid)
         elif role == Role.HOSPITAL_ADMIN.value:
             hid = hospital_id or current_user.get("hospital_id")
             if hid:
-                filters["hospital_id"] = hid
+                query = query.join(Patient, Case.patient_id == Patient.id).where(Patient.hospital_id == hid)
         elif role == Role.GROUP_ADMIN.value:
             agid = current_user.get("admin_group_id")
             if agid:
-                hosp_result = await db.execute(select(Hospital.id).where(Hospital.admin_group_id == agid))
-                hids = [row[0] for row in hosp_result.all()]
+                hosp_r = await db.execute(select(Hospital.id).where(Hospital.admin_group_id == agid))
+                hids = [r[0] for r in hosp_r.all()]
                 if hids:
-                    patient_result = await db.execute(select(Patient.id).where(Patient.hospital_id.in_(hids)))
-                    pids = [row[0] for row in patient_result.all()]
+                    pat_r = await db.execute(select(Patient.id).where(Patient.hospital_id.in_(hids)))
+                    pids = [r[0] for r in pat_r.all()]
                     if pids:
-                        case_result = await db.execute(select(Case.id).where(Case.patient_id.in_(pids)))
-                        role_case_ids = [row[0] for row in case_result.all()]
+                        cas_r = await db.execute(select(Case.id).where(Case.patient_id.in_(pids)))
+                        cids = [r[0] for r in cas_r.all()]
+                        query = query.where(TreatmentPlan.case_id.in_(cids))
+                    else:
+                        query = query.where(TreatmentPlan.id == "__none__")
+                else:
+                    query = query.where(TreatmentPlan.id == "__none__")
         elif role == Role.SUPER_ADMIN.value and hospital_id:
-            filters["hospital_id"] = hospital_id
+            query = query.join(Patient, Case.patient_id == Patient.id).where(Patient.hospital_id == hospital_id)
 
-        if role_case_ids is not None:
-            if "case_id__in" in filters:
-                existing = set(filters["case_id__in"])
-                merged = list(existing & set(role_case_ids))
-                if not merged:
-                    return []
-                filters["case_id__in"] = merged
-            else:
-                if not role_case_ids:
-                    return []
-                filters["case_id__in"] = role_case_ids
-
-        if search:
-            search_term = f"%{search}%"
-            case_q = select(Case.id).outerjoin(Patient, Case.patient_id == Patient.id).where(
+        if search and search.strip():
+            term = f"%{search.strip()}%"
+            query = query.where(
                 or_(
-                    Case.case_number.ilike(search_term),
-                    Patient.full_name.ilike(search_term),
+                    Patient.full_name.ilike(term),
+                    Patient.op_no.ilike(term),
+                    Case.case_number.ilike(term),
+                    TreatmentPlan.treatment_number.ilike(term),
+                    TreatmentPlan.treatment_name.ilike(term),
+                    User.full_name.ilike(term),
+                    TreatmentPlan.status.ilike(term),
                 )
             )
-            case_result = await db.execute(case_q)
-            matching_case_ids = [row[0] for row in case_result.all()]
 
-            all_matching_case_ids = list(set(matching_case_ids))
-            if all_matching_case_ids:
-                if "case_id__in" in filters:
-                    existing = set(filters["case_id__in"])
-                    filters["case_id__in"] = list(existing & set(all_matching_case_ids))
-                else:
-                    filters["case_id__in"] = all_matching_case_ids
-            elif not matching_case_ids:
-                return []
+        if status and status != "all":
+            query = query.where(TreatmentPlan.status.ilike(status))
 
-        return await service.get_all(skip=skip, limit=limit, filters=filters or None)
+        if doctor_id:
+            query = query.where(TreatmentPlan.assigned_doctor_id == doctor_id)
+
+        if case_id:
+            query = query.where(TreatmentPlan.case_id == case_id)
+
+        if patient_id:
+            query = query.where(Case.patient_id == patient_id)
+
+        if date_from:
+            query = query.where(TreatmentPlan.created_at >= date_from)
+
+        if date_to:
+            from datetime import datetime as dt
+            try:
+                end = dt.fromisoformat(date_to).replace(hour=23, minute=59, second=59)
+                query = query.where(TreatmentPlan.created_at <= end)
+            except Exception:
+                query = query.where(TreatmentPlan.created_at <= date_to)
+
+        count_query = select(func.count()).select_from(query.subquery())
+        total_result = await db.execute(count_query)
+        total = total_result.scalar() or 0
+
+        query = query.order_by(TreatmentPlan.created_at.desc())
+        query = query.offset(skip).limit(limit)
+
+        result = await db.execute(query)
+        plans = list(result.unique().scalars().all())
+
+        from app.services.treatment_plan_service import _enrich_plan
+        for p in plans:
+            _enrich_plan(p)
+
+        return {"items": plans, "total": total, "skip": skip, "limit": limit}
+
     except HTTPException:
         raise
     except Exception as e:
