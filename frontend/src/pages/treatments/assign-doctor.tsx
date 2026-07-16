@@ -47,7 +47,7 @@ export default function AssignDoctor() {
 
   const doctorList = useMemo(() => {
     const raw = Array.isArray(doctors) ? doctors : (doctors?.items || [])
-    return raw.map((d: any) => ({ id: d.id, name: `${d.first_name || ""} ${d.last_name || ""}`.trim() || d.email }))
+    return raw.map((d: any) => ({ id: d.id, name: d.full_name || d.name || d.email }))
   }, [doctors])
 
   const assignMutation = useMutation({

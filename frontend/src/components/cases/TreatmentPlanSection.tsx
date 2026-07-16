@@ -147,9 +147,9 @@ export default function TreatmentPlanSection({
               {filtered.length === 0 ? (
                 <p className="py-3 text-center text-sm text-gray-500">No matching procedures</p>
               ) : (
-                filtered.map((name) => (
+                filtered.map((name, idx) => (
                   <button
-                    key={name}
+                    key={`${name}-${idx}`}
                     type="button"
                     onClick={() => addTreatment(name)}
                     className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm text-gray-800 hover:bg-blue-50 hover:text-blue-700 transition-colors"

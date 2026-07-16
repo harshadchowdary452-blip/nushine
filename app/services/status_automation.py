@@ -199,12 +199,6 @@ class StatusAutomationService:
 
         if new_status == AppointmentStatus.COMPLETED:
             await self._on_appointment_completed(appt)
-        elif new_status == AppointmentStatus.NO_SHOW:
-            await self._on_appointment_no_show(appt)
-        elif new_status == AppointmentStatus.CONFIRMED:
-            await self._on_appointment_confirmed(appt)
-        elif new_status == AppointmentStatus.IN_PROGRESS:
-            await self._on_appointment_started(appt)
 
         return appt
 
@@ -283,8 +277,8 @@ class StatusAutomationService:
 
         elif new_status == TreatmentPlanStatus.GENERATED:
             case = await self.db.get(Case, tp.case_id)
-            if case and case.status in (CaseStatus.OPEN,):
-                case.status = CaseStatus.ON_HOLD
+            if case:
+                case.status = CaseStatus.IN_PROGRESS
                 await self.db.flush()
 
         return tp
@@ -547,9 +541,9 @@ class StatusAutomationService:
                 "follow_up": lambda o: o.patient_id,
                 "billing": lambda o: None,
             }
-            patient_id = cascade_targets.get(entity_type, lambda o: None)(obj)
-            if entity_type == "treatment" and patient_id:
-                await self._check_case_completion(patient_id)
+            target_id = cascade_targets.get(entity_type, lambda o: None)(obj)
+            if entity_type == "treatment" and target_id:
+                await self._check_case_completion(target_id)
             if entity_type == "follow_up" and obj.patient_id:
                 await self.update_patient_status(obj.patient_id)
 

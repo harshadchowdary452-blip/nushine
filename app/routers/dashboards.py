@@ -956,7 +956,7 @@ async def hospital_admin_dashboard(
 
 async def _get_most_booked_doctors(db: AsyncSession, hospital_id: str, today: date, limit: int = 5):
     from app.models.appointment import Appointment, AppointmentStatus
-    excluded = [AppointmentStatus.CANCELLED.value, AppointmentStatus.NO_SHOW.value]
+    excluded = [AppointmentStatus.CANCELLED.value]
     pid_r = await db.execute(select(Patient.id).where(Patient.hospital_id == hospital_id))
     pids = [row[0] for row in pid_r.all()]
     if not pids:
@@ -981,7 +981,7 @@ async def _get_most_booked_doctors(db: AsyncSession, hospital_id: str, today: da
 
 async def _get_peak_hours(db: AsyncSession, hospital_id: str, today: date, limit: int = 5):
     from app.models.appointment import Appointment, AppointmentStatus
-    excluded = [AppointmentStatus.CANCELLED.value, AppointmentStatus.NO_SHOW.value]
+    excluded = [AppointmentStatus.CANCELLED.value]
     pid_r = await db.execute(select(Patient.id).where(Patient.hospital_id == hospital_id))
     pids = [row[0] for row in pid_r.all()]
     if not pids:
@@ -1135,7 +1135,7 @@ async def doctor_dashboard(db: AsyncSession = Depends(get_db), current_user: dic
             Appointment.doctor_id == doctor_id,
             Appointment.appointment_date == today,
             Appointment.is_active == True,
-            Appointment.status.notin_([AppointmentStatus.CANCELLED.value, AppointmentStatus.NO_SHOW.value]),
+            Appointment.status.notin_([AppointmentStatus.CANCELLED.value]),
         )
     )).scalar() or 0
 

@@ -57,6 +57,7 @@ class TreatmentGenerator:
                 status=TreatmentPlanStatus.GENERATED,
                 assigned_doctor_id=item.assigned_doctor_id,
                 assistant_doctor_id=item.assistant_doctor_id,
+                priority=item.priority,
                 tooth_numbers=json.dumps(tooth_numbers) if tooth_numbers else None,
                 sequence_order=item.sequence_order,
                 treatment_plan_item_id=item.id,
@@ -66,13 +67,11 @@ class TreatmentGenerator:
             self.db.add(plan)
             await self.db.flush()
 
-            # Generate treatment number
-            try:
-                cnt = await self.db.execute(select(func.count(TreatmentPlan.id)))
-                plan.treatment_number = f"TRT-{cnt.scalar():04d}"
-                await self.db.flush()
-            except Exception:
-                pass
+            # Generate treatment number (UUID-based to avoid collisions)
+            import uuid as _uuid
+            short_id = _uuid.uuid4().hex[:8].upper()
+            plan.treatment_number = f"TRT-{short_id}"
+            await self.db.flush()
 
             # Map dependency
             if item.dependency_item_id and item.dependency_item_id in dep_map:

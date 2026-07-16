@@ -125,7 +125,7 @@ class AppointmentService:
         return result.scalars().all()
 
     async def _get_existing_appointments(self, doctor_id: str, appointment_date: date) -> list[Appointment]:
-        excluded_statuses = [AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW]
+        excluded_statuses = [AppointmentStatus.CANCELLED]
         result = await self.db.execute(
             select(Appointment).where(
                 Appointment.doctor_id == doctor_id,
@@ -424,7 +424,7 @@ class AppointmentService:
                     max_per_hour = settings.get("doctor_max_appointments_per_hour", 4)
                 except (json.JSONDecodeError, TypeError):
                     pass
-        excluded_statuses = [AppointmentStatus.CANCELLED.value, AppointmentStatus.NO_SHOW.value]
+        excluded_statuses = [AppointmentStatus.CANCELLED.value]
         count_result = await self.db.execute(
             select(func.count(Appointment.id)).where(
                 Appointment.doctor_id == doctor_id,

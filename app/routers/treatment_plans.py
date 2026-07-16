@@ -1,8 +1,9 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
 from typing import List, Optional
+from pydantic import BaseModel
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.core.permissions import verify_permission, verify_tenant_access, Permission, Role
@@ -13,7 +14,7 @@ from app.services.treatment_notification import (
     notify_treatment_completed, notify_treatment_overdue,
     notify_treatment_assigned, notify_pending_assignment,
 )
-from app.schemas.treatment_plan import TreatmentPlanCreate, TreatmentPlanUpdate, TreatmentPlanResponse
+from app.schemas.treatment_plan import TreatmentPlanUpdate, TreatmentPlanResponse
 from app.schemas.common import MessageResponse
 from app.models.case import Case
 from app.models.patient import Patient
@@ -25,6 +26,22 @@ router = APIRouter(prefix="/treatment-plans", tags=["Treatment Plans"])
 logger = logging.getLogger(__name__)
 
 
+class CompleteTreatmentBody(BaseModel):
+    outcome: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class SetWaitingBody(BaseModel):
+    reason: Optional[str] = None
+    expected_followup: Optional[str] = None
+    lab_name: Optional[str] = None
+    lab_order_number: Optional[str] = None
+    lab_sent_date: Optional[str] = None
+    lab_return_date: Optional[str] = None
+    lab_cost: Optional[float] = None
+    lab_tracking_notes: Optional[str] = None
+
+
 async def _get_patient_id_from_plan(db: AsyncSession, plan_id: str) -> str:
     plan_result = await db.execute(select(Case.patient_id).join(TreatmentPlan, TreatmentPlan.case_id == Case.id).where(TreatmentPlan.id == plan_id))
     row = plan_result.one_or_none()
@@ -32,22 +49,6 @@ async def _get_patient_id_from_plan(db: AsyncSession, plan_id: str) -> str:
         raise HTTPException(status_code=404, detail="Associated case/patient not found")
     return row[0]
 
-
-@router.post("/", response_model=TreatmentPlanResponse, status_code=status.HTTP_201_CREATED)
-async def create_treatment_plan(data: TreatmentPlanCreate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    verify_permission(current_user, Permission.CREATE_TREATMENT_PLAN)
-    service = TreatmentPlanService(db)
-    plan_data = data.model_dump()
-    plan = await service.create(plan_data, user_id=current_user.get("sub"))
-    await db.commit()
-    patient_id = await _get_patient_id_from_plan(db, plan.id)
-    await record_timeline_event(
-        db, current_user=current_user, patient_id=patient_id,
-        action="Treatment Plan Created",
-        description=f"Treatment plan created with status {plan.status}",
-        module="Treatments",
-    )
-    return plan
 
 
 @router.get("/", response_model=List[TreatmentPlanResponse])
@@ -120,8 +121,6 @@ async def get_treatment_plans(skip: int = Query(0, ge=0), limit: int = Query(100
                 filters["case_id__in"] = role_case_ids
 
         if search:
-            from app.models.case import Case
-            from app.models.patient import Patient
             search_term = f"%{search}%"
             case_q = select(Case.id).outerjoin(Patient, Case.patient_id == Patient.id).where(
                 or_(
@@ -131,12 +130,6 @@ async def get_treatment_plans(skip: int = Query(0, ge=0), limit: int = Query(100
             )
             case_result = await db.execute(case_q)
             matching_case_ids = [row[0] for row in case_result.all()]
-
-            tp_q = select(TreatmentPlan.id).where(TreatmentPlan.treatment_name.ilike(search_term))
-            tp_result = await db.execute(tp_q)
-            matching_tp_case_ids_subq = select(TreatmentPlan.case_id).where(TreatmentPlan.treatment_name.ilike(search_term))
-            tp_case_result = await db.execute(tp_q)
-            matching_tp_ids = [row[0] for row in tp_case_result.all()]
 
             all_matching_case_ids = list(set(matching_case_ids))
             if all_matching_case_ids:
@@ -188,11 +181,11 @@ async def update_treatment_plan(plan_id: str, data: TreatmentPlanUpdate, db: Asy
     if not plan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Treatment plan not found")
     await verify_tenant_access(current_user, plan, "treatment_plan", db)
-    old_data = {"plan_name": plan.plan_name, "status": plan.status.value if hasattr(plan.status, 'value') else plan.status, "notes": plan.notes}
+    old_data = {"plan_name": plan.treatment_name, "status": plan.status.value if hasattr(plan.status, 'value') else plan.status, "notes": plan.notes}
     updated = await service.update(plan_id, data.model_dump(exclude_none=True), user_id=current_user.get("sub"))
     await db.commit()
-    new_data = {"plan_name": updated.plan_name, "status": updated.status.value if hasattr(updated.status, 'value') else updated.status, "notes": updated.notes}
-    changes = build_changes(old_data, new_data)
+    new_data = {"plan_name": updated.treatment_name, "status": updated.status.value if hasattr(updated.status, 'value') else updated.status, "notes": updated.notes}
+    changes = build_changes(new_data, old_data)
     patient_id = await _get_patient_id_from_plan(db, plan_id)
     await record_timeline_event(
         db, current_user=current_user, patient_id=patient_id,
@@ -267,10 +260,16 @@ async def start_treatment(plan_id: str, db: AsyncSession = Depends(get_db), curr
 
 
 @router.post("/{plan_id}/complete")
-async def complete_treatment(plan_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+async def complete_treatment(plan_id: str, body: CompleteTreatmentBody = Body(default=None), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.CREATE_TREATMENT_PLAN)
     service = TreatmentPlanService(db)
-    result = await service.update_status(plan_id, "COMPLETED", user_id=current_user.get("sub"))
+    update_data = {"status": "COMPLETED"}
+    if body:
+        if body.outcome:
+            update_data["notes"] = f"Outcome: {body.outcome}" + (f" — {body.notes}" if body.notes else "")
+        elif body.notes:
+            update_data["notes"] = body.notes
+    result = await service.update(plan_id, update_data, user_id=current_user.get("sub"))
     await db.commit()
     patient_id = await _get_patient_id_from_plan(db, plan_id)
     await record_timeline_event(
@@ -279,6 +278,12 @@ async def complete_treatment(plan_id: str, db: AsyncSession = Depends(get_db), c
         description=f"Treatment completed",
         module="Treatments",
     )
+    try:
+        svc = StatusAutomationService(db)
+        await svc.update_treatment_status(plan_id, TreatmentPlanStatus.COMPLETED)
+        await db.commit()
+    except Exception as e:
+        logger.warning("StatusAutomation on complete failed: %s", e)
     try:
         plan_result = await db.execute(select(TreatmentPlan).where(TreatmentPlan.id == plan_id))
         plan = plan_result.scalar_one_or_none()
@@ -313,22 +318,40 @@ async def report_overdue(plan_id: str, reason: str = Query(...), delay_type: str
 
 
 @router.post("/{plan_id}/set-waiting")
-async def set_waiting(plan_id: str, waiting_type: str = Query(...), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+async def set_waiting(plan_id: str, waiting_type: str = Query(...), body: SetWaitingBody = Body(default=None), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.CREATE_TREATMENT_PLAN)
     service = TreatmentPlanService(db)
     if waiting_type not in ("WAITING_PATIENT", "WAITING_LAB"):
         raise HTTPException(status_code=400, detail="waiting_type must be WAITING_PATIENT or WAITING_LAB")
-    result = await service.update_status(plan_id, waiting_type, user_id=current_user.get("sub"))
+    update_data = {"status": waiting_type}
+    if body and body.reason:
+        update_data["overdue_reason"] = body.reason
+    result = await service.update(plan_id, update_data, user_id=current_user.get("sub"))
     await db.commit()
-    patient_id = await _get_patient_id_from_plan(db, plan_id)
-    from datetime import datetime, timezone
+
     plan_result = await db.execute(select(TreatmentPlan).where(TreatmentPlan.id == plan_id))
     plan = plan_result.scalar_one_or_none()
+
+    if waiting_type == "WAITING_LAB" and body and plan:
+        from datetime import datetime as dt, timezone
+        if body.lab_name:
+            plan.overdue_reason = f"Lab: {body.lab_name}" + (f" (Order: {body.lab_order_number})" if body.lab_order_number else "")
+        if body.expected_followup:
+            plan.overdue_delay_type = body.expected_followup
+        await db.flush()
+
+    patient_id = await _get_patient_id_from_plan(db, plan_id)
     label = "Waiting for Patient" if waiting_type == "WAITING_PATIENT" else "Waiting for Lab"
+    desc = f"Treatment set to {label}"
+    if body and body.reason:
+        desc += f": {body.reason}"
+    if waiting_type == "WAITING_LAB" and body:
+        if body.lab_name:
+            desc += f" — Lab: {body.lab_name}"
     await record_timeline_event(
         db, current_user=current_user, patient_id=patient_id,
         action=f"Treatment Set to {label}",
-        description=f"Treatment set to {label}" + (f": {plan.overdue_reason}" if plan and plan.overdue_reason else ""),
+        description=desc,
         module="Treatments",
     )
     try:

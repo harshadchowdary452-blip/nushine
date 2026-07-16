@@ -28,6 +28,7 @@ from app.models.hospital import Hospital
 from app.models.user import User
 from app.services.status_automation import StatusAutomationService
 from app.services.timeline_helper import record_timeline_event, build_changes
+from app.services.treatment_plan_item_service import TreatmentPlanItemService
 
 router = APIRouter(prefix="/cases", tags=["Case Reports"])
 
@@ -36,6 +37,7 @@ async def _load_case_with_findings(db: AsyncSession, case_id: str) -> Case:
     result = await db.execute(
         select(Case).where(Case.id == case_id).options(
             selectinload(Case.findings),
+            selectinload(Case.clinical_progress_notes),
             selectinload(Case.patient).selectinload(Patient.hospital),
             selectinload(Case.doctor),
             selectinload(Case.created_by),
@@ -48,6 +50,10 @@ async def _load_case_with_findings(db: AsyncSession, case_id: str) -> Case:
     if case:
         svc = CaseService(db)
         await svc.attach_names(case)
+        if case.treatment_plans:
+            from app.services.treatment_plan_service import _enrich_plan
+            for tp in case.treatment_plans:
+                _enrich_plan(tp)
     return case
 
 
@@ -227,6 +233,7 @@ async def update_case(case_id: str, data: CaseUpdate, db: AsyncSession = Depends
         module="Case Reports",
         changes=changes,
     )
+    updated = await _load_case_with_findings(db, case_id)
     return updated
 
 
@@ -356,17 +363,40 @@ async def approve_treatment_plan(case_id: str, db: AsyncSession = Depends(get_db
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
     await verify_tenant_access(current_user, case, "case", db)
     from app.models.case import CaseTreatmentPlanStatus
+    if case.treatment_plan_status == CaseTreatmentPlanStatus.APPROVED:
+        case = await _load_case_with_findings(db, case_id)
+        return case
+
+    if case.initial_treatment_plan and case.initial_treatment_plan.startswith("_JSON_"):
+        await service._sync_treatment_items(case_id, case.initial_treatment_plan, current_user.get("sub"))
+
+    item_svc = TreatmentPlanItemService(db)
+    items = await item_svc.get_current_items(case_id)
+    if not items:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot approve: no treatment plan items found. Add items first.")
+
+    unassigned = [i for i in items if not i.assigned_doctor_id]
+    if unassigned:
+        names = [i.procedure_name for i in unassigned]
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot approve: {len(unassigned)} item(s) missing a Primary Doctor: {', '.join(names)}",
+        )
+
     case.treatment_plan_status = CaseTreatmentPlanStatus.APPROVED
     case.treatment_plan_approved = True
     case.treatment_plan_approved_by_id = current_user.get("sub")
     case.treatment_plan_approved_at = datetime.now(timezone.utc)
     await db.flush()
     from app.services.treatment_generator import TreatmentGenerator
-    from app.services.treatment_plan_item_service import TreatmentPlanItemService
-    item_svc = TreatmentPlanItemService(db)
-    items = await item_svc.get_current_items(case_id)
     generator = TreatmentGenerator(db)
     await generator.generate_from_items(items, user_id=current_user.get("sub"))
+    await db.commit()
+    await service._add_timeline(
+        case_id, "Treatment Plan Approved",
+        new_value=f"{len(items)} item(s) generated as treatments",
+        user_id=current_user.get("sub"), performer_role=current_user.get("role"),
+    )
     await db.commit()
     await record_timeline_event(
         db, current_user=current_user, patient_id=case.patient_id,
@@ -409,6 +439,24 @@ async def submit_treatment_plan(case_id: str, db: AsyncSession = Depends(get_db)
     if not case:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
     await verify_tenant_access(current_user, case, "case", db)
+
+    if case.initial_treatment_plan and case.initial_treatment_plan.startswith("_JSON_"):
+        await service._sync_treatment_items(case_id, case.initial_treatment_plan, current_user.get("sub"))
+
+    from app.services.treatment_plan_item_service import TreatmentPlanItemService
+    item_svc = TreatmentPlanItemService(db)
+    items = await item_svc.get_current_items(case_id)
+    if not items:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot submit: no treatment plan items found. Add items first.")
+
+    unassigned = [i for i in items if not i.assigned_doctor_id]
+    if unassigned:
+        names = [i.procedure_name for i in unassigned]
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot submit: {len(unassigned)} item(s) missing a Primary Doctor: {', '.join(names)}",
+        )
+
     from app.models.case import CaseTreatmentPlanStatus
     case.treatment_plan_status = CaseTreatmentPlanStatus.PENDING_APPROVAL
     await db.commit()

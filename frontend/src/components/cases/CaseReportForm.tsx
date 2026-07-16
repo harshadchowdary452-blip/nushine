@@ -218,8 +218,8 @@ export default function CaseReportForm({
         ? "_JSON_" + JSON.stringify(txItems.map((t: TreatmentItem) => ({
             name: t.name,
             toothNumbers: t.toothNumbers || [],
-            estimatedVisits: t.estimatedVisits || "",
-            estimatedCost: t.estimatedCost || "",
+            estimatedVisits: t.estimatedVisits === "" ? 1 : t.estimatedVisits,
+            estimatedCost: t.estimatedCost === "" ? 0 : t.estimatedCost,
             remarks: t.remarks || "",
           })))
         : form.initial_treatment_plan || ""

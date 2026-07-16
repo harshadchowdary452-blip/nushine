@@ -29,7 +29,7 @@ async def check_same_day_appointments():
         try:
             async with async_session_factory() as db:
                 today = date.today()
-                query = select(Appointment).where(Appointment.appointment_date == today, Appointment.status.in_([AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED]), Appointment.is_active == True)
+                query = select(Appointment).where(Appointment.appointment_date == today, Appointment.status == AppointmentStatus.SCHEDULED, Appointment.is_active == True)
                 result = await db.execute(query)
                 appointments = result.scalars().all()
                 for apt in appointments:
@@ -61,7 +61,7 @@ async def check_missed_appointments():
                 result = await db.execute(query)
                 appointments = result.scalars().all()
                 for apt in appointments:
-                    apt.status = AppointmentStatus.MISSED
+                    apt.status = AppointmentStatus.CANCELLED
                     patient = await db.get(Patient, apt.patient_id)
                     if patient and patient.phone:
                         await send_missed_appointment(patient.phone, patient.full_name)

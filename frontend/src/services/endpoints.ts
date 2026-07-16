@@ -157,8 +157,9 @@ export const treatmentApi = {
   update: (id: string, data: any) => api.put(`/treatment-plans/${id}`, data).then((r) => r.data),
   updateStatus: (id: string, status: string) => api.put(`/treatment-plans/${id}/status`, null, { params: { status } }).then((r) => r.data),
   start: (id: string) => api.post(`/treatment-plans/${id}/start`).then((r) => r.data),
-  complete: (id: string) => api.post(`/treatment-plans/${id}/complete`).then((r) => r.data),
-  setWaiting: (id: string, waitingType: string) => api.post(`/treatment-plans/${id}/set-waiting`, null, { params: { waiting_type: waitingType } }).then((r) => r.data),
+  complete: (id: string, data?: { outcome?: string; notes?: string }) => api.post(`/treatment-plans/${id}/complete`, data || {}).then((r) => r.data),
+  setWaiting: (id: string, waitingType: string, data?: { reason?: string; expected_followup?: string; lab_name?: string; lab_order_number?: string; lab_sent_date?: string; lab_return_date?: string; lab_cost?: number; lab_tracking_notes?: string }) =>
+    api.post(`/treatment-plans/${id}/set-waiting`, data || {}, { params: { waiting_type: waitingType } }).then((r) => r.data),
   reportOverdue: (id: string, params: { reason: string; delay_type: string }) => api.post(`/treatment-plans/${id}/report-overdue`, null, { params }).then((r) => r.data),
   suggestAppointment: (id: string) => api.get(`/treatment-plans/${id}/suggest-appointment`).then((r) => r.data),
   checkDependency: (id: string) => api.get(`/treatment-plans/${id}/check-dependency`).then((r) => r.data),
@@ -176,8 +177,21 @@ export const treatmentPlanItemsApi = {
     api.put(`/treatment-plan-items/${id}`, data).then((r) => r.data),
   delete: (id: string) =>
     api.delete(`/treatment-plan-items/${id}`).then((r) => r.data),
-  assignDoctors: (assignments: { item_id: string; assigned_doctor_id?: string; assistant_doctor_id?: string }[]) =>
+  assignDoctors: (assignments: { item_id: string; assigned_doctor_id?: string; assistant_doctor_id?: string; priority?: string }[]) =>
     api.post("/treatment-plan-items/assign-doctors", { assignments }).then((r) => r.data),
+};
+
+export const clinicalProgressNotesApi = {
+  listByCase: (caseId: string) =>
+    api.get(`/clinical-progress-notes/by-case/${caseId}`).then((r) => r.data),
+  get: (id: string) =>
+    api.get(`/clinical-progress-notes/${id}`).then((r) => r.data),
+  create: (data: { case_id: string; note_date: string; clinical_note: string; attachments_json?: string; digital_signature_url?: string }) =>
+    api.post("/clinical-progress-notes/", data).then((r) => r.data),
+  update: (id: string, data: { clinical_note?: string; attachments_json?: string; digital_signature_url?: string }) =>
+    api.put(`/clinical-progress-notes/${id}`, data).then((r) => r.data),
+  delete: (id: string) =>
+    api.delete(`/clinical-progress-notes/${id}`).then((r) => r.data),
 };
 
 export const doctorQueueApi = {

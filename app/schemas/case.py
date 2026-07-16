@@ -4,6 +4,7 @@ from datetime import datetime, date, time
 from app.schemas.patient import PatientResponse
 from app.schemas.hospital import HospitalBrief
 from app.schemas.treatment_plan import TreatmentPlanResponse
+from app.schemas.clinical_progress_note import ClinicalProgressNoteResponse
 
 
 class ClinicalFindingCreate(BaseModel):
@@ -11,6 +12,8 @@ class ClinicalFindingCreate(BaseModel):
     tooth_number: Optional[str] = None
     dentition_type: Optional[str] = None
     surface: Optional[str] = None
+    severity: Optional[str] = None
+    doctor_id: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -21,6 +24,9 @@ class ClinicalFindingResponse(BaseModel):
     tooth_number: Optional[str] = None
     dentition_type: Optional[str] = None
     surface: Optional[str] = None
+    severity: Optional[str] = None
+    doctor_id: Optional[str] = None
+    doctor_name: Optional[str] = None
     notes: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
@@ -162,7 +168,8 @@ class CaseResponse(BaseModel):
     treatment_plan_approved: Optional[bool] = None
     treatment_plan_rejection_reason: Optional[str] = None
     findings: Optional[List[ClinicalFindingResponse]] = None
-    treatment_plans: Optional[List[TreatmentPlanResponse]] = None
+    clinical_progress_notes: Optional[List[ClinicalProgressNoteResponse]] = None
+    treatment_plans: Optional[List["TreatmentPlanResponse"]] = None
     created_at: datetime
     updated_at: datetime
 

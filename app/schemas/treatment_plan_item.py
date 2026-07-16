@@ -7,11 +7,13 @@ class TreatmentPlanItemCreate(BaseModel):
     case_id: Optional[str] = None
     procedure_name: str = Field(..., min_length=1, max_length=255)
     tooth_numbers: Optional[List[str]] = None
-    estimated_visits: int = Field(default=1, ge=1)
-    estimated_cost: float = Field(default=0.0, ge=0)
+    estimated_visits: Optional[int] = Field(default=1)
+    estimated_cost: Optional[float] = Field(default=0.0)
     remarks: Optional[str] = None
     sequence_order: int = Field(default=0, ge=0)
     dependency_item_id: Optional[str] = None
+    reason_for_change: Optional[str] = None
+    priority: Optional[str] = None
     assigned_doctor_id: Optional[str] = None
     assistant_doctor_id: Optional[str] = None
 
@@ -24,6 +26,8 @@ class TreatmentPlanItemUpdate(BaseModel):
     remarks: Optional[str] = None
     sequence_order: Optional[int] = None
     dependency_item_id: Optional[str] = None
+    reason_for_change: Optional[str] = None
+    priority: Optional[str] = None
     assigned_doctor_id: Optional[str] = None
     assistant_doctor_id: Optional[str] = None
 
@@ -40,6 +44,8 @@ class TreatmentPlanItemResponse(BaseModel):
     remarks: Optional[str] = None
     sequence_order: int
     dependency_item_id: Optional[str] = None
+    reason_for_change: Optional[str] = None
+    priority: Optional[str] = None
     generated_treatment_id: Optional[str] = None
     assigned_doctor_id: Optional[str] = None
     assistant_doctor_id: Optional[str] = None
@@ -65,6 +71,7 @@ class TreatmentPlanItemAssignDoctor(BaseModel):
     item_id: str
     assigned_doctor_id: Optional[str] = None
     assistant_doctor_id: Optional[str] = None
+    priority: Optional[str] = None
 
 
 class TreatmentPlanItemBulkAssignDoctor(BaseModel):

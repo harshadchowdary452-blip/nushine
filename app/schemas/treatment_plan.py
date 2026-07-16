@@ -1,7 +1,8 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import datetime, date
 from enum import Enum
+import json
 
 
 class TreatmentPlanCreate(BaseModel):
@@ -56,6 +57,7 @@ class TreatmentPlanResponse(BaseModel):
     progress: float = 0.0
     patient_name: Optional[str] = None
     patient_id: Optional[str] = None
+    patient_op_no: Optional[str] = None
     assigned_doctor_id: Optional[str] = None
     assigned_doctor_name: Optional[str] = None
     assistant_doctor_id: Optional[str] = None
@@ -77,3 +79,13 @@ class TreatmentPlanResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+    @field_validator("tooth_numbers", mode="before")
+    @classmethod
+    def parse_tooth_numbers(cls, v):
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except (json.JSONDecodeError, TypeError):
+                return None
+        return v

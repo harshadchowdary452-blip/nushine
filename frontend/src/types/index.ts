@@ -113,7 +113,7 @@ export interface Patient {
   updated_at: string;
 }
 
-export type CaseStatus = "NEW" | "DIAGNOSIS_PENDING" | "TREATMENT_PLANNED" | "IN_PROGRESS" | "FOLLOW_UP" | "COMPLETED" | "CANCELLED";
+export type CaseStatus = "OPEN" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "CANCELLED";
 
 export type PatientStatus = "NEW" | "ACTIVE" | "INACTIVE" | "UNDER_TREATMENT" | "TREATMENT_ONGOING" | "FOLLOW_UP" | "COMPLETED" | "OPD" | "LOST" | "ARCHIVED";
 
@@ -123,8 +123,24 @@ export interface ClinicalFinding {
   finding_type: string;
   tooth_number: string | null;
   surface?: string;
+  severity?: string | null;
+  doctor_id?: string | null;
+  doctor_name?: string | null;
   notes: string | null;
   created_at?: string;
+}
+
+export interface ClinicalProgressNote {
+  id: string;
+  case_id: string;
+  doctor_id: string;
+  doctor_name?: string | null;
+  note_date: string;
+  clinical_note: string;
+  attachments_json?: string | null;
+  digital_signature_url?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Case {
@@ -177,6 +193,7 @@ export interface Case {
   consultant?: Consultant;
   treatment_plans?: any[] | null;
   treatment_plan_items?: TreatmentPlanItem[] | null;
+  clinical_progress_notes?: ClinicalProgressNote[] | null;
   treatment_plan_status?: string | null;
   treatment_plan_version?: number;
   treatment_plan_approved?: boolean;
@@ -235,6 +252,7 @@ export interface TreatmentPlanItem {
   remarks: string | null;
   sequence_order: number;
   dependency_item_id: string | null;
+  reason_for_change?: string | null;
   generated_treatment_id: string | null;
   assigned_doctor_id: string | null;
   assistant_doctor_id: string | null;
@@ -268,6 +286,7 @@ export interface TreatmentPlan {
   progress: number;
   patient_name?: string;
   patient_id?: string;
+  patient_op_no?: string | null;
   doctor_name?: string;
   assigned_doctor_id?: string | null;
   assistant_doctor_id?: string | null;
@@ -317,6 +336,11 @@ export interface TreatmentSitting {
   lab_tracking_status?: string | null;
   lab_tracking_notes?: string | null;
   lab_tracking_due_date?: string | null;
+  lab_name?: string | null;
+  lab_order_number?: string | null;
+  lab_sent_date?: string | null;
+  lab_return_date?: string | null;
+  lab_cost?: number | null;
   completed_by_id?: string | null;
   completed_at?: string | null;
   doctor_name?: string | null;

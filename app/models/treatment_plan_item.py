@@ -18,6 +18,8 @@ class TreatmentPlanItem(Base):
     remarks: Mapped[str] = mapped_column(Text, nullable=True)
     sequence_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     dependency_item_id: Mapped[str] = mapped_column(String(36), ForeignKey("treatment_plan_items.id"), nullable=True)
+    reason_for_change: Mapped[str] = mapped_column(Text, nullable=True)
+    priority: Mapped[str] = mapped_column(String(20), nullable=True, default=None)
     generated_treatment_id: Mapped[str] = mapped_column(String(36), ForeignKey("treatment_plans.id"), nullable=True)
     assigned_doctor_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
     assistant_doctor_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)

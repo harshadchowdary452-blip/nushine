@@ -140,16 +140,17 @@ async def bulk_assign_doctors(data: TreatmentPlanItemBulkAssignDoctor, db: Async
             update_data["assigned_doctor_id"] = assignment.assigned_doctor_id
         if assignment.assistant_doctor_id is not None:
             update_data["assistant_doctor_id"] = assignment.assistant_doctor_id
+        if assignment.priority is not None:
+            update_data["priority"] = assignment.priority
         if update_data:
-            updated_item = await service.repo.update(assignment.item_id, **update_data)
-            if updated_item:
-                updated.append(updated_item)
+            enriched = await service.update_item(assignment.item_id, update_data, user_id=current_user.get("sub"))
+            if enriched:
+                updated.append(enriched)
     await db.commit()
     if updated:
         case_result = await db.execute(select(Case.patient_id).where(Case.id == updated[0].case_id))
         case_row = case_result.one_or_none()
         if case_row:
-            from app.services.treatment_plan_item_service import _enrich_item
             await record_timeline_event(
                 db, current_user=current_user, patient_id=case_row[0],
                 action="Doctors Assigned to Treatment Items",

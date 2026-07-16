@@ -1,4 +1,5 @@
 import logging
+import json
 from typing import Optional, List
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +20,7 @@ from app.models.treatment_sitting import TreatmentSitting
 from app.models.pre_op import PreOp
 from app.models.post_op import PostOp
 from app.models.consultant_note import ConsultantNote
+from app.models.clinical_progress_note import ClinicalProgressNote
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +75,43 @@ class CaseService:
             await self.db.flush()
         return entry
 
+    async def _sync_treatment_items(self, case_id: str, initial_treatment_plan: str, user_id: str = None):
+        if not initial_treatment_plan or not initial_treatment_plan.startswith("_JSON_"):
+            return
+        result = await self.db.execute(
+            select(TreatmentPlanItem).where(
+                TreatmentPlanItem.case_id == case_id,
+                TreatmentPlanItem.is_current == True,
+            )
+        )
+        existing = list(result.scalars().all())
+        if existing:
+            return
+        try:
+            items = json.loads(initial_treatment_plan[6:])
+        except (json.JSONDecodeError, IndexError):
+            return
+        if not isinstance(items, list) or not items:
+            return
+        for i, item in enumerate(items):
+            tooth_numbers = item.get("toothNumbers", [])
+            if isinstance(tooth_numbers, list):
+                tooth_numbers = json.dumps(tooth_numbers)
+            tpi = TreatmentPlanItem(
+                case_id=case_id,
+                procedure_name=item.get("name", ""),
+                tooth_numbers=tooth_numbers,
+                estimated_visits=item.get("estimatedVisits") or 1,
+                estimated_cost=item.get("estimatedCost") or 0.0,
+                remarks=item.get("remarks", ""),
+                sequence_order=i + 1,
+                version=1,
+                is_current=True,
+                created_by_id=user_id,
+            )
+            self.db.add(tpi)
+        await self.db.flush()
+
     async def create(self, data: dict, user_id: str = None, user_role: str = None) -> Case:
         try:
             patient_id = data.get("patient_id")
@@ -122,6 +161,8 @@ class CaseService:
                     finding = ClinicalFinding(case_id=case.id, **f)
                     self.db.add(finding)
                 await self.db.flush()
+
+            await self._sync_treatment_items(case.id, data.get("initial_treatment_plan"), user_id)
 
             await self._add_timeline(case.id, "Case Created", user_id=user_id, performer_role=user_role)
             if findings_data:
@@ -182,6 +223,19 @@ class CaseService:
             old_case = await self.repo.get(case_id)
             if not old_case:
                 return None
+
+            from app.models.case import CaseTreatmentPlanStatus
+            is_approved = old_case.treatment_plan_status in (
+                CaseTreatmentPlanStatus.APPROVED,
+                CaseTreatmentPlanStatus.TREATMENT_IN_PROGRESS,
+                CaseTreatmentPlanStatus.COMPLETED,
+            )
+            if is_approved:
+                protected = [k for k in ("diagnosis", "treatment_plan", "treatment_plan_items") if k in data]
+                if protected:
+                    logger.warning("Case %s is approved — blocking edit of protected fields: %s", case_id, protected)
+                    for k in protected:
+                        data.pop(k)
 
             if "status" in data and data["status"] is not None:
                 new_status = CaseStatus(data["status"])
@@ -245,6 +299,9 @@ class CaseService:
             data["updated_by_id"] = user_id
             case = await self.repo.update(case_id, **data)
             if case:
+                plan_to_sync = data.get("initial_treatment_plan") or (old_case.initial_treatment_plan if old_case.initial_treatment_plan else None)
+                if plan_to_sync:
+                    await self._sync_treatment_items(case_id, plan_to_sync, user_id)
                 await self.audit_log_repo.create(user_id=user_id, action="UPDATE_CASE", entity_type="CASE", entity_id=case_id, details="Case updated")
                 await self.attach_names(case)
             return case
@@ -303,6 +360,7 @@ class CaseService:
     async def delete(self, case_id: str, user_id: str = None) -> bool:
         try:
             await self.db.execute(sa_delete(ClinicalFinding).where(ClinicalFinding.case_id == case_id))
+            await self.db.execute(sa_delete(ClinicalProgressNote).where(ClinicalProgressNote.case_id == case_id))
             await self.db.execute(sa_delete(CaseTimeline).where(CaseTimeline.case_id == case_id))
             await self.db.execute(sa_delete(PreOp).where(PreOp.case_id == case_id))
             await self.db.execute(sa_delete(PostOp).where(PostOp.case_id == case_id))

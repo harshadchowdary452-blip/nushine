@@ -6,6 +6,7 @@ from app.models.consultant import Consultant
 from app.models.case import Case, ClinicalFinding
 from app.models.case_timeline import CaseTimeline
 from app.models.consultant_note import ConsultantNote
+from app.models.clinical_progress_note import ClinicalProgressNote
 from app.models.treatment_plan import TreatmentPlan
 from app.models.treatment_plan_item import TreatmentPlanItem
 from app.models.treatment_sitting import TreatmentSitting
@@ -47,6 +48,7 @@ from app.models.patient_timeline import PatientTimeline
 __all__ = [
     "AdminGroup", "Hospital", "User", "Patient", "Consultant",
     "ConsultantNote", "TreatmentPlan", "TreatmentPlanItem", "TreatmentSitting",
+    "ClinicalProgressNote",
     "Appointment", "PreOp", "PostOp", "Billing", "RefreshToken", "AuditLog", "PaymentTransaction",
     "HospitalMonthlyExpense",
     "CommunicationLog", "CommunicationChannel", "CommunicationStatus", "MessageType",

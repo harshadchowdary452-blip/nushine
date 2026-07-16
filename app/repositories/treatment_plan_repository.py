@@ -17,7 +17,7 @@ class TreatmentPlanRepository(BaseRepository[TreatmentPlan]):
     def _base_query(self):
         return select(self.model).options(
             selectinload(TreatmentPlan.sittings),
-            joinedload(TreatmentPlan.case).joinedload(Case.patient),
+            joinedload(TreatmentPlan.case).joinedload(Case.patient).selectinload(Patient.hospital),
             joinedload(TreatmentPlan.case).joinedload(Case.doctor),
             joinedload(TreatmentPlan.assigned_doctor),
             joinedload(TreatmentPlan.assistant_doctor),

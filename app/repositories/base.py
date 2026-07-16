@@ -15,7 +15,11 @@ class BaseRepository(Generic[ModelType]):
         instance = self.model(**kwargs)
         self.db.add(instance)
         await self.db.flush()
-        await self.db.refresh(instance)
+        refresh_attrs = [r.key for r in instance.__mapper__.relationships if r.lazy == "selectin"]
+        if refresh_attrs:
+            await self.db.refresh(instance, attribute_names=refresh_attrs)
+        else:
+            await self.db.refresh(instance)
         return instance
 
     async def get(self, id: Any) -> Optional[ModelType]:
@@ -68,7 +72,14 @@ class BaseRepository(Generic[ModelType]):
             if hasattr(instance, key) and value is not None:
                 setattr(instance, key, value)
         await self.db.flush()
-        await self.db.refresh(instance)
+        try:
+            refresh_attrs = [r.key for r in instance.__mapper__.relationships if r.lazy == "selectin"]
+            if refresh_attrs:
+                await self.db.refresh(instance, attribute_names=refresh_attrs)
+            else:
+                await self.db.refresh(instance)
+        except Exception:
+            pass
         return instance
 
     async def delete(self, id: Any) -> bool:

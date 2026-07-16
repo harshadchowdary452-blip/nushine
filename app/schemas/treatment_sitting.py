@@ -6,6 +6,8 @@ from datetime import datetime, date, time
 class TreatmentSittingCreate(BaseModel):
     treatment_plan_id: str
     sitting_number: int = Field(..., ge=1)
+    sitting_date: Optional[date] = None
+    doctor_id: Optional[str] = None
     work_done: Optional[str] = None
     status: Optional[str] = None
     doctor_notes: Optional[str] = None
@@ -22,11 +24,17 @@ class TreatmentSittingCreate(BaseModel):
     lab_tracking_status: Optional[str] = None
     lab_tracking_notes: Optional[str] = None
     lab_tracking_due_date: Optional[date] = None
+    lab_name: Optional[str] = None
+    lab_order_number: Optional[str] = None
+    lab_sent_date: Optional[date] = None
+    lab_return_date: Optional[date] = None
+    lab_cost: Optional[float] = None
 
 
 class TreatmentSittingUpdate(BaseModel):
     work_done: Optional[str] = None
     status: Optional[str] = None
+    doctor_id: Optional[str] = None
     doctor_notes: Optional[str] = None
     procedure_performed: Optional[str] = None
     clinical_notes: Optional[str] = None
@@ -41,6 +49,11 @@ class TreatmentSittingUpdate(BaseModel):
     lab_tracking_status: Optional[str] = None
     lab_tracking_notes: Optional[str] = None
     lab_tracking_due_date: Optional[date] = None
+    lab_name: Optional[str] = None
+    lab_order_number: Optional[str] = None
+    lab_sent_date: Optional[date] = None
+    lab_return_date: Optional[date] = None
+    lab_cost: Optional[float] = None
 
 
 class TreatmentSittingResponse(BaseModel):
@@ -66,6 +79,11 @@ class TreatmentSittingResponse(BaseModel):
     lab_tracking_status: Optional[str] = None
     lab_tracking_notes: Optional[str] = None
     lab_tracking_due_date: Optional[date] = None
+    lab_name: Optional[str] = None
+    lab_order_number: Optional[str] = None
+    lab_sent_date: Optional[date] = None
+    lab_return_date: Optional[date] = None
+    lab_cost: Optional[float] = None
     completed_by_id: Optional[str] = None
     completed_at: Optional[datetime] = None
     doctor_name: Optional[str] = None

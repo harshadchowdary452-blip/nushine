@@ -1,11 +1,11 @@
 import { useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   Loader2, Printer, PenLine, ArrowLeft, Send
 } from "lucide-react"
 import { format } from "date-fns"
-import { casesApi } from "@/services/endpoints"
+import { casesApi, treatmentPlanItemsApi } from "@/services/endpoints"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -42,14 +42,48 @@ export default function CaseReportDetail() {
   })
   const c: Case | undefined = caseData
 
+  const { data: planItems } = useQuery({
+    queryKey: ["treatment-plan-items", id],
+    queryFn: () => treatmentPlanItemsApi.listByCase(id!),
+    enabled: !!id,
+  })
+  const itemList: any[] = Array.isArray(planItems) ? planItems : (planItems?.items || [])
+  const isApproved = c?.treatment_plan_status === "APPROVED" || c?.treatment_plan_status === "TREATMENT_IN_PROGRESS" || c?.treatment_plan_status === "COMPLETED"
+
   async function handleSave(payload: Record<string, any>) {
     if (!id) return
     await casesApi.update(id, payload)
+
+    const txItems = payload.treatment_plan_items
+    if (Array.isArray(txItems) && txItems.length > 0 && itemList.length > 0) {
+      await treatmentPlanItemsApi.create({
+        case_id: id,
+        items: txItems.map((item: any) => ({
+          procedure_name: item.name || "",
+          tooth_numbers: item.toothNumbers || [],
+          estimated_visits: item.estimatedVisits ? Number(item.estimatedVisits) : 1,
+          estimated_cost: item.estimatedCost ? Number(item.estimatedCost) : 0,
+          remarks: item.remarks || "",
+        })),
+      })
+    }
+
     queryClient.invalidateQueries({ queryKey: ["case", id] })
     queryClient.invalidateQueries({ queryKey: ["case-timeline", id] })
+    queryClient.invalidateQueries({ queryKey: ["treatment-plan-items", id] })
     addToast({ title: "Case report updated", variant: "success" })
     setEditing(false)
   }
+
+  const submitMutation = useMutation({
+    mutationFn: () => casesApi.submitTreatmentPlan(id!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["case", id] })
+      addToast({ title: "Submitted for approval", variant: "success" })
+      navigate(`/treatments/approve/${id}`)
+    },
+    onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to submit", variant: "destructive" }),
+  })
 
   if (isFetching) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin" /></div>
@@ -81,20 +115,44 @@ export default function CaseReportDetail() {
           </Button>
           {(() => {
             const hasTreatmentPlan =
-              (c.treatment_plan_items && c.treatment_plan_items.length > 0) ||
+              (itemList.length > 0) ||
               (c.treatment_plans && c.treatment_plans.length > 0) ||
               (c.initial_treatment_plan && c.initial_treatment_plan.length > 0)
-            return hasTreatmentPlan && !c.treatment_plan_approved ? (
-              <Button size="sm" onClick={() => navigate(`/treatments/approve/${id}`)}>
-                <Send className="h-4 w-4 mr-1" /> Submit for Approval
-              </Button>
-            ) : null
+            const planStatus = c.treatment_plan_status
+            if (planStatus === "DRAFT" && hasTreatmentPlan) {
+              return (
+                <Button size="sm" onClick={() => navigate(`/treatments/approve/${id}`)}>
+                  <Send className="h-4 w-4 mr-1" /> Assign Doctors & Submit
+                </Button>
+              )
+            }
+            if (planStatus === "PENDING_APPROVAL") {
+              return (
+                <Button size="sm" variant="outline" onClick={() => navigate(`/treatments/approve/${id}`)}>
+                  <Send className="h-4 w-4 mr-1" /> View Approval
+                </Button>
+              )
+            }
+            if (planStatus === "REJECTED") {
+              return (
+                <Button size="sm" onClick={() => navigate(`/treatments/approve/${id}`)}>
+                  <Send className="h-4 w-4 mr-1" /> Resubmit
+                </Button>
+              )
+            }
+            return null
           })()}
-          {c.treatment_plan_approved && (
+          {c.treatment_plan_status === "APPROVED" && (
             <span className="inline-flex items-center rounded-full bg-green-100 text-green-800 px-2 py-1 text-xs font-medium">Treatment Approved</span>
           )}
-          <Button size="sm" onClick={() => setEditing(!editing)}>
-            <PenLine className="h-4 w-4 mr-1" /> {editing ? "Cancel" : "Edit"}
+          {c.treatment_plan_status === "PENDING_APPROVAL" && (
+            <span className="inline-flex items-center rounded-full bg-yellow-100 text-yellow-800 px-2 py-1 text-xs font-medium">Pending Approval</span>
+          )}
+          {c.treatment_plan_status === "REJECTED" && (
+            <span className="inline-flex items-center rounded-full bg-red-100 text-red-800 px-2 py-1 text-xs font-medium">Rejected</span>
+          )}
+          <Button size="sm" onClick={() => setEditing(!editing)} disabled={isApproved}>
+            <PenLine className="h-4 w-4 mr-1" /> {editing ? "Cancel" : isApproved ? "Locked After Approval" : "Edit"}
           </Button>
         </div>
       </div>
@@ -179,6 +237,16 @@ export default function CaseReportDetail() {
             doctor_specialization: c.doctor_specialization || "",
             notes: c.notes || "",
             doctor_id: c.doctor_id || "",
+            ...(itemList.length > 0 ? {
+              treatment_plan_items: itemList.map((item: any, i: number) => ({
+                id: item.id || `api-${i}`,
+                name: item.procedure_name || "",
+                toothNumbers: Array.isArray(item.tooth_numbers) ? item.tooth_numbers : (typeof item.tooth_numbers === "string" ? (() => { try { return JSON.parse(item.tooth_numbers) } catch { return [] } })() : []),
+                estimatedVisits: item.estimated_visits ?? "",
+                estimatedCost: item.estimated_cost ?? "",
+                remarks: item.remarks || "",
+              })),
+            } : {}),
           }}
           initialFindings={(c.findings || []).map(apiToFinding)}
           onSubmit={handleSave}
@@ -236,7 +304,10 @@ export default function CaseReportDetail() {
           </TabsContent>
 
           <TabsContent value="treatment" className="mt-4 space-y-4">
-            <TreatmentPlanView caseData={c} />
+            <TreatmentPlanView caseData={c} itemList={itemList} />
+            {(c.treatment_plan_status === "APPROVED" || c.treatment_plan_approved) && c.treatment_plans && c.treatment_plans.length > 0 && (
+              <GeneratedTreatmentsView treatmentPlans={c.treatment_plans} />
+            )}
             {c.patient_instructions && <SectionCard title="Patient Instructions" content={c.patient_instructions} />}
             {c.medicines_prescribed && <SectionCard title="Medicines Prescribed" content={c.medicines_prescribed} />}
             {c.follow_up_instructions && <SectionCard title="Follow-Up Instructions" content={c.follow_up_instructions} />}
@@ -270,9 +341,9 @@ function SectionCard({ title, content }: { title: string; content: string }) {
   )
 }
 
-function parseTreatmentItems(c: Case): any[] {
-  if (c.treatment_plan_items && c.treatment_plan_items.length > 0) {
-    return c.treatment_plan_items.map((item: any) => ({
+function parseTreatmentItems(c: Case, itemList: any[]): any[] {
+  if (itemList && itemList.length > 0) {
+    return itemList.map((item: any) => ({
       name: item.procedure_name || "—",
       toothNumbers: Array.isArray(item.tooth_numbers) ? item.tooth_numbers : (typeof item.tooth_numbers === "string" ? (() => { try { return JSON.parse(item.tooth_numbers) } catch { return [] } })() : []),
       estimatedVisits: item.estimated_visits || "",
@@ -301,8 +372,8 @@ function parseTreatmentItems(c: Case): any[] {
   return []
 }
 
-function TreatmentPlanView({ caseData }: { caseData: Case }) {
-  const items = parseTreatmentItems(caseData)
+function TreatmentPlanView({ caseData, itemList }: { caseData: Case; itemList: any[] }) {
+  const items = parseTreatmentItems(caseData, itemList)
   if (items.length === 0 && !caseData.initial_treatment_plan) return null
 
   const allTeeth = new Set<string>()
@@ -401,5 +472,115 @@ function TimelineView({ caseId }: { caseId: string }) {
         </div>
       ))}
     </div>
+  )
+}
+
+function GeneratedTreatmentsView({ treatmentPlans }: { treatmentPlans: any[] }) {
+  if (!treatmentPlans || treatmentPlans.length === 0) return null
+  const totalCost = treatmentPlans.reduce((s: number, tp: any) => s + (tp.cost || 0), 0)
+  const totalPaid = treatmentPlans.reduce((s: number, tp: any) => s + (tp.paid_amount || 0), 0)
+  const allCompleted = treatmentPlans.every((tp: any) => tp.status === "COMPLETED")
+
+  return (
+    <Card className="border-green-200">
+      <CardHeader className="py-3 flex flex-row items-center justify-between">
+        <CardTitle className="text-sm flex items-center gap-2">
+          Treatment Summary ({treatmentPlans.length})
+          {allCompleted && (
+            <span className="inline-flex items-center rounded-full bg-green-100 text-green-800 px-2 py-0.5 text-[10px] font-medium">ALL COMPLETED</span>
+          )}
+        </CardTitle>
+        <span className="text-[10px] text-muted-foreground">Read-only — managed in Treatment Workspace</span>
+      </CardHeader>
+      <CardContent className="py-2">
+        <div className="space-y-2">
+          {treatmentPlans.map((tp: any) => {
+            const completed = tp.completed_sittings || 0
+            const total = tp.total_sittings || 1
+            const remaining = tp.remaining_sittings ?? (total - completed)
+            const progress = total > 0 ? Math.round((completed / total) * 100) : 0
+            const pending = (tp.cost || 0) - (tp.paid_amount || 0)
+            const toothNumbers = (() => {
+              if (!tp.tooth_numbers) return null
+              try {
+                const parsed = typeof tp.tooth_numbers === "string" ? JSON.parse(tp.tooth_numbers) : tp.tooth_numbers
+                return Array.isArray(parsed) ? parsed.join(", ") : parsed
+              } catch { return tp.tooth_numbers }
+            })()
+
+            return (
+              <div key={tp.id} className="rounded-lg border border-gray-200 bg-white p-3 text-sm space-y-2">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-gray-900">{tp.treatment_name || "—"}</p>
+                      <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                        tp.status === "COMPLETED" ? "bg-green-100 text-green-700" :
+                        tp.status === "IN_PROGRESS" ? "bg-blue-100 text-blue-700" :
+                        tp.status === "WAITING_PATIENT" || tp.status === "WAITING_LAB" ? "bg-yellow-100 text-yellow-700" :
+                        tp.status === "OVERDUE" ? "bg-red-100 text-red-700" :
+                        tp.status === "CANCELLED" ? "bg-red-100 text-red-700" :
+                        "bg-gray-100 text-gray-600"
+                      }`}>
+                        {tp.status || "GENERATED"}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                      {toothNumbers && <span>Tooth: {toothNumbers}</span>}
+                      {tp.assigned_doctor_name && <span className="text-blue-600 font-medium">Dr. {tp.assigned_doctor_name}</span>}
+                      {tp.assistant_doctor_name && <span>Asst: Dr. {tp.assistant_doctor_name}</span>}
+                      {tp.priority && (
+                        <span className={tp.priority === "HIGH" ? "text-red-600" : tp.priority === "MEDIUM" ? "text-amber-600" : "text-green-600"}>
+                          {tp.priority}
+                        </span>
+                      )}
+                      {tp.treatment_number && <span className="font-mono">{tp.treatment_number}</span>}
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 text-xs h-7"
+                    onClick={() => window.location.href = `/treatments/${tp.id}`}
+                  >
+                    Open Workspace
+                  </Button>
+                </div>
+
+                {/* Visit Progress */}
+                <div className="flex items-center gap-3 text-xs">
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-1 text-muted-foreground">
+                      <span>{completed} / {total} visits</span>
+                      {remaining > 0 && <span>{remaining} remaining</span>}
+                    </div>
+                    <div className="h-1.5 w-full rounded-full bg-gray-100">
+                      <div
+                        className={`h-1.5 rounded-full transition-all ${tp.status === "COMPLETED" ? "bg-green-500" : "bg-blue-500"}`}
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Cost Summary */}
+                <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground border-t border-gray-100 pt-2">
+                  <span>Est. Cost: <strong className="text-gray-900">₹{(tp.cost || 0).toLocaleString("en-IN")}</strong></span>
+                  <span>Collected: <strong className="text-green-700">₹{(tp.paid_amount || 0).toLocaleString("en-IN")}</strong></span>
+                  {pending > 0 && <span>Pending: <strong className="text-amber-600">₹{pending.toLocaleString("en-IN")}</strong></span>}
+                  {tp.next_appointment_date && (
+                    <span className="text-blue-600">Next: {format(new Date(tp.next_appointment_date), "dd MMM yyyy")}</span>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        <div className="flex items-center justify-between mt-4 pt-3 border-t text-sm">
+          <span className="text-muted-foreground">Total Estimated Cost</span>
+          <span className="font-semibold">₹{totalCost.toLocaleString("en-IN")}</span>
+        </div>
+      </CardContent>
+    </Card>
   )
 }

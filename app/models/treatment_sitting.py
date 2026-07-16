@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, date, time, timezone
-from sqlalchemy import String, DateTime, Date, Time, Text, JSON, Integer, Boolean, ForeignKey, Enum as SAEnum
+from sqlalchemy import String, DateTime, Date, Time, Text, JSON, Integer, Boolean, Float, ForeignKey, Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 from enum import Enum
@@ -37,10 +37,23 @@ class TreatmentSitting(Base):
     lab_tracking_status: Mapped[str] = mapped_column(String(50), nullable=True)
     lab_tracking_notes: Mapped[str] = mapped_column(Text, nullable=True)
     lab_tracking_due_date: Mapped[date] = mapped_column(Date, nullable=True)
+    lab_name: Mapped[str] = mapped_column(String(255), nullable=True)
+    lab_order_number: Mapped[str] = mapped_column(String(100), nullable=True)
+    lab_sent_date: Mapped[date] = mapped_column(Date, nullable=True)
+    lab_return_date: Mapped[date] = mapped_column(Date, nullable=True)
+    lab_cost: Mapped[float] = mapped_column(Float, nullable=True)
     completed_by_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
     completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-    treatment_plan = relationship("TreatmentPlan", back_populates="sittings")
+    treatment_plan = relationship("TreatmentPlan", back_populates="sittings", lazy="selectin")
     doctor = relationship("User", foreign_keys=[doctor_id], lazy="selectin")
     completed_by = relationship("User", foreign_keys=[completed_by_id], lazy="selectin")
+
+    @property
+    def doctor_name(self):
+        return self.doctor.full_name if self.doctor else None
+
+    @property
+    def completed_by_name(self):
+        return self.completed_by.full_name if self.completed_by else None

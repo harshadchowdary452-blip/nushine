@@ -19,6 +19,9 @@ class CaseTreatmentPlanStatus(str, Enum):
     PENDING_APPROVAL = "PENDING_APPROVAL"
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
+    TREATMENT_IN_PROGRESS = "TREATMENT_IN_PROGRESS"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
 
 
 class ClinicalFinding(Base):
@@ -29,10 +32,13 @@ class ClinicalFinding(Base):
     tooth_number: Mapped[str] = mapped_column(String(10), nullable=True)
     dentition_type: Mapped[str] = mapped_column(String(5), nullable=True)
     surface: Mapped[str] = mapped_column(String(50), nullable=True)
+    severity: Mapped[str] = mapped_column(String(50), nullable=True)
+    doctor_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
     notes: Mapped[str] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     case = relationship("Case", back_populates="findings")
+    doctor = relationship("User", foreign_keys=[doctor_id], lazy="selectin")
 
 
 class Case(Base):
@@ -118,4 +124,5 @@ class Case(Base):
     post_ops = relationship("PostOp", back_populates="case", cascade="all, delete-orphan")
     consultant_notes = relationship("ConsultantNote", back_populates="case", cascade="all, delete-orphan")
     findings = relationship("ClinicalFinding", back_populates="case", cascade="all, delete-orphan", order_by="ClinicalFinding.created_at")
+    clinical_progress_notes = relationship("ClinicalProgressNote", back_populates="case", cascade="all, delete-orphan", order_by="ClinicalProgressNote.note_date")
     timeline_entries = relationship("CaseTimeline", back_populates="case", cascade="all, delete-orphan", order_by="CaseTimeline.created_at")

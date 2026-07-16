@@ -3,7 +3,7 @@ from datetime import date, timedelta, time, datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
 from app.models.treatment_type import TreatmentType
-from app.models.follow_up import FollowUp, FollowUpType, FollowUpStatus
+from app.models.follow_up import FollowUp, FollowUpType, FollowUpStatus, FollowUpOutcome
 from app.models.treatment_plan import TreatmentPlan, TreatmentPlanStatus
 from app.models.case import Case
 from app.models.patient import Patient

@@ -20,7 +20,7 @@ from app.core.permissions import Role
 from app.core.logging import setup_logging, correlation_id, generate_correlation_id
 from app.core.middleware import RequestIDMiddleware
 from app.utils.scheduler import check_appointment_reminders, check_same_day_appointments, check_missed_appointments, check_overdue_treatments
-from app.routers import auth, admin_groups, hospitals, doctors, consultants, patients, cases, consultant_notes, treatment_plans, treatment_sittings, treatment_plan_items, appointments, billings, pre_ops, post_ops, dashboards, whatsapp_messaging, whatsapp_config, notifications, hospital_monthly_expenses, reports, crm, calendar, status_audit, campaigns, campaign_templates, leads, doctor_working_hours, doctor_availability, doctor_leaves, doctor_blocked_slots, consent_forms, enquiries, treatment_follow_ups, recalls, crm_settings, exports, treatment_types, crm_opd_settings, doctor_queue
+from app.routers import auth, admin_groups, hospitals, doctors, consultants, patients, cases, consultant_notes, treatment_plans, treatment_sittings, treatment_plan_items, appointments, billings, pre_ops, post_ops, dashboards, whatsapp_messaging, whatsapp_config, notifications, hospital_monthly_expenses, reports, crm, calendar, status_audit, campaigns, campaign_templates, leads, doctor_working_hours, doctor_availability, doctor_leaves, doctor_blocked_slots, consent_forms, enquiries, treatment_follow_ups, recalls, crm_settings, exports, treatment_types, crm_opd_settings, doctor_queue, clinical_progress_notes
 
 setup_logging(settings.ENVIRONMENT)
 logger = logging.getLogger("app")
@@ -164,6 +164,7 @@ app.include_router(exports.router, prefix="/api/v1")
 app.include_router(treatment_types.router, prefix="/api/v1")
 app.include_router(crm_opd_settings.router, prefix="/api/v1")
 app.include_router(doctor_queue.router, prefix="/api/v1")
+app.include_router(clinical_progress_notes.router, prefix="/api/v1")
 
 
 @app.get("/")

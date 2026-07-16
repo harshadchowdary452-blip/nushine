@@ -7,7 +7,7 @@ from sqlalchemy.orm import joinedload
 from fastapi import HTTPException, status
 from app.repositories.treatment_plan_repository import TreatmentPlanRepository
 from app.repositories.audit_log_repository import AuditLogRepository
-from app.models.treatment_plan import TreatmentPlan
+from app.models.treatment_plan import TreatmentPlan, TreatmentPlanStatus
 from app.models.treatment_type import TreatmentType
 from app.models.case import Case
 from app.models.patient import Patient
@@ -19,39 +19,43 @@ logger = logging.getLogger(__name__)
 
 
 def _enrich_plan(plan: TreatmentPlan):
-    total = plan.total_sittings or 0
-    completed = plan.completed_sittings or 0
-    remaining = plan.remaining_sittings or 0
-    sittings_data = {
-        "total_sittings": total,
-        "completed_sittings": completed,
-        "remaining_sittings": remaining,
-        "progress": round((completed / total * 100) if total > 0 else 0, 1),
-        "pending_amount": max(0, (plan.cost or 0) - (plan.paid_amount or 0)),
-    }
-    for k, v in sittings_data.items():
-        setattr(plan, k, v)
+    try:
+        total = plan.total_sittings or 0
+        completed = plan.completed_sittings or 0
+        remaining = plan.remaining_sittings or 0
+        sittings_data = {
+            "total_sittings": total,
+            "completed_sittings": completed,
+            "remaining_sittings": remaining,
+            "progress": round((completed / total * 100) if total > 0 else 0, 1),
+            "pending_amount": max(0, (plan.cost or 0) - (plan.paid_amount or 0)),
+        }
+        for k, v in sittings_data.items():
+            setattr(plan, k, v)
 
-    setattr(plan, "treatment_type_name", plan.treatment_type.name if plan.treatment_type else None)
-    setattr(plan, "assigned_doctor_name", plan.assigned_doctor.full_name if plan.assigned_doctor else None)
-    setattr(plan, "assistant_doctor_name", plan.assistant_doctor.full_name if plan.assistant_doctor else None)
-    if plan.tooth_numbers and isinstance(plan.tooth_numbers, str):
-        try:
-            import json
-            plan.tooth_numbers = json.loads(plan.tooth_numbers)
-        except (json.JSONDecodeError, TypeError):
-            pass
+        setattr(plan, "treatment_type_name", plan.treatment_type.name if plan.treatment_type else None)
+        setattr(plan, "assigned_doctor_name", plan.assigned_doctor.full_name if plan.assigned_doctor else None)
+        setattr(plan, "assistant_doctor_name", plan.assistant_doctor.full_name if plan.assistant_doctor else None)
 
-    case = plan.case
-    if case:
-        setattr(plan, "case_number", f"CASE-{case.id[:8].upper()}")
-        setattr(plan, "case_status", case.status.value if hasattr(case.status, 'value') else str(case.status))
-        patient = case.patient
-        if patient:
-            setattr(plan, "patient_id", patient.id)
-            setattr(plan, "patient_name", patient.full_name)
-        if hasattr(case, 'doctor') and case.doctor:
-            setattr(plan, "doctor_name", case.doctor.full_name)
+        case = plan.case
+        if case:
+            setattr(plan, "case_number", f"CASE-{case.id[:8].upper()}")
+            setattr(plan, "case_status", case.status.value if hasattr(case.status, 'value') else str(case.status))
+            patient = case.patient
+            if patient:
+                setattr(plan, "patient_id", patient.id)
+                setattr(plan, "patient_name", patient.full_name)
+                setattr(plan, "patient_op_no", getattr(patient, "op_no", None))
+                try:
+                    hosp = patient.hospital
+                    if hosp:
+                        setattr(plan, "hospital_name", hosp.name)
+                except Exception:
+                    pass
+            if hasattr(case, 'doctor') and case.doctor:
+                setattr(plan, "doctor_name", case.doctor.full_name)
+    except Exception as e:
+        logger.warning("Error enriching plan %s: %s", getattr(plan, 'id', '?'), e)
     return plan
 
 
@@ -127,7 +131,7 @@ class TreatmentPlanService:
             select(Appointment).where(
                 Appointment.patient_id == case.patient_id,
                 Appointment.appointment_date == plan.next_appointment_date,
-                Appointment.status.in_([AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED]),
+                Appointment.status == AppointmentStatus.SCHEDULED,
                 Appointment.is_active == True,
             ).limit(1)
         )
@@ -306,8 +310,6 @@ class TreatmentPlanService:
 
     async def update_status(self, plan_id: str, status: str, user_id: str = None) -> Optional[TreatmentPlan]:
         try:
-            from app.models.treatment_plan import TreatmentPlanStatus
-
             if status in ("IN_PROGRESS", "SCHEDULED"):
                 dep_check = await self.check_dependency_met(plan_id)
                 if not dep_check["can_start"]:

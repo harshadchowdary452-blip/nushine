@@ -65,4 +65,4 @@ class TreatmentPlanItemRepository(BaseRepository[TreatmentPlanItem]):
         versions = {}
         for item in all_items:
             versions.setdefault(item.version, []).append(item)
-        return [versions[v] for v in sorted(versions.keys(), reverse=True)]
+        return [versions[v] for v in sorted(versions.keys())]

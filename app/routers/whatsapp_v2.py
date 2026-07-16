@@ -145,7 +145,7 @@ async def resolve_variables(db: AsyncSession, patient_id: str, hospital_id: Opti
         select(Appointment).where(
             Appointment.patient_id == patient_id,
             Appointment.is_active == True,
-            Appointment.status.in_([AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED]),
+            Appointment.status == AppointmentStatus.SCHEDULED,
             Appointment.appointment_date >= date.today()
         ).order_by(Appointment.appointment_date.asc(), Appointment.appointment_time.asc()).limit(1)
     )

@@ -26,7 +26,6 @@ const ConsultantList = lazy(() => import("@/pages/consultants/list"));
 const TreatmentList = lazy(() => import("@/pages/treatments/list"));
 const TreatmentDetail = lazy(() => import("@/pages/treatments/detail"));
 const TreatmentPlanApproval = lazy(() => import("@/pages/treatments/approval"));
-const AssignDoctor = lazy(() => import("@/pages/treatments/assign-doctor"));
 const ScheduleFirstAppointment = lazy(() => import("@/pages/treatments/schedule-first"));
 const TreatmentWorkflowBoard = lazy(() => import("@/pages/treatments/workflow-board"));
 const DoctorQueue = lazy(() => import("@/pages/treatments/doctor-queue"));
@@ -176,7 +175,6 @@ export const router = createBrowserRouter([
       { path: "/treatments", element: withRoles(<TreatmentList />, CARE_ROLES) },
       { path: "/treatments/:id", element: withRoles(<TreatmentDetail />, CARE_ROLES) },
       { path: "/treatments/approve/:caseId", element: withRoles(<TreatmentPlanApproval />, CARE_ROLES) },
-      { path: "/treatments/assign-doctors/:caseId", element: withRoles(<AssignDoctor />, CARE_ROLES) },
       { path: "/treatments/schedule-first/:caseId", element: withRoles(<ScheduleFirstAppointment />, CARE_ROLES) },
       { path: "/treatments/workflow", element: withRoles(<TreatmentWorkflowBoard />, ADMIN_ROLES) },
       { path: "/treatments/queue", element: withRoles(<DoctorQueue />, CARE_ROLES) },

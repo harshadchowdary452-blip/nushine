@@ -59,9 +59,9 @@ async def create_sitting(data: TreatmentSittingCreate, db: AsyncSession = Depend
     await _verify_plan_accessible(db, data.treatment_plan_id, current_user)
     service = TreatmentSittingService(db)
     sitting = await service.create(data.model_dump(), user_id=current_user.get("sub"))
+    plan_name = sitting.treatment_plan.treatment_name if sitting.treatment_plan else "N/A"
     await db.commit()
     patient_id = await _get_patient_id_from_sitting(db, sitting.id)
-    plan_name = sitting.treatment_plan.treatment_name if sitting.treatment_plan else "N/A"
     await record_timeline_event(
         db, current_user=current_user, patient_id=patient_id,
         action="Treatment Sitting Added",
@@ -124,7 +124,7 @@ async def delete_sitting(sitting_id: str, db: AsyncSession = Depends(get_db), cu
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Treatment sitting not found")
     await verify_tenant_access(current_user, sitting, "sitting", db)
     patient_id = await _get_patient_id_from_sitting(db, sitting_id)
-    deleted = await service.delete(sitting_id)
+    deleted = await service.delete(sitting_id, user_id=current_user.get("sub"))
     await record_timeline_event(
         db, current_user=current_user, patient_id=patient_id,
         action="Treatment Sitting Deleted",
