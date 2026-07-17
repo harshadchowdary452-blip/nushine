@@ -1,10 +1,10 @@
-import { useState, useMemo, useCallback, lazy, Suspense } from "react"
+import { useState, useMemo, useCallback } from "react"
 import { motion } from "framer-motion"
 import { useQuery } from "@tanstack/react-query"
 import {
   Calendar, Users, FolderOpen, Activity, FileText, DollarSign, TrendingUp,
   IndianRupee, PieChart, Clock, AlertTriangle, CheckCircle2, UserPlus,
-  Phone, ArrowUpRight, BarChart3, Sparkles, Target, Eye, Stethoscope,
+  Phone, BarChart3, Sparkles, Stethoscope,
   PauseCircle, AlertOctagon, Timer, ClipboardCheck, LayoutList,
 } from "lucide-react"
 import {
@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import QuickViewDrawer from "@/components/ui/quick-view-drawer"
 import DateFilterBar from "@/components/ui/date-filter-bar"
 import AnalyticsDrawer from "@/components/analytics-drawer"
+import type { Performer } from "@/types"
 import { formatIndianRupees, formatIndianNumber } from "@/lib/currency"
 import { cn } from "@/lib/utils"
 
@@ -35,12 +36,12 @@ const STATUS_COLORS: Record<string, string> = {
   RESCHEDULED: "bg-orange-100 text-orange-700",
 }
 
-const ChartTooltip = ({ active, payload, label }: any) => {
+const ChartTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) => {
   if (active && payload && payload.length) {
     return (
       <div className="rounded-xl border border-gray-100 bg-white p-3 shadow-lg">
         <p className="text-sm font-semibold text-gray-900 mb-1">{label}</p>
-        {payload.map((p: any, i: number) => (
+        {payload.map((p, i) => (
           <p key={i} className="text-xs" style={{ color: p.color }}>
             {p.name}: {formatIndianRupees(p.value ?? 0)}
           </p>
@@ -99,7 +100,7 @@ export default function HospitalAdminDashboard() {
   })
 
   const onDoctorClick = useCallback((id?: string) => {
-    const item = (stats?.doctor_performance ?? []).find((d: any) => d.id === id)
+    const item = (stats?.doctor_performance ?? []).find((d) => d.id === id)
     if (item) setQuickView({ type: "doctor", id: item.id, name: item.name })
   }, [stats?.doctor_performance])
 
@@ -121,15 +122,14 @@ export default function HospitalAdminDashboard() {
   }
 
   const cmp = stats?.comparison as Record<string, number> | undefined
-  const todayApptsList: any[] = stats?.today_appointments_list || []
-  const recentActivity: any[] = stats?.recent_activity || []
-  const revenueSources: any[] = stats?.revenue_sources || []
+  const todayApptsList: Record<string, string>[] = stats?.today_appointments_list || []
+  const recentActivity: Array<{ type: string; description: string; date: string }> = stats?.recent_activity || []
+  const revenueSources: Array<{ method: string; amount: number }> = stats?.revenue_sources || []
   const crmInsights = stats?.crm_insights || {}
   const pendingActions = stats?.pending_actions || {}
-  const expenseBreakdown: { category: string; amount: number }[] = stats?.expense_breakdown || []
-  const revenueExpenseTrend: any[] = stats?.revenue_expense_trend || []
-  const doctorPerf: any[] = stats?.doctor_performance || []
-  const treatmentPerf: any[] = stats?.treatment_performance || []
+  const revenueExpenseTrend: Array<{ month: string; revenue: number; expenses: number; profit: number }> = stats?.revenue_expense_trend || []
+  const doctorPerf: Performer[] = stats?.doctor_performance || []
+  const treatmentPerf: Performer[] = stats?.treatment_performance || []
 
   return (
     <motion.div className="space-y-5" variants={container} initial="hidden" animate="show">
@@ -254,15 +254,15 @@ export default function HospitalAdminDashboard() {
                       outerRadius={65}
                       innerRadius={35}
                     >
-                      {revenueSources.map((_: any, i: number) => (
+                      {revenueSources.map((_, i) => (
                         <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value: any) => formatIndianRupees(Number(value))} />
+                    <Tooltip formatter={(value: string | number | (string | number)[]) => formatIndianRupees(Number(value))} />
                   </RePieChart>
                 </ResponsiveContainer>
                 <div className="space-y-1.5">
-                  {revenueSources.map((src: any, i: number) => (
+                  {revenueSources.map((src, i) => (
                     <div key={src.method} className="flex items-center justify-between text-xs py-1">
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
@@ -291,7 +291,7 @@ export default function HospitalAdminDashboard() {
           <CardContent className="px-5 pb-5">
             {doctorPerf.length > 0 ? (
               <div className="space-y-1">
-                {doctorPerf.map((doc: any, i: number) => (
+                {doctorPerf.map((doc, i) => (
                   <div
                     key={doc.id || i}
                     className="flex items-center justify-between py-2 px-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
@@ -323,7 +323,7 @@ export default function HospitalAdminDashboard() {
           <CardContent className="px-5 pb-5">
             {treatmentPerf.length > 0 ? (
               <div className="space-y-1">
-                {treatmentPerf.map((tp: any, i: number) => (
+                {treatmentPerf.map((tp, i) => (
                   <div key={i} className="flex items-center justify-between py-2 px-2 rounded-lg hover:bg-gray-50 transition-colors">
                     <div className="flex items-center gap-3">
                       <span className={cn(
@@ -355,7 +355,7 @@ export default function HospitalAdminDashboard() {
           <CardContent className="px-5 pb-5">
             {todayApptsList.length > 0 ? (
               <div className="space-y-2 max-h-[320px] overflow-y-auto">
-                {todayApptsList.map((appt: any) => (
+                {todayApptsList.map((appt) => (
                   <div key={appt.id} className="flex items-center justify-between py-2.5 px-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
                     <div className="flex items-center gap-3">
                       <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100">
@@ -429,7 +429,7 @@ export default function HospitalAdminDashboard() {
           <CardContent className="px-5 pb-5">
             {recentActivity.length > 0 ? (
               <div className="space-y-3 max-h-[280px] overflow-y-auto">
-                {recentActivity.map((act: any, i: number) => (
+                {recentActivity.map((act, i) => (
                   <div key={i} className="flex items-start gap-3 py-2">
                     <div className={cn(
                       "flex h-7 w-7 items-center justify-center rounded-full mt-0.5",
@@ -483,7 +483,7 @@ export default function HospitalAdminDashboard() {
             {crmInsights.leads_by_source?.length > 0 && (
               <div className="space-y-1.5 pt-2 border-t border-gray-100">
                 <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider mb-2">Top Sources</p>
-                {crmInsights.leads_by_source.map((src: any, i: number) => (
+                {crmInsights.leads_by_source.map((src: { source: string; count: number }, i: number) => (
                   <div key={i} className="flex items-center justify-between text-xs py-1">
                     <span className="font-medium text-gray-700">{src.source.replace(/_/g, " ")}</span>
                     <span className="font-semibold text-gray-900">{src.count}</span>
@@ -511,7 +511,7 @@ export default function HospitalAdminDashboard() {
             {consentStats.recent?.length > 0 && (
               <CardContent className="px-5 pb-5">
                 <div className="space-y-2">
-                  {consentStats.recent.slice(0, 5).map((r: any) => (
+                  {consentStats.recent.slice(0, 5).map((r) => (
                     <div key={r.id} className="flex items-center justify-between text-sm py-1.5 px-2 rounded-lg hover:bg-gray-50 transition-colors">
                       <span className="font-medium text-gray-900">{r.patient_name}</span>
                       <span className="text-xs text-gray-500">{r.consent_type} &middot; {r.created_at ? new Date(r.created_at).toLocaleDateString() : ""}</span>

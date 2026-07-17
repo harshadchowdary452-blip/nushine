@@ -44,7 +44,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      try { setCapsLock(e.getModifierState("CapsLock")) } catch {}
+      try { setCapsLock(e.getModifierState("CapsLock")) } catch { /* caps lock detection not supported */ }
     }
     document.addEventListener("keydown", handler)
     document.addEventListener("keyup", handler)

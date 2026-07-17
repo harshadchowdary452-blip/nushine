@@ -47,11 +47,17 @@ class TreatmentSittingService:
         if existing.scalar_one_or_none():
             logger.info("Appointment already exists for patient %s on %s at %s, skipping", case.patient_id, appt_date, appt_time)
             return None
-        duration = 30
+        from app.models.appointment import resolve_duration
+        duration = resolve_duration(
+            procedure_name=sitting.procedure_performed,
+            appointment_type="TREATMENT",
+            override_minutes=sitting.duration_minutes,
+        )
         end_time = (datetime.combine(date.min, appt_time) + timedelta(minutes=duration)).time()
+        doctor_id = sitting.next_appointment_doctor_id or case.doctor_id or ""
         appt = Appointment(
             patient_id=case.patient_id,
-            doctor_id=case.doctor_id or "",
+            doctor_id=doctor_id,
             appointment_date=appt_date,
             appointment_time=appt_time,
             duration_minutes=duration,

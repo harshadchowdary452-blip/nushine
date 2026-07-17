@@ -10,9 +10,29 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/toast"
+import { extractDetail } from "@/types"
+
+interface RecallItem {
+  id: string
+  patient_name: string
+  follow_up_type: string
+  status: string
+  patient_phone: string | null
+  doctor_name: string | null
+  treatment_name: string | null
+  follow_up_date: string
+  treatment_completed_date: string | null
+  outcome: string | null
+}
+
+interface RecallCompletePayload {
+  outcome: string
+  notes?: string
+  next_recall_date?: string
+}
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 const typeLabels: Record<string, string> = {
   "6_MONTH_RECALL": "6-Month Recall",
@@ -52,7 +72,7 @@ export default function Recalls() {
       type: typeFilter || undefined,
     }),
   })
-  const items: any[] = recalls || []
+  const items: RecallItem[] = recalls || []
 
   const { data: stats } = useQuery({
     queryKey: ["recalls", "stats"],
@@ -60,22 +80,22 @@ export default function Recalls() {
   })
 
   const completeMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => recallsApi.complete(id, data),
+    mutationFn: ({ id, data }: { id: string; data: RecallCompletePayload }) => recallsApi.complete(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["recalls"] })
       addToast({ title: "Completed", variant: "success" })
       setCompleteOpen(null); setOutcome("DOING_WELL"); setOutcomeNotes(""); setNextRecallDate("")
     },
-    onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed", variant: "destructive" }),
+    onError: (err: unknown) => addToast({ title: "Error", description: extractDetail(err) || "Failed", variant: "destructive" }),
   })
 
   const generateMutation = useMutation({
     mutationFn: () => recallsApi.generate(),
-    onSuccess: (data: any) => {
+    onSuccess: (data: { created: number }) => {
       queryClient.invalidateQueries({ queryKey: ["recalls"] })
       addToast({ title: "Generated", description: `${data.created} recalls created`, variant: "success" })
     },
-    onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed", variant: "destructive" }),
+    onError: (err: unknown) => addToast({ title: "Error", description: extractDetail(err) || "Failed", variant: "destructive" }),
   })
 
   return (
@@ -118,7 +138,7 @@ export default function Recalls() {
             <div className="py-12 text-center text-muted-foreground">No recalls found</div>
           ) : (
             <div className="space-y-3 max-h-[700px] overflow-y-auto">
-              {items.map((r: any) => (
+              {items.map((r) => (
                 <div key={r.id} className="rounded-lg border p-4 hover:bg-gray-50 transition-colors">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">

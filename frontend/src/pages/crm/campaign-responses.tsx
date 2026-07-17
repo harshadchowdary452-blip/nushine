@@ -1,14 +1,13 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   MessageSquare, Phone, Send, UserPlus, CalendarCheck, UserCheck, FileText,
   Search, Filter, Loader2, ChevronLeft, ChevronRight, MoreHorizontal, MessageCircle,
-  Stethoscope, Clock, CheckCircle, XCircle, AlertCircle, ArrowUpRight,
-  Users, Award, Megaphone, Plus,
+  AlertCircle, Megaphone,
 } from "lucide-react"
 import { campaignsApi } from "@/services/endpoints"
-import { leadsApi } from "@/services/endpoints"
+
 import PageHeader from "@/components/layout/page-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -18,12 +17,58 @@ import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/toast"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogBody, DialogFooter } from "@/components/ui/dialog"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter } from "@/components/ui/dialog"
+
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 import { appointmentsApi, usersApi } from "@/services/endpoints"
+
+interface CampaignResponse {
+  id: string
+  patient_name?: string
+  phone?: string
+  campaign_name?: string
+  campaign_id?: string
+  message?: string
+  status?: string
+  reply_time?: string
+  created_at?: string
+  is_lead?: boolean
+  lead_status?: string
+  lead_id?: string
+  lead_name?: string
+  email?: string
+  source?: string
+  assigned_staff_name?: string
+  assigned_staff_id?: string
+  notes?: string
+  next_action?: string
+  patient_id?: string
+}
+
+interface CampaignItem {
+  id: string
+  name?: string
+}
+
+interface StaffUser {
+  id: string
+  full_name: string
+  role: string
+}
+
+interface DoctorOption {
+  id?: string
+  doctor_id?: string
+  full_name?: string
+  doctor_name?: string
+}
+
+interface SlotItem {
+  available?: boolean
+  time?: string
+}
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.05 } } }
 
@@ -127,12 +172,12 @@ export default function CampaignResponses() {
     enabled: !!apptDate,
   })
 
-  const responses: any[] = Array.isArray(responsesData) ? responsesData : responsesData?.items || responsesData?.data || []
+  const responses: CampaignResponse[] = Array.isArray(responsesData) ? responsesData : responsesData?.items || responsesData?.data || []
   const totalItems = responsesData?.total ?? (Array.isArray(responsesData) ? responsesData.length : 0)
   const totalPages = Math.max(1, Math.ceil(totalItems / limit))
-  const campaigns: any[] = Array.isArray(campaignsData) ? campaignsData : campaignsData?.items || campaignsData?.data || []
-  const users: any[] = Array.isArray(usersData) ? usersData : usersData?.items || usersData?.data || []
-  const doctors: any[] = Array.isArray(doctorsData) ? doctorsData : doctorsData?.items || doctorsData?.data || []
+  const campaigns: CampaignItem[] = Array.isArray(campaignsData) ? campaignsData : campaignsData?.items || campaignsData?.data || []
+  const users: StaffUser[] = Array.isArray(usersData) ? usersData : usersData?.items || usersData?.data || []
+  const doctors: DoctorOption[] = Array.isArray(doctorsData) ? doctorsData : doctorsData?.items || doctorsData?.data || []
 
   const replyMutation = useMutation({
     mutationFn: (data: { campaignId: string; recipientId: string; message: string }) =>
@@ -187,7 +232,7 @@ export default function CampaignResponses() {
   }
 
   const handleAssignStaff = (responseId: string) => {
-    const user = users.find((u: any) => u.id === selectedStaffId)
+    const user = users.find((u: StaffUser) => u.id === selectedStaffId)
     if (!user) return
     setLocalStaff((prev) => ({ ...prev, [responseId]: { id: user.id, name: user.full_name } }))
     addToast({ title: "Staff Assigned", description: `Assigned to ${user.full_name}`, variant: "success" })
@@ -200,8 +245,8 @@ export default function CampaignResponses() {
     setSlotsLoading(true)
     try {
       const result = await appointmentsApi.slots({ doctor_id: doctorId, date })
-      const data: any[] = Array.isArray(result) ? result : result?.slots || []
-      const available = data.filter((s: any) => s.available !== false).map((s: any) => s.time || s)
+      const data: SlotItem[] = Array.isArray(result) ? result : result?.slots || []
+      const available = data.filter((s: SlotItem) => s.available !== false).map((s: SlotItem) => s.time || s)
       setAvailSlots(available.length > 0 ? available : [])
     } catch {
       setAvailSlots([])
@@ -216,17 +261,17 @@ export default function CampaignResponses() {
     }
   }, [apptDoctorId, apptDate])
 
-  const handleOpenNotes = (resp: any) => {
+  const handleOpenNotes = (resp: CampaignResponse) => {
     setNotesText(localNotes[resp.id] || resp.notes || "")
     setNotesOpen({ id: resp.id, currentNotes: localNotes[resp.id] || resp.notes })
   }
 
-  const handleOpenAssign = (resp: any) => {
+  const handleOpenAssign = (resp: CampaignResponse) => {
     setSelectedStaffId(localStaff[resp.id]?.id || resp.assigned_staff_id || "")
     setAssignOpen({ id: resp.id, currentStaffId: localStaff[resp.id]?.id || resp.assigned_staff_id })
   }
 
-  const handleOpenAppointment = (resp: any) => {
+  const handleOpenAppointment = (resp: CampaignResponse) => {
     setApptDoctorId("")
     setApptDate("")
     setApptTime("")
@@ -241,7 +286,7 @@ export default function CampaignResponses() {
     })
   }
 
-  const handleOpenConvert = (resp: any) => {
+  const handleOpenConvert = (resp: CampaignResponse) => {
     setConvName(resp.patient_name || "")
     setConvPhone(resp.phone || "")
     setConvEmail("")
@@ -369,7 +414,7 @@ export default function CampaignResponses() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Campaigns</SelectItem>
-                  {campaigns.map((c: any) => (
+                  {campaigns.map((c: CampaignItem) => (
                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -454,7 +499,7 @@ export default function CampaignResponses() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {responses.map((resp: any) => {
+                    {responses.map((resp: CampaignResponse) => {
                       const assigned = localStaff[resp.id]
                       const staffName = assigned?.name || resp.assigned_staff_name || "-"
                       const respNotes = localNotes[resp.id] || resp.notes
@@ -629,7 +674,7 @@ export default function CampaignResponses() {
                   {users.length === 0 ? (
                     <SelectItem value="_none" disabled>No staff available</SelectItem>
                   ) : (
-                    users.map((u: any) => (
+                    users.map((u: StaffUser) => (
                       <SelectItem key={u.id} value={u.id}>{u.full_name} ({u.role.replace(/_/g, " ")})</SelectItem>
                     ))
                   )}
@@ -670,7 +715,7 @@ export default function CampaignResponses() {
                       {doctors.length === 0 ? (
                         <SelectItem value="_none" disabled>No doctors available</SelectItem>
                       ) : (
-                        doctors.map((d: any) => (
+                        doctors.map((d: DoctorOption) => (
                           <SelectItem key={d.id || d.doctor_id} value={d.id || d.doctor_id}>
                             {d.full_name || d.doctor_name}
                           </SelectItem>

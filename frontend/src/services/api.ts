@@ -26,8 +26,8 @@ api.interceptors.response.use((response) => {
   const responseTime = response.headers["x-response-time"];
   if (requestId && responseTime) {
     // Attach for dev tools visibility
-    (response as any).requestId = requestId;
-    (response as any).responseTime = responseTime;
+    (response as { requestId: string }).requestId = requestId;
+    (response as { responseTime: string }).responseTime = responseTime;
   }
   return response;
 });

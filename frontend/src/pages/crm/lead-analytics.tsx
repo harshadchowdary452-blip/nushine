@@ -1,18 +1,17 @@
 import { useMemo } from "react"
-import { useNavigate } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
 import { motion } from "framer-motion"
 import {
-  Users, UserPlus, TrendingUp, BarChart3, PieChart, IndianRupee,
+  Users, TrendingUp, BarChart3, PieChart,
   Target, Star, AlertTriangle, CheckCircle2, Calendar,
 } from "lucide-react"
 import { leadsApi } from "@/services/endpoints"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+
 import { Skeleton } from "@/components/ui/skeleton"
 import KpiCard from "@/components/layout/kpi-card"
-import { PieChart as RePie, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from "recharts"
-import { formatIndianRupees } from "@/lib/currency"
+import { PieChart as RePie, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts"
+
 import type { Lead } from "@/types"
 
 const STATUS_COLORS: Record<string, string> = {
@@ -28,21 +27,15 @@ const STATUS_COLORS: Record<string, string> = {
   NO_RESPONSE: "#F97316",
 }
 
-const SOURCE_COLORS = ["#0EA5E9", "#8B5CF6", "#F59E0B", "#10B981", "#EF4444", "#EC4899", "#14B8A6", "#F97316", "#6366F1", "#84CC16", "#06B6D4", "#D946EF", "#FB923C", "#22C55E", "#E11D48", "#A855F7", "#64748B"]
-
-const priorityOrder: Record<string, number> = { HIGH: 3, MEDIUM: 2, LOW: 1 }
-
 export default function LeadAnalytics() {
-  const navigate = useNavigate()
 
   const { data: leads, isLoading } = useQuery({
     queryKey: ["leads", "all"],
     queryFn: () => leadsApi.list({ limit: 500 }),
   })
 
-  const items: Lead[] = Array.isArray(leads) ? leads : []
-
   const analytics = useMemo(() => {
+    const items: Lead[] = Array.isArray(leads) ? leads : []
     const total = items.length
     const statusBreakdown: Record<string, number> = {}
     const sourceBreakdown: Record<string, number> = {}
@@ -68,7 +61,7 @@ export default function LeadAnalytics() {
     const avgScore = total > 0 ? (totalScore / total).toFixed(0) : "0"
 
     return { total, converted, lost, highPriority, followUpDue, conversionRate, avgScore, statusData, sourceData }
-  }, [items])
+  }, [leads])
 
   if (isLoading) {
     return (

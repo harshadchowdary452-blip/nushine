@@ -529,8 +529,6 @@ function generateArch(side: "left" | "right", isUpper: boolean, count: number): 
     const t = (i + 0.5) / count  // 0..1 from center outward
     const angle = t * Math.PI * 0.42
     const R = isUpper ? 240 : 220
-    const flat = isUpper ? 1.0 : 1.0
-
     const x = sign * R * Math.sin(angle)
     const y = (isUpper ? -1 : 1) * (R * (1 - Math.cos(angle)) * (isUpper ? 0.55 : 0.60))
 
@@ -633,7 +631,6 @@ function archToothPositions(isUpper: boolean, count: number): { x: number; y: nu
 
 export function getGingivaPath(isUpper: boolean): string {
   const toothPositions = archToothPositions(isUpper, 8)
-  const marginR = isUpper ? 300 : 280
   const cx = 0
   const baseY = isUpper ? -70 : 180
   const papillaDepth = isUpper ? 12 : -12

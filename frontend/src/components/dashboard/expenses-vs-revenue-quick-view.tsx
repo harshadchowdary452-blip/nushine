@@ -16,12 +16,12 @@ interface ExpensesVsRevenueQuickViewProps {
   className?: string
 }
 
-const MiniTooltip = ({ active, payload, label }: any) => {
+const MiniTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ color: string; name: string; value: number }>; label?: string }) => {
   if (active && payload && payload.length) {
     return (
       <div className="rounded-lg border border-gray-100 bg-white p-2 shadow-md">
         <p className="text-xs font-semibold text-gray-700 mb-0.5">{label}</p>
-        {payload.map((p: any, i: number) => (
+        {payload.map((p: { color: string; name: string; value: number }, i: number) => (
           <p key={i} className="text-xs font-medium" style={{ color: p.color }}>
             {p.name}: {formatIndianRupees(p.value ?? 0)}
           </p>

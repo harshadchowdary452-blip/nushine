@@ -28,6 +28,7 @@ class TreatmentSitting(Base):
     prescription: Mapped[str] = mapped_column(Text, nullable=True)
     next_appointment_date: Mapped[date] = mapped_column(Date, nullable=True)
     next_appointment_time: Mapped[time] = mapped_column(Time, nullable=True)
+    next_appointment_doctor_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
     next_visit_required: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     materials_used: Mapped[str] = mapped_column(Text, nullable=True)
     duration_minutes: Mapped[int] = mapped_column(Integer, nullable=True)
@@ -48,11 +49,16 @@ class TreatmentSitting(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     treatment_plan = relationship("TreatmentPlan", back_populates="sittings", lazy="selectin")
     doctor = relationship("User", foreign_keys=[doctor_id], lazy="selectin")
+    next_appointment_doctor = relationship("User", foreign_keys=[next_appointment_doctor_id], lazy="selectin")
     completed_by = relationship("User", foreign_keys=[completed_by_id], lazy="selectin")
 
     @property
     def doctor_name(self):
         return self.doctor.full_name if self.doctor else None
+
+    @property
+    def next_appointment_doctor_name(self):
+        return self.next_appointment_doctor.full_name if self.next_appointment_doctor else None
 
     @property
     def completed_by_name(self):

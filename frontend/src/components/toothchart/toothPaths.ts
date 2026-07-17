@@ -34,7 +34,6 @@ function incisorPath(width: number, rootW: number): ToothPaths {
 }
 
 function caninePath(): ToothPaths {
-  const cx = 24
   return {
     outline: [
       `M 12,28`,

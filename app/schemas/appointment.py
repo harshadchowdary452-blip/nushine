@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime, date, time
+from app.models.appointment import PROCEDURE_DURATIONS
 
 
 TREATMENT_DURATION_MAP = {
@@ -18,6 +19,7 @@ class AppointmentCreate(BaseModel):
     appointment_date: date
     appointment_time: time
     appointment_type: Optional[str] = "CONSULTATION"
+    procedure_name: Optional[str] = None
     duration_minutes: Optional[int] = None
     notes: Optional[str] = None
 
@@ -107,3 +109,10 @@ class DoctorSlotResponse(BaseModel):
     is_on_leave: bool = False
     leave_reason: Optional[str] = None
     working_hours: Optional[str] = None
+    duration_minutes: Optional[int] = None
+    procedure_name: Optional[str] = None
+
+
+class ProcedureDurationResponse(BaseModel):
+    procedures: dict[str, int]
+    defaults: dict[str, int]

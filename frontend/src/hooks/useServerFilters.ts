@@ -56,9 +56,10 @@ export function useServerFilters(opts?: UseServerFiltersOptions) {
     setPageRaw(Math.max(1, p))
   }, [])
 
+  const filtersKey = JSON.stringify(filters)
   useEffect(() => {
     setPage(1)
-  }, [JSON.stringify(filters)])
+  }, [filtersKey, setPage])
 
   const [sortField, setSortField] = useState(defaultSort)
   const [sortDir, setSortDir] = useState<"asc" | "desc">(defaultSortDir)

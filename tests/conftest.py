@@ -3,7 +3,8 @@ from typing import AsyncGenerator
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from app.database import Base, get_db
-from app.main import app
+from app.main import app, limiter
+from app.routers.auth import limiter as auth_limiter
 
 TEST_DATABASE_URL = "sqlite+aiosqlite://"
 engine = create_async_engine(TEST_DATABASE_URL, echo=False, connect_args={"check_same_thread": False})
@@ -34,9 +35,13 @@ async def override_get_db():
 @pytest.fixture
 async def client() -> AsyncGenerator:
     app.dependency_overrides[get_db] = override_get_db
+    limiter.enabled = False
+    auth_limiter.enabled = False
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
+    limiter.enabled = True
+    auth_limiter.enabled = True
     app.dependency_overrides.clear()
 
 

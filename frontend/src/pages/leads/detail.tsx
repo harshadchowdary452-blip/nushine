@@ -9,7 +9,7 @@ import {
   CheckCircle2, XCircle, AlertTriangle, Plus, ChevronRight, Users,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -26,7 +26,15 @@ import {
 import { leadsApi, doctorsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
 import { useAuthStore } from "@/store/authStore"
-import type { Lead, LeadCall, LeadCommunication, LeadCallOutcome } from "@/types"
+import type { Lead, LeadCall, LeadCommunication, LeadCallOutcome, DoctorListItem, ApiError } from "@/types"
+
+interface LeadFollowUp {
+  id: string
+  status: string | null
+  follow_up_date: string | null
+  follow_up_time: string | null
+  notes: string | null
+}
 
 const statusStyles: Record<string, string> = {
   NEW: "bg-blue-600 text-white",
@@ -143,7 +151,7 @@ export default function LeadDetail() {
     queryFn: () => doctorsApi.list({ page_size: 200, admin_group_id: currentUser?.admin_group_id || undefined }),
     enabled: !!currentUser,
   })
-  const doctors: any[] = Array.isArray(doctorsData) ? doctorsData : doctorsData?.items || []
+  const doctors: DoctorListItem[] = Array.isArray(doctorsData) ? doctorsData : doctorsData?.items || []
 
   const statusMutation = useMutation({
     mutationFn: (status: string) => leadsApi.updateStatus(id!, status),
@@ -155,7 +163,7 @@ export default function LeadDetail() {
   })
 
   const updateMutation = useMutation({
-    mutationFn: (data: any) => leadsApi.update(id!, data),
+    mutationFn: (data: Record<string, unknown>) => leadsApi.update(id!, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["lead", id] })
       addToast({ title: "Updated", variant: "success" })
@@ -170,11 +178,11 @@ export default function LeadDetail() {
       addToast({ title: "Lead deleted", variant: "success" })
       navigate("/leads?" + searchParams.toString())
     },
-    onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to delete lead", variant: "destructive" }),
+    onError: (err: ApiError) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to delete lead", variant: "destructive" }),
   })
 
   const callMutation = useMutation({
-    mutationFn: (data: any) => leadsApi.addCall(id!, data),
+    mutationFn: (data: Record<string, unknown>) => leadsApi.addCall(id!, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["lead-calls", id] })
       addToast({ title: "Call recorded", variant: "success" })
@@ -184,7 +192,7 @@ export default function LeadDetail() {
   })
 
   const commMutation = useMutation({
-    mutationFn: (data: any) => leadsApi.addCommunication(id!, data),
+    mutationFn: (data: Record<string, unknown>) => leadsApi.addCommunication(id!, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["lead-communications", id] })
       addToast({ title: "Message sent", variant: "success" })
@@ -194,7 +202,7 @@ export default function LeadDetail() {
   })
 
   const followUpMutation = useMutation({
-    mutationFn: (data: any) => leadsApi.createFollowUp(id!, data),
+    mutationFn: (data: Record<string, unknown>) => leadsApi.createFollowUp(id!, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["lead-followups", id] })
       queryClient.invalidateQueries({ queryKey: ["lead", id] })
@@ -205,7 +213,7 @@ export default function LeadDetail() {
   })
 
   const apptMutation = useMutation({
-    mutationFn: (data: any) => leadsApi.bookAppointment(id!, data),
+    mutationFn: (data: Record<string, unknown>) => leadsApi.bookAppointment(id!, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["lead", id] })
       queryClient.invalidateQueries({ queryKey: ["leads"] })
@@ -216,14 +224,14 @@ export default function LeadDetail() {
   })
 
   const convertMutation = useMutation({
-    mutationFn: (data: any) => leadsApi.convert(id!, data),
+    mutationFn: (data: Record<string, unknown>) => leadsApi.convert(id!, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["lead", id] })
       queryClient.invalidateQueries({ queryKey: ["leads"] })
       addToast({ title: "Lead converted", variant: "success" })
       setConvertOpen(false)
     },
-    onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Conversion failed", variant: "destructive" }),
+    onError: (err: ApiError) => addToast({ title: "Error", description: err?.response?.data?.detail || "Conversion failed", variant: "destructive" }),
   })
 
   const cycleStatus = useCallback(() => {
@@ -273,7 +281,7 @@ export default function LeadDetail() {
 
   const callItems: LeadCall[] = Array.isArray(calls) ? calls : []
   const commItems: LeadCommunication[] = Array.isArray(communications) ? communications : []
-  const fuItems: any[] = Array.isArray(followUps) ? followUps : []
+  const fuItems: LeadFollowUp[] = Array.isArray(followUps) ? followUps : []
 
   if (isLoading) return (
     <div className="space-y-4 p-4">
@@ -596,7 +604,7 @@ export default function LeadDetail() {
                 <p className="text-xs text-gray-400 py-8 text-center">No follow-ups scheduled</p>
               ) : (
                 <div className="space-y-2">
-                  {fuItems.map((fu: any) => (
+                  {fuItems.map((fu: LeadFollowUp) => (
                     <div key={fu.id} className="flex items-center justify-between rounded-lg border border-gray-100 p-3 text-sm bg-white">
                       <div className="flex items-center gap-3">
                         {fu.status === "COMPLETED" ? (
@@ -871,7 +879,7 @@ export default function LeadDetail() {
               <Select value={apptDoctor} onValueChange={setApptDoctor}>
                 <SelectTrigger><SelectValue placeholder="Select doctor (optional)" /></SelectTrigger>
                 <SelectContent>
-                  {doctors.length > 0 ? doctors.map((doc: any) => (
+                  {doctors.length > 0 ? doctors.map((doc: DoctorListItem) => (
                     <SelectItem key={doc.id} value={doc.id}>{doc.full_name}</SelectItem>
                   )) : <SelectItem value="" disabled>No doctors available</SelectItem>}
                 </SelectContent>
@@ -912,7 +920,7 @@ export default function LeadDetail() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setConvertOpen(false)}>Cancel</Button>
             <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => {
-              const data: Record<string, any> = {}
+              const data: Record<string, string | number | undefined> = {}
               if (convertPatientName) data.patient_name = convertPatientName
               if (convertAge) data.age = parseInt(convertAge)
               if (convertGender) data.gender = convertGender

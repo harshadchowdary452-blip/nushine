@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/select"
 import { FilterBar, FilterField } from "@/components/ui/filter-bar"
 import { REGISTRATION_DATE_PRESETS, resolveDatePreset } from "@/lib/date-presets"
-import { cn } from "@/lib/utils"
+
 
 interface PatientFilterBarProps {
   filters: Record<string, string>
@@ -57,14 +57,14 @@ export default function PatientFilterBar({
       setFilter("created_at_from", range.date_from || "")
       setFilter("created_at_to", range.date_to || "")
     }
-  }, [datePreset])
+  }, [datePreset, setFilter])
 
   useEffect(() => {
     if (datePreset === "custom") {
       setFilter("created_at_from", customFrom)
       setFilter("created_at_to", customTo)
     }
-  }, [customFrom, customTo, datePreset])
+  }, [customFrom, customTo, datePreset, setFilter])
 
   function handleSearch() {
     setFilter("search", searchInput)

@@ -90,7 +90,7 @@ export default function DoctorAvailability() {
   })
 
   const createOverrideMutation = useMutation({
-    mutationFn: (data: any) => doctorAvailabilityApi.create(doctorId, data),
+    mutationFn: (data: Partial<DoctorAvailability>) => doctorAvailabilityApi.create(doctorId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["doctorAvailability", doctorId] })
       addToast({ title: "Success", description: "Override created", variant: "success" })

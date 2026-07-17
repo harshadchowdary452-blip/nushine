@@ -1,14 +1,14 @@
 import { useState } from "react"
 import { motion } from "framer-motion"
 import { useQuery } from "@tanstack/react-query"
-import { Users, Calendar, FolderOpen, ClipboardList, Stethoscope, Sparkles, TrendingUp, Award, DollarSign, Activity, BarChart3, Clock } from "lucide-react"
+import { Users, Calendar, FolderOpen, ClipboardList, Stethoscope, DollarSign, BarChart3 } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts"
 import { useAuthStore } from "@/store/authStore"
 import { dashboardApi } from "@/services/endpoints"
 import { Skeleton } from "@/components/ui/skeleton"
 import KpiCard from "@/components/layout/kpi-card"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import Leaderboard from "@/components/ui/leaderboard"
+
 import QuickViewDrawer from "@/components/ui/quick-view-drawer"
 import { formatIndianRupees, formatIndianNumber } from "@/lib/currency"
 
@@ -40,12 +40,12 @@ export default function DoctorDashboard() {
 
   const hasData = stats && (stats.my_patients || stats.today_appointments || stats.active_cases)
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ color: string; name: string; value: number; dataKey: string }>; label?: string }) => {
     if (active && payload && payload.length) {
       return (
         <div className="rounded-xl border border-gray-100 bg-white p-3 shadow-lg">
           <p className="text-sm font-semibold text-gray-900 mb-1">{label}</p>
-          {payload.map((p: any, i: number) => (
+          {payload.map((p: { color: string; name: string; value: number }, i: number) => (
             <p key={i} className="text-xs" style={{ color: p.color }}>
               {p.name}: {p.name?.includes("Revenue") || p.dataKey === "revenue" ? formatIndianRupees(p.value) : formatIndianNumber(p.value)}
             </p>

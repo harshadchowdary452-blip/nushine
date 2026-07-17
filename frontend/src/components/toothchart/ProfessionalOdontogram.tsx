@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react'
-import type { ToothCondition, ToothSurface, ToothFinding } from './types'
+import type { ToothFinding } from './types'
 import {
-  FINDING_TYPES, QUICK_FINDINGS, ALL_FINDING_NAMES,
+  FINDING_TYPES, QUICK_FINDINGS,
   getFindingColor, getFindingLabel,
 } from './findingConfig'
 
@@ -220,7 +220,6 @@ function Summary({ findings, onUpdate }: { findings: ToothFinding[]; onUpdate?: 
 }
 
 const SURF_LABEL: Record<string, string> = { Mesial: 'M', Distal: 'D', Buccal: 'B', Lingual: 'L', Occlusal: 'O', Incisal: 'I', Labial: 'La' }
-const SURF_COLOR: Record<string, string> = { Mesial: '#F59E0B', Distal: '#8B5CF6', Buccal: '#3B82F6', Lingual: '#10B981', Occlusal: '#EF4444', Incisal: '#EC4899', Labial: '#6366F1' }
 
 // ─── Right Panel ──────────────────────────────────────────────────────
 

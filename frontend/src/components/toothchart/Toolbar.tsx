@@ -11,18 +11,6 @@ interface ToolbarProps {
   patientName?: string
 }
 
-const CONDITION_ICONS: Record<string, string> = {
-  Decayed: '🦷',
-  Restored: '⬜',
-  Defective: '╳',
-  Missing: '○',
-  Erupt: '⬆',
-  Implant: '⦿',
-  Impacted: '↻',
-  Bridge: '═',
-  Denture: '▤',
-}
-
 export default function Toolbar({
   activeFilter,
   setActiveFilter,

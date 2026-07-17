@@ -1,14 +1,14 @@
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   Megaphone, Plus, Loader2, Rocket, Trash2, Send, Eye, MessageCircle, Mail, MessageSquare,
-  Target, Users, CheckCircle, AlertCircle, X, Copy, Archive, RotateCcw, BarChart3,
-  Calendar, Clock, TrendingUp, DollarSign, Activity, Smartphone, Zap,
-  Gift, Flower2, Sparkles, Droplets, Crown, Smile, Stethoscope, FileText,
-  ChevronLeft, ChevronRight, Filter, Search,
+  Target, Users, CheckCircle, AlertCircle, Copy, Archive, RotateCcw, BarChart3,
+  Clock, TrendingUp, Activity,
+  Gift, Sparkles, Droplets, Crown, Smile, Stethoscope, FileText,
 } from "lucide-react"
 import { campaignsApi, campaignTemplatesApi, whatsappTemplatesApi } from "@/services/endpoints"
+import { extractDetail } from "@/types"
 import { formatIndianRupees } from "@/lib/currency"
 import { cn } from "@/lib/utils"
 import PageHeader from "@/components/layout/page-header"
@@ -21,7 +21,59 @@ import { useToast } from "@/components/ui/toast"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+
+interface Campaign {
+  id: string
+  name?: string
+  status?: string
+  is_active?: boolean
+  created_at?: string
+  channel?: string
+  target?: string
+  patients_targeted?: number
+  messages_sent?: number
+  messages_failed?: number
+  messages_delivered?: number
+}
+
+interface CampaignRecipient {
+  id: string
+  status?: string
+  patient_name?: string
+  recipient_name?: string
+  patient_id?: string
+  phone?: string
+  error_message?: string
+}
+
+interface CampaignTemplateItem {
+  id: string
+  name?: string
+  message?: string
+}
+
+interface CampaignFilters {
+  gender?: string
+  doctor_id?: string
+  age_min?: number
+  age_max?: number
+}
+
+interface CampaignProgress {
+  sent?: number
+  failed?: number
+  delivered?: number
+  pending?: number
+  total_recipients?: number
+}
+
+interface CampaignAnalyticsData {
+  overview?: Record<string, number>
+  top_campaigns?: Array<{ id?: string; name?: string; sent?: number; messages_sent?: number; delivered?: number; messages_delivered?: number; revenue?: number; revenue_generated?: number }>
+  roi_data?: Array<{ campaign_name?: string; campaign_cost?: number; revenue_generated?: number; roi_percentage?: number; patients_converted?: number }>
+  conversion_funnel?: Record<string, number>
+}
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.04 } } }
 
@@ -72,7 +124,7 @@ export default function Campaigns() {
   const [quickType, setQuickType] = useState<string | null>(null)
   const [viewRecipients, setViewRecipients] = useState<string | null>(null)
   const [showAnalytics, setShowAnalytics] = useState(false)
-  const pollInterval = 5000
+
 
   const { data: campaigns, isLoading } = useQuery({
     queryKey: ["campaigns", tab],
@@ -89,12 +141,12 @@ export default function Campaigns() {
     queryFn: () => campaignsApi.analytics.detailed(),
     enabled: showAnalytics,
   })
-  const items: any[] = Array.isArray(campaigns) ? campaigns : []
+  const items: Campaign[] = Array.isArray(campaigns) ? campaigns : []
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => campaignsApi.delete(id),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["campaigns"] }); addToast({ title: "Deleted", variant: "success" }) },
-    onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to delete", variant: "destructive" }),
+    onError: (err: unknown) => addToast({ title: "Error", description: extractDetail(err) || "Failed to delete", variant: "destructive" }),
   })
   const archiveMutation = useMutation({
     mutationFn: (id: string) => campaignsApi.update(id, { is_active: false }),
@@ -106,18 +158,14 @@ export default function Campaigns() {
   })
   const resendMutation = useMutation({
     mutationFn: (id: string) => campaignsApi.resend(id),
-    onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["campaigns"] })
-      addToast({ title: "Resent", description: `Sent to ${data.sent_count || data.recipients_count} recipients`, variant: "success" })
+    onSuccess: (data: { sent_count?: number; recipients_count?: number }) => { description: `Sent to ${data.sent_count || data.recipients_count} recipients`, variant: "success" })
     },
   })
   const launchMutation = useMutation({
     mutationFn: (id: string) => campaignsApi.launch(id),
-    onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["campaigns"] })
-      addToast({ title: "Launched", description: `Sending to ${data.recipients_count} recipients`, variant: "success" })
+    onSuccess: (data: { recipients_count?: number }) => { description: `Sending to ${data.recipients_count} recipients`, variant: "success" })
     },
-    onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to launch", variant: "destructive" }),
+    onError: (err: unknown) => addToast({ title: "Error", description: extractDetail(err) || "Failed to launch", variant: "destructive" }),
   })
 
   const handleQuickCampaign = (type: string) => {
@@ -189,7 +237,7 @@ export default function Campaigns() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {items.map((c: any) => (
+                  {items.map((c: Campaign) => (
                     <CampaignRow
                       key={c.id}
                       campaign={c}
@@ -256,7 +304,7 @@ function KpiCard({ title, value, color, icon: Icon }: { title: string; value: st
 }
 
 interface CampaignRowProps {
-  campaign: any
+  campaign: Campaign
   onDelete: () => void
   onArchive: () => void
   onDuplicate: () => void
@@ -267,7 +315,7 @@ interface CampaignRowProps {
 }
 
 function CampaignRow({ campaign: c, onDelete, onArchive, onDuplicate, onResend, onLaunch, onViewRecipients, launchPending }: CampaignRowProps) {
-  const [liveProgress, setLiveProgress] = useState<any>(null)
+  const [liveProgress, setLiveProgress] = useState<CampaignProgress | null>(null)
   const ChannelIcon = channelIcon[c.channel] || MessageCircle
   const total = c.patients_targeted || 1
   const sent = c.messages_sent || 0
@@ -365,11 +413,11 @@ function RecipientsList({ campaignId }: { campaignId: string }) {
     queryFn: () => campaignsApi.recipients(campaignId),
     refetchInterval: 5000,
   })
-  const items: any[] = Array.isArray(recipients) ? recipients : []
+  const items: CampaignRecipient[] = Array.isArray(recipients) ? recipients : []
   if (isLoading) return <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
   if (items.length === 0) return <div className="py-8 text-center text-gray-400">No recipients yet</div>
-  const grouped: Record<string, any[]> = {}
-  items.forEach((r: any) => { const s = r.status || "UNKNOWN"; if (!grouped[s]) grouped[s] = []; grouped[s].push(r) })
+  const grouped: Record<string, CampaignRecipient[]> = {}
+  items.forEach((r: CampaignRecipient) => { const s = r.status || "UNKNOWN"; if (!grouped[s]) grouped[s] = []; grouped[s].push(r) })
   const statusOrder = ["QUEUED", "SENT", "DELIVERED", "READ", "FAILED", "REPLIED"]
   return (
     <div className="space-y-4 max-h-80 overflow-y-auto">
@@ -380,7 +428,7 @@ function RecipientsList({ campaignId }: { campaignId: string }) {
           <div key={s}>
             <p className="text-xs font-medium text-gray-500 mb-1">{s} ({g.length})</p>
             <div className="space-y-1">
-              {g.map((r: any) => (
+              {g.map((r: CampaignRecipient) => (
                 <div key={r.id} className="flex items-center justify-between rounded border px-3 py-2 text-sm">
                   <span className="font-medium truncate">{r.patient_name || r.recipient_name || `#${(r.patient_id || r.id).slice(-6)}`}</span>
                   {r.phone && <span className="text-xs text-gray-400 ml-2">{r.phone}</span>}
@@ -409,7 +457,7 @@ function CampaignWizard({ quickType, onDone }: { quickType: string | null; onDon
   const [previewCount, setPreviewCount] = useState<number | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [sending, setSending] = useState(false)
-  const [filters, setFilters] = useState<any>({})
+  const [filters, setFilters] = useState<CampaignFilters>({})
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false)
   const [newTplName, setNewTplName] = useState("")
   const [newTplMsg, setNewTplMsg] = useState("")
@@ -419,13 +467,13 @@ function CampaignWizard({ quickType, onDone }: { quickType: string | null; onDon
     queryKey: ["campaign-templates"],
     queryFn: () => campaignTemplatesApi.list(),
   })
-  const ctItems: any[] = Array.isArray(campaignTemplates) ? campaignTemplates : []
+  const ctItems: CampaignTemplateItem[] = Array.isArray(campaignTemplates) ? campaignTemplates : []
 
   const { data: waTemplates } = useQuery({
     queryKey: ["whatsapp-templates"],
     queryFn: () => whatsappTemplatesApi.list(),
   })
-  const waTmplItems: any[] = Array.isArray(waTemplates) ? waTemplates : waTemplates?.data || waTemplates?.items || []
+  const waTmplItems: CampaignTemplateItem[] = Array.isArray(waTemplates) ? waTemplates : (waTemplates as { data?: CampaignTemplateItem[]; items?: CampaignTemplateItem[] })?.data || (waTemplates as { data?: CampaignTemplateItem[]; items?: CampaignTemplateItem[] })?.items || []
 
   const saveTemplateMutation = useMutation({
     mutationFn: (data: { name: string; channel: string; category: string; message: string }) =>
@@ -446,7 +494,7 @@ function CampaignWizard({ quickType, onDone }: { quickType: string | null; onDon
       if (quick) setName(quick.label)
       setCampaignType(quickType)
     }
-  }, [quickType])
+  }, [quickType, name])
 
   const previewAudience = async () => {
     setPreviewLoading(true)
@@ -465,8 +513,8 @@ function CampaignWizard({ quickType, onDone }: { quickType: string | null; onDon
       addToast({ title: "Created", description: "Campaign created. Launch it from the list.", variant: "success" })
       onDone()
       queryClient.invalidateQueries({ queryKey: ["campaigns"] })
-    } catch (err: any) {
-      addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to create", variant: "destructive" })
+    } catch (err: unknown) {
+      addToast({ title: "Error", description: extractDetail(err) || "Failed to create", variant: "destructive" })
     }
     setSending(false)
   }
@@ -548,7 +596,7 @@ function CampaignWizard({ quickType, onDone }: { quickType: string | null; onDon
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">Gender</Label>
-              <Select value={filters.gender || ""} onValueChange={(v) => setFilters((f: any) => ({ ...f, gender: v || undefined }))}>
+              <Select value={filters.gender || ""} onValueChange={(v) => setFilters((f: CampaignFilters) => ({ ...f, gender: v || undefined }))}>
                 <SelectTrigger><SelectValue placeholder="Any" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="any">Any</SelectItem>
@@ -559,15 +607,15 @@ function CampaignWizard({ quickType, onDone }: { quickType: string | null; onDon
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Doctor</Label>
-              <Input value={filters.doctor_id || ""} onChange={(e) => setFilters((f: any) => ({ ...f, doctor_id: e.target.value || undefined }))} placeholder="Doctor ID" />
+              <Input value={filters.doctor_id || ""} onChange={(e) => setFilters((f: CampaignFilters) => ({ ...f, doctor_id: e.target.value || undefined }))} placeholder="Doctor ID" />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Min Age</Label>
-              <Input type="number" value={filters.age_min || ""} onChange={(e) => setFilters((f: any) => ({ ...f, age_min: e.target.value ? Number(e.target.value) : undefined }))} />
+              <Input type="number" value={filters.age_min || ""} onChange={(e) => setFilters((f: CampaignFilters) => ({ ...f, age_min: e.target.value ? Number(e.target.value) : undefined }))} />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Max Age</Label>
-              <Input type="number" value={filters.age_max || ""} onChange={(e) => setFilters((f: any) => ({ ...f, age_max: e.target.value ? Number(e.target.value) : undefined }))} />
+              <Input type="number" value={filters.age_max || ""} onChange={(e) => setFilters((f: CampaignFilters) => ({ ...f, age_max: e.target.value ? Number(e.target.value) : undefined }))} />
             </div>
           </div>
           <Button variant="outline" size="sm" className="gap-1" onClick={previewAudience} disabled={previewLoading}>
@@ -602,7 +650,7 @@ function CampaignWizard({ quickType, onDone }: { quickType: string | null; onDon
           </div>
           {templates.length > 0 && (
             <div className="space-y-1 max-h-40 overflow-y-auto border rounded-lg p-2">
-              {templates.map((t: any) => (
+                {templates.map((t: CampaignTemplateItem) => (
                 <button key={t.id} type="button" onClick={() => { setSelectedTemplate(t.id); setMessage(t.message) }}
                   className={cn("w-full text-left px-3 py-2 rounded-md text-sm transition-colors", selectedTemplate === t.id ? "bg-blue-50 text-blue-700 font-medium" : "hover:bg-gray-50")}>
                   {t.name}
@@ -682,13 +730,11 @@ function CampaignWizard({ quickType, onDone }: { quickType: string | null; onDon
   )
 }
 
-function AnalyticsSection({ data }: { data: any }) {
+function AnalyticsSection({ data }: { data: CampaignAnalyticsData }) {
   const overview = data?.overview || {}
-  const topCampaigns: any[] = data?.top_campaigns || []
-  const roiData: any[] = data?.roi_data || []
-  const messagesOverTime: any[] = data?.messages_over_time || []
-  const topTemplates: any[] = data?.top_templates || []
-  const topSources: any[] = data?.top_sources || []
+  const topCampaigns = data?.top_campaigns || []
+  const roiData = data?.roi_data || []
+
   const funnel = data?.conversion_funnel || {}
 
   return (
@@ -710,7 +756,7 @@ function AnalyticsSection({ data }: { data: any }) {
               <p className="text-sm text-gray-400 py-4 text-center">No campaign data yet</p>
             ) : (
               <div className="space-y-2">
-                {topCampaigns.map((c: any, i: number) => (
+                {topCampaigns.map((c: { id?: string; name?: string; sent?: number; messages_sent?: number; delivered?: number; messages_delivered?: number; revenue?: number; revenue_generated?: number }, i: number) => (
                   <div key={c.id || i} className="flex items-center justify-between rounded border p-2.5 text-sm">
                     <div className="min-w-0 flex-1">
                       <p className="font-medium truncate">{c.name || `Campaign #${i + 1}`}</p>
@@ -764,7 +810,7 @@ function AnalyticsSection({ data }: { data: any }) {
                   <th className="pb-2 pr-4">Campaign</th><th className="pb-2 pr-4">Cost</th><th className="pb-2 pr-4">Revenue</th><th className="pb-2 pr-4">ROI</th><th className="pb-2 pr-4">Converted</th>
                 </tr></thead>
                 <tbody>
-                  {roiData.map((r: any, i: number) => (
+                  {roiData.map((r: { campaign_name?: string; campaign_cost?: number; revenue_generated?: number; roi_percentage?: number; patients_converted?: number }, i: number) => (
                     <tr key={i} className="border-b last:border-0">
                       <td className="py-2 pr-4 font-medium">{r.campaign_name || `Campaign #${i + 1}`}</td>
                       <td className="py-2 pr-4">{formatIndianRupees(r.campaign_cost || 0)}</td>

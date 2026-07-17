@@ -1,17 +1,53 @@
 import { useState, useMemo, useEffect } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Loader2, Save, ChevronDown, ChevronRight } from "lucide-react"
-import { format } from "date-fns"
+
 import { patientsApi, doctorsApi } from "@/services/endpoints"
+import type { ClinicalFinding } from "@/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import ProfessionalOdontogram from "@/components/toothchart/ProfessionalOdontogram"
-import type { ToothFinding } from "@/components/toothchart/types"
+import type { Patient } from "@/types"
+import type { ToothFinding, ToothCondition, ToothSurface } from "@/components/toothchart/types"
 import TreatmentPlanSection from "./TreatmentPlanSection"
 import type { TreatmentItem } from "./TreatmentPlanSection"
+
+interface CaseFormData {
+  chief_complaint?: string
+  chief_complaint_duration?: string
+  chief_complaint_severity?: string
+  chief_complaint_associated_symptoms?: string
+  hpi?: string
+  personal_history?: string
+  family_history?: string
+  medical_history?: string
+  dental_history?: string
+  extra_oral_examination?: string
+  intra_oral_examination?: string
+  clinical_findings_summary?: string | null
+  periodontal_examination?: string
+  investigations?: string
+  provisional_diagnosis?: string
+  final_diagnosis?: string
+  diagnosis?: string
+  initial_treatment_plan?: string
+  treatment_plan_estimated_cost?: number | string
+  treatment_plan_estimated_visits?: number | string
+  patient_instructions?: string
+  medicines_prescribed?: string
+  follow_up_instructions?: string
+  next_review_date?: string
+  doctor_registration_number?: string
+  doctor_specialization?: string
+  notes?: string
+  doctor_id?: string
+  patient_id?: string
+  treatment_plan_items?: TreatmentItem[]
+  _previousSummary?: string
+}
 
 const TYPE_TO_VISUAL: Record<string, string> = {
   "Dental Caries": "Decayed", "Composite Filling": "Restored",
@@ -51,14 +87,14 @@ function CollapsibleSection({ title, defaultOpen, children }: { title: string; d
   )
 }
 
-export function apiToFinding(api: any): ToothFinding {
+export function apiToFinding(api: ClinicalFinding & { dentition_type?: string }): ToothFinding {
   const surfaces = api.surface
-    ? api.surface.split(",").map((s: string) => CODE_TO_SURFACE[s.trim()]).filter(Boolean) as any[]
+    ? api.surface.split(",").map((s: string) => CODE_TO_SURFACE[s.trim()]).filter(Boolean) as ToothSurface[]
     : []
   return {
     id: api.id || `api-${Date.now()}`,
     toothNumber: parseInt(api.tooth_number) || 0,
-    condition: (TYPE_TO_VISUAL[api.finding_type] || "Decayed") as any,
+    condition: (TYPE_TO_VISUAL[api.finding_type] || "Decayed") as ToothCondition,
     surfaces: surfaces.length > 0 ? surfaces : undefined,
     description: api.notes || undefined,
     date: (api.created_at || new Date().toISOString()).split("T")[0],
@@ -97,8 +133,8 @@ function buildFindingsPayload(findings: ToothFinding[], mode: "create" | "edit")
   }))
 }
 
-function cleanPayload(payload: Record<string, any>): Record<string, any> {
-  const cleaned: Record<string, any> = {}
+function cleanPayload(payload: Record<string, unknown>): Record<string, unknown> {
+  const cleaned: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(payload)) {
     if (v === "" || v === undefined || v === null || k.startsWith("_")) continue
     cleaned[k] = v
@@ -108,9 +144,9 @@ function cleanPayload(payload: Record<string, any>): Record<string, any> {
 
 interface CaseReportFormProps {
   mode: "create" | "edit"
-  initialData?: Record<string, any>
+  initialData?: Record<string, unknown>
   initialFindings?: ToothFinding[]
-  onSubmit: (payload: Record<string, any>) => Promise<void>
+  onSubmit: (payload: Record<string, unknown>) => Promise<void>
   onCancel?: () => void
   patientName?: string
   opNumber?: string
@@ -129,13 +165,13 @@ export default function CaseReportForm({
   doctorName,
   visitDate,
 }: CaseReportFormProps) {
-  const [form, setForm] = useState<Record<string, any>>(() => {
+  const [form, setForm] = useState<CaseFormData>(() => {
     const data = initialData || {}
     if (!data.treatment_plan_items && data.initial_treatment_plan && typeof data.initial_treatment_plan === "string" && data.initial_treatment_plan.startsWith("_JSON_")) {
       try {
         const parsed = JSON.parse(data.initial_treatment_plan.slice(6))
         if (Array.isArray(parsed) && parsed.length > 0) {
-          data.treatment_plan_items = parsed.map((t: any, i: number) => ({
+            data.treatment_plan_items = parsed.map((t: Partial<TreatmentItem>, i: number) => ({
             id: `loaded-${i}-${Date.now()}`,
             name: t.name || "",
             toothNumbers: t.toothNumbers || [],
@@ -152,7 +188,7 @@ export default function CaseReportForm({
   const [saving, setSaving] = useState(false)
 
   const [patientSearch, setPatientSearch] = useState("")
-  const [selectedPatient, setSelectedPatient] = useState<any>(null)
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
   const [doctorId, setDoctorId] = useState("")
 
   const { data: patientResults } = useQuery({
@@ -160,19 +196,19 @@ export default function CaseReportForm({
     queryFn: () => patientsApi.search({ q: patientSearch, limit: 10 }),
     enabled: patientSearch.length >= 2,
   })
-  const patients: any[] = Array.isArray(patientResults)
+  const patients: Patient[] = Array.isArray(patientResults)
     ? patientResults
     : patientResults?.data || patientResults?.patients || []
 
   const { data: doctors } = useQuery({
     queryKey: ["doctors-form"],
-    queryFn: () => doctorsApi.list({ limit: 200 }).then((r: any) => {
+    queryFn: () => doctorsApi.list({ limit: 200 }).then((r) => {
       if (Array.isArray(r)) return r
       if (r?.users) return r.users
       return []
     }),
   })
-  const doctorsList: any[] = Array.isArray(doctors) ? doctors : []
+  const doctorsList = Array.isArray(doctors) ? doctors : []
 
   useEffect(() => {
     if (initialData) {
@@ -181,7 +217,7 @@ export default function CaseReportForm({
         try {
           const parsed = JSON.parse(data.initial_treatment_plan.slice(6))
           if (Array.isArray(parsed) && parsed.length > 0) {
-            data.treatment_plan_items = parsed.map((t: any, i: number) => ({
+        data.treatment_plan_items = parsed.map((t: Partial<TreatmentItem>, i: number) => ({
               id: `loaded-${i}-${Date.now()}`,
               name: t.name || "",
               toothNumbers: t.toothNumbers || [],
@@ -205,9 +241,9 @@ export default function CaseReportForm({
   useEffect(() => {
     const currentSummary = form.clinical_findings_summary
     if (!currentSummary || currentSummary === (form._previousSummary || "")) {
-      setForm((prev: any) => ({ ...prev, clinical_findings_summary: findingsSummary, _previousSummary: findingsSummary }))
+      setForm((prev) => ({ ...prev, clinical_findings_summary: findingsSummary, _previousSummary: findingsSummary }))
     }
-  }, [findingsSummary])
+  }, [findingsSummary, form._previousSummary, form.clinical_findings_summary])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -224,7 +260,7 @@ export default function CaseReportForm({
           })))
         : form.initial_treatment_plan || ""
 
-      const payload: Record<string, any> = {
+      const payload: Record<string, unknown> = {
         ...form,
         initial_treatment_plan: serializedPlan,
         treatment_plan_estimated_cost: form.treatment_plan_estimated_cost ? Number(form.treatment_plan_estimated_cost) : null,
@@ -248,8 +284,8 @@ export default function CaseReportForm({
     }
   }
 
-  function setV(key: string, value: any) {
-    setForm((prev: any) => ({ ...prev, [key]: value }))
+  function setV<K extends keyof CaseFormData>(key: K, value: CaseFormData[K]) {
+    setForm((prev) => ({ ...prev, [key]: value }))
   }
 
   const compact = mode === "create"
@@ -269,7 +305,7 @@ export default function CaseReportForm({
             />
             {patientSearch.length >= 2 && patients.length > 0 && (
               <div className="border rounded-md max-h-[120px] overflow-y-auto">
-                {patients.map((p: any) => (
+                {patients.map((p) => (
                   <div
                     key={p.id}
                     className={`px-3 py-1.5 text-xs cursor-pointer hover:bg-muted flex justify-between ${selectedPatient?.id === p.id ? "bg-muted font-medium" : ""}`}
@@ -293,7 +329,7 @@ export default function CaseReportForm({
             <Select value={doctorId} onValueChange={setDoctorId}>
               <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select doctor" /></SelectTrigger>
               <SelectContent>
-                {doctorsList.map((d: any) => (
+                {doctorsList.map((d: Record<string, string>) => (
                   <SelectItem key={d.id} value={d.id}>{d.full_name || d.name || d.username}</SelectItem>
                 ))}
               </SelectContent>

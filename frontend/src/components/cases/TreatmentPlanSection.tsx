@@ -34,9 +34,7 @@ function nextId() {
 export default function TreatmentPlanSection({
   treatments,
   onChange,
-  estimatedVisits,
   onEstimatedVisitsChange,
-  estimatedCost,
   onEstimatedCostChange,
 }: TreatmentPlanSectionProps) {
   const [search, setSearch] = useState("")
@@ -53,7 +51,16 @@ export default function TreatmentPlanSection({
   const treatmentNames: string[] = useMemo(() => {
     if (!treatmentTypes) return []
     const list = Array.isArray(treatmentTypes) ? treatmentTypes : treatmentTypes?.data || []
-    return list.map((t: any) => t.name)
+    const seen = new Set<string>()
+    const unique: string[] = []
+    for (const t of list) {
+      const name = (t.name || "").trim()
+      if (name && !seen.has(name)) {
+        seen.add(name)
+        unique.push(name)
+      }
+    }
+    return unique
   }, [treatmentTypes])
 
   useEffect(() => {
@@ -90,7 +97,7 @@ export default function TreatmentPlanSection({
   useEffect(() => {
     onEstimatedVisitsChange(String(totals.visits))
     onEstimatedCostChange(String(totals.cost))
-  }, [totals.visits, totals.cost])
+  }, [totals.visits, totals.cost, onEstimatedCostChange, onEstimatedVisitsChange])
 
   function addTreatment(name: string) {
     if (treatments.some((t) => t.name === name)) return

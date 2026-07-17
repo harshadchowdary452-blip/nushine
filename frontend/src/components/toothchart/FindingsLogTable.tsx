@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { type ToothFinding, SURFACE_LABELS, CONDITION_LABELS, TOOTH_NAMES } from './types'
+import { type ToothFinding, SURFACE_LABELS, TOOTH_NAMES } from './types'
 
 interface FindingsLogTableProps {
   findings: ToothFinding[]

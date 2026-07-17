@@ -4,22 +4,39 @@ import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "react-router-dom"
 import {
   LayoutDashboard, Megaphone, CalendarDays, MessageSquare, FileText, BarChart3,
-  Bell, Settings, Clock, Plus, Send, Trash2, Edit3, Target
+  Plus, Send, Trash2, Edit3,
 } from "lucide-react"
 import { crmApi, campaignsApi } from "@/services/endpoints"
 import PageHeader from "@/components/layout/page-header"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { useToast } from "@/components/ui/toast"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import CrmDashboard from "@/pages/dashboard/crm-dashboard"
 import EnquiryCalendar from "@/pages/crm/enquiry-calendar"
+
+interface CrmCampaign {
+  id: string
+  name: string
+  status: string
+  type: string
+  message?: string
+  target_audience?: string
+  sent_count?: number
+}
+
+interface CrmTemplate {
+  id: string
+  name: string
+  body?: string
+  subject?: string
+  is_active: boolean
+}
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.05 } } }
 
@@ -33,7 +50,6 @@ const statusBadge: Record<string, string> = {
 
 export default function CrmPage() {
   const navigate = useNavigate()
-  const { addToast } = useToast()
   const [campaignOpen, setCampaignOpen] = useState(false)
   const [campaignName, setCampaignName] = useState("")
   const [campaignType, setCampaignType] = useState("GENERAL")
@@ -43,13 +59,13 @@ export default function CrmPage() {
     queryKey: ["crm-campaigns"],
     queryFn: () => campaignsApi.list(),
   })
-  const campaigns: any[] = Array.isArray(campaignsData) ? campaignsData : campaignsData?.items || []
+  const campaigns: CrmCampaign[] = Array.isArray(campaignsData) ? campaignsData : campaignsData?.items || []
 
   const { data: templatesData } = useQuery({
     queryKey: ["crm", "templates"],
     queryFn: () => crmApi.templates.list(),
   })
-  const templates: any[] = Array.isArray(templatesData) ? templatesData : templatesData?.items || []
+  const templates: CrmTemplate[] = Array.isArray(templatesData) ? templatesData : templatesData?.items || []
 
   return (
     <motion.div className="space-y-6" variants={container} initial="hidden" animate="show">
@@ -96,7 +112,7 @@ export default function CrmPage() {
             </Card>
           ) : (
             <div className="space-y-3">
-              {campaigns.map((c: any) => (
+              {campaigns.map((c: CrmCampaign) => (
                 <Card key={c.id} className="p-4 border-border shadow-card">
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
@@ -137,7 +153,7 @@ export default function CrmPage() {
             </Card>
           ) : (
             <div className="grid gap-3 md:grid-cols-2">
-              {templates.map((t: any) => (
+              {templates.map((t: CrmTemplate) => (
                 <Card key={t.id} className="p-4 border-border shadow-card">
                   <div className="flex items-center gap-2 mb-2">
                     <FileText className="h-4 w-4 text-primary" />

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, and_, or_, func, not_
 from typing import List, Optional
 from app.database import get_db
 from app.dependencies import get_current_user
@@ -19,9 +19,24 @@ async def list_treatment_types(
     hospital_id = current_user.get("hospital_id")
     q = select(TreatmentType).where(TreatmentType.is_active == True)
     if hospital_id:
-        q = q.where(
-            (TreatmentType.hospital_id == hospital_id) | (TreatmentType.hospital_id.is_(None))
+        hosp_names = (
+            select(TreatmentType.name)
+            .where(
+                TreatmentType.hospital_id == hospital_id,
+                TreatmentType.is_active == True,
+            )
         )
+        q = q.where(
+            or_(
+                TreatmentType.hospital_id == hospital_id,
+                and_(
+                    TreatmentType.hospital_id.is_(None),
+                    not_(TreatmentType.name.in_(hosp_names)),
+                ),
+            )
+        )
+    else:
+        q = q.where(TreatmentType.hospital_id.is_(None))
     q = q.order_by(TreatmentType.name)
     result = await db.execute(q)
     return result.scalars().all()
@@ -38,7 +53,11 @@ async def create_treatment_type(
     existing = await db.execute(
         select(TreatmentType).where(
             TreatmentType.name == data.name,
-            TreatmentType.hospital_id == hospital_id,
+            or_(
+                TreatmentType.hospital_id == hospital_id,
+                TreatmentType.hospital_id.is_(None),
+            ),
+            TreatmentType.is_active == True,
         )
     )
     if existing.scalar_one_or_none():
@@ -101,7 +120,11 @@ async def seed_treatment_types(
         existing = await db.execute(
             select(TreatmentType).where(
                 TreatmentType.name == name,
-                TreatmentType.hospital_id == hospital_id,
+                or_(
+                    TreatmentType.hospital_id == hospital_id,
+                    TreatmentType.hospital_id.is_(None),
+                ),
+                TreatmentType.is_active == True,
             )
         )
         if not existing.scalar_one_or_none():

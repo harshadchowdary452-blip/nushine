@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Settings, Plus, Trash2, Loader2, ToggleLeft, ToggleRight, Database, Clock, User, Flag } from "lucide-react"
+import { Settings, Plus, Trash2, Loader2, ToggleLeft, ToggleRight, Database, Clock } from "lucide-react"
 import { crmSettingsApi, treatmentTypesApi } from "@/services/endpoints"
 import PageHeader from "@/components/layout/page-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,6 +12,28 @@ import { useToast } from "@/components/ui/toast"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import type { ApiError } from "@/types"
+
+interface CrmRule {
+  id: string
+  treatment_type_name?: string
+  treatment_name?: string
+  is_active: boolean
+  follow_up_1_day?: boolean
+  follow_up_7_day?: boolean
+  recall_6_month?: boolean
+  recall_12_month?: boolean
+  custom_recall_days?: number | null
+}
+
+interface TreatmentType {
+  id: string
+  name: string
+}
+
+interface SeedResult {
+  seeded?: string[]
+}
 
 export default function CrmSettings() {
   const queryClient = useQueryClient()
@@ -28,28 +50,28 @@ export default function CrmSettings() {
     queryKey: ["crm-settings", "rules"],
     queryFn: () => crmSettingsApi.rules.list(),
   })
-  const rulesList: any[] = rules || []
+  const rulesList: CrmRule[] = rules || []
 
   const { data: opdSettings } = useQuery({
     queryKey: ["crm-settings", "opd"],
     queryFn: () => crmSettingsApi.opd.get(),
   })
-  const opdSetting: any = Array.isArray(opdSettings) ? opdSettings[0] : opdSettings
+  const opdSetting: Record<string, unknown> | null = Array.isArray(opdSettings) ? opdSettings[0] : opdSettings
 
   const { data: treatmentTypes } = useQuery({
     queryKey: ["treatment-types"],
     queryFn: () => treatmentTypesApi.list(),
   })
-  const treatmentTypesList: any[] = treatmentTypes || []
+  const treatmentTypesList: TreatmentType[] = treatmentTypes || []
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => crmSettingsApi.rules.create(data),
+    mutationFn: (data: Record<string, unknown>) => crmSettingsApi.rules.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["crm-settings"] })
       addToast({ title: "Rule Created", variant: "success" })
       setOpen(false); setSelectedTypeId(""); setFu1Day(true); setFu7Day(true); setRecall6m(true); setRecall12m(true); setCustomDays("")
     },
-    onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed", variant: "destructive" }),
+    onError: (err: ApiError) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed", variant: "destructive" }),
   })
 
   const deleteMutation = useMutation({
@@ -58,7 +80,7 @@ export default function CrmSettings() {
       queryClient.invalidateQueries({ queryKey: ["crm-settings"] })
       addToast({ title: "Deleted", variant: "success" })
     },
-    onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed", variant: "destructive" }),
+    onError: (err: ApiError) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed", variant: "destructive" }),
   })
 
   const toggleMutation = useMutation({
@@ -70,20 +92,20 @@ export default function CrmSettings() {
 
   const seedMutation = useMutation({
     mutationFn: () => treatmentTypesApi.seed(),
-    onSuccess: (data: any) => {
+    onSuccess: (data: SeedResult) => {
       queryClient.invalidateQueries({ queryKey: ["treatment-types"] })
       addToast({ title: "Seeded", description: `Created ${data.seeded?.length || 0} treatment types`, variant: "success" })
     },
-    onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Seed failed", variant: "destructive" }),
+    onError: (err: ApiError) => addToast({ title: "Error", description: err?.response?.data?.detail || "Seed failed", variant: "destructive" }),
   })
 
   const opdUpdateMutation = useMutation({
-    mutationFn: (data: any) => crmSettingsApi.opd.update(data),
+    mutationFn: (data: Record<string, unknown>) => crmSettingsApi.opd.update(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["crm-settings"] })
       addToast({ title: "OPD Settings Updated", variant: "success" })
     },
-    onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to update OPD settings", variant: "destructive" }),
+    onError: (err: ApiError) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to update OPD settings", variant: "destructive" }),
   })
 
   return (
@@ -115,7 +137,7 @@ export default function CrmSettings() {
             </div>
           ) : (
             <div className="space-y-3">
-              {rulesList.map((r: any) => (
+              {rulesList.map((r: CrmRule) => (
                 <div key={r.id} className="flex items-center justify-between rounded-lg border p-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 mb-1">
@@ -231,7 +253,7 @@ export default function CrmSettings() {
                     <SelectValue placeholder="Select treatment type" />
                   </SelectTrigger>
                   <SelectContent position="popper" className="max-h-[200px] overflow-y-auto">
-                    {treatmentTypesList.map((tt: any) => (
+                    {treatmentTypesList.map((tt: TreatmentType) => (
                       <SelectItem key={tt.id} value={tt.id}>{tt.name}</SelectItem>
                     ))}
                   </SelectContent>

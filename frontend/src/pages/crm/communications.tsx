@@ -11,6 +11,16 @@ import { Badge } from "@/components/ui/badge"
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.05 } } }
 
+interface CommunicationItem {
+  id: string
+  channel: string
+  message: string
+  subject?: string
+  message_type?: string
+  status: string
+  sent_at?: string
+}
+
 const channelIcons: Record<string, React.ElementType> = {
   WHATSAPP: MessageSquare,
   EMAIL: Mail,
@@ -84,8 +94,8 @@ export default function CommunicationHistory() {
           ) : (
             <div className="space-y-3">
               {items
-                .filter((c: any) => !search || c.message?.toLowerCase().includes(search.toLowerCase()) || c.subject?.toLowerCase().includes(search.toLowerCase()))
-                .map((c: any) => {
+                .filter((c: CommunicationItem) => !search || c.message?.toLowerCase().includes(search.toLowerCase()) || c.subject?.toLowerCase().includes(search.toLowerCase()))
+                .map((c: CommunicationItem) => {
                   const Icon = channelIcons[c.channel] || MessageSquare
                   return (
                     <div key={c.id} className="flex items-start gap-4 rounded-lg border p-4 transition-colors hover:bg-gray-50">

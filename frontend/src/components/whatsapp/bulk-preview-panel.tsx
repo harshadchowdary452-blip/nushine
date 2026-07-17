@@ -1,11 +1,10 @@
 import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { CheckCircle2, XCircle, AlertTriangle, Send, ExternalLink, Smartphone, Loader2 } from "lucide-react"
-import type { Patient } from "@/types"
 
 interface BulkItem {
   patient_id: string

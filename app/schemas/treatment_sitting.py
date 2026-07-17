@@ -16,6 +16,7 @@ class TreatmentSittingCreate(BaseModel):
     prescription: Optional[str] = None
     next_appointment_date: Optional[date] = None
     next_appointment_time: Optional[time] = None
+    next_appointment_doctor_id: Optional[str] = None
     next_visit_required: Optional[bool] = True
     materials_used: Optional[str] = None
     duration_minutes: Optional[int] = None
@@ -41,6 +42,7 @@ class TreatmentSittingUpdate(BaseModel):
     prescription: Optional[str] = None
     next_appointment_date: Optional[date] = None
     next_appointment_time: Optional[time] = None
+    next_appointment_doctor_id: Optional[str] = None
     next_visit_required: Optional[bool] = None
     materials_used: Optional[str] = None
     duration_minutes: Optional[int] = None
@@ -70,6 +72,8 @@ class TreatmentSittingResponse(BaseModel):
     prescription: Optional[str] = None
     next_appointment_date: Optional[date]
     next_appointment_time: Optional[time]
+    next_appointment_doctor_id: Optional[str] = None
+    next_appointment_doctor_name: Optional[str] = None
     next_visit_required: bool = True
     materials_used: Optional[str] = None
     duration_minutes: Optional[int] = None

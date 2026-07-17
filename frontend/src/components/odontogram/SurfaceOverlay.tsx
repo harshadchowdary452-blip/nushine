@@ -1,5 +1,5 @@
 import React, { memo } from 'react'
-import { getSurfaceClips, type SurfaceClips, SURFACE_LABELS } from './toothPaths'
+import { getSurfaceClips } from './toothPaths'
 import type { Finding, FindingType } from './Odontogram'
 
 interface SurfaceOverlayProps {
@@ -13,22 +13,6 @@ interface SurfaceOverlayProps {
   hoveredSurface: string | null
   onSurfaceClick: (surface: string) => void
   onSurfaceHover: (surface: string | null) => void
-}
-
-const SURFACE_COLORS: Record<string, { active: string; hover: string; finding: string }> = {
-  mesial:   { active: '#3B82F6', hover: 'rgba(59,130,246,0.25)', finding: '#8B4513' },
-  distal:   { active: '#3B82F6', hover: 'rgba(59,130,246,0.25)', finding: '#8B4513' },
-  labial:   { active: '#3B82F6', hover: 'rgba(59,130,246,0.25)', finding: '#8B4513' },
-  buccal:   { active: '#3B82F6', hover: 'rgba(59,130,246,0.25)', finding: '#8B4513' },
-  incisal:  { active: '#3B82F6', hover: 'rgba(59,130,246,0.25)', finding: '#8B4513' },
-  occlusal: { active: '#3B82F6', hover: 'rgba(59,130,246,0.25)', finding: '#8B4513' },
-  root:     { active: '#3B82F6', hover: 'rgba(59,130,246,0.25)', finding: '#8B4513' },
-}
-
-function surfaceHasFinding(findings: Finding[], surface: string, toothNum: number): boolean {
-  return findings.some(
-    (f) => f.toothNumber === String(toothNum) && f.surface?.toLowerCase() === surface.toLowerCase()
-  )
 }
 
 function surfaceFindingColor(findings: Finding[], surface: string, toothNum: number): string | null {
@@ -46,7 +30,7 @@ function surfaceFindingColor(findings: Finding[], surface: string, toothNum: num
 }
 
 const SurfacePath = memo(function SurfacePath({
-  surfaceKey,
+  surfaceKey: _surfaceKey,
   outline,
   clipPathId,
   isSelected,
@@ -96,8 +80,8 @@ export default memo(function SurfaceOverlay({
   toothNum,
   outline,
   isAnterior,
-  isUpper,
-  isMirror,
+  isUpper: _isUpper,
+  isMirror: _isMirror,
   findings,
   selectedSurface,
   hoveredSurface,

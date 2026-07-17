@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { useMutation, useQuery } from "@tanstack/react-query"
-import { User, Lock, Save, Loader2, CheckCircle, AlertCircle, Building2, Shield, Mail, Phone, Stethoscope, BadgeCheck } from "lucide-react"
+import { useMutation } from "@tanstack/react-query"
+import { User, Lock, Save, Loader2, AlertCircle, Mail, Phone, Stethoscope, BadgeCheck } from "lucide-react"
 import { useAuthStore } from "@/store/authStore"
 import { authApi } from "@/services/endpoints"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -9,9 +9,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/toast"
-import { Separator } from "@/components/ui/separator"
+
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import type { User as UserType, ApiError } from "@/types"
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } }
 
@@ -37,7 +38,7 @@ export default function Settings() {
   const updateMutation = useMutation({
     mutationFn: (data: typeof profile) => authApi.updateProfile(data),
     onSuccess: () => {
-      setUser({ ...user!, ...profile } as any)
+      setUser({ ...user!, ...profile } as UserType)
       addToast({ title: "Profile updated", description: "Your profile has been saved successfully.", variant: "success" })
     },
     onError: () => addToast({ title: "Error", description: "Failed to update profile.", variant: "destructive" }),
@@ -50,8 +51,8 @@ export default function Settings() {
       setPassword({ current_password: "", new_password: "", confirm_password: "" })
       setPasswordError("")
     },
-    onError: (err: any) => {
-      const msg = err?.response?.data?.detail || "Failed to change password."
+    onError: (err: unknown) => {
+      const msg = (err as ApiError)?.response?.data?.detail || "Failed to change password."
       setPasswordError(msg)
     },
   })

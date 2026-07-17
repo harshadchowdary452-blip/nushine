@@ -2,8 +2,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFoo
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Send, ExternalLink, AlertTriangle, CheckCircle2, XCircle, User, Phone, Stethoscope, Building2, CalendarDays, Clock, Pill, Receipt, Heart } from "lucide-react"
+
+import { Send, ExternalLink, AlertTriangle, CheckCircle2, XCircle, User, Phone, Stethoscope, Building2, CalendarDays, Pill, Heart } from "lucide-react"
 
 interface PreviewData {
   patient_id: string
@@ -34,7 +34,6 @@ export default function WhatsAppPreviewModal({ open, onClose, preview, loading, 
   if (!preview) return null
 
   const isValid = preview.validation.patient_exists && preview.validation.has_phone
-  const hasAllVars = preview.unresolved_variables.length === 0
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>

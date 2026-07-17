@@ -1,12 +1,13 @@
-import { useState, useEffect } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   Phone, MessageCircle, CheckCircle, Loader2,
   Search, ChevronLeft, ChevronRight, ChevronsLeft, Calendar,
-  FileText, History, RotateCcw, User, Stethoscope, X, Copy, Check,
+  FileText, History, RotateCcw,
 } from "lucide-react"
 import { format, addDays, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addWeeks, subWeeks, addMonths, subMonths } from "date-fns"
 import { enquiriesApi, crmApi, appointmentsApi, doctorsApi, whatsappTemplatesApi } from "@/services/endpoints"
+import { extractDetail } from "@/types"
 import PageHeader from "@/components/layout/page-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -20,6 +21,55 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
+
+interface CalendarItem {
+  id: string
+  source?: string
+  patient_name?: string
+  patient_phone?: string
+  op_number?: string
+  doctor_id?: string
+  doctor_name?: string
+  treatment_type?: string
+  treatment_name?: string
+  follow_up_type?: string
+  due_date?: string
+  status?: string
+  response_status?: string
+  feedback?: string
+  staff_notes?: string
+  response?: string
+  next_action?: string
+  last_contact_date?: string
+  patient_id?: string
+  appointment_date?: string
+  hospital_phone?: string
+}
+
+interface DoctorItem {
+  id: string
+  full_name?: string
+  name?: string
+  username?: string
+}
+
+interface TimelineEntry {
+  id?: string
+  created_at?: string
+  action?: string
+  status?: string
+  follow_up_type?: string
+  notes?: string
+  patient_feedback?: string
+  response_summary?: string
+}
+
+interface WhatsAppTemplate {
+  id?: string
+  name?: string
+  message?: string
+  is_active?: boolean
+}
 
 const DEFAULT_ENQUIRY_TEMPLATE = `Hello {{patient_name}},
 
@@ -117,16 +167,16 @@ export default function EnquiryCalendar() {
     queryKey: ["enquiry-calendar", dateRange.start, dateRange.end, statusFilter, typeFilter],
     queryFn: () => enquiriesApi.calendar({ start_date: dateRange.start, end_date: dateRange.end, status: statusFilter || undefined, type: typeFilter || undefined }),
   })
-  const allItems: any[] = items || []
+  const allItems: CalendarItem[] = (items as CalendarItem[]) || []
 
   const searchedItems = searchQuery
-    ? allItems.filter((i: any) =>
+    ? allItems.filter((i: CalendarItem) =>
         (i.patient_name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
         (i.op_number || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
         (i.treatment_name || "").toLowerCase().includes(searchQuery.toLowerCase()))
     : allItems
 
-  const filteredItems = viewMode === "day" ? searchedItems.filter((i: any) => i.due_date === selectedDate) : searchedItems
+  const filteredItems = viewMode === "day" ? searchedItems.filter((i: CalendarItem) => i.due_date === selectedDate) : searchedItems
 
   // --- Doctors scoped to hospital ---
   const currentUser = (() => {
@@ -136,18 +186,19 @@ export default function EnquiryCalendar() {
 
   const { data: doctors } = useQuery({
     queryKey: ["doctors-list", hospitalId],
-    queryFn: () => doctorsApi.list(hospitalId ? { hospital_id: hospitalId, limit: 200 } : { limit: 200 }).then((r: any) => {
-      if (Array.isArray(r)) return r
-      if (r?.users) return r.users
-      if (r?.data) return r.data
+    queryFn: () => doctorsApi.list(hospitalId ? { hospital_id: hospitalId, limit: 200 } : { limit: 200 }).then((r: unknown) => {
+      if (Array.isArray(r)) return r as DoctorItem[]
+      const resp = r as Record<string, unknown> | undefined
+      if (resp?.users) return resp.users as DoctorItem[]
+      if (resp?.data) return resp.data as DoctorItem[]
       return []
     }),
   })
-  const doctorsList: any[] = Array.isArray(doctors) ? doctors : []
+  const doctorsList: DoctorItem[] = Array.isArray(doctors) ? doctors : []
 
   // --- Feedback Dialog ---
   const [feedbackOpen, setFeedbackOpen] = useState<string | null>(null)
-  const [feedbackItem, setFeedbackItem] = useState<any>(null)
+  const [feedbackItem, setFeedbackItem] = useState<CalendarItem | null>(null)
   const [fbResponseStatus, setFbResponseStatus] = useState("")
   const [fbPatientFeedback, setFbPatientFeedback] = useState("")
   const [fbStaffNotes, setFbStaffNotes] = useState("")
@@ -171,7 +222,7 @@ export default function EnquiryCalendar() {
   })
   const fbSlotsList: string[] = Array.isArray(fbSlots) ? fbSlots : fbSlots?.slots ? fbSlots.slots : []
 
-  function openFeedback(item: any, channel?: string) {
+  function openFeedback(item: CalendarItem, _channel?: string) {
     setFeedbackItem(item)
     setFeedbackOpen(item.id)
     setFbResponseStatus(item.response_status || "")
@@ -216,8 +267,8 @@ export default function EnquiryCalendar() {
       queryClient.invalidateQueries({ queryKey: ["dashboard-doctors"] })
       addToast({ title: "Feedback saved", variant: "success" })
       closeFeedback()
-    } catch (err: any) {
-      addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to save feedback", variant: "destructive" })
+    } catch (err: unknown) {
+      addToast({ title: "Error", description: extractDetail(err) || "Failed to save feedback", variant: "destructive" })
     }
     setFbSaving(false)
   }
@@ -244,8 +295,8 @@ export default function EnquiryCalendar() {
       queryClient.invalidateQueries({ queryKey: ["dashboard-doctors"] })
       addToast({ title: "Appointment created & feedback saved", variant: "success" })
       closeFeedback()
-    } catch (err: any) {
-      addToast({ title: "Error", description: err?.response?.data?.detail || "Booking failed", variant: "destructive" })
+    } catch (err: unknown) {
+      addToast({ title: "Error", description: extractDetail(err) || "Booking failed", variant: "destructive" })
     }
     setFbApptSaving(false)
   }
@@ -259,8 +310,8 @@ export default function EnquiryCalendar() {
       queryClient.invalidateQueries({ queryKey: ["crm-enhanced-dashboard"] })
       queryClient.invalidateQueries({ queryKey: ["dashboard-doctors"] })
       addToast({ title: "Marked completed, dashboard updated", variant: "success" })
-    } catch (err: any) {
-      addToast({ title: "Error", description: err?.response?.data?.detail || "Failed", variant: "destructive" })
+    } catch (err: unknown) {
+      addToast({ title: "Error", description: extractDetail(err) || "Failed", variant: "destructive" })
     }
   }
 
@@ -278,15 +329,15 @@ export default function EnquiryCalendar() {
       queryClient.invalidateQueries({ queryKey: ["enquiry-calendar"] })
       addToast({ title: "Rescheduled", variant: "success" })
       setReschedOpen(null); setReschedSaving(false)
-    } catch (err: any) {
-      addToast({ title: "Error", description: err?.response?.data?.detail || "Failed", variant: "destructive" })
+    } catch (err: unknown) {
+      addToast({ title: "Error", description: extractDetail(err) || "Failed", variant: "destructive" })
       setReschedSaving(false)
     }
   }
 
   // --- Appointment Booking Dialog ---
   const [apptOpen, setApptOpen] = useState<string | null>(null)
-  const [apptItem, setApptItem] = useState<any>(null)
+  const [apptItem, setApptItem] = useState<CalendarItem | null>(null)
   const [apptDoctorId, setApptDoctorId] = useState("")
   const [apptDate, setApptDate] = useState("")
   const [apptTime, setApptTime] = useState("")
@@ -300,7 +351,7 @@ export default function EnquiryCalendar() {
   const slotsList: string[] = Array.isArray(availableSlots) ? availableSlots :
     availableSlots?.slots ? availableSlots.slots : []
 
-  function openAppointment(item: any) {
+  function openAppointment(item: CalendarItem) {
     setApptItem(item)
     setApptOpen(item.id)
     setApptDoctorId(item.doctor_id || "")
@@ -333,20 +384,20 @@ export default function EnquiryCalendar() {
       queryClient.invalidateQueries({ queryKey: ["dashboard-doctors"] })
       addToast({ title: "Appointment created, timeline & dashboard updated", variant: "success" })
       setApptOpen(null); setApptItem(null); setApptDoctorId(""); setApptDate(""); setApptTime(""); setApptSaving(false)
-    } catch (err: any) {
-      addToast({ title: "Error", description: err?.response?.data?.detail || "Booking failed", variant: "destructive" })
+    } catch (err: unknown) {
+      addToast({ title: "Error", description: extractDetail(err) || "Booking failed", variant: "destructive" })
       setApptSaving(false)
     }
   }
 
   // --- WhatsApp Dialog ---
   const [waOpen, setWaOpen] = useState<string | null>(null)
-  const [waItem, setWaItem] = useState<any>(null)
+  const [waItem, setWaItem] = useState<CalendarItem | null>(null)
   const [waMessage, setWaMessage] = useState("")
   const [waLoading, setWaLoading] = useState(false)
   const [waTemplateError, setWaTemplateError] = useState("")
 
-  function buildWhatsAppVars(item: any): Record<string, string> {
+  function buildWhatsAppVars(item: CalendarItem): Record<string, string> {
     return {
       patient_name: item.patient_name || "Patient",
       doctor_name: item.doctor_name || "Doctor",
@@ -357,7 +408,7 @@ export default function EnquiryCalendar() {
     }
   }
 
-  async function openWhatsApp(item: any) {
+  async function openWhatsApp(item: CalendarItem) {
     const phone = item.patient_phone
     if (!phone) { addToast({ title: "Patient mobile number is not available.", variant: "destructive" }); return }
     setWaItem(item)
@@ -367,8 +418,8 @@ export default function EnquiryCalendar() {
     // Try to load backend template named "Enquiry Follow-Up" or "1-Day Enquiry"
     try {
       const templates = await whatsappTemplatesApi.list({ hospital_id: currentUser?.hospital_id })
-      const list: any[] = Array.isArray(templates) ? templates : templates?.items || templates?.data || []
-      const template = list.find((t: any) =>
+      const list: WhatsAppTemplate[] = Array.isArray(templates) ? templates : (templates as { items?: WhatsAppTemplate[]; data?: WhatsAppTemplate[] })?.items || (templates as { items?: WhatsAppTemplate[]; data?: WhatsAppTemplate[] })?.data || []
+      const template = list.find((t: WhatsAppTemplate) =>
         t.is_active !== false && t.name && /enquiry|follow.?up/i.test(t.name) && t.message
       )
       if (template && template.message) {
@@ -376,7 +427,7 @@ export default function EnquiryCalendar() {
         setWaMessage(replaceTemplateVars(template.message, vars))
       } else {
         // No enquiry template found, try any active template
-        const anyTemplate = list.find((t: any) => t.is_active !== false && t.message)
+        const anyTemplate = list.find((t: WhatsAppTemplate) => t.is_active !== false && t.message)
         if (anyTemplate?.message) {
           const vars = buildWhatsAppVars(item)
           setWaMessage(replaceTemplateVars(anyTemplate.message, vars))
@@ -408,13 +459,13 @@ export default function EnquiryCalendar() {
     try {
       await crmApi.followUps.update(waOpen, { status: "CONTACTED", contact_channel: "WHATSAPP", whatsapp_message: waMessage })
       queryClient.invalidateQueries({ queryKey: ["enquiry-calendar"] })
-    } catch {}
+    } catch { /* follow-up update failed, ignore */ }
     setWaOpen(null); setWaMessage(""); setWaTemplateError("")
     setTimeout(() => openFeedback(waItem, "WHATSAPP"), 800)
   }
 
   // --- Call handler ---
-  function handleCall(item: any) {
+  function handleCall(item: CalendarItem) {
     const phone = item.patient_phone
     if (!phone) { addToast({ title: "No phone number for this patient", variant: "destructive" }); return }
     // Copy number to clipboard as fallback
@@ -431,13 +482,13 @@ export default function EnquiryCalendar() {
 
   // --- Timeline Dialog ---
   const [timelineOpen, setTimelineOpen] = useState<string | null>(null)
-  const [timelineItem, setTimelineItem] = useState<any>(null)
+  const [timelineItem, setTimelineItem] = useState<CalendarItem | null>(null)
   const { data: timelineData } = useQuery({
     queryKey: ["patient-timeline", timelineItem?.patient_id],
     queryFn: () => crmApi.patientFollowUpHistory(timelineItem.patient_id),
     enabled: !!timelineItem?.patient_id,
   })
-  const timelineEntries: any[] = Array.isArray(timelineData) ? timelineData : []
+  const timelineEntries: TimelineEntry[] = Array.isArray(timelineData) ? timelineData : []
 
   // --- Navigation ---
   function navDay(d: -1 | 1) { setSelectedDate(format(d > 0 ? addDays(selDate, 1) : subDays(selDate, 1), "yyyy-MM-dd")) }
@@ -452,12 +503,12 @@ export default function EnquiryCalendar() {
   const calEnd = endOfMonth(selDate)
 
   // --- Summary counts ---
-  const dayItems = allItems.filter((i: any) => i.due_date === selectedDate)
-  const dayFU = dayItems.filter((i: any) => i.follow_up_type === "1_DAY_FOLLOW_UP").length
-  const day7FU = dayItems.filter((i: any) => i.follow_up_type === "7_DAY_FOLLOW_UP").length
-  const day6m = dayItems.filter((i: any) => i.follow_up_type === "6_MONTH_RECALL").length
-  const day12m = dayItems.filter((i: any) => i.follow_up_type === "12_MONTH_RECALL").length
-  const dayOther = dayItems.filter((i: any) => !["1_DAY_FOLLOW_UP", "7_DAY_FOLLOW_UP", "6_MONTH_RECALL", "12_MONTH_RECALL"].includes(i.follow_up_type)).length
+  const dayItems = allItems.filter((i: CalendarItem) => i.due_date === selectedDate)
+  const dayFU = dayItems.filter((i: CalendarItem) => i.follow_up_type === "1_DAY_FOLLOW_UP").length
+  const day7FU = dayItems.filter((i: CalendarItem) => i.follow_up_type === "7_DAY_FOLLOW_UP").length
+  const day6m = dayItems.filter((i: CalendarItem) => i.follow_up_type === "6_MONTH_RECALL").length
+  const day12m = dayItems.filter((i: CalendarItem) => i.follow_up_type === "12_MONTH_RECALL").length
+  const dayOther = dayItems.filter((i: CalendarItem) => !["1_DAY_FOLLOW_UP", "7_DAY_FOLLOW_UP", "6_MONTH_RECALL", "12_MONTH_RECALL"].includes(i.follow_up_type)).length
 
   return (
     <div className="space-y-6">
@@ -558,7 +609,7 @@ export default function EnquiryCalendar() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredItems.map((item: any) => {
+                  {filteredItems.map((item: CalendarItem) => {
                     const isOverdue = item.due_date && item.due_date < format(today, "yyyy-MM-dd") && !["COMPLETED", "APPOINTMENT_BOOKED", "LOST", "CONVERTED"].includes(item.status)
                     return (
                       <TableRow key={`${item.source}-${item.id}`} className={isOverdue ? "bg-red-50/30" : ""}>
@@ -673,7 +724,7 @@ export default function EnquiryCalendar() {
               for (let i = 0; i < startDay; i++) cells.push(<div key={`e-${i}`} className="bg-gray-50 p-2" />)
               for (let d = 1; d <= daysInMonth; d++) {
                 const dateStr = `${format(selDate, "yyyy-MM")}-${String(d).padStart(2, "0")}`
-                const dayItems = allItems.filter((i: any) => i.due_date === dateStr)
+                const dayItems = allItems.filter((i: CalendarItem) => i.due_date === dateStr)
                 const isToday = dateStr === format(today, "yyyy-MM-dd")
                 const isSelected = dateStr === selectedDate
                 cells.push(
@@ -683,7 +734,7 @@ export default function EnquiryCalendar() {
                       ${isSelected ? "bg-blue-100 ring-2 ring-inset ring-blue-500" : ""}`}>
                     <div className={`text-xs font-bold ${isToday ? "text-blue-600" : isSelected ? "text-blue-700" : "text-gray-700"}`}>{d}</div>
                     <div className="text-[9px] text-blue-600 mt-0.5 leading-tight">
-                      {dayItems.slice(0, 3).map((item: any) => (
+                      {dayItems.slice(0, 3).map((item: CalendarItem) => (
                         <div key={item.id} className="truncate">{item.patient_name}</div>
                       ))}
                       {dayItems.length > 3 && <div className="text-gray-400">+{dayItems.length - 3}</div>}
@@ -751,7 +802,7 @@ export default function EnquiryCalendar() {
                     <SelectTrigger><SelectValue placeholder="Select doctor" /></SelectTrigger>
                     <SelectContent position="popper" className="max-h-[220px]">
                       {doctorsList.length === 0 && <SelectItem value="__loading__" disabled>No doctors available</SelectItem>}
-                      {doctorsList.map((doc: any) => (
+                      {doctorsList.map((doc: DoctorItem) => (
                         <SelectItem key={doc.id} value={doc.id}>{doc.full_name || doc.name || doc.username}</SelectItem>
                       ))}
                     </SelectContent>
@@ -858,7 +909,7 @@ export default function EnquiryCalendar() {
                 <SelectTrigger><SelectValue placeholder="Select doctor" /></SelectTrigger>
                 <SelectContent position="popper" className="max-h-[220px]">
                   {doctorsList.length === 0 && <SelectItem value="__loading__" disabled>No doctors available</SelectItem>}
-                  {doctorsList.map((doc: any) => (
+                  {doctorsList.map((doc: DoctorItem) => (
                     <SelectItem key={doc.id} value={doc.id}>{doc.full_name || doc.name || doc.username}</SelectItem>
                   ))}
                 </SelectContent>
@@ -947,7 +998,7 @@ export default function EnquiryCalendar() {
                 No timeline entries found for this patient.
               </div>
             ) : (
-              timelineEntries.map((entry: any, idx: number) => (
+              timelineEntries.map((entry: TimelineEntry, idx: number) => (
                 <div key={entry.id || idx} className="flex gap-3">
                   <div className="flex flex-col items-center">
                     <div className="w-2.5 h-2.5 rounded-full bg-primary mt-1.5" />

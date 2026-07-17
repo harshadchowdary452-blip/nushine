@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
-import { Plus, Search, Edit, Trash2, Shield, UserCog, Building2, ChevronDown, ChevronUp } from "lucide-react"
+import { Plus, Search, Edit, Trash2, Shield, Building2 } from "lucide-react"
 import { format } from "date-fns"
 import PageHeader from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
@@ -21,9 +21,10 @@ import {
 import { Card, CardContent } from "@/components/ui/card"
 import { groupsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
-import type { AdminGroup } from "@/types"
+import type { AdminGroup, ApiError } from "@/types"
 
 interface GroupForm {
+  [key: string]: unknown
   name: string
   description: string
   is_active: boolean
@@ -35,7 +36,6 @@ interface GroupForm {
 const emptyForm: GroupForm = { name: "", description: "", is_active: true, admin_email: "", admin_password: "", admin_full_name: "" }
 
 export default function AdminGroups() {
-  console.log("[PAGE] AdminGroups mounted", { path: window.location.pathname })
   const queryClient = useQueryClient()
   const { addToast } = useToast()
   const [search, setSearch] = useState("")
@@ -53,7 +53,7 @@ export default function AdminGroups() {
   const createMutation = useMutation({
     mutationFn: async (data: GroupForm) => {
       const { admin_email, admin_password, admin_full_name, ...groupData } = data
-      const newGroup: any = await groupsApi.create(groupData)
+      const newGroup = await groupsApi.create(groupData) as AdminGroup
       if (admin_email && admin_password) {
         await groupsApi.createAdmin(newGroup.id, {
           email: admin_email,
@@ -94,8 +94,8 @@ export default function AdminGroups() {
       setDeleteDialogOpen(false)
       setDeletingGroup(null)
     },
-    onError: (err: any) => {
-      const msg = err?.response?.data?.detail || "Failed to delete group"
+    onError: (err: unknown) => {
+      const msg = (err as ApiError)?.response?.data?.detail || "Failed to delete group"
       addToast({ title: "Error", description: msg, variant: "destructive" })
     },
   })

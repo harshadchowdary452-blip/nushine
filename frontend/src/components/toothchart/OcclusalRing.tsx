@@ -1,5 +1,5 @@
 import React from 'react'
-import { type ToothFinding, type ToothSurface, type ToothCondition, SURFACE_LABELS, CONDITION_COLORS } from './types'
+import { type ToothFinding, type ToothSurface, type ToothCondition, CONDITION_COLORS } from './types'
 
 interface OcclusalRingProps {
   toothNumber: number
@@ -17,8 +17,6 @@ const RING_VIEWBOX = '0 0 40 40'
 const CENTER = 20
 const OUTER_R = 16
 const INNER_R = 9
-const MID_R = (OUTER_R + INNER_R) / 2
-
 interface Segment {
   surface: ToothSurface
   startAngle: number
@@ -70,14 +68,6 @@ function getSegmentFill(
     }
   }
   return defaultColor
-}
-
-const SURFACE_LABEL_POSITIONS: Record<string, { x: number; y: number }> = {
-  Mesial: { x: CENTER, y: CENTER - OUTER_R - 2 },
-  Buccal: { x: CENTER + OUTER_R + 3, y: CENTER },
-  Distal: { x: CENTER, y: CENTER + OUTER_R + 3 },
-  Lingual: { x: CENTER - OUTER_R - 3, y: CENTER },
-  Occlusal: { x: CENTER, y: CENTER },
 }
 
 export default React.memo(function OcclusalRing({

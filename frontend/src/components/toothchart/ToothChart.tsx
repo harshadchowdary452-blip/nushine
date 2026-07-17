@@ -1,11 +1,9 @@
-import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
+import React, { useState, useCallback } from 'react'
 import {
   type ToothFinding,
   type ToothCondition,
-  type ToothSurface,
   type FindingFormData,
   type ToothChartProps,
-  CONDITION_COLORS,
   MOCK_FINDINGS,
 } from './types'
 import Toolbar from './Toolbar'
@@ -24,7 +22,7 @@ export default function ToothChart({
   findings: externalFindings,
   onFindingsChange,
   patientName,
-  patientId,
+  patientId: _patientId,
   readonly: extReadonly,
 }: ToothChartProps) {
   const [localFindings, setLocalFindings] = useState<ToothFinding[]>(MOCK_FINDINGS)
@@ -162,10 +160,10 @@ export default function ToothChart({
         </div>
       )
     },
-    [toothFindingsFor, selectedTooth, activeHighlight, activeFilter]
+    [toothFindingsFor, selectedTooth, activeHighlight, activeFilter, renderToothColumn]
   )
 
-  const NumberStrip = ({ teeth, label }: { teeth: number[]; label: string }) => (
+  const NumberStrip = ({ teeth, label: _label }: { teeth: number[]; label: string }) => (
     <div className="flex relative" style={{ justifyContent: 'center' }}>
       {teeth.map((n) => (
         <div

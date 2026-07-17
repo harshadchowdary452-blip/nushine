@@ -52,7 +52,7 @@ export interface PaginationParams {
   search?: string;
   sort_by?: string;
   sort_order?: "asc" | "desc";
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface AdminGroup {
@@ -85,6 +85,7 @@ export type PatientGender = "MALE" | "FEMALE" | "OTHER";
 export interface Patient {
   id: string;
   hospital_id: string;
+  hospital_name?: string | null;
   doctor_id: string | null;
   full_name: string;
   gender: PatientGender | null;
@@ -93,6 +94,7 @@ export interface Patient {
   phone: string | null;
   email: string | null;
   patient_source: string | null;
+  patient_name?: string | null;
   source_campaign_name: string | null;
   source_campaign_id: string | null;
   source_campaign_date: string | null;
@@ -107,6 +109,8 @@ export interface Patient {
   op_no: string | null;
   emergency_contact: string | null;
   photo_url: string | null;
+  allergies?: string | null;
+  blood_group?: string | null;
   status: PatientStatus;
   is_active: boolean;
   created_at: string;
@@ -191,7 +195,7 @@ export interface Case {
   patient?: Patient;
   doctor?: User;
   consultant?: Consultant;
-  treatment_plans?: any[] | null;
+  treatment_plans?: TreatmentPlan[] | null;
   treatment_plan_items?: TreatmentPlanItem[] | null;
   clinical_progress_notes?: ClinicalProgressNote[] | null;
   treatment_plan_status?: string | null;
@@ -260,6 +264,7 @@ export interface TreatmentPlanItem {
   assigned_doctor_name?: string | null;
   assistant_doctor_name?: string | null;
   created_by_name?: string | null;
+  priority?: string;
   created_at: string;
   updated_at: string;
 }
@@ -402,6 +407,8 @@ export interface DoctorSlotResponse {
   is_on_leave: boolean;
   leave_reason?: string;
   working_hours?: string;
+  duration_minutes?: number;
+  procedure_name?: string;
 }
 
 export interface DoctorWorkingHour {
@@ -956,7 +963,7 @@ export interface TimelineEvent {
   module: string | null
   user_name: string | null
   created_at: string
-  changes: any
+  changes: Array<{ field: string; old_value: string | null; new_value: string | null }> | null
 }
 
 export interface RelatedAppointment {
@@ -968,4 +975,129 @@ export interface RelatedAppointment {
   appointment_type: string
   doctor_name: string | null
   case_number: string | null
+}
+
+export interface AppointmentSchedulerSelectData {
+  doctor_id: string
+  appointment_date: string
+  appointment_time: string
+  duration_minutes: number
+  procedure_name?: string
+  appointment_type: string
+}
+
+export interface DoctorListItem {
+  id: string
+  full_name?: string
+  name?: string
+  email?: string
+  specialization: string | null
+  is_active?: boolean
+}
+
+export interface DoctorOption {
+  id: string
+  name: string
+  specialization: string | null
+}
+
+export interface FollowUpResponse {
+  id: string
+  patient_id?: string
+  follow_up_type?: string
+  response_message?: string
+  response_status?: string
+  feedback?: string
+  follow_up_required?: boolean
+  appointment_id?: string | null
+  doctor_name?: string | null
+  created_by_name?: string | null
+  created_at?: string
+}
+
+export interface WaitingPayload {
+  reason: string
+  expected_followup?: string
+  lab_name?: string
+  lab_order_number?: string
+  lab_sent_date?: string
+  lab_return_date?: string
+  lab_cost?: number
+  lab_tracking_notes?: string
+  next_appointment_date?: string
+  next_appointment_time?: string
+  next_appointment_doctor_id?: string
+}
+
+export interface VisitPayload {
+  [key: string]: unknown
+  treatment_plan_id: string
+  sitting_number: number
+  status: string
+  clinical_notes: string | null
+  procedure_performed: string | null
+  prescription: string | null
+  materials_used: string | null
+  duration_minutes: number | null
+  work_done: string | null
+  doctor_notes: string | null
+  next_visit_required: boolean
+  sitting_date: string
+  next_appointment_date?: string
+  next_appointment_time?: string
+  next_appointment_doctor_id?: string
+}
+
+export interface ParsedTreatmentItem {
+  id: string
+  name: string
+  toothNumbers: string[]
+  estimatedVisits: number | ""
+  estimatedCost: number | ""
+  remarks: string
+  status?: string
+  assignedDoctor?: string | null
+}
+
+export interface CasePayload {
+  patient_id?: string
+  doctor_id?: string
+  appointment_id?: string
+  chief_complaint: string
+  diagnosis?: string
+  notes?: string
+  [key: string]: unknown
+}
+
+export interface AppointmentCreatePayload {
+  [key: string]: unknown
+  patient_id: string
+  doctor_id: string
+  appointment_date: string
+  appointment_time: string
+  appointment_type?: string
+  notes?: string
+  duration_minutes?: number
+}
+
+export interface ReassignDoctorResponse {
+  new_doctor_name: string
+  [key: string]: unknown
+}
+
+export interface ApiError extends Error {
+  response?: {
+    data?: {
+      detail?: string | Array<{ msg?: string; type?: string; loc?: string[] }>
+    }
+    status?: number
+  }
+}
+
+export function extractDetail(err: unknown): string {
+  const apiErr = err as ApiError
+  const detail = apiErr?.response?.data?.detail
+  if (typeof detail === "string") return detail
+  if (Array.isArray(detail) && detail.length > 0) return detail.map((e) => e.msg).filter(Boolean).join(", ")
+  return "An unexpected error occurred"
 }

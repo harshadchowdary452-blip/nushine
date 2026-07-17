@@ -11,7 +11,7 @@ import {
   type SortingState,
 } from "@tanstack/react-table"
 import { motion } from "framer-motion"
-import { Plus, Search, Eye, Edit, UserCog, Stethoscope } from "lucide-react"
+import { Plus, Search, Eye, Edit, UserCog } from "lucide-react"
 import PageHeader from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"

@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
-import { MessageSquare, Plus, Edit3, Trash2, Copy, FileText, CheckCircle2 } from "lucide-react"
+import { Plus, Edit3, Trash2, Copy, FileText, CheckCircle2 } from "lucide-react"
 import PageHeader from "@/components/layout/page-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -9,12 +9,18 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { Switch } from "@/components/ui/switch"
+
 import { Skeleton } from "@/components/ui/skeleton"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { useToast } from "@/components/ui/toast"
-import { useAuthStore } from "@/store/authStore"
 import { whatsappTemplatesApi } from "@/services/endpoints"
+
+interface WATemplate {
+  id: string
+  name: string
+  message: string
+  is_active: boolean
+}
 
 const DEFAULT_TEMPLATES = [
   { name: "Appointment Reminder", message: "Hello {PatientName},\n\nReminder:\nAppointment Date: {Date}\nAppointment Time: {Time}\nDoctor: {DoctorName}\nHospital: {HospitalName}\n\nRegards,\n{HospitalName}" },
@@ -30,7 +36,6 @@ const DEFAULT_TEMPLATES = [
 export default function WhatsAppTemplates() {
   const queryClient = useQueryClient()
   const { addToast } = useToast()
-  const { user } = useAuthStore()
 
   const [open, setOpen] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
@@ -43,16 +48,16 @@ export default function WhatsAppTemplates() {
     queryFn: () => whatsappTemplatesApi.list(),
   })
 
-  const allTemplates: any[] = Array.isArray(templates) ? templates : []
+  const allTemplates: WATemplate[] = Array.isArray(templates) ? templates : []
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => whatsappTemplatesApi.create(data),
+    mutationFn: (data: { name: string; message: string }) => whatsappTemplatesApi.create(data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["whatsapp-templates"] }); addToast({ title: "Template created", variant: "success" }); setOpen(false); reset() },
     onError: () => addToast({ title: "Error", variant: "destructive" }),
   })
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => whatsappTemplatesApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: { name: string; message: string } }) => whatsappTemplatesApi.update(id, data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["whatsapp-templates"] }); addToast({ title: "Template updated", variant: "success" }); setOpen(false); reset() },
     onError: () => addToast({ title: "Error", variant: "destructive" }),
   })
@@ -65,7 +70,7 @@ export default function WhatsAppTemplates() {
 
   function reset() { setName(""); setMessage(""); setEditId(null) }
 
-  function openCreate(t?: any) {
+  function openCreate(t?: WATemplate) {
     if (t) { setName(t.name); setMessage(t.message); setEditId(t.id) }
     else { reset() }
     setOpen(true)
@@ -94,7 +99,7 @@ export default function WhatsAppTemplates() {
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-2">
-            {allTemplates.map((t: any) => (
+            {allTemplates.map((t: WATemplate) => (
               <Card key={t.id} className="border-gray-200">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium flex items-center gap-2">

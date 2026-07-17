@@ -14,6 +14,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.05 } } }
 
+interface EmailTemplate {
+  id: string
+  name: string
+  subject: string
+  body: string
+}
+
 export default function EmailTemplates() {
   const queryClient = useQueryClient()
   const { addToast } = useToast()

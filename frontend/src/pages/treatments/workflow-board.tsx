@@ -1,15 +1,13 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
-import { ArrowLeft } from "lucide-react"
 import PageHeader from "@/components/layout/page-header"
-import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { treatmentApi } from "@/services/endpoints"
 import { cn } from "@/lib/utils"
+import type { TreatmentPlan } from "@/types"
 
 const COLUMNS = [
   { key: "ASSIGNED", label: "Assigned", color: "bg-blue-500" },
@@ -33,7 +31,7 @@ export default function TreatmentWorkflowBoard() {
   const columns = useMemo(() => {
     return COLUMNS.map(col => ({
       ...col,
-      items: plans.filter((p: any) => p.status === col.key),
+      items: plans.filter((p: TreatmentPlan) => p.status === col.key),
     }))
   }, [plans])
 
@@ -54,7 +52,7 @@ export default function TreatmentWorkflowBoard() {
               <span className="text-xs text-muted-foreground ml-auto bg-muted rounded-full px-1.5">{col.items.length}</span>
             </div>
             <div className="flex-1 space-y-2 overflow-y-auto">
-              {col.items.map((plan: any) => (
+              {col.items.map((plan: TreatmentPlan) => (
                 <div
                   key={plan.id}
                   className="rounded-lg border bg-white p-3 hover:shadow-sm transition-shadow cursor-pointer"

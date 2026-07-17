@@ -1,8 +1,8 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
-import { Plus, Search, Edit, Trash2, Building2, UserCog } from "lucide-react"
-import { format } from "date-fns"
+import { Plus, Search, Edit, Trash2, Building2 } from "lucide-react"
+
 import PageHeader from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -30,8 +30,10 @@ import { useAuthStore } from "@/store/authStore"
 import { useToast } from "@/components/ui/toast"
 import DentalEmptyState from "@/components/ui/dental-empty-state"
 import type { Hospital, AdminGroup } from "@/types"
+import { extractDetail } from "@/types"
 
 interface HospitalForm {
+  [key: string]: unknown
   name: string
   address: string
   phone: string
@@ -90,7 +92,7 @@ export default function AdminHospitals() {
   const createMutation = useMutation({
     mutationFn: async (data: HospitalForm) => {
       const { admin_email, admin_password, admin_full_name, ...hospitalData } = data
-      const newHospital: any = await hospitalsApi.create(hospitalData)
+      const newHospital = await hospitalsApi.create(hospitalData) as Hospital
       if (admin_email && admin_password) {
         await hospitalsApi.createAdmin(newHospital.id, {
           email: admin_email,
@@ -131,8 +133,8 @@ export default function AdminHospitals() {
       setDeleteDialogOpen(false)
       setDeletingHospital(null)
     },
-    onError: (err: any) => {
-      const msg = err?.response?.data?.detail || "Failed to delete hospital"
+    onError: (err: unknown) => {
+      const msg = extractDetail(err) || "Failed to delete hospital"
       addToast({ title: "Error", description: msg, variant: "destructive" })
     },
   })
@@ -186,8 +188,11 @@ export default function AdminHospitals() {
       return
     }
     if (editingHospital) {
-      const { admin_email, admin_password, admin_full_name, ...hospitalData } = form
-      updateMutation.mutate({ id: editingHospital.id, payload: hospitalData as any })
+      const hospitalData: Record<string, unknown> = { ...form }
+      delete hospitalData.admin_email
+      delete hospitalData.admin_password
+      delete hospitalData.admin_full_name
+      updateMutation.mutate({ id: editingHospital.id, payload: hospitalData as HospitalForm })
     } else {
       createMutation.mutate(form)
     }

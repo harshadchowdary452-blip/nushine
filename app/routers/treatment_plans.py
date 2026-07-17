@@ -1,7 +1,8 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, func, String as SAString
+from sqlalchemy.orm import selectinload, joinedload
 from typing import List, Optional
 from pydantic import BaseModel
 from app.database import get_db
@@ -20,6 +21,7 @@ from app.models.case import Case
 from app.models.patient import Patient
 from app.models.hospital import Hospital
 from app.models.treatment_plan import TreatmentPlan, TreatmentPlanStatus
+from app.models.user import User
 from app.services.timeline_helper import record_timeline_event, build_changes
 
 router = APIRouter(prefix="/treatment-plans", tags=["Treatment Plans"])
@@ -51,7 +53,7 @@ async def _get_patient_id_from_plan(db: AsyncSession, plan_id: str) -> str:
 
 
 
-@router.get("/", response_model=dict)
+@router.get("/")
 async def get_treatment_plans(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=200),
@@ -59,7 +61,7 @@ async def get_treatment_plans(
     patient_id: Optional[str] = Query(None),
     hospital_id: Optional[str] = Query(None),
     doctor_id: Optional[str] = Query(None),
-    status: Optional[str] = Query(None),
+    status_filter: Optional[str] = Query(None, alias="status"),
     search: Optional[str] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
@@ -73,7 +75,7 @@ async def get_treatment_plans(
             select(TreatmentPlan)
             .join(Case, TreatmentPlan.case_id == Case.id)
             .outerjoin(Patient, Case.patient_id == Patient.id)
-            .outerjoin(User, TreatmentPlan.assigned_doctor_id == User.id, isouter=True)
+            .outerjoin(User, TreatmentPlan.assigned_doctor_id == User.id)
             .options(
                 selectinload(TreatmentPlan.sittings),
                 joinedload(TreatmentPlan.case).joinedload(Case.patient).selectinload(Patient.hospital),
@@ -93,7 +95,7 @@ async def get_treatment_plans(
         elif role == Role.HOSPITAL_ADMIN.value:
             hid = hospital_id or current_user.get("hospital_id")
             if hid:
-                query = query.join(Patient, Case.patient_id == Patient.id).where(Patient.hospital_id == hid)
+                query = query.where(Patient.hospital_id == hid)
         elif role == Role.GROUP_ADMIN.value:
             agid = current_user.get("admin_group_id")
             if agid:
@@ -111,7 +113,7 @@ async def get_treatment_plans(
                 else:
                     query = query.where(TreatmentPlan.id == "__none__")
         elif role == Role.SUPER_ADMIN.value and hospital_id:
-            query = query.join(Patient, Case.patient_id == Patient.id).where(Patient.hospital_id == hospital_id)
+            query = query.where(Patient.hospital_id == hospital_id)
 
         if search and search.strip():
             term = f"%{search.strip()}%"
@@ -123,12 +125,12 @@ async def get_treatment_plans(
                     TreatmentPlan.treatment_number.ilike(term),
                     TreatmentPlan.treatment_name.ilike(term),
                     User.full_name.ilike(term),
-                    TreatmentPlan.status.ilike(term),
+                    TreatmentPlan.status.cast(SAString).ilike(term),
                 )
             )
 
-        if status and status != "all":
-            query = query.where(TreatmentPlan.status.ilike(status))
+        if status_filter and status_filter != "all":
+            query = query.where(TreatmentPlan.status == status_filter)
 
         if doctor_id:
             query = query.where(TreatmentPlan.assigned_doctor_id == doctor_id)
@@ -164,7 +166,8 @@ async def get_treatment_plans(
         for p in plans:
             _enrich_plan(p)
 
-        return {"items": plans, "total": total, "skip": skip, "limit": limit}
+        serialized = [TreatmentPlanResponse.model_validate(p).model_dump() for p in plans]
+        return {"items": serialized, "total": total, "skip": skip, "limit": limit}
 
     except HTTPException:
         raise

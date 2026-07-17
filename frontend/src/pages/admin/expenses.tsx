@@ -1,10 +1,10 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
 import {
   Plus, Search, Edit, Trash2, Calendar, Building2, IndianRupee, Users, Zap,
   Droplets, Wifi, Settings, ShoppingBag, Megaphone, Wrench, MoreHorizontal,
-  List, BarChart3, ChevronLeft, ChevronRight, Clock, TrendingUp, Wallet,
+  List, ChevronLeft, ChevronRight, Clock, TrendingUp, Wallet,
   DollarSign,
 } from "lucide-react"
 import { format } from "date-fns"
@@ -29,7 +29,7 @@ import { Label } from "@/components/ui/label"
 import { expensesApi, hospitalsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
 import { useAuthStore } from "@/store/authStore"
-import type { HospitalMonthlyExpense, ExpenseAnalytics } from "@/types"
+import type { HospitalMonthlyExpense, Hospital, ApiError } from "@/types"
 
 const EXPENSE_CATEGORIES = [
   "Staff Salaries", "Rent", "Electricity", "Water", "Internet",
@@ -63,7 +63,6 @@ const EXPENSE_FILTERS = [
 const PAYMENT_METHODS = ["Cash", "Card", "Bank Transfer", "Cheque", "UPI", "Other"]
 
 const currentYear = new Date().getFullYear()
-const YEARS = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i)
 const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
 
 export default function AdminExpenses() {
@@ -81,7 +80,6 @@ export default function AdminExpenses() {
   const [calMonth, setCalMonth] = useState(new Date().getMonth() + 1)
   const [calYear, setCalYear] = useState(currentYear)
   const [selectedCalDate, setSelectedCalDate] = useState<string | null>(null)
-  const [calDayExpenses, setCalDayExpenses] = useState<HospitalMonthlyExpense[] | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingExpense, setEditingExpense] = useState<HospitalMonthlyExpense | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -139,7 +137,7 @@ export default function AdminExpenses() {
   })
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => expensesApi.create(data),
+    mutationFn: (data: Record<string, unknown>) => expensesApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["expenses"], refetchType: "all" })
       queryClient.invalidateQueries({ queryKey: ["expenses-analytics"], refetchType: "all" })
@@ -149,13 +147,13 @@ export default function AdminExpenses() {
       setDialogOpen(false)
       resetForm()
     },
-    onError: (err: any) => {
+    onError: (err: ApiError) => {
       addToast({ title: "Failed to create expense", description: err?.response?.data?.detail || err.message, variant: "destructive" })
     },
   })
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => expensesApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) => expensesApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["expenses"], refetchType: "all" })
       queryClient.invalidateQueries({ queryKey: ["expenses-analytics"], refetchType: "all" })
@@ -166,7 +164,7 @@ export default function AdminExpenses() {
       setEditingExpense(null)
       resetForm()
     },
-    onError: (err: any) => {
+    onError: (err: ApiError) => {
       addToast({ title: "Failed to update expense", description: err?.response?.data?.detail || err.message, variant: "destructive" })
     },
   })
@@ -180,7 +178,7 @@ export default function AdminExpenses() {
       queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" })
       addToast({ title: "Expense deleted", variant: "success" })
     },
-    onError: (err: any) => {
+    onError: (err: ApiError) => {
       addToast({ title: "Failed to delete expense", description: err?.response?.data?.detail || err.message, variant: "destructive" })
     },
   })
@@ -245,15 +243,15 @@ export default function AdminExpenses() {
   }
 
   const filteredExpenses = Array.isArray(expenses)
-    ? expenses.filter((e: any) =>
+    ? expenses.filter((e: HospitalMonthlyExpense) =>
         !search || e.expense_name?.toLowerCase().includes(search.toLowerCase()) ||
         e.expense_category?.toLowerCase().includes(search.toLowerCase()) ||
         e.vendor?.toLowerCase().includes(search.toLowerCase())
       )
     : []
 
-  const categoryBadgeVariant = (cat: string) => {
-    const map: Record<string, string> = {
+  const categoryBadgeVariant = (cat: string): "default" | "secondary" | "warning" | "info" | "outline" => {
+    const map: Record<string, "default" | "secondary" | "warning" | "info" | "outline"> = {
       "Staff Salaries": "default",
       "Rent": "secondary",
       "Electricity": "warning",
@@ -269,7 +267,7 @@ export default function AdminExpenses() {
   }
 
   const hospitalMap = Array.isArray(hospitals)
-    ? Object.fromEntries((hospitals as any[]).map((h: any) => [h.id, h.name]))
+    ? Object.fromEntries(hospitals.map((h: Hospital) => [h.id, h.name]))
     : {}
 
   // ── Calendar helpers ──
@@ -286,18 +284,10 @@ export default function AdminExpenses() {
 
   function handleCalDateClick(dateStr: string) {
     setSelectedCalDate(dateStr)
-    setCalDayExpenses(null)
   }
 
   function handleCloseCalDay() {
     setSelectedCalDate(null)
-    setCalDayExpenses(null)
-  }
-
-  function openCalDayExpenses() {
-    if (selectedCalDate && calDayQuery.data) {
-      setCalDayExpenses(calDayQuery.data as HospitalMonthlyExpense[])
-    }
   }
 
   return (
@@ -433,7 +423,7 @@ export default function AdminExpenses() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Hospitals</SelectItem>
-                  {hospitals.map((h: any) => (
+                  {hospitals.map((h: Hospital) => (
                     <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -474,7 +464,7 @@ export default function AdminExpenses() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredExpenses.map((expense: any) => (
+                    {filteredExpenses.map((expense: HospitalMonthlyExpense) => (
                       <motion.tr
                         key={expense.id}
                         initial={{ opacity: 0 }}
@@ -491,7 +481,7 @@ export default function AdminExpenses() {
                           )}
                         </td>
                         <td className="px-4 py-3" data-label="Category">
-                          <Badge variant={categoryBadgeVariant(expense.expense_category) as any}>
+                          <Badge variant={categoryBadgeVariant(expense.expense_category)}>
                             {expense.expense_category}
                           </Badge>
                         </td>
@@ -622,7 +612,7 @@ export default function AdminExpenses() {
                 <Select value={formData.hospital_id} onValueChange={(v) => setFormData({ ...formData, hospital_id: v })}>
                   <SelectTrigger><SelectValue placeholder="Select hospital" /></SelectTrigger>
                   <SelectContent>
-                    {hospitals.map((h: any) => (
+                    {hospitals.map((h: Hospital) => (
                       <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>
                     ))}
                   </SelectContent>

@@ -1,11 +1,10 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useMemo, useCallback, useEffect, useRef } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   ArrowLeft, CheckCircle2, XCircle, Loader2, AlertTriangle, User, Stethoscope,
-  Send, Phone, Mail, Heart, MapPin, Shield, ChevronDown, Calendar,
-  Clock, Save, AlertCircle, Check, Loader, CircleDot, FileText, Eye,
+  Send, Phone, Mail, Heart, MapPin, Shield, Calendar,
+  AlertCircle, Check, Loader, FileText, Eye,
   Activity, UserPlus, RefreshCw,
 } from "lucide-react"
 import PageHeader from "@/components/layout/page-header"
@@ -15,13 +14,16 @@ import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Separator } from "@/components/ui/separator"
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { casesApi, treatmentPlanItemsApi, doctorsApi, appointmentsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
 import { useAuthStore } from "@/store/authStore"
 import { formatIndianRupees } from "@/lib/currency"
 import { cn } from "@/lib/utils"
+import AppointmentScheduler from "@/components/appointments/AppointmentScheduler"
+import type { Case, Patient, TreatmentPlanItem, DoctorListItem, AppointmentCreatePayload, ClinicalFinding, ClinicalProgressNote, DoctorOption } from "@/types"
+import { extractDetail } from "@/types"
 
 function calcAge(dob: string | null | undefined): number | null {
   if (!dob) return null
@@ -133,8 +135,8 @@ export default function TreatmentPlanApproval() {
     enabled: !!caseId,
   })
 
-  const c = caseData as any
-  const patient = c?.patient as any
+  const c = caseData as Case | undefined
+  const patient = c?.patient as Patient | undefined
   const hospitalId = patient?.hospital_id
 
   const { data: doctorsData } = useQuery({
@@ -149,23 +151,23 @@ export default function TreatmentPlanApproval() {
     enabled: !!patient?.id,
   })
 
-  const doctorList = useMemo(() => {
+  const doctorList: DoctorOption[] = useMemo(() => {
     const raw = Array.isArray(doctorsData) ? doctorsData : (doctorsData?.items || [])
-    return raw.filter((d: any) => d.is_active !== false).map((d: any) => ({
+    return raw.filter((d: DoctorListItem) => d.is_active !== false).map((d: DoctorListItem): DoctorOption => ({
       id: d.id,
-      name: d.full_name || d.name || d.email,
+      name: d.full_name || d.name || d.email || "",
       specialization: d.specialization || null,
     }))
   }, [doctorsData])
 
   const itemList = useMemo(() => (Array.isArray(items) ? items : (items?.items || [])), [items])
-  const totalCost = itemList.reduce((sum: number, item: any) => sum + (item.estimated_cost || 0), 0)
-  const totalVisits = itemList.reduce((sum: number, item: any) => sum + (item.estimated_visits || 0), 0)
+  const totalCost = itemList.reduce((sum: number, item: TreatmentPlanItem) => sum + (item.estimated_cost || 0), 0)
+  const totalVisits = itemList.reduce((sum: number, item: TreatmentPlanItem) => sum + (item.estimated_visits || 0), 0)
   const user = useAuthStore((s) => s.user)
   const isAdmin = user?.role === "HOSPITAL_ADMIN" || user?.role === "SUPER_ADMIN"
 
   const getEdit = useCallback((itemId: string): RowEdit => {
-    const item = itemList.find((i: any) => i.id === itemId)
+    const item = itemList.find((i: TreatmentPlanItem) => i.id === itemId)
     return rowEdits[itemId] || {
       primary: item?.assigned_doctor_id || "",
       assistant: item?.assistant_doctor_id || "",
@@ -173,12 +175,10 @@ export default function TreatmentPlanApproval() {
     }
   }, [rowEdits, itemList])
 
-  const getPrimaryDoctor = useCallback((item: any) => getEdit(item.id).primary, [getEdit])
-  const getAssistantDoctor = useCallback((item: any) => getEdit(item.id).assistant, [getEdit])
-  const getPriority = useCallback((item: any) => getEdit(item.id).priority, [getEdit])
+  const getPrimaryDoctor = useCallback((item: TreatmentPlanItem) => getEdit(item.id).primary, [getEdit])
 
   const isItemModified = useCallback((itemId: string) => {
-    const item = itemList.find((i: any) => i.id === itemId)
+    const item = itemList.find((i: TreatmentPlanItem) => i.id === itemId)
     if (!item) return false
     const edit = getEdit(itemId)
     return edit.primary !== (item.assigned_doctor_id || "") ||
@@ -187,11 +187,11 @@ export default function TreatmentPlanApproval() {
   }, [itemList, getEdit])
 
   const hasAnyModifications = useMemo(() => {
-    return itemList.some((item: any) => isItemModified(item.id))
+    return itemList.some((item: TreatmentPlanItem) => isItemModified(item.id))
   }, [itemList, isItemModified])
 
   const allItemsHaveDoctor = useMemo(() => {
-    return itemList.length > 0 && itemList.every((item: any) => {
+    return itemList.length > 0 && itemList.every((item: TreatmentPlanItem) => {
       const edit = getEdit(item.id)
       return edit.primary
     })
@@ -199,26 +199,13 @@ export default function TreatmentPlanApproval() {
 
   const allItemsSaved = useMemo(() => {
     if (itemList.length === 0) return false
-    return itemList.every((item: any) => {
+    return itemList.every((item: TreatmentPlanItem) => {
       const status = rowStatuses[item.id]
       if (status === "saving" || status === "error") return false
       if (isItemModified(item.id)) return false
       return true
     })
   }, [itemList, rowStatuses, isItemModified])
-
-  const setRowEdit = useCallback((itemId: string, field: keyof RowEdit, value: string) => {
-    setRowEdits(prev => {
-      const current = prev[itemId] || { primary: "", assistant: "", priority: "" }
-      return { ...prev, [itemId]: { ...current, [field]: value } }
-    })
-    setRowStatuses(prev => ({ ...prev, [itemId]: "idle" as SaveStatus }))
-
-    if (debounceTimers.current[itemId]) clearTimeout(debounceTimers.current[itemId])
-    debounceTimers.current[itemId] = setTimeout(() => {
-      triggerAutoSave(itemId)
-    }, 500)
-  }, [])
 
   const assignMutation = useMutation({
     mutationFn: async (assignments: { item_id: string; assigned_doctor_id?: string; assistant_doctor_id?: string; priority?: string }[]) => {
@@ -227,11 +214,11 @@ export default function TreatmentPlanApproval() {
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["treatment-plan-items", caseId] })
-      variables.forEach((a: any) => {
+      variables.forEach((a) => {
         setRowStatuses(prev => ({ ...prev, [a.item_id]: "saved" }))
       })
       setTimeout(() => {
-        variables.forEach((a: any) => {
+        variables.forEach((a) => {
           setRowStatuses(prev => {
             if (prev[a.item_id] === "saved") return { ...prev, [a.item_id]: "idle" }
             return prev
@@ -239,8 +226,8 @@ export default function TreatmentPlanApproval() {
         })
       }, 2000)
     },
-    onError: (_err: any, variables: any) => {
-      variables.forEach((a: any) => {
+    onError: (_err: Error, variables: { item_id: string; assigned_doctor_id?: string; assistant_doctor_id?: string; priority?: string }[]) => {
+      variables.forEach((a) => {
         setRowStatuses(prev => ({ ...prev, [a.item_id]: "error" }))
       })
       addToast({ title: "Save Failed", description: "Could not save doctor assignment. Click to retry.", variant: "destructive" })
@@ -248,7 +235,7 @@ export default function TreatmentPlanApproval() {
   })
 
   const triggerAutoSave = useCallback((itemId: string) => {
-    const item = itemList.find((i: any) => i.id === itemId)
+    const item = itemList.find((i: TreatmentPlanItem) => i.id === itemId)
     if (!item) return
     const edit = getEdit(itemId)
     if (!isItemModified(itemId)) return
@@ -262,6 +249,19 @@ export default function TreatmentPlanApproval() {
     }])
   }, [itemList, getEdit, isItemModified, assignMutation])
 
+  const setRowEdit = useCallback((itemId: string, field: keyof RowEdit, value: string) => {
+    setRowEdits(prev => {
+      const current = prev[itemId] || { primary: "", assistant: "", priority: "" }
+      return { ...prev, [itemId]: { ...current, [field]: value } }
+    })
+    setRowStatuses(prev => ({ ...prev, [itemId]: "idle" as SaveStatus }))
+
+    if (debounceTimers.current[itemId]) clearTimeout(debounceTimers.current[itemId])
+    debounceTimers.current[itemId] = setTimeout(() => {
+      triggerAutoSave(itemId)
+    }, 500)
+  }, [triggerAutoSave])
+
   const retrySave = useCallback((itemId: string) => {
     triggerAutoSave(itemId)
   }, [triggerAutoSave])
@@ -270,7 +270,7 @@ export default function TreatmentPlanApproval() {
     mutationFn: async () => {
       if (!caseId) throw new Error("Case ID is required")
       if (hasAnyModifications) {
-        const assignments = itemList.map((item: any) => {
+        const assignments = itemList.map((item: TreatmentPlanItem) => {
           const edit = getEdit(item.id)
           return {
             item_id: item.id,
@@ -290,14 +290,14 @@ export default function TreatmentPlanApproval() {
       setRowStatuses({})
       addToast({ title: "Submitted for Approval", variant: "success" })
     },
-    onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to submit", variant: "destructive" }),
+    onError: (err: Error) => addToast({ title: "Error", description: (err as unknown as Record<string, unknown>)?.response ? ((err as unknown as { response: { data: { detail?: string } } }).response?.data?.detail) || "Failed to submit" : "Failed to submit", variant: "destructive" }),
   })
 
   const approveMutation = useMutation({
     mutationFn: async () => {
       if (!caseId) throw new Error("Case ID is required")
       if (hasAnyModifications) {
-        const assignments = itemList.map((item: any) => {
+        const assignments = itemList.map((item: TreatmentPlanItem) => {
           const edit = getEdit(item.id)
           return {
             item_id: item.id,
@@ -309,8 +309,8 @@ export default function TreatmentPlanApproval() {
         await assignMutation.mutateAsync(assignments)
       }
       if (firstAppointment) {
-        const apptData: any = {
-          patient_id: patient?.id,
+        const apptData: AppointmentCreatePayload = {
+          patient_id: patient?.id ?? "",
           doctor_id: firstAppointment.doctor_id,
           appointment_date: firstAppointment.date,
           appointment_time: firstAppointment.time,
@@ -331,7 +331,7 @@ export default function TreatmentPlanApproval() {
       addToast({ title: "Treatment Plan Approved", description: "Treatments generated. Redirecting to Treatment Workspace.", variant: "success" })
       navigate("/treatments")
     },
-    onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to approve", variant: "destructive" }),
+    onError: (err: Error) => addToast({ title: "Error", description: extractDetail(err) || "Failed to approve", variant: "destructive" }),
   })
 
   const rejectMutation = useMutation({
@@ -347,7 +347,7 @@ export default function TreatmentPlanApproval() {
       addToast({ title: "Treatment Plan Rejected", variant: "success" })
       navigate(`/cases/${caseId}`)
     },
-    onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to reject", variant: "destructive" }),
+    onError: (err: Error) => addToast({ title: "Error", description: extractDetail(err) || "Failed to reject", variant: "destructive" }),
   })
 
   const requestChangesMutation = useMutation({
@@ -362,12 +362,13 @@ export default function TreatmentPlanApproval() {
       addToast({ title: "Changes Requested", variant: "success" })
       navigate(`/cases/${caseId}`)
     },
-    onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to request changes", variant: "destructive" }),
+    onError: (err: Error) => addToast({ title: "Error", description: extractDetail(err) || "Failed to request changes", variant: "destructive" }),
   })
 
   useEffect(() => {
+    const timers = debounceTimers.current
     return () => {
-      Object.values(debounceTimers.current).forEach(clearTimeout)
+      Object.values(timers).forEach(clearTimeout)
     }
   }, [])
 
@@ -392,17 +393,17 @@ export default function TreatmentPlanApproval() {
 
   const patientAge = patient?.age ?? calcAge(patient?.date_of_birth)
   const patientCases = Array.isArray(patientCasesData) ? patientCasesData : (patientCasesData?.items || [])
-  const activeCases = patientCases.filter((pc: any) => pc.status !== "COMPLETED" && pc.status !== "CANCELLED")
-  const completedCases = patientCases.filter((pc: any) => pc.status === "COMPLETED")
+  const activeCases = patientCases.filter((pc: Case) => pc.status !== "COMPLETED" && pc.status !== "CANCELLED")
+  const completedCases = patientCases.filter((pc: Case) => pc.status === "COMPLETED")
 
   const findings = c.findings || []
   const diagnoses = [c.provisional_diagnosis, c.final_diagnosis, c.diagnosis].filter(Boolean)
 
   const readinessChecks = [
-    { label: "Doctors Assigned", done: allItemsHaveDoctor, detail: `${itemList.filter((_: any, i: number) => getPrimaryDoctor(itemList[i])).length} / ${itemList.length}` },
+    { label: "Doctors Assigned", done: allItemsHaveDoctor, detail: `${itemList.filter((_: TreatmentPlanItem, i: number) => getPrimaryDoctor(itemList[i])).length} / ${itemList.length}` },
     { label: "Treatment Items Saved", done: allItemsSaved, detail: allItemsSaved ? "All saved" : "Some unsaved" },
-    { label: "Estimated Visits Complete", done: itemList.every((item: any) => item.estimated_visits > 0), detail: `${totalVisits} total visits` },
-    { label: "Estimated Costs Complete", done: itemList.every((item: any) => item.estimated_cost > 0), detail: formatIndianRupees(totalCost) },
+    { label: "Estimated Visits Complete", done: itemList.every((item: TreatmentPlanItem) => item.estimated_visits > 0), detail: `${totalVisits} total visits` },
+    { label: "Estimated Costs Complete", done: itemList.every((item: TreatmentPlanItem) => item.estimated_cost > 0), detail: formatIndianRupees(totalCost) },
     { label: "First Appointment Configured", done: !!firstAppointment?.doctor_id && !!firstAppointment?.date && !!firstAppointment?.time },
     { label: "Validation Passed", done: allItemsHaveDoctor && allItemsSaved && itemList.length > 0 },
   ]
@@ -565,7 +566,7 @@ export default function TreatmentPlanApproval() {
                 </CardHeader>
                 <CardContent className="py-2">
                   <div className="space-y-2">
-                    {findings.map((f: any) => (
+                    {findings.map((f: ClinicalFinding) => (
                       <div key={f.id} className="flex items-start gap-2 text-xs border-b border-border/50 pb-2 last:border-0 last:pb-0">
                         <Badge variant={f.severity === "severe" ? "danger" : f.severity === "moderate" ? "warning" : "secondary"} className="shrink-0 text-[10px]">
                           {f.finding_type}
@@ -626,7 +627,7 @@ export default function TreatmentPlanApproval() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="py-2 text-xs space-y-2">
-                  {c.clinical_progress_notes.map((n: any) => (
+                  {c.clinical_progress_notes.map((n: ClinicalProgressNote) => (
                     <div key={n.id} className="border-l-2 border-blue-200 pl-2">
                       <p className="text-muted-foreground">{new Date(n.note_date).toLocaleDateString()}</p>
                       <p>{n.clinical_note}</p>
@@ -657,7 +658,7 @@ export default function TreatmentPlanApproval() {
                         Every procedure must have a Primary Doctor assigned.
                       </div>
                     )}
-                    {itemList.map((item: any) => {
+                    {itemList.map((item: TreatmentPlanItem) => {
                       const edit = getEdit(item.id)
                       const saveStatus = rowStatuses[item.id] || "idle"
                       const modified = isItemModified(item.id)
@@ -707,7 +708,7 @@ export default function TreatmentPlanApproval() {
                                 {(() => {
                                   const sorted = sortDoctorsByRelevance(doctorList, item.procedure_name)
                                   const specs = getRecommendedSpecializations(item.procedure_name)
-                                  const hasSpecialists = sorted.length > 0 && specs.length > 0 && sorted.some((d: any) => d.specialization && specs.some((s: string) => d.specialization.toLowerCase().includes(s.toLowerCase())))
+                                  const hasSpecialists = sorted.length > 0 && specs.length > 0 && sorted.some((d: DoctorOption) => d.specialization && specs.some((s: string) => d.specialization!.toLowerCase().includes(s.toLowerCase())))
                                   return (
                                     <>
                                       {specs.length > 0 && (
@@ -726,8 +727,8 @@ export default function TreatmentPlanApproval() {
                                         onBlur={() => triggerAutoSave(item.id)}
                                       >
                                         <option value="">Select Doctor *</option>
-                                        {sorted.map((doc: any) => {
-                                          const isRecommended = specs.length > 0 && doc.specialization && specs.some((s: string) => doc.specialization.toLowerCase().includes(s.toLowerCase()))
+                                        {sorted.map((doc: DoctorOption) => {
+                                          const isRecommended = specs.length > 0 && doc.specialization && specs.some((s: string) => doc.specialization!.toLowerCase().includes(s.toLowerCase()))
                                           return (
                                             <option key={doc.id} value={doc.id}>
                                               {isRecommended ? "* " : ""}Dr. {doc.name}{doc.specialization ? ` (${doc.specialization})` : ""}
@@ -748,7 +749,7 @@ export default function TreatmentPlanApproval() {
                                   onBlur={() => triggerAutoSave(item.id)}
                                 >
                                   <option value="">None</option>
-                                  {doctorList.filter((d: any) => d.id !== edit.primary).map((doc: any) => (
+                                  {doctorList.filter((d: DoctorOption) => d.id !== edit.primary).map((doc: DoctorOption) => (
                                     <option key={doc.id} value={doc.id}>Dr. {doc.name}{doc.specialization ? ` (${doc.specialization})` : ""}</option>
                                   ))}
                                 </select>
@@ -822,10 +823,12 @@ export default function TreatmentPlanApproval() {
                       <select
                         className="mt-1 flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                         value={firstAppointment?.treatment_item_id || ""}
-                        onChange={(e) => setFirstAppointment(prev => ({ ...prev, treatment_item_id: e.target.value, doctor_id: prev?.doctor_id || "", date: prev?.date || "", time: prev?.time || "", future_ready: prev?.future_ready || false, chair: prev?.chair || "", room: prev?.room || "" }))}
+                        onChange={(e) => {
+                          setFirstAppointment(prev => ({ ...prev, treatment_item_id: e.target.value, doctor_id: prev?.doctor_id || "", date: prev?.date || "", time: prev?.time || "", future_ready: prev?.future_ready || false, chair: prev?.chair || "", room: prev?.room || "" }))
+                        }}
                       >
                         <option value="">Select Treatment</option>
-                        {itemList.map((item: any) => (
+                        {itemList.map((item: TreatmentPlanItem) => (
                           <option key={item.id} value={item.id}>{item.procedure_name} (Tooth {Array.isArray(item.tooth_numbers) ? item.tooth_numbers.join(", ") : item.tooth_numbers || "—"})</option>
                         ))}
                       </select>
@@ -838,31 +841,41 @@ export default function TreatmentPlanApproval() {
                         onChange={(e) => setFirstAppointment(prev => ({ ...prev, doctor_id: e.target.value, treatment_item_id: prev?.treatment_item_id || "", date: prev?.date || "", time: prev?.time || "", future_ready: prev?.future_ready || false, chair: prev?.chair || "", room: prev?.room || "" }))}
                       >
                         <option value="">Select Doctor</option>
-                        {doctorList.map((doc: any) => (
+                        {doctorList.map((doc: DoctorOption) => (
                           <option key={doc.id} value={doc.id}>Dr. {doc.name}</option>
                         ))}
                       </select>
                     </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Date *</Label>
-                      <input
-                        type="date"
-                        className="mt-1 flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                        value={firstAppointment?.date || ""}
-                        onChange={(e) => setFirstAppointment(prev => ({ ...prev, date: e.target.value, treatment_item_id: prev?.treatment_item_id || "", doctor_id: prev?.doctor_id || "", time: prev?.time || "", future_ready: prev?.future_ready || false, chair: prev?.chair || "", room: prev?.room || "" }))}
-                        min={new Date().toISOString().split("T")[0]}
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Time *</Label>
-                      <input
-                        type="time"
-                        className="mt-1 flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                        value={firstAppointment?.time || ""}
-                        onChange={(e) => setFirstAppointment(prev => ({ ...prev, time: e.target.value, treatment_item_id: prev?.treatment_item_id || "", doctor_id: prev?.doctor_id || "", date: prev?.date || "", future_ready: prev?.future_ready || false, chair: prev?.chair || "", room: prev?.room || "" }))}
-                      />
-                    </div>
-                    <div className="flex items-center gap-2 pt-5">
+                  </div>
+
+                  {firstAppointment?.doctor_id && (
+                    <AppointmentScheduler
+                      doctorId={firstAppointment.doctor_id}
+                      procedureName={itemList.find((i: TreatmentPlanItem) => i.id === firstAppointment.treatment_item_id)?.procedure_name || ""}
+                      appointmentType="TREATMENT"
+                      date={firstAppointment.date || ""}
+                      selectedTime={firstAppointment.time || ""}
+                      showDoctorSelector={false}
+                      showTypeSelector={false}
+                      showProcedureSelector={false}
+                      onSelect={(data) => setFirstAppointment(prev => prev ? {
+                        ...prev,
+                        date: data.appointment_date,
+                        time: data.appointment_time,
+                      } : {
+                        treatment_item_id: "",
+                        doctor_id: data.doctor_id,
+                        date: data.appointment_date,
+                        time: data.appointment_time,
+                        future_ready: false,
+                        chair: "",
+                        room: "",
+                      })}
+                    />
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="flex items-center gap-2 pt-2">
                       <input
                         type="checkbox"
                         id="future_ready"
@@ -872,25 +885,27 @@ export default function TreatmentPlanApproval() {
                       />
                       <Label htmlFor="future_ready" className="text-xs text-muted-foreground cursor-pointer">Future Ready</Label>
                     </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Chair</Label>
-                      <input
-                        type="text"
-                        className="mt-1 flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                        value={firstAppointment?.chair || ""}
-                        onChange={(e) => setFirstAppointment(prev => ({ ...prev, chair: e.target.value, treatment_item_id: prev?.treatment_item_id || "", doctor_id: prev?.doctor_id || "", date: prev?.date || "", time: prev?.time || "", future_ready: prev?.future_ready || false, room: prev?.room || "" }))}
-                        placeholder="Optional"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Room</Label>
-                      <input
-                        type="text"
-                        className="mt-1 flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                        value={firstAppointment?.room || ""}
-                        onChange={(e) => setFirstAppointment(prev => ({ ...prev, room: e.target.value, treatment_item_id: prev?.treatment_item_id || "", doctor_id: prev?.doctor_id || "", date: prev?.date || "", time: prev?.time || "", future_ready: prev?.future_ready || false, chair: prev?.chair || "" }))}
-                        placeholder="Optional"
-                      />
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1">
+                        <Label className="text-xs text-muted-foreground">Chair</Label>
+                        <input
+                          type="text"
+                          className="mt-1 flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                          value={firstAppointment?.chair || ""}
+                          onChange={(e) => setFirstAppointment(prev => ({ ...prev, chair: e.target.value, treatment_item_id: prev?.treatment_item_id || "", doctor_id: prev?.doctor_id || "", date: prev?.date || "", time: prev?.time || "", future_ready: prev?.future_ready || false, room: prev?.room || "" }))}
+                          placeholder="Optional"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <Label className="text-xs text-muted-foreground">Room</Label>
+                        <input
+                          type="text"
+                          className="mt-1 flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                          value={firstAppointment?.room || ""}
+                          onChange={(e) => setFirstAppointment(prev => ({ ...prev, room: e.target.value, treatment_item_id: prev?.treatment_item_id || "", doctor_id: prev?.doctor_id || "", date: prev?.date || "", time: prev?.time || "", future_ready: prev?.future_ready || false, chair: prev?.chair || "" }))}
+                          placeholder="Optional"
+                        />
+                      </div>
                     </div>
                   </div>
                 </CardContent>
@@ -932,7 +947,7 @@ export default function TreatmentPlanApproval() {
                 </CardHeader>
                 <CardContent className="py-2">
                   <div className="space-y-1 max-h-32 overflow-y-auto">
-                    {doctorList.map((doc: any) => (
+                    {doctorList.map((doc: DoctorOption) => (
                       <div key={doc.id} className="text-xs flex items-center gap-2 py-0.5">
                         <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
                         <span className="font-medium">Dr. {doc.name}</span>

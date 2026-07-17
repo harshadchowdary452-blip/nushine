@@ -27,7 +27,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { ArrowLeft, Download, Plus, CreditCard, History, Percent, FileText } from "lucide-react";
 import { format } from "date-fns";
@@ -42,10 +41,8 @@ export default function BillingDetail() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { addToast } = useToast();
-  const [paymentOpen, setPaymentOpen] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("");
-  const [historyOpen, setHistoryOpen] = useState(false);
   const [discountOpen, setDiscountOpen] = useState(false);
   const [discountType, setDiscountType] = useState("PERCENTAGE");
   const [discountPercent, setDiscountPercent] = useState("");
@@ -56,12 +53,6 @@ export default function BillingDetail() {
     queryKey: ["billing", id],
     queryFn: () => billingApi.get(id!),
     enabled: !!id,
-  });
-
-  const { data: transactions } = useQuery({
-    queryKey: ["billing", id, "transactions"],
-    queryFn: () => billingApi.getTransactions(id!),
-    enabled: historyOpen,
   });
 
   const { data: historyEntries } = useQuery({
@@ -93,7 +84,6 @@ export default function BillingDetail() {
       queryClient.invalidateQueries({ queryKey: ["billings"] });
       queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" });
       addToast({ title: "Success", description: "Payment recorded successfully", variant: "success" });
-      setPaymentOpen(false);
       setPaymentAmount("");
       setPaymentMethod("");
     },

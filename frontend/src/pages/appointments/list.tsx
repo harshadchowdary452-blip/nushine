@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef, useEffect } from "react"
+import { useState, useMemo, useRef, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
@@ -7,12 +7,11 @@ import {
   getSortedRowModel,
   flexRender,
   type ColumnDef,
-  type SortingState,
 } from "@tanstack/react-table"
 import { motion } from "framer-motion"
 import {
   Plus, Search, Eye, Trash2, Calendar, List, ChevronLeft, ChevronRight,
-  CalendarDays, User as UserIcon, X, Clock, SlidersHorizontal,
+  CalendarDays, User as UserIcon, X, SlidersHorizontal,
 } from "lucide-react"
 import { format, eachDayOfInterval, startOfMonth, endOfMonth, getDay, isSameDay } from "date-fns"
 import PageHeader from "@/components/layout/page-header"
@@ -34,7 +33,9 @@ import QuickExport from "@/components/ui/quick-export"
 import { useServerFilters } from "@/hooks/useServerFilters"
 import { FilterChips } from "@/components/ui/filter-bar"
 import AppointmentFilterBar from "./filter-bar"
-import type { Appointment, Patient, User, PaginatedResponse, DoctorSlotResponse } from "@/types"
+import AppointmentScheduler from "@/components/appointments/AppointmentScheduler"
+import type { Appointment, Patient, User, PaginatedResponse } from "@/types"
+import { extractDetail } from "@/types"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/store/authStore"
 
@@ -74,106 +75,6 @@ function getEmptyAppointmentForm(): AppointmentForm {
   }
 }
 
-const SLOT_COLORS: Record<string, string> = {
-  available: "bg-green-100 text-green-800 border-green-300 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700 cursor-pointer",
-  booked: "bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700 cursor-not-allowed opacity-60",
-  leave: "bg-gray-100 text-gray-400 border-gray-200 dark:bg-gray-800 dark:text-gray-500 dark:border-gray-700 cursor-not-allowed opacity-50",
-  blocked: "bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-700 cursor-not-allowed opacity-60",
-  past: "bg-gray-50 text-gray-300 border-gray-100 dark:bg-gray-900 dark:text-gray-600 dark:border-gray-800 cursor-not-allowed opacity-40",
-  selected: "bg-blue-500 text-white border-blue-600 dark:bg-blue-600 dark:border-blue-700 cursor-pointer",
-}
-
-interface SlotGridProps {
-  doctorId: string; date: string; durationMinutes: number;
-  selectedTime: string; onSelect: (time: string) => void
-}
-
-function SlotGrid({ doctorId, date, durationMinutes, selectedTime, onSelect }: SlotGridProps) {
-  const { data, isLoading, isError, error } = useQuery<DoctorSlotResponse>({
-    queryKey: ["doctor-slots", doctorId, date, durationMinutes],
-    queryFn: () => appointmentsApi.slots({ doctor_id: doctorId, date, duration_minutes: durationMinutes }),
-    enabled: !!doctorId && !!date,
-    retry: 0,
-  })
-
-  if (isLoading) {
-    return (
-      <div className="rounded-xl border p-4 space-y-2">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <div className="h-2 w-2 rounded-full bg-yellow-400 animate-pulse" />
-          Loading available slots...
-        </div>
-      </div>
-    )
-  }
-
-  if (isError || !data) {
-    return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-4 space-y-2">
-        <p className="text-sm text-red-600 font-medium">Failed to load slots</p>
-        <p className="text-xs text-red-500">{(error as any)?.response?.data?.detail || (error as any)?.message || "Unknown error"}</p>
-      </div>
-    )
-  }
-
-  return (
-    <div className="rounded-xl border p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h4 className="text-sm font-semibold">
-          {data.doctor_name} — {format(new Date(data.date), "MMM dd, yyyy")}
-        </h4>
-        {data.is_on_leave && (
-          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
-            On Leave{data.leave_reason ? `: ${data.leave_reason}` : ""}
-          </span>
-        )}
-      </div>
-      {data.working_hours && (
-        <p className="text-xs text-muted-foreground mb-2">Working hours: {data.working_hours}</p>
-      )}
-      {data.slots.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-4 text-center">No slots available for this date.</p>
-      ) : (
-        <>
-          <div className="flex items-center gap-3 mb-3 flex-wrap text-xs">
-            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded border border-green-300 bg-green-100 dark:bg-green-900/30 dark:border-green-700" /> Available</span>
-            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded border border-red-300 bg-red-100 dark:bg-red-900/30 dark:border-red-700" /> Booked</span>
-            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded border border-gray-200 bg-gray-100 dark:bg-gray-800 dark:border-gray-700" /> Unavailable</span>
-            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-500" /> Selected</span>
-          </div>
-          <div className="flex flex-wrap gap-2 max-h-56 overflow-y-auto">
-            {data.slots.map((slot) => {
-              const isSelected = selectedTime === slot.time
-              const colorClass = isSelected ? SLOT_COLORS.selected : SLOT_COLORS[slot.status] || SLOT_COLORS.past
-              return (
-                <button
-                  key={slot.time}
-                  type="button"
-                  disabled={slot.status !== "available" && !isSelected}
-                  onClick={() => { if (slot.status === "available") onSelect(slot.time) }}
-                  className={cn("px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors", colorClass)}
-                  title={
-                    slot.status === "booked" ? `Booked by ${slot.patient_name || "someone"}${slot.appointment_type ? ` (${slot.appointment_type})` : ""}`
-                    : slot.status === "blocked" ? "Blocked"
-                    : slot.status === "leave" ? "Doctor on leave"
-                    : slot.status === "past" ? "Past time"
-                    : `${slot.time} - Available`
-                  }
-                >
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {slot.time.slice(0, 5).replace(/^0(\d)/, "$1")}
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        </>
-      )}
-    </div>
-  )
-}
-
 export default function AppointmentList() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -192,16 +93,16 @@ export default function AppointmentList() {
   const [form, setForm] = useState<AppointmentForm>(getEmptyAppointmentForm)
   const [patientSearch, setPatientSearch] = useState("")
   const patientSearchRef = useRef<HTMLInputElement>(null)
-  const [availability, setAvailability] = useState<{ available: boolean; current_count: number; max_allowed: number; message?: string } | null>(null)
-  const [checkingAvailability, setCheckingAvailability] = useState(false)
+  const [, setAvailability] = useState<{ available: boolean; current_count: number; max_allowed: number; message?: string } | null>(null)
+  const [, setCheckingAvailability] = useState(false)
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
 
   const currentUser = useAuthStore((s) => s.user)
 
   const { data, isLoading } = useQuery<PaginatedResponse<Appointment>>({
-    queryKey: ["appointments", "search", queryKey],
+    queryKey: ["appointments", "search", queryKey, page],
     queryFn: () => {
-      const params: Record<string, any> = {
+      const params: Record<string, string | number> = {
         page, page_size: 10,
         sort_by: sortField, sort_order: sortDir,
       }
@@ -291,8 +192,8 @@ export default function AppointmentList() {
       addToast({ title: "Success", description: "Appointment deleted successfully", variant: "success" })
       setDeleteDialogOpen(false); setDeletingAppointment(null)
     },
-    onError: (err: any) => {
-      addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to delete appointment", variant: "destructive" })
+    onError: (err: unknown) => {
+      addToast({ title: "Error", description: extractDetail(err), variant: "destructive" })
     },
   })
 
@@ -300,7 +201,7 @@ export default function AppointmentList() {
   function handleDelete() { if (deletingAppointment) deleteMutation.mutate(deletingAppointment.id) }
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => appointmentsApi.create(data),
+    mutationFn: (data: Record<string, unknown>) => appointmentsApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["appointments"], refetchType: "all" })
       queryClient.invalidateQueries({ queryKey: ["doctor-slots"], refetchType: "all" })
@@ -309,10 +210,8 @@ export default function AppointmentList() {
       addToast({ title: "Success", description: "Appointment created successfully", variant: "success" })
       resetForm()
     },
-    onError: (err: any) => {
-      const detail = err?.response?.data?.detail
-      const msg = Array.isArray(detail) ? detail.map((d: any) => d.msg).join("; ") : detail || "Failed to create appointment"
-      addToast({ title: "Error", description: msg, variant: "destructive" })
+    onError: (err: unknown) => {
+      addToast({ title: "Error", description: extractDetail(err), variant: "destructive" })
     },
   })
 
@@ -699,14 +598,25 @@ export default function AppointmentList() {
                   </Select>
                 </div>
               </div>
-              {form.doctor_id && form.appointment_date && (
-                <SlotGrid doctorId={form.doctor_id} date={form.appointment_date} durationMinutes={form.duration_minutes}
-                  selectedTime={form.appointment_time} onSelect={(time) => setForm({ ...form, appointment_time: time })} />
-              )}
               <div className="grid gap-2">
                 <Label htmlFor="notes">Notes</Label>
                 <Input id="notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
               </div>
+              {form.doctor_id && form.appointment_date && (
+                <AppointmentScheduler
+                  doctorId={form.doctor_id}
+                  appointmentType={form.appointment_type}
+                  date={form.appointment_date}
+                  selectedTime={form.appointment_time}
+                  showDoctorSelector={false}
+                  showTypeSelector={false}
+                  onSelect={(data) => setForm({
+                    ...form,
+                    appointment_time: data.appointment_time,
+                    duration_minutes: data.duration_minutes,
+                  })}
+                />
+              )}
             </div>
             <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-gray-100">
               <Button type="button" variant="outline" onClick={resetForm}>Cancel</Button>

@@ -1,9 +1,8 @@
-import React, { useState, useCallback, useMemo } from 'react'
+import React, { useState, useCallback } from 'react'
 import {
   type ToothFinding,
   type ToothCondition,
   type ToothSurface,
-  type FindingFormData,
   type ToothChartProps,
   CONDITION_COLORS,
   MOCK_FINDINGS,
@@ -64,7 +63,7 @@ export default function ToothGrid({
   const [localFindings, setLocalFindings] = useState<ToothFinding[]>(MOCK_FINDINGS)
   const [isChild, setIsChild] = useState(false)
   const [selectedId, setSelectedId] = useState<number | string | null>(null)
-  const [selectedSurface, setSelectedSurface] = useState<string | null>(null)
+  const [, setSelectedSurface] = useState<string | null>(null)
   const [undoStack, setUndoStack] = useState<ToothFinding[][]>([])
 
   const findings = externalFindings ?? localFindings

@@ -1,21 +1,86 @@
 import { format } from "date-fns"
+import type { ClinicalFinding, TreatmentPlan, ParsedTreatmentItem } from "@/types"
 
-function sf(f: any): string {
+interface CasePrintHospital {
+  name?: string
+  address?: string
+  phone?: string
+  email?: string
+  registration_number?: string
+}
+
+interface CasePrintDoctor {
+  full_name?: string
+  qualification?: string
+  specialization?: string
+  license_number?: string
+  phone?: string
+}
+
+interface CasePrintPatient {
+  full_name?: string
+  op_no?: string
+  age?: number | null
+  gender?: string | null
+  phone?: string | null
+  abha_id?: string | null
+  address?: string | null
+}
+
+interface CasePrintData {
+  id: string
+  case_number?: string | null
+  findings?: ClinicalFinding[]
+  hospital?: CasePrintHospital
+  patient?: CasePrintPatient
+  doctor?: CasePrintDoctor
+  appointment_date?: string | null
+  created_at?: string
+  doctor_name?: string | null
+  doctor_qualification?: string | null
+  doctor_specialization?: string | null
+  doctor_registration_number?: string | null
+  patient_name?: string
+  chief_complaint?: string | null
+  chief_complaint_duration?: string | null
+  chief_complaint_severity?: string | null
+  chief_complaint_associated_symptoms?: string | null
+  hpi?: string | null
+  medical_history?: string | null
+  dental_history?: string | null
+  personal_history?: string | null
+  family_history?: string | null
+  extra_oral_examination?: string | null
+  intra_oral_examination?: string | null
+  periodontal_examination?: string | null
+  investigations?: string | null
+  provisional_diagnosis?: string | null
+  final_diagnosis?: string | null
+  clinical_findings_summary?: string | null
+  initial_treatment_plan?: string | null
+  treatment_plans?: TreatmentPlan[]
+  medicines_prescribed?: string | null
+  patient_instructions?: string | null
+  follow_up_instructions?: string | null
+  next_review_date?: string | null
+}
+
+function sf(f: ClinicalFinding): string {
   if (f.surface) return f.surface.replace(/,/g, ", ")
   if (f.notes) { const m = f.notes.match(/\[S:([^\]]+)\]/); if (m) return m[1] }
   return "\u2014"
 }
 
-function rm(f: any): string {
+function rm(f: ClinicalFinding): string {
   if (f.notes) { let s = f.notes; s = s.replace(/^\[S:[^\]]*\]\s*/g, ""); s = s.replace(/^\[M:[^\]]*\]\s*/g, ""); return s || "\u2014" }
   return "\u2014"
 }
 
-function chk(...vals: any[]) {
+function chk(...vals: (string | number | boolean | null | undefined)[]) {
   return vals.some(v => v !== null && v !== undefined && v !== "")
 }
 
-export default function CaseReportPrint({ c }: { c: any }) {
+export default function CaseReportPrint({ c }: { c: CasePrintData }) {
   const findings = c.findings || []
   const h = c.hospital
   const hn = h?.name, ha = h?.address || "", hp = h?.phone || "", he = h?.email || "", hr = h?.registration_number || ""
@@ -219,7 +284,7 @@ export default function CaseReportPrint({ c }: { c: any }) {
                   <tr><th>Tooth</th><th>Finding</th><th>Surface</th><th>Remarks</th></tr>
                 </thead>
                 <tbody>
-                  {findings.map((f: any, i: number) => (
+                  {findings.map((f: ClinicalFinding, i: number) => (
                     <tr key={f.id || i}>
                       <td>{f.tooth_number || "\u2014"}</td>
                       <td>{f.finding_type || "\u2014"}</td>
@@ -258,18 +323,16 @@ export default function CaseReportPrint({ c }: { c: any }) {
         {/* Treatment Plan */}
         {(() => {
           // Try to parse structured JSON data from initial_treatment_plan (new form)
-          let items: any[] | null = null
-          let isJson = false
+          let items: ParsedTreatmentItem[] | null = null
           if (c.initial_treatment_plan && typeof c.initial_treatment_plan === "string" && c.initial_treatment_plan.startsWith("_JSON_")) {
             try {
               items = JSON.parse(c.initial_treatment_plan.slice(6))
-              isJson = true
             } catch { items = null }
           }
           // Fall back to DB treatment_plans relationship
           if (!items || items.length === 0) {
             if (c.treatment_plans && c.treatment_plans.length > 0) {
-              items = c.treatment_plans.map((tp: any) => ({
+              items = c.treatment_plans.map((tp: TreatmentPlan) => ({
                 name: tp.treatment_name || "\u2014",
                 toothNumbers: [],
                 estimatedVisits: tp.total_sittings || "",
@@ -283,15 +346,15 @@ export default function CaseReportPrint({ c }: { c: any }) {
           // Compute summary
           const totalProcedures = items.length
           const allTeeth = new Set<string>()
-          const totalVisits = items.reduce((s: number, it: any) => {
-            const v = parseInt(it.estimatedVisits) || 0
+          const totalVisits = items.reduce((s: number, it: ParsedTreatmentItem) => {
+            const v = parseInt(String(it.estimatedVisits)) || 0
             return s + v
           }, 0)
-          const totalCost = items.reduce((s: number, it: any) => {
-            const c = parseFloat(it.estimatedCost) || 0
+          const totalCost = items.reduce((s: number, it: ParsedTreatmentItem) => {
+            const c = parseFloat(String(it.estimatedCost)) || 0
             return s + c
           }, 0)
-          items.forEach((it: any) => (it.toothNumbers || []).forEach((t: string) => allTeeth.add(t)))
+          items.forEach((it: ParsedTreatmentItem) => (it.toothNumbers || []).forEach((t: string) => allTeeth.add(t)))
 
           return (
             <div>
@@ -307,7 +370,7 @@ export default function CaseReportPrint({ c }: { c: any }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((it: any, i: number) => (
+                  {items.map((it: ParsedTreatmentItem, i: number) => (
                     <tr key={i} className="tp-row">
                       <td style={{ textAlign: "left", fontWeight: 600 }}>{it.name || "\u2014"}</td>
                       <td>{(it.toothNumbers && it.toothNumbers.length > 0) ? it.toothNumbers.join(", ") : "\u2014"}</td>

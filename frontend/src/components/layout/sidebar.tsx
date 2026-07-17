@@ -3,10 +3,10 @@ import { Link, useLocation } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   LayoutDashboard, Users, FolderOpen, CalendarDays, Stethoscope, Receipt,
-  UserCog, Settings, ChevronLeft, X, Building2, Shield, MessageSquare,
-  Activity, Menu, IndianRupee, TrendingUp, Bell, Mail, BarChart3, FileText,
-  Phone, ClipboardList, Calendar, Megaphone, Clock, UserPlus, Send,
-  Search, Star, ChevronRight, LogOut, Download, LayoutList, Kanban,
+  Settings, ChevronLeft, Building2, Shield, MessageSquare,
+  Activity, Menu, IndianRupee, Mail, BarChart3, FileText,
+  Megaphone, Clock, UserPlus,
+  Search, Download, LayoutList, Kanban,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useSidebarStore } from "@/store/sidebarStore"
@@ -97,7 +97,7 @@ function getMainNavItems(role: string): NavItem[] {
 
 export default function Sidebar() {
   const { collapsed, mobileOpen, toggle, setMobileOpen, bottomNavOpen, setBottomNavOpen } = useSidebarStore()
-  const { user, logout } = useAuthStore()
+  const { user } = useAuthStore()
   const location = useLocation()
   const role = user?.role || "DOCTOR"
   const sections = roleNav[role] || roleNav.DOCTOR

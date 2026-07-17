@@ -6,7 +6,7 @@ import { dashboardApi } from "@/services/endpoints"
 import { formatIndianRupees, formatIndianNumber } from "@/lib/currency"
 import DateFilterBar from "@/components/ui/date-filter-bar"
 import { Badge } from "@/components/ui/badge"
-import { ScrollArea } from "@/components/ui/scroll-area"
+
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from "@/components/ui/sheet"
@@ -14,7 +14,7 @@ import {
   Dialog, DialogContent, DialogTitle,
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
-import type { QuickViewAdminGroup, QuickViewHospital, QuickViewDoctor, QuickViewPatient, QuickViewPatientPreOp, QuickViewPatientPostOp } from "@/types"
+import type { QuickViewAdminGroup, QuickViewHospital, QuickViewDoctor, QuickViewPatient } from "@/types"
 
 interface QuickViewDrawerProps {
   open: boolean

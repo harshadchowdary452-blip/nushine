@@ -1,19 +1,20 @@
 import { useState, useMemo } from "react"
-import { useQuery, useMutation } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { motion } from "framer-motion"
-import { Send, Users, MessageSquare, Filter, ChevronRight, ExternalLink, Copy, CheckCircle2, Search } from "lucide-react"
+import { Send, MessageSquare, Filter, ChevronRight, ExternalLink, Copy, CheckCircle2, Search } from "lucide-react"
 import PageHeader from "@/components/layout/page-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
+
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/components/ui/toast"
 import { useAuthStore } from "@/store/authStore"
 import { patientsApi, leadsApi, whatsappTemplatesApi } from "@/services/endpoints"
+import type { Patient, Lead } from "@/types"
 
 type AudienceType = "all_patients" | "selected_patients" | "all_leads" | "selected_leads" | "appointment_tomorrow" | "pending_followups" | "six_month_recall" | "patient_source" | "custom"
 
@@ -26,18 +27,18 @@ export default function WhatsAppBroadcast() {
   const [selectedTemplate, setSelectedTemplate] = useState("")
   const [customMessage, setCustomMessage] = useState("")
   const [searchTerm, setSearchTerm] = useState("")
-  const [preview, setPreview] = useState<any[]>([])
+  const [preview, setPreview] = useState<Array<{ name: string; phone: string; message: string; link: string }>>([])
   const [showPreview, setShowPreview] = useState(false)
-  const [generatedLinks, setGeneratedLinks] = useState<any[]>([])
+  const [generatedLinks, setGeneratedLinks] = useState<Array<{ name: string; phone: string; message: string; link: string }>>([])
   const [copiedAll, setCopiedAll] = useState(false)
 
-  const { data: patients, isLoading: patientsLoading } = useQuery({
+  const { data: patients } = useQuery({
     queryKey: ["patients", "all", hospitalId],
     queryFn: () => patientsApi.list({ limit: 500, hospital_id: hospitalId }),
     enabled: !!hospitalId,
   })
 
-  const { data: leads, isLoading: leadsLoading } = useQuery({
+  const { data: leads } = useQuery({
     queryKey: ["leads", "all"],
     queryFn: () => leadsApi.list({ limit: 500 }),
   })
@@ -47,14 +48,14 @@ export default function WhatsAppBroadcast() {
     queryFn: () => whatsappTemplatesApi.list(),
   })
 
-  const allPatients: any[] = Array.isArray(patients) ? patients : []
-  const allLeads: any[] = Array.isArray(leads) ? leads : []
-  const allTemplates: any[] = Array.isArray(templates) ? templates : []
+  const allPatients: Patient[] = useMemo(() => Array.isArray(patients) ? patients : [], [patients])
+  const allLeads: Lead[] = useMemo(() => Array.isArray(leads) ? leads : [], [leads])
+  const allTemplates: Array<{ id: string; name: string; message: string }> = useMemo(() => Array.isArray(templates) ? templates : [], [templates])
 
   const filteredPatients = useMemo(() => {
     if (!searchTerm) return allPatients
     const q = searchTerm.toLowerCase()
-    return allPatients.filter((p: any) =>
+    return allPatients.filter((p) =>
       (p.patient_name || "").toLowerCase().includes(q) || (p.phone || "").includes(q)
     )
   }, [allPatients, searchTerm])
@@ -62,29 +63,29 @@ export default function WhatsAppBroadcast() {
   const filteredLeads = useMemo(() => {
     if (!searchTerm) return allLeads
     const q = searchTerm.toLowerCase()
-    return allLeads.filter((l: any) =>
+    return allLeads.filter((l) =>
       l.lead_name.toLowerCase().includes(q) || l.mobile.includes(q)
     )
   }, [allLeads, searchTerm])
 
-  function resolveAudience(): any[] {
+  function resolveAudience(): Array<Patient | Lead> {
     switch (audienceType) {
-      case "all_patients": return allPatients.filter((p: any) => p.phone)
-      case "all_leads": return allLeads.filter((l: any) => l.mobile)
-      case "appointment_tomorrow": return allPatients.filter((p: any) => p.phone && p.next_appointment_date)
-      case "pending_followups": return allPatients.filter((p: any) => p.phone && p.next_follow_up)
-      case "six_month_recall": return allPatients.filter((p: any) => p.phone)
+      case "all_patients": return allPatients.filter((p) => p.phone)
+      case "all_leads": return allLeads.filter((l) => l.mobile)
+      case "appointment_tomorrow": return allPatients.filter((p) => p.phone && p.next_appointment_date)
+      case "pending_followups": return allPatients.filter((p) => p.phone && p.next_follow_up)
+      case "six_month_recall": return allPatients.filter((p) => p.phone)
       default: return []
     }
   }
 
   function getMessage(): string {
     if (customMessage.trim()) return customMessage
-    const t = allTemplates.find((t: any) => t.id === selectedTemplate)
+    const t = allTemplates.find((t) => t.id === selectedTemplate)
     return t?.message || ""
   }
 
-  function fillTemplate(msg: string, recipient: any): string {
+  function fillTemplate(msg: string, recipient: { patient_name?: string | null; lead_name?: string; full_name?: string }): string {
     const name = recipient.patient_name || recipient.lead_name || recipient.full_name || "Patient"
     return msg
       .replace(/\{PatientName\}/g, name)
@@ -103,9 +104,9 @@ export default function WhatsAppBroadcast() {
   function handlePreview() {
     const audience = resolveAudience().slice(0, 10)
     const message = getMessage()
-    const items = audience.map((r: any) => {
-      const phone = r.phone || r.mobile
-      const name = r.patient_name || r.lead_name || r.full_name || "Patient"
+    const items = audience.map((r) => {
+      const phone = ('phone' in r ? r.phone : null) || ('mobile' in r ? r.mobile : null) || ""
+      const name = ('patient_name' in r ? r.patient_name : null) || ('lead_name' in r ? r.lead_name : null) || "Patient"
       const filled = fillTemplate(message, r)
       return { name, phone, message: filled, link: generateDeepLink(phone, filled) }
     })
@@ -118,9 +119,9 @@ export default function WhatsAppBroadcast() {
     const message = getMessage()
     if (audience.length === 0) { addToast({ title: "No recipients", description: "No matching patients/leads found", variant: "destructive" }); return }
     if (!message.trim()) { addToast({ title: "No message", description: "Select a template or write a custom message", variant: "destructive" }); return }
-    const links = audience.map((r: any) => {
-      const phone = r.phone || r.mobile
-      const name = r.patient_name || r.lead_name || r.full_name || "Patient"
+    const links = audience.map((r) => {
+      const phone = ('phone' in r ? r.phone : null) || ('mobile' in r ? r.mobile : null) || ""
+      const name = ('patient_name' in r ? r.patient_name : null) || ('lead_name' in r ? r.lead_name : null) || "Patient"
       const filled = fillTemplate(message, r)
       return { name, phone, message: filled, link: generateDeepLink(phone, filled) }
     })
@@ -167,7 +168,7 @@ export default function WhatsAppBroadcast() {
                     <Input placeholder="Search patients..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8" />
                   </div>
                   <div className="max-h-32 overflow-y-auto space-y-1">
-                    {filteredPatients.slice(0, 20).map((p: any) => (
+                    {filteredPatients.slice(0, 20).map((p) => (
                       <label key={p.id} className="flex items-center gap-2 text-sm p-1.5 rounded hover:bg-gray-50 cursor-pointer">
                         <input type="checkbox" className="rounded" />
                         <span className="flex-1">{p.patient_name || "Unknown"}</span>
@@ -185,7 +186,7 @@ export default function WhatsAppBroadcast() {
                     <Input placeholder="Search leads..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8" />
                   </div>
                   <div className="max-h-32 overflow-y-auto space-y-1">
-                    {filteredLeads.slice(0, 20).map((l: any) => (
+                    {filteredLeads.slice(0, 20).map((l) => (
                       <label key={l.id} className="flex items-center gap-2 text-sm p-1.5 rounded hover:bg-gray-50 cursor-pointer">
                         <input type="checkbox" className="rounded" />
                         <span className="flex-1">{l.lead_name}</span>
@@ -208,7 +209,7 @@ export default function WhatsAppBroadcast() {
               <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
                 <SelectTrigger><SelectValue placeholder="Select a template" /></SelectTrigger>
                 <SelectContent>
-                  {allTemplates.map((t: any) => (
+                  {allTemplates.map((t) => (
                     <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
                   ))}
                 </SelectContent>

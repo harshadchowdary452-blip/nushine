@@ -78,7 +78,7 @@ export default function Navbar() {
     try {
       await notificationsApi.delete(id)
       setNotifications((prev) => prev.filter((n) => n.id !== id))
-    } catch {}
+    } catch { /* notification delete failed, ignore */ }
     await fetchUnreadCount()
   }
 

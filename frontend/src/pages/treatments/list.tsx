@@ -1,8 +1,7 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useMemo, useCallback, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { useQuery } from "@tanstack/react-query"
-import { Search, Filter, Stethoscope, Clock, FileText, ChevronDown, ChevronRight, Calendar, IndianRupee, Hash, ChevronLeft, RotateCcw } from "lucide-react"
+import { useQuery, keepPreviousData } from "@tanstack/react-query"
+import { Search, Filter, Stethoscope, Clock, FileText, ChevronDown, ChevronRight, IndianRupee, Hash, ChevronLeft, RotateCcw, Loader2 } from "lucide-react"
 import PageHeader from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -113,7 +112,7 @@ export default function TreatmentList() {
 
   const skip = (page - 1) * PAGE_SIZE
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isFetching } = useQuery({
     queryKey: ["treatment-plans", debouncedSearch, statusFilter, skip],
     queryFn: () => treatmentApi.list({
       skip,
@@ -121,6 +120,7 @@ export default function TreatmentList() {
       search: debouncedSearch || undefined,
       status: statusFilter !== "all" ? statusFilter : undefined,
     }),
+    placeholderData: keepPreviousData,
   })
 
   const allPlans: TreatmentPlan[] = useMemo(() => {
@@ -138,7 +138,7 @@ export default function TreatmentList() {
 
   const caseGroups = useMemo(() => groupByCase(allPlans), [allPlans])
 
-  const activeTreatments = allPlans.filter((p: any) => !["COMPLETED", "CANCELLED"].includes(p.status)).length
+  const activeTreatments = allPlans.filter((p: TreatmentPlan) => !["COMPLETED", "CANCELLED"].includes(p.status)).length
 
   const toggleExpand = useCallback((caseId: string, e: React.MouseEvent) => {
     e.stopPropagation()
@@ -150,17 +150,7 @@ export default function TreatmentList() {
     })
   }, [])
 
-  if (isLoading && allPlans.length === 0) {
-    return (
-      <div className="space-y-6 p-6">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-12 w-full" />
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-24 w-full" />
-        ))}
-      </div>
-    )
-  }
+  const showInitialSkeleton = isLoading && allPlans.length === 0
 
   return (
     <div className="space-y-6">
@@ -197,9 +187,21 @@ export default function TreatmentList() {
             <RotateCcw className="h-4 w-4 mr-1" /> Clear
           </Button>
         )}
+        {isFetching && !isLoading && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            <span>Searching...</span>
+          </div>
+        )}
       </div>
 
-      {caseGroups.length === 0 ? (
+      {showInitialSkeleton ? (
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 w-full" />
+          ))}
+        </div>
+      ) : caseGroups.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center py-16">
             <Stethoscope className="h-10 w-10 text-muted-foreground mb-3" />

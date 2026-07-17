@@ -15,6 +15,22 @@ import { useToast } from "@/components/ui/toast"
 import { campaignTemplatesApi } from "@/services/endpoints"
 import { cn } from "@/lib/utils"
 
+interface CampaignTemplate {
+  id: string
+  name: string
+  channel: string
+  category: string
+  message: string
+  is_active: boolean
+}
+
+interface CampaignTemplatePayload {
+  name: string
+  channel: string
+  category: string
+  message: string
+}
+
 const channelIcon: Record<string, React.ElementType> = {
   WHATSAPP: MessageCircle, SMS: MessageSquare, EMAIL: Mail,
 }
@@ -39,16 +55,16 @@ export default function CampaignTemplates() {
     queryKey: ["campaign-templates", filterChannel],
     queryFn: () => campaignTemplatesApi.list(filterChannel ? { channel: filterChannel } : {}),
   })
-  const items: any[] = Array.isArray(templates) ? templates : []
+  const items: CampaignTemplate[] = Array.isArray(templates) ? templates : []
 
   const reset = () => { setName(""); setChannel("WHATSAPP"); setCategory("GENERAL"); setMessage(""); setEditId(null) }
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => campaignTemplatesApi.create(data),
+    mutationFn: (data: CampaignTemplatePayload) => campaignTemplatesApi.create(data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["campaign-templates"] }); addToast({ title: "Template created", variant: "success" }); setOpen(false); reset() },
   })
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => campaignTemplatesApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: CampaignTemplatePayload }) => campaignTemplatesApi.update(id, data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["campaign-templates"] }); addToast({ title: "Template updated", variant: "success" }); setOpen(false); reset() },
   })
   const deleteMutation = useMutation({
@@ -60,7 +76,7 @@ export default function CampaignTemplates() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["campaign-templates"] }); addToast({ title: "Duplicated", variant: "success" }) },
   })
 
-  const openEdit = (t: any) => { setEditId(t.id); setName(t.name); setChannel(t.channel); setCategory(t.category); setMessage(t.message); setOpen(true) }
+  const openEdit = (t: CampaignTemplate) => { setEditId(t.id); setName(t.name); setChannel(t.channel); setCategory(t.category); setMessage(t.message); setOpen(true) }
   const openCreate = () => { reset(); setOpen(true) }
   const handleSave = () => {
     if (!name || !message) return
@@ -99,7 +115,7 @@ export default function CampaignTemplates() {
             </div>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {items.map((t: any) => {
+              {items.map((t: CampaignTemplate) => {
                 const Icon = channelIcon[t.channel] || FileText
                 return (
                   <div key={t.id} className="rounded-lg border p-4 space-y-3 hover:shadow-sm transition-shadow">

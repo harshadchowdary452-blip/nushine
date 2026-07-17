@@ -2,12 +2,12 @@ import { useState, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
-import { Plus, Search, Eye, Phone, MessageSquare, Users, UserPlus, Calendar, MoreHorizontal, Star, ArrowUpDown, ChevronDown, Target, IndianRupee } from "lucide-react"
+import { Plus, Search, Eye, Phone, MessageSquare, Users, UserPlus, Calendar, MoreHorizontal, Star, ArrowUpDown, Target } from "lucide-react"
 import { format } from "date-fns"
 import PageHeader from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
+
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent } from "@/components/ui/card"
 import {
@@ -23,7 +23,6 @@ import { leadsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
 import DentalEmptyState from "@/components/ui/dental-empty-state"
 import QuickExport from "@/components/ui/quick-export"
-import { useAuthStore } from "@/store/authStore"
 import type { Lead, LeadSource, LeadStatus } from "@/types"
 
 const priorityColors: Record<string, string> = {
@@ -60,7 +59,6 @@ export default function LeadList() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { addToast } = useToast()
-  const { user } = useAuthStore()
 
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("")
@@ -96,9 +94,8 @@ export default function LeadList() {
     onError: () => addToast({ title: "Error", description: "Failed to create lead", variant: "destructive" }),
   })
 
-  const items: Lead[] = Array.isArray(leads) ? leads : []
-
   const filtered = useMemo(() => {
+    const items: Lead[] = Array.isArray(leads) ? leads : []
     let result = items
     if (search) {
       const q = search.toLowerCase()
@@ -119,7 +116,7 @@ export default function LeadList() {
       return sortDir === "desc" ? -cmp : cmp
     })
     return result
-  }, [items, search, sortField, sortDir])
+  }, [leads, search, sortField, sortDir])
 
   function resetForm() {
     setLeadName(""); setMobile(""); setAlternateMobile(""); setEmail("")

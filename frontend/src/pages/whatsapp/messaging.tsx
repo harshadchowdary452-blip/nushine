@@ -1,8 +1,8 @@
 import { useState } from "react"
 import { motion } from "framer-motion"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Send, MessageSquare, Users, Search, Loader2, CheckCircle2, XCircle, Eye, Filter, BarChart3, History, FileText, ExternalLink, Smartphone, AlertTriangle, Clock } from "lucide-react"
-import { patientsApi, doctorsApi, whatsappV2Api } from "@/services/endpoints"
+import { useQuery, useMutation } from "@tanstack/react-query"
+import { Send, MessageSquare, Users, Search, Loader2, CheckCircle2, Eye, Filter, History, FileText, ExternalLink, Smartphone, Clock } from "lucide-react"
+import { patientsApi, whatsappV2Api } from "@/services/endpoints"
 import PageHeader from "@/components/layout/page-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -45,7 +45,6 @@ const PRESETS = [
 ]
 
 export default function WhatsAppMessaging() {
-  const queryClient = useQueryClient()
   const { addToast } = useToast()
   const [tab, setTab] = useState<string>("send")
   const [message, setMessage] = useState("")
@@ -54,15 +53,11 @@ export default function WhatsAppMessaging() {
   const [selectedPatients, setSelectedPatients] = useState<string[]>([])
   const [template, setTemplate] = useState("")
   const [filterType, setFilterType] = useState("all")
-  const [filterApptDate, setFilterApptDate] = useState("")
-  const [filterDoctor, setFilterDoctor] = useState("")
-  const [filterStatus, setFilterStatus] = useState("")
-
   const [showPreview, setShowPreview] = useState(false)
-  const [previewData, setPreviewData] = useState<any>(null)
+  const [previewData, setPreviewData] = useState<Record<string, unknown> | null>(null)
 
   const [showBulkPreview, setShowBulkPreview] = useState(false)
-  const [bulkPreviewData, setBulkPreviewData] = useState<any>(null)
+  const [bulkPreviewData, setBulkPreviewData] = useState<Record<string, unknown> | null>(null)
 
   const [historyPage, setHistoryPage] = useState(1)
   const [historyFilter, setHistoryFilter] = useState({ patient_id: "", message_type: "", status: "" })
@@ -70,10 +65,6 @@ export default function WhatsAppMessaging() {
   const { data: patients } = useQuery({
     queryKey: ["patients", "whatsapp"],
     queryFn: () => patientsApi.list({ page_size: 200 }),
-  })
-  const { data: doctors } = useQuery({
-    queryKey: ["doctors", "whatsapp"],
-    queryFn: () => doctorsApi.list({ page_size: 100 }),
   })
   const { data: messageTypes } = useQuery({
     queryKey: ["whatsapp", "message-types"],
@@ -90,7 +81,6 @@ export default function WhatsAppMessaging() {
   })
 
   const patientList: Patient[] = patients?.items || patients || []
-  const doctorList: any[] = doctors?.items || doctors || []
 
   const previewMutation = useMutation({
     mutationFn: (data: { patient_id: string; message: string }) =>
@@ -130,7 +120,7 @@ export default function WhatsAppMessaging() {
   })
 
   const bulkSendMutation = useMutation({
-    mutationFn: (data: { items: any[]; send_mode: string }) =>
+    mutationFn: (data: { items: Record<string, string>[]; send_mode: string }) =>
       whatsappV2Api.bulkSend({ items: data.items.map(i => ({ ...i, send_mode: data.send_mode })) }),
     onSuccess: (data) => {
       addToast({ title: "Broadcast Done", description: `${data.sent} sent, ${data.failed} failed`, variant: "success" })
@@ -160,7 +150,7 @@ export default function WhatsAppMessaging() {
     if (selectedPatients.length === patientList.length) {
       setSelectedPatients([])
     } else {
-      setSelectedPatients(patientList.map((p: any) => p.id))
+      setSelectedPatients(patientList.map((p: Patient) => p.id))
     }
   }
 
@@ -178,7 +168,7 @@ export default function WhatsAppMessaging() {
   }
 
   async function handleBulkPreview() {
-    const ids = filterType === "all" ? patientList.map((p: any) => p.id) : selectedPatients
+    const ids = filterType === "all" ? patientList.map((p: Patient) => p.id) : selectedPatients
     if (ids.length === 0) {
       addToast({ title: "No patients", description: "Select at least one patient", variant: "destructive" })
       return
@@ -188,9 +178,9 @@ export default function WhatsAppMessaging() {
 
   async function handleBulkSend(mode: "redirect" | "api") {
     if (!bulkPreviewData) return
-    const validItems = bulkPreviewData.items
-      .filter((i: any) => i.is_valid)
-      .map((i: any) => ({
+    const validItems = (bulkPreviewData.items as Record<string, unknown>[])
+      .filter((i) => i.is_valid)
+      .map((i) => ({
         patient_id: i.patient_id,
         message: i.rendered_message,
         message_type: "GENERAL",
@@ -202,7 +192,7 @@ export default function WhatsAppMessaging() {
     <motion.div className="space-y-6" variants={container} initial="hidden" animate="show">
       <PageHeader title="WhatsApp Messaging" description="Send messages with live preview & audit trail" />
 
-      <Tabs value={tab} onValueChange={(v: any) => setTab(v)} className="w-full">
+      <Tabs value={tab} onValueChange={(v: string) => setTab(v)} className="w-full">
         <TabsList className="bg-white border border-border rounded-xl p-1">
           <TabsTrigger value="send"><Send className="h-4 w-4 mr-1" /> Send</TabsTrigger>
           <TabsTrigger value="bulk"><Users className="h-4 w-4 mr-1" /> Bulk</TabsTrigger>
@@ -227,7 +217,7 @@ export default function WhatsAppMessaging() {
                         <Select value={selectedPatient} onValueChange={setSelectedPatient}>
                           <SelectTrigger><SelectValue placeholder="Select patient..." /></SelectTrigger>
                           <SelectContent>
-                            {patientList.map((p: any) => (
+                            {patientList.map((p: Patient) => (
                               <SelectItem key={p.id} value={p.id}>{p.full_name} - {p.phone}</SelectItem>
                             ))}
                           </SelectContent>
@@ -415,7 +405,7 @@ export default function WhatsAppMessaging() {
                     </div>
                     <ScrollArea className="h-80">
                       <div className="space-y-1">
-                        {patientList.map((p: any) => (
+                        {patientList.map((p: Patient) => (
                           <button key={p.id} onClick={() => togglePatient(p.id)}
                             className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
                               selectedPatients.includes(p.id) ? "bg-blue-50 text-blue-700" : "hover:bg-gray-50"
@@ -480,7 +470,7 @@ export default function WhatsAppMessaging() {
                   <SelectTrigger className="w-40"><SelectValue placeholder="Type" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Types</SelectItem>
-                    {messageTypes?.types?.map((t: any) => (
+                    {messageTypes?.types?.map((t: Record<string, string>) => (
                       <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                     ))}
                   </SelectContent>
@@ -506,7 +496,7 @@ export default function WhatsAppMessaging() {
                     {historyData?.items?.length === 0 && (
                       <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">No messages sent yet</td></tr>
                     )}
-                    {historyData?.items?.map((item: any) => (
+                    {historyData?.items?.map((item: Record<string, unknown>) => (
                       <tr key={item.id} className="border-b last:border-0 hover:bg-gray-50">
                         <td className="px-4 py-2.5">
                           <div>

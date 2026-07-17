@@ -17,16 +17,23 @@ import KpiCard from "@/components/layout/kpi-card"
 import DateFilterBar from "@/components/ui/date-filter-bar"
 import { Button } from "@/components/ui/button"
 import { formatIndianRupees, formatIndianNumber } from "@/lib/currency"
+import type { RevenueExpenseTrendPoint, ExpenseBreakdownItem } from "@/types"
 import { cn } from "@/lib/utils"
 
 const PIE_COLORS = ["#4F46E5", "#EF4444", "#F59E0B", "#10B981", "#8B5CF6", "#EC4899", "#06B6D4", "#F97316", "#14B8A6", "#84CC16"]
 
-const ChartTooltip = ({ active, payload, label }: any) => {
+interface ChartTooltipProps {
+  active?: boolean
+  payload?: Array<{ name: string; value: number; color: string; dataKey: string }>
+  label?: string
+}
+
+const ChartTooltip = ({ active, payload, label }: ChartTooltipProps) => {
   if (active && payload && payload.length) {
     return (
       <div className="rounded-xl border border-gray-100 bg-white p-3 shadow-lg">
         <p className="text-sm font-semibold text-gray-900 mb-1">{label}</p>
-        {payload.map((p: any, i: number) => {
+        {payload.map((p, i) => {
           const isFinancial = ["Revenue", "Expenses", "Profit", "revenue", "expenses", "profit"].includes(p.name) || ["revenue", "expenses", "profit"].includes(p.dataKey)
           return (
             <p key={i} className="text-xs" style={{ color: p.color }}>
@@ -95,8 +102,8 @@ function FinancialDashboard({ className }: FinancialDashboardProps) {
   const profitMargin = stats?.profit_margin ?? 0
   const outstandingPayments = stats?.total_pending_billing ?? 0
   const expenseBreakdown: { category: string; amount: number }[] = stats?.expense_breakdown || []
-  const revenueExpenseTrend: any[] = stats?.revenue_expense_trend || []
-  const totalExpenseAmount = expenseBreakdown.reduce((s: number, e: any) => s + e.amount, 0)
+  const revenueExpenseTrend: RevenueExpenseTrendPoint[] = stats?.revenue_expense_trend || []
+  const totalExpenseAmount = expenseBreakdown.reduce((s: number, e) => s + e.amount, 0)
 
   return (
     <div className={cn("space-y-4", className)}>
@@ -196,13 +203,13 @@ function FinancialDashboard({ className }: FinancialDashboardProps) {
                       cx="50%" cy="50%"
                       outerRadius={80}
                       innerRadius={40}
-                      label={({ category, percent }: any) => `${category} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                      label={({ category, percent }: { category: string; percent: number }) => `${category} ${((percent ?? 0) * 100).toFixed(0)}%`}
                     >
-                      {expenseBreakdown.map((_: any, i: number) => (
+                      {expenseBreakdown.map((_, i) => (
                         <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value: any) => formatIndianRupees(Number(value))} />
+                    <Tooltip formatter={(value) => formatIndianRupees(Number(value))} />
                   </RePieChart>
                 </ResponsiveContainer>
                 <div className="flex-1 space-y-1.5 w-full">
@@ -210,7 +217,7 @@ function FinancialDashboard({ className }: FinancialDashboardProps) {
                     <span>Category</span>
                     <span>Amount</span>
                   </div>
-                  {expenseBreakdown.map((item: any, i: number) => (
+                  {expenseBreakdown.map((item, i) => (
                     <div
                       key={item.category}
                       className="flex items-center justify-between text-xs py-1 px-2 rounded hover:bg-gray-50 cursor-pointer transition-colors"

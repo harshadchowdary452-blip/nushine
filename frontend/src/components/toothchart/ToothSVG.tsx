@@ -1,5 +1,5 @@
 import React from 'react'
-import { getToothPathDef, type ToothPaths } from './toothPaths'
+import { getToothPathDef } from './toothPaths'
 import { type ToothFinding, type ToothCondition, CONDITION_COLORS } from './types'
 
 interface ToothSVGProps {
@@ -39,11 +39,6 @@ function renderImplant(cx: number, cy: number, width: number, height: number): s
   ].join(' ')
 }
 
-function renderBridgeConnector(cx: number, cy: number, width: number): string {
-  const bw = width * 0.8
-  return `M ${cx - bw / 2},${cy} L ${cx + bw / 2},${cy}`
-}
-
 function renderDentureBlock(cx: number, cy: number, width: number, height: number): string {
   return `M ${cx - width * 0.35},${cy + height * 0.1} L ${cx + width * 0.35},${cy + height * 0.1} L ${cx + width * 0.4},${cy + height * 0.9} L ${cx - width * 0.4},${cy + height * 0.9} Z`
 }
@@ -51,7 +46,7 @@ function renderDentureBlock(cx: number, cy: number, width: number, height: numbe
 export default React.memo(function ToothSVG({
   toothNumber,
   findings,
-  isUpper,
+  isUpper: _isUpper,
   view,
   isSelected,
   isHovered,
@@ -67,11 +62,6 @@ export default React.memo(function ToothSVG({
   const eruptFinding = findings.find((f) => f.condition === 'Erupt')
   const isHighlighted = activeFilter ? findings.some((f) => f.condition === activeFilter) : false
 
-  const fill = wholeCondition === 'Missing' ? 'none'
-    : wholeCondition === 'Implant' ? '#E8E0D8'
-    : wholeCondition === 'Denture' ? '#D0C8C0'
-    : view === 'crown' ? TOOTH_COLOR : ROOT_COLOR
-
   const stroke = wholeCondition === 'Missing' ? '#888'
     : isSelected ? '#2563EB'
     : isHovered ? '#3B82F6'
@@ -86,7 +76,6 @@ export default React.memo(function ToothSVG({
 
   const cx = 24
   const cy = view === 'crown' ? 10 : 8
-  const svgH = view === 'crown' ? 76 : 72
 
   const highlightPath = pathDef.crownDetails?.[0] || ''
 

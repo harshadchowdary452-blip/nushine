@@ -25,34 +25,34 @@ export const authApi = {
 export const groupsApi = {
   list: (params?: PaginationParams) => api.get("/admin-groups", { params: withPagination(params) }).then((r) => r.data),
   get: (id: string) => api.get(`/admin-groups/${id}`).then((r) => r.data),
-  create: (data: any) => api.post("/admin-groups", data).then((r) => r.data),
-  update: (id: string, data: any) => api.put(`/admin-groups/${id}`, data).then((r) => r.data),
+  create: (data: Record<string, unknown>) => api.post("/admin-groups", data).then((r) => r.data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/admin-groups/${id}`, data).then((r) => r.data),
   delete: (id: string) => api.delete(`/admin-groups/${id}`).then((r) => r.data),
-  createAdmin: (groupId: string, data: any) => api.post(`/admin-groups/${groupId}/admins`, data).then((r) => r.data),
+  createAdmin: (groupId: string, data: Record<string, unknown>) => api.post(`/admin-groups/${groupId}/admins`, data).then((r) => r.data),
 };
 
 export const hospitalsApi = {
   list: (params?: PaginationParams) => api.get("/hospitals", { params: withPagination(params) }).then((r) => r.data),
   get: (id: string) => api.get(`/hospitals/${id}`).then((r) => r.data),
-  create: (data: any) => api.post("/hospitals", data).then((r) => r.data),
-  update: (id: string, data: any) => api.put(`/hospitals/${id}`, data).then((r) => r.data),
+  create: (data: Record<string, unknown>) => api.post("/hospitals", data).then((r) => r.data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/hospitals/${id}`, data).then((r) => r.data),
   delete: (id: string) => api.delete(`/hospitals/${id}`).then((r) => r.data),
-  createAdmin: (hospitalId: string, data: any) => api.post(`/hospitals/${hospitalId}/admins`, data).then((r) => r.data),
+  createAdmin: (hospitalId: string, data: Record<string, unknown>) => api.post(`/hospitals/${hospitalId}/admins`, data).then((r) => r.data),
 };
 
 export const usersApi = {
   list: (params?: PaginationParams) => api.get("/users", { params: withPagination(params) }).then((r) => r.data),
   get: (id: string) => api.get(`/users/${id}`).then((r) => r.data),
-  create: (data: any) => api.post("/users", data).then((r) => r.data),
-  update: (id: string, data: any) => api.put(`/users/${id}`, data).then((r) => r.data),
+  create: (data: Record<string, unknown>) => api.post("/users", data).then((r) => r.data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/users/${id}`, data).then((r) => r.data),
   delete: (id: string) => api.delete(`/users/${id}`).then((r) => r.data),
 };
 
 export const doctorsApi = {
   list: (params?: PaginationParams) => api.get("/doctors", { params: withPagination(params) }).then((r) => r.data),
   get: (id: string) => api.get(`/doctors/${id}`).then((r) => r.data),
-  create: (data: any) => api.post("/doctors", data).then((r) => r.data),
-  update: (id: string, data: any) => api.put(`/doctors/${id}`, data).then((r) => r.data),
+  create: (data: Record<string, unknown>) => api.post("/doctors", data).then((r) => r.data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/doctors/${id}`, data).then((r) => r.data),
   deactivate: (id: string) => api.post(`/doctors/${id}/deactivate`),
   activate: (id: string) => api.post(`/doctors/${id}/activate`),
 };
@@ -61,8 +61,8 @@ export const patientsApi = {
   list: (params?: PaginationParams) => api.get("/patients", { params: withPagination(params) }).then((r) => r.data),
   searchAdvanced: (params?: Record<string, unknown>) => api.get("/patients/search-advanced", { params }).then((r) => r.data),
   get: (id: string) => api.get(`/patients/${id}`).then((r) => r.data),
-  create: (data: any) => api.post("/patients", data).then((r) => r.data),
-  update: (id: string, data: any) => api.put(`/patients/${id}`, data).then((r) => r.data),
+  create: (data: Record<string, unknown>) => api.post("/patients", data).then((r) => r.data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/patients/${id}`, data).then((r) => r.data),
   delete: (id: string) => api.delete(`/patients/${id}`).then((r) => r.data),
   search: (params?: PaginationParams) => api.get("/patients/search", { params: withPagination(params) }).then((r) => r.data),
   getPatientTimeline: (patientId: string, params?: Record<string, unknown>) =>
@@ -72,8 +72,8 @@ export const patientsApi = {
 export const casesApi = {
   list: (params?: Record<string, unknown>) => api.get("/cases", { params }).then((r) => r.data),
   get: (id: string) => api.get(`/cases/${id}`).then((r) => r.data),
-  create: (data: any) => api.post("/cases", data).then((r) => r.data),
-  update: (id: string, data: any) => api.put(`/cases/${id}`, data).then((r) => r.data),
+  create: (data: Record<string, unknown>) => api.post("/cases", data).then((r) => r.data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/cases/${id}`, data).then((r) => r.data),
   delete: (id: string) => api.delete(`/cases/${id}`).then((r) => r.data),
   getTimeline: (id: string, params?: Record<string, unknown>) =>
     api.get(`/cases/${id}/timeline`, { params }).then((r) => r.data),
@@ -91,8 +91,8 @@ export const appointmentsApi = {
   list: (params?: PaginationParams) => api.get("/appointments", { params: withPagination(params) }).then((r) => r.data),
   search: (params?: Record<string, unknown>) => api.get("/appointments/search", { params }).then((r) => r.data),
   get: (id: string) => api.get(`/appointments/${id}`).then((r) => r.data),
-  create: (data: any) => api.post("/appointments", data).then((r) => r.data),
-  update: (id: string, data: any) => api.put(`/appointments/${id}`, data).then((r) => r.data),
+  create: (data: Record<string, unknown>) => api.post("/appointments", data).then((r) => r.data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/appointments/${id}`, data).then((r) => r.data),
   delete: (id: string) => api.delete(`/appointments/${id}`).then((r) => r.data),
   cancel: (id: string, data: { reason?: string }) =>
     api.post(`/appointments/${id}/cancel`, data).then((r) => r.data),
@@ -104,42 +104,43 @@ export const appointmentsApi = {
     api.get("/appointments/availability", { params }).then((r) => r.data),
   reassignDoctor: (id: string, data: { doctor_id: string; reason?: string }) =>
     api.post(`/appointments/${id}/reassign-doctor`, data).then((r) => r.data),
-  slots: (params: { doctor_id: string; date: string; duration_minutes?: number }) =>
+  slots: (params: { doctor_id: string; date: string; duration_minutes?: number; procedure_name?: string; appointment_type?: string }) =>
     api.get("/appointments/slots", { params }).then((r) => r.data),
+  procedureDurations: () => api.get("/appointments/procedure-durations").then((r) => r.data),
   fullDetail: (id: string) => api.get(`/appointments/${id}/full-detail`).then((r) => r.data),
 };
 
 export const doctorWorkingHoursApi = {
   get: (doctorId: string) => api.get(`/doctors/${doctorId}/working-hours/`).then((r) => r.data),
-  bulkUpdate: (doctorId: string, data: { schedules: any[] }) => api.post(`/doctors/${doctorId}/working-hours/bulk`, data).then((r) => r.data),
+  bulkUpdate: (doctorId: string, data: { schedules: Record<string, unknown>[] }) => api.post(`/doctors/${doctorId}/working-hours/bulk`, data).then((r) => r.data),
 };
 
 export const doctorAvailabilityApi = {
   list: (doctorId: string) => api.get(`/doctors/${doctorId}/availability/`).then((r) => r.data),
   get: (doctorId: string, overrideId: string) => api.get(`/doctors/${doctorId}/availability/${overrideId}`).then((r) => r.data),
-  create: (doctorId: string, data: any) => api.post(`/doctors/${doctorId}/availability/`, data).then((r) => r.data),
-  update: (doctorId: string, overrideId: string, data: any) => api.put(`/doctors/${doctorId}/availability/${overrideId}`, data).then((r) => r.data),
+  create: (doctorId: string, data: Record<string, unknown>) => api.post(`/doctors/${doctorId}/availability/`, data).then((r) => r.data),
+  update: (doctorId: string, overrideId: string, data: Record<string, unknown>) => api.put(`/doctors/${doctorId}/availability/${overrideId}`, data).then((r) => r.data),
   delete: (doctorId: string, overrideId: string) => api.delete(`/doctors/${doctorId}/availability/${overrideId}`).then((r) => r.data),
 };
 
 export const doctorLeavesApi = {
   list: (doctorId: string) => api.get(`/doctors/${doctorId}/leaves/`).then((r) => r.data),
-  create: (doctorId: string, data: any) => api.post(`/doctors/${doctorId}/leaves/`, data).then((r) => r.data),
-  update: (doctorId: string, leaveId: string, data: any) => api.put(`/doctors/${doctorId}/leaves/${leaveId}`, data).then((r) => r.data),
+  create: (doctorId: string, data: Record<string, unknown>) => api.post(`/doctors/${doctorId}/leaves/`, data).then((r) => r.data),
+  update: (doctorId: string, leaveId: string, data: Record<string, unknown>) => api.put(`/doctors/${doctorId}/leaves/${leaveId}`, data).then((r) => r.data),
   delete: (doctorId: string, leaveId: string) => api.delete(`/doctors/${doctorId}/leaves/${leaveId}`).then((r) => r.data),
 };
 
 export const doctorBlockedSlotsApi = {
   list: (doctorId: string) => api.get(`/doctors/${doctorId}/blocked-slots/`).then((r) => r.data),
-  create: (doctorId: string, data: any) => api.post(`/doctors/${doctorId}/blocked-slots/`, data).then((r) => r.data),
+  create: (doctorId: string, data: Record<string, unknown>) => api.post(`/doctors/${doctorId}/blocked-slots/`, data).then((r) => r.data),
   delete: (doctorId: string, slotId: string) => api.delete(`/doctors/${doctorId}/blocked-slots/${slotId}`).then((r) => r.data),
 };
 
 export const consultantsApi = {
   list: (params?: PaginationParams) => api.get("/consultants", { params: withPagination(params) }).then((r) => r.data),
   get: (id: string) => api.get(`/consultants/${id}`).then((r) => r.data),
-  create: (data: any) => api.post("/consultants", data).then((r) => r.data),
-  update: (id: string, data: any) => api.put(`/consultants/${id}`, data).then((r) => r.data),
+  create: (data: Record<string, unknown>) => api.post("/consultants", data).then((r) => r.data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/consultants/${id}`, data).then((r) => r.data),
   delete: (id: string) => api.delete(`/consultants/${id}`).then((r) => r.data),
 };
 
@@ -154,8 +155,8 @@ export const treatmentApi = {
     api.get("/treatment-plans", { params }).then((r) => r.data),
   get: (id: string) => api.get(`/treatment-plans/${id}`).then((r) => r.data),
   listByCase: (caseId: string) => api.get(`/treatment-plans/by-case/${caseId}`).then((r) => r.data),
-  create: (data: any) => api.post("/treatment-plans", data).then((r) => r.data),
-  update: (id: string, data: any) => api.put(`/treatment-plans/${id}`, data).then((r) => r.data),
+  create: (data: Record<string, unknown>) => api.post("/treatment-plans", data).then((r) => r.data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/treatment-plans/${id}`, data).then((r) => r.data),
   updateStatus: (id: string, status: string) => api.put(`/treatment-plans/${id}/status`, null, { params: { status } }).then((r) => r.data),
   start: (id: string) => api.post(`/treatment-plans/${id}/start`).then((r) => r.data),
   complete: (id: string, data?: { outcome?: string; notes?: string }) => api.post(`/treatment-plans/${id}/complete`, data || {}).then((r) => r.data),
@@ -172,9 +173,9 @@ export const treatmentPlanItemsApi = {
     api.get(`/treatment-plan-items/by-case/${caseId}`, { params }).then((r) => r.data),
   getVersions: (caseId: string) =>
     api.get(`/treatment-plan-items/versions/${caseId}`).then((r) => r.data),
-  create: (data: { case_id: string; items: any[] }) =>
+  create: (data: { case_id: string; items: Record<string, unknown>[] }) =>
     api.post("/treatment-plan-items/", data).then((r) => r.data),
-  update: (id: string, data: any) =>
+  update: (id: string, data: Record<string, unknown>) =>
     api.put(`/treatment-plan-items/${id}`, data).then((r) => r.data),
   delete: (id: string) =>
     api.delete(`/treatment-plan-items/${id}`).then((r) => r.data),
@@ -203,17 +204,17 @@ export const doctorQueueApi = {
 export const treatmentSittingsApi = {
   listByPlan: (planId: string) => api.get(`/treatment-sittings/by-plan/${planId}`).then((r) => r.data),
   get: (id: string) => api.get(`/treatment-sittings/${id}`).then((r) => r.data),
-  create: (data: any) => api.post("/treatment-sittings", data).then((r) => r.data),
-  update: (id: string, data: any) => api.put(`/treatment-sittings/${id}`, data).then((r) => r.data),
+  create: (data: Record<string, unknown>) => api.post("/treatment-sittings", data).then((r) => r.data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/treatment-sittings/${id}`, data).then((r) => r.data),
 };
 
 export const billingApi = {
   list: (params?: PaginationParams) => api.get("/billings", { params: withPagination(params) }).then((r) => r.data),
   get: (id: string) => api.get(`/billings/${id}`).then((r) => r.data),
-  create: (data: any) => api.post("/billings", data).then((r) => r.data),
-  update: (id: string, data: any) => api.put(`/billings/${id}`, data).then((r) => r.data),
+  create: (data: Record<string, unknown>) => api.post("/billings", data).then((r) => r.data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/billings/${id}`, data).then((r) => r.data),
   delete: (id: string) => api.delete(`/billings/${id}`).then((r) => r.data),
-  updatePayment: (id: string, data: any) => api.put(`/billings/${id}/payment`, data).then((r) => r.data),
+  updatePayment: (id: string, data: Record<string, unknown>) => api.put(`/billings/${id}/payment`, data).then((r) => r.data),
   getPdf: (id: string) => api.get(`/billings/${id}/pdf`, { responseType: "blob" }).then((r) => r.data),
   getTransactions: (id: string) => api.get(`/billings/${id}/transactions`).then((r) => r.data),
   getHistory: (id: string) => api.get(`/billings/${id}/history`).then((r) => r.data),
@@ -242,8 +243,8 @@ export const dashboardApi = {
 export const expensesApi = {
   list: (params?: Record<string, unknown>) => api.get("/expenses", { params }).then((r) => r.data),
   get: (id: string) => api.get(`/expenses/${id}`).then((r) => r.data),
-  create: (data: any) => api.post("/expenses", data).then((r) => r.data),
-  update: (id: string, data: any) => api.put(`/expenses/${id}`, data).then((r) => r.data),
+  create: (data: Record<string, unknown>) => api.post("/expenses", data).then((r) => r.data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/expenses/${id}`, data).then((r) => r.data),
   delete: (id: string) => api.delete(`/expenses/${id}`).then((r) => r.data),
   analytics: () => api.get("/expenses/analytics").then((r) => r.data),
   calendar: (params?: { month?: number; year?: number; hospital_id?: string }) => api.get("/expenses/calendar", { params }).then((r) => r.data),
@@ -288,7 +289,7 @@ export const whatsappV2Api = {
     api.post("/whatsapp/send", data).then((r) => r.data),
   bulkPreview: (data: { patient_ids: string[]; message: string; message_type?: string }) =>
     api.post("/whatsapp/bulk-preview", data).then((r) => r.data),
-  bulkSend: (data: { items: any[] }) =>
+  bulkSend: (data: { items: Record<string, unknown>[] }) =>
     api.post("/whatsapp/bulk-send", data).then((r) => r.data),
   history: (params?: { patient_id?: string; message_type?: string; status?: string; sent_via?: string; start_date?: string; end_date?: string; page?: number; page_size?: number }) =>
     api.get("/whatsapp/history", { params }).then((r) => r.data),
@@ -304,8 +305,8 @@ export const campaignsApi = {
   list: (params?: { skip?: number; limit?: number; status?: string; campaign_type?: string }) =>
     api.get("/campaigns", { params }).then((r) => r.data),
   get: (id: string) => api.get(`/campaigns/${id}`).then((r) => r.data),
-  create: (data: any) => api.post("/campaigns", data).then((r) => r.data),
-  update: (id: string, data: any) => api.put(`/campaigns/${id}`, data).then((r) => r.data),
+  create: (data: Record<string, unknown>) => api.post("/campaigns", data).then((r) => r.data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/campaigns/${id}`, data).then((r) => r.data),
   delete: (id: string) => api.delete(`/campaigns/${id}`).then((r) => r.data),
   launch: (id: string) => api.post(`/campaigns/${id}/launch`).then((r) => r.data),
   duplicate: (id: string) => api.post(`/campaigns/${id}/duplicate`).then((r) => r.data),
@@ -314,13 +315,13 @@ export const campaignsApi = {
   progress: (id: string) => api.get(`/campaigns/${id}/progress`).then((r) => r.data),
   recipients: (id: string, params?: { skip?: number; limit?: number; status?: string }) =>
     api.get(`/campaigns/${id}/recipients`, { params }).then((r) => r.data),
-  previewAudience: (data: { target: string; filters?: any; hospital_id?: string }) =>
+  previewAudience: (data: { target: string; filters?: Record<string, unknown>; hospital_id?: string }) =>
     api.post("/campaigns/preview-audience", data).then((r) => r.data),
   recordResponse: (campaignId: string, recipientId: string, data: { message: string; is_lead?: boolean }) =>
     api.post(`/campaigns/${campaignId}/recipients/${recipientId}/response`, data).then((r) => r.data),
   responses: (params?: { campaign_id?: string; search?: string; status?: string; skip?: number; limit?: number }) =>
     api.get("/campaigns/responses", { params }).then((r) => r.data),
-  convertLead: (campaignId: string, data: { lead_id: string; patient_data: any }) =>
+  convertLead: (campaignId: string, data: { lead_id: string; patient_data: Record<string, unknown> }) =>
     api.post(`/campaigns/${campaignId}/convert-lead`, data).then((r) => r.data),
   createAppointment: (campaignId: string, data: { patient_id: string; doctor_id: string; appointment_date: string; appointment_time: string; notes?: string }) =>
     api.post(`/campaigns/${campaignId}/create-appointment`, data).then((r) => r.data),
@@ -344,11 +345,11 @@ export const campaignsApi = {
 
 export const whatsappConfigApi = {
   get: (hospitalId: string) => api.get(`/whatsapp-config/${hospitalId}`).then((r) => r.data),
-  update: (hospitalId: string, data: Record<string, any>) => api.put(`/whatsapp-config/${hospitalId}`, data).then((r) => r.data),
+  update: (hospitalId: string, data: Record<string, unknown>) => api.put(`/whatsapp-config/${hospitalId}`, data).then((r) => r.data),
 };
 
 export const whatsappTemplatesApi = {
-  list: (params?: Record<string, any>) => api.get("/crm/whatsapp-templates", { params }).then((r) => r.data),
+  list: (params?: Record<string, unknown>) => api.get("/crm/whatsapp-templates", { params }).then((r) => r.data),
   create: (data: { name: string; message: string }) => api.post("/crm/whatsapp-templates", data).then((r) => r.data),
   update: (id: string, data: { name?: string; message?: string; is_active?: boolean }) =>
     api.put(`/crm/whatsapp-templates/${id}`, data).then((r) => r.data),
@@ -380,7 +381,7 @@ export const leadsApi = {
   getCalls: (id: string) => api.get<LeadCall[]>(`/leads/${id}/calls`).then((r) => r.data),
   addCall: (id: string, data: { outcome?: string; notes?: string; follow_up_date?: string; duration_seconds?: number }) =>
     api.post<LeadCall>(`/leads/${id}/calls`, data).then((r) => r.data),
-  convert: (id: string, data?: Record<string, any>) =>
+  convert: (id: string, data?: Record<string, unknown>) =>
     api.post(`/leads/${id}/convert`, data || {}).then((r) => r.data),
   createFollowUp: (id: string, data: { follow_up_date: string; follow_up_time?: string; priority?: string; reason?: string; notes?: string }) =>
     api.post(`/leads/${id}/follow-ups`, data).then((r) => r.data),
@@ -573,7 +574,7 @@ export const crmSettingsApi = {
   summary: () => api.get("/crm/settings/summary").then((r) => r.data),
   opd: {
     get: () => api.get("/crm/opd-settings/").then((r) => r.data),
-    update: (data: any) => api.post("/crm/opd-settings/", data).then((r) => r.data),
+    update: (data: Record<string, unknown>) => api.post("/crm/opd-settings/", data).then((r) => r.data),
   },
 };
 

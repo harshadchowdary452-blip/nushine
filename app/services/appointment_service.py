@@ -7,7 +7,7 @@ from sqlalchemy import select, func, extract, and_
 from fastapi import HTTPException, status
 from app.repositories.appointment_repository import AppointmentRepository
 from app.repositories.audit_log_repository import AuditLogRepository
-from app.models.appointment import Appointment, AppointmentStatus, AppointmentType, TREATMENT_DURATIONS, Appointment as ApptModel
+from app.models.appointment import Appointment, AppointmentStatus, AppointmentType, TREATMENT_DURATIONS, PROCEDURE_DURATIONS, resolve_duration, Appointment as ApptModel
 from app.models.patient import Patient
 from app.models.user import User
 from app.models.notification import Notification
@@ -151,7 +151,17 @@ class AppointmentService:
             "appointment_id": a.id,
         }
 
-    async def get_doctor_slots(self, doctor_id: str, appointment_date: date, duration_minutes: int = 30) -> dict:
+    async def get_doctor_slots(
+        self,
+        doctor_id: str,
+        appointment_date: date,
+        duration_minutes: int | None = None,
+        procedure_name: str | None = None,
+        appointment_type: str | None = None,
+    ) -> dict:
+        if duration_minutes is None:
+            duration_minutes = resolve_duration(procedure_name, appointment_type or AppointmentType.CONSULTATION)
+
         doctor_result = await self.db.execute(
             select(User.full_name, User.hospital_id, User.admin_group_id).where(User.id == doctor_id)
         )
@@ -188,6 +198,8 @@ class AppointmentService:
                 "is_on_leave": True,
                 "leave_reason": leave_row[0] if leave_row else None,
                 "working_hours": None,
+                "duration_minutes": duration_minutes,
+                "procedure_name": procedure_name,
             }
 
         schedule = await self._get_doctor_schedule(doctor_id, appointment_date)
@@ -199,6 +211,8 @@ class AppointmentService:
                 "slots": [],
                 "is_on_leave": False,
                 "working_hours": None,
+                "duration_minutes": duration_minutes,
+                "procedure_name": procedure_name,
             }
 
         working_hours = f"{schedule.start_time.strftime('%I:%M %p')} - {schedule.end_time.strftime('%I:%M %p')}"
@@ -266,6 +280,8 @@ class AppointmentService:
             "slots": slots_result,
             "is_on_leave": False,
             "working_hours": working_hours,
+            "duration_minutes": duration_minutes,
+            "procedure_name": procedure_name,
         }
 
     async def _validate_appointment_slot(self, doctor_id: str, appointment_date: date, appointment_time: time, duration_minutes: int):
@@ -304,12 +320,9 @@ class AppointmentService:
             appointment_type_str = data.get("appointment_type", "CONSULTATION")
             duration_minutes = data.get("duration_minutes")
 
+            procedure_name = data.get("procedure_name")
             if not duration_minutes:
-                try:
-                    appt_type_enum = AppointmentType(appointment_type_str)
-                    duration_minutes = TREATMENT_DURATIONS.get(appt_type_enum, 30)
-                except (ValueError, KeyError):
-                    duration_minutes = 30
+                duration_minutes = resolve_duration(procedure_name, appointment_type_str)
 
             end_time = compute_end_time(appointment_time, duration_minutes)
 

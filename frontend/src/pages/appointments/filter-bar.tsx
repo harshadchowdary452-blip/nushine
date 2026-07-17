@@ -34,14 +34,14 @@ export default function AppointmentFilterBar({
       setFilter("date_from", range.date_from || "")
       setFilter("date_to", range.date_to || "")
     }
-  }, [datePreset])
+  }, [datePreset, setFilter])
 
   useEffect(() => {
     if (datePreset === "custom") {
       setFilter("date_from", customFrom)
       setFilter("date_to", customTo)
     }
-  }, [customFrom, customTo, datePreset])
+  }, [customFrom, customTo, datePreset, setFilter])
 
   function handleSearch() {
     setFilter("search", searchInput)

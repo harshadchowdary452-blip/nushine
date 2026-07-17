@@ -2,7 +2,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Link, useNavigate } from "react-router-dom"
 import {
-  Search, Plus, ArrowUpDown, Loader2, Eye, Trash2, FileText,
+  Search, Plus, ArrowUpDown, Loader2, Eye, Trash2,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FolderOpen
 } from "lucide-react"
 import { format } from "date-fns"
@@ -22,6 +22,13 @@ import { useToast } from "@/components/ui/toast"
 import PageHeader from "@/components/layout/page-header"
 import CaseReportForm from "@/components/cases/CaseReportForm"
 import type { Case } from "@/types"
+import { extractDetail } from "@/types"
+
+interface CaseDoctor {
+  id: string
+  full_name?: string
+  name?: string
+}
 
 const STATUS_OPTIONS = [
   { value: "all", label: "All Statuses" },
@@ -46,7 +53,7 @@ export default function CaseReportsList() {
   const { addToast } = useToast()
 
   const [page, setPage] = useState(0)
-  const [pageSize, setPageSize] = useState(20)
+  const [pageSize] = useState(20)
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("")
   const [doctorFilter, setDoctorFilter] = useState("")
@@ -74,14 +81,15 @@ export default function CaseReportsList() {
 
   const { data: doctors } = useQuery({
     queryKey: ["doctors-for-filter"],
-    queryFn: () => doctorsApi.list({ limit: 200 }).then((r: any) => {
-      if (Array.isArray(r)) return r
-      if (r?.users) return r.users
-      if (r?.data) return r.data
+    queryFn: () => doctorsApi.list({ limit: 200 }).then((r: unknown) => {
+      const result = r as Record<string, unknown>
+      if (Array.isArray(r)) return r as CaseDoctor[]
+      if (result?.users && Array.isArray(result.users)) return result.users as CaseDoctor[]
+      if (result?.data && Array.isArray(result.data)) return result.data as CaseDoctor[]
       return []
     }),
   })
-  const doctorsList: any[] = Array.isArray(doctors) ? doctors : []
+  const doctorsList: CaseDoctor[] = Array.isArray(doctors) ? doctors : []
 
   const totalPages = Math.ceil((cases.length || 1) / pageSize)
 
@@ -91,7 +99,7 @@ export default function CaseReportsList() {
       queryClient.invalidateQueries({ queryKey: ["case-history-list"] })
       addToast({ title: "Case Report deleted", variant: "success" })
     },
-    onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Delete failed", variant: "destructive" }),
+    onError: (err: unknown) => addToast({ title: "Error", description: extractDetail(err), variant: "destructive" }),
   })
 
   return (
@@ -124,7 +132,7 @@ export default function CaseReportsList() {
               <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="All Doctors" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value=" ">All Doctors</SelectItem>
-                {doctorsList.map((d: any) => (
+                {doctorsList.map((d: CaseDoctor) => (
                   <SelectItem key={d.id} value={d.id}>{d.full_name || d.name || d.username}</SelectItem>
                 ))}
               </SelectContent>

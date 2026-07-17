@@ -9,7 +9,6 @@ import {
   getGingivaPath,
   getTonguePath,
   type ArchPosition,
-  getSurfaceClips,
 } from "./toothPaths"
 import SurfaceOverlay from "./SurfaceOverlay"
 
@@ -136,24 +135,6 @@ const SELECTION_GLOW = "#3B82F6"
 
 // ─── Helpers ──────────────────────────────────────────────────────
 
-function getPrimaryFinding(findings: Finding[]): FindingType | null {
-  if (!findings.length) return null
-  let best = findings[0]
-  let bestP = -1
-  for (const f of findings) {
-    const v = FINDING_VISUALS[f.type]
-    if (v && v.priority > bestP) { best = f; bestP = v.priority }
-  }
-  return best.type
-}
-
-function getSecondaryFindings(findings: Finding[], primary: FindingType | null): FindingType[] {
-  return findings
-    .filter((f) => f.type !== primary)
-    .sort((a, b) => (FINDING_VISUALS[b.type]?.priority || 0) - (FINDING_VISUALS[a.type]?.priority || 0))
-    .map((f) => f.type)
-}
-
 function hasType(findings: Finding[], type: string): boolean {
   return findings.some((f) => f.type === type)
 }
@@ -237,9 +218,6 @@ const ToothSVG = memo(function ToothSVG({
   }, [isSelected])
 
   const toothFindings = findings.filter((f) => f.toothNumber === S(toothNum))
-  const primaryType = getPrimaryFinding(toothFindings)
-  const secondaryTypes = getSecondaryFindings(toothFindings, primaryType)
-  const visual = primaryType ? FINDING_VISUALS[primaryType] : null
 
   const isMissing = hasType(toothFindings, "MissingTooth")
   const isImplant = hasType(toothFindings, "Implant")
@@ -496,7 +474,7 @@ const ToothSVG = memo(function ToothSVG({
 
 // ─── Tooltip ──────────────────────────────────────────────────────
 
-function ToothTooltip({ toothNum, findings, isPrimary, mouseX, mouseY }: {
+function ToothTooltip({ toothNum, findings, isPrimary: _isPrimary, mouseX, mouseY }: {
   toothNum: number; findings: Finding[]; isPrimary: boolean; mouseX: number; mouseY: number
 }) {
   const tf = findings.filter((f) => f.toothNumber === S(toothNum))
@@ -589,7 +567,6 @@ function RightPanel({
   const toothName = TOOTH_NAMES[toothNum] || "Unknown"
   const quadrant = getToothQuadrant(toothNum)
   const anatomy = getToothAnatomy(toothNum, isPrimary)
-  const isUpper = [1, 2, 5, 6].includes(Math.floor(toothNum / 10))
 
   const [ftype, setFtype] = useState("Caries – Enamel")
   const [surf, setSurf] = useState("")
@@ -763,7 +740,7 @@ const inputStyle: React.CSSProperties = {
 
 // ─── Clinical Summary ─────────────────────────────────────────────
 
-function ClinicalSummary({ findings, isPrimary }: { findings: Finding[]; isPrimary: boolean }) {
+function ClinicalSummary({ findings, isPrimary: _isPrimary }: { findings: Finding[]; isPrimary: boolean }) {
   const grouped = useMemo(() => {
     const map = new Map<string, Finding[]>()
     for (const f of findings) {
@@ -954,8 +931,6 @@ export default function Odontogram({
     onFindingsChange?.(patientId || "local", updated)
   }, [onFindingsChange, patientId])
 
-  const scale = lowerTeeth.length <= 10 ? 0.85 : 1
-
   // Generate summary text
   const summaryText = useMemo(() => {
     if (findings.length === 0) return `No clinical findings recorded (${dentitionLabel} dentition).`
@@ -972,7 +947,7 @@ export default function Odontogram({
     return lines.join("\n")
   }, [findings, dentitionLabel])
 
-  const [summaryEdit, setSummaryEdit] = useState("")
+  const [, setSummaryEdit] = useState("")
 
   useEffect(() => {
     setSummaryEdit(summaryText)

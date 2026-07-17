@@ -1,4 +1,4 @@
-import { format, subDays, startOfWeek, startOfMonth, endOfMonth, endOfMonth as eom, addDays, subMonths, startOfYear, endOfYear } from "date-fns"
+import { format, subDays, startOfWeek, startOfMonth, addDays, subMonths, startOfYear, endOfYear, endOfMonth as eom } from "date-fns"
 
 export const APPOINTMENT_DATE_PRESETS = [
   { value: "today", label: "Today" },

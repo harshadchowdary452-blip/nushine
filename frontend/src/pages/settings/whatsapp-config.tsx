@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
-import { MessageSquare, Save, Smartphone, Globe, ToggleLeft, ToggleRight, Info, Wifi } from "lucide-react"
+import { Save, Smartphone, Globe, ToggleRight, Info } from "lucide-react"
 import PageHeader from "@/components/layout/page-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"

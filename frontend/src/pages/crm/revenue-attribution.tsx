@@ -1,32 +1,29 @@
 import { useMemo } from "react"
-import { useNavigate } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
 import { motion } from "framer-motion"
 import {
-  IndianRupee, TrendingUp, Users, BarChart3, PieChart, Target, ArrowUpRight,
+  IndianRupee, TrendingUp, Users, BarChart3, PieChart, Target,
 } from "lucide-react"
 import { leadsApi } from "@/services/endpoints"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+
 import { Skeleton } from "@/components/ui/skeleton"
 import KpiCard from "@/components/layout/kpi-card"
-import { PieChart as RePie, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from "recharts"
+import { PieChart as RePie, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts"
 import { formatIndianRupees } from "@/lib/currency"
 import type { Lead } from "@/types"
 
 const SOURCE_COLORS = ["#0EA5E9", "#8B5CF6", "#F59E0B", "#10B981", "#EF4444", "#EC4899", "#14B8A6", "#F97316", "#6366F1", "#84CC16", "#06B6D4", "#D946EF", "#FB923C", "#22C55E", "#E11D48", "#A855F7", "#64748B"]
 
 export default function RevenueAttribution() {
-  const navigate = useNavigate()
 
   const { data: leads, isLoading } = useQuery({
     queryKey: ["leads", "all"],
     queryFn: () => leadsApi.list({ limit: 500 }),
   })
 
-  const items: Lead[] = Array.isArray(leads) ? leads : []
-
   const revenueData = useMemo(() => {
+    const items: Lead[] = Array.isArray(leads) ? leads : []
     const converted = items.filter((l) => l.status === "CONVERTED")
     const sourceRevenue: Record<string, { count: number; potentialRevenue: number }> = {}
 
@@ -50,7 +47,7 @@ export default function RevenueAttribution() {
     const totalLeads = items.length
 
     return { bySource, totalPotential, totalLeads, convertedCount: converted.length }
-  }, [items])
+  }, [leads])
 
   if (isLoading) {
     return (
@@ -92,12 +89,12 @@ export default function RevenueAttribution() {
             {revenueData.bySource.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
                 <RePie>
-                  <Pie data={revenueData.bySource} dataKey="potentialRevenue" nameKey="source" cx="50%" cy="50%" outerRadius={100} label={({ name, percent }: any) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}>
+                  <Pie data={revenueData.bySource} dataKey="potentialRevenue" nameKey="source" cx="50%" cy="50%" outerRadius={100} label={({ name, percent }: { name: string; percent: number }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}>
                     {revenueData.bySource.map((entry, idx) => (
                       <Cell key={idx} fill={entry.fill} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: any) => formatIndianRupees(Number(value))} />
+                  <Tooltip formatter={(value: string | number | (string | number)[]) => formatIndianRupees(Number(value))} />
                 </RePie>
               </ResponsiveContainer>
             ) : (
@@ -115,7 +112,7 @@ export default function RevenueAttribution() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                   <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v: number) => `\u20B9${(v / 1000).toFixed(0)}k`} />
                   <YAxis type="category" dataKey="source" tick={{ fontSize: 11 }} width={100} />
-                  <Tooltip formatter={(value: any) => formatIndianRupees(Number(value))} />
+                  <Tooltip formatter={(value: string | number | (string | number)[]) => formatIndianRupees(Number(value))} />
                   <Bar dataKey="potentialRevenue" fill="#0EA5E9" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>

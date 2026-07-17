@@ -3,9 +3,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, isToday, parse, getYear, setMonth } from "date-fns"
-
-type ViewMode = "month" | "week" | "agenda"
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, isToday, getYear } from "date-fns"
 
 interface DatePickerProps {
   value: Date | undefined
@@ -24,12 +22,9 @@ const presets = [
   { label: "This Year", days: "year" as const },
 ]
 
-const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-
 export default function DatePicker({ value, onChange, placeholder = "Select date", className }: DatePickerProps) {
   const [open, setOpen] = useState(false)
   const [viewDate, setViewDate] = useState(value || new Date())
-  const [viewMode, setViewMode] = useState<ViewMode>("month")
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {

@@ -5,15 +5,30 @@ import { useAuthStore } from "@/store/authStore"
 import { consentFormsApi } from "@/services/endpoints"
 import api from "@/services/api"
 import { useToast } from "@/components/ui/toast"
-import { Search, Plus, Trash2, RotateCcw, Eye, Download, FileText, Upload } from "lucide-react"
+import { Search, Trash2, RotateCcw, Eye, Download, Upload } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import type { ConsentForm } from "@/types"
+import { extractDetail } from "@/types"
+
+interface ConsentFormPatient {
+  id: string
+  full_name: string
+  op_no?: string
+  phone?: string
+  op_number?: string
+}
+
+interface DoctorOption {
+  id: string
+  full_name: string
+}
 
 const CONSENT_TYPES = [
   "General Consent", "RCT Consent", "Extraction Consent", "Implant Consent",
@@ -29,7 +44,7 @@ export default function ConsentFormList() {
   const [showDeleted, setShowDeleted] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [patientSearch, setPatientSearch] = useState("")
-  const [selectedPatient, setSelectedPatient] = useState<any>(null)
+  const [selectedPatient, setSelectedPatient] = useState<ConsentFormPatient | null>(null)
   const [formType, setFormType] = useState("")
   const [customType, setCustomType] = useState("")
   const [doctorId, setDoctorId] = useState("")
@@ -101,8 +116,8 @@ export default function ConsentFormList() {
       addToast({ title: "Success", description: "Consent form uploaded" })
       setCreateOpen(false)
       resetForm()
-    } catch (err: any) {
-      addToast({ title: "Error", description: err?.response?.data?.detail || "Upload failed", variant: "destructive" })
+    } catch (err: unknown) {
+      addToast({ title: "Error", description: extractDetail(err), variant: "destructive" })
     } finally {
       setCreateLoading(false)
     }
@@ -158,7 +173,7 @@ export default function ConsentFormList() {
                 />
                 {patientSearch.length > 1 && !selectedPatient && patientsData && (
                   <div className="mt-1 max-h-40 overflow-auto rounded border p-1">
-                    {(Array.isArray(patientsData) ? patientsData : []).map((p: any) => (
+                    {(Array.isArray(patientsData) ? patientsData : []).map((p: ConsentFormPatient) => (
                       <div
                         key={p.id}
                         className="cursor-pointer rounded p-2 text-sm hover:bg-muted"
@@ -207,7 +222,7 @@ export default function ConsentFormList() {
                     <SelectValue placeholder="Select doctor..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {doctors.map((d: any) => (
+                    {doctors.map((d: DoctorOption) => (
                       <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>
                     ))}
                   </SelectContent>
@@ -269,7 +284,7 @@ export default function ConsentFormList() {
               ) : items.length === 0 ? (
                 <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No consent forms found</TableCell></TableRow>
               ) : (
-                items.map((cf: any) => (
+                items.map((cf: ConsentForm) => (
                   <TableRow key={cf.id} className={cf.is_deleted ? "opacity-50" : ""}>
                     <TableCell className="font-medium">{cf.patient_name}</TableCell>
                     <TableCell>{cf.op_number || "-"}</TableCell>

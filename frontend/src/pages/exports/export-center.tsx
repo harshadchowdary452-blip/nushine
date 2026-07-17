@@ -4,7 +4,7 @@ import { motion } from "framer-motion"
 import { useAuthStore } from "@/store/authStore"
 import {
   Download, FileSpreadsheet, FileText, Calendar,
-  Loader2, CheckCircle2, AlertCircle, Clock, Search,
+  Loader2, Clock, Search,
   Users, FolderOpen, Activity, Receipt, Bell, BarChart3,
   UserPlus, CalendarDays, Stethoscope, IndianRupee, File as FilePdf,
 } from "lucide-react"
@@ -77,10 +77,10 @@ export default function ExportCenter() {
     ? ["enquiries", "follow-ups", "recalls", "doctors", "consent-forms"]
     : [];
 
-  const visibleModules = modules.filter((m: any) => !hiddenModules.includes(m.id));
+  const visibleModules = modules.filter((m: { id: string }) => !hiddenModules.includes(m.id));
 
   const filteredModules = searchQuery
-    ? visibleModules.filter((m: any) => m.label.toLowerCase().includes(searchQuery.toLowerCase()))
+    ? visibleModules.filter((m: { id: string; label: string }) => m.label.toLowerCase().includes(searchQuery.toLowerCase()))
     : visibleModules;
 
   const getParams = () => {
@@ -96,7 +96,7 @@ export default function ExportCenter() {
     mutationFn: async () => {
       const params = getParams();
       const blob = await exportsApi.exportData(selectedModule, selectedFormat, params);
-      return { blob, label: modules.find((m: any) => m.id === selectedModule)?.label || selectedModule };
+      return { blob, label: modules.find((m: { id: string; label: string }) => m.id === selectedModule)?.label || selectedModule };
     },
     onSuccess: ({ blob, label }) => {
       const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "_");
@@ -214,7 +214,7 @@ export default function ExportCenter() {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                    {filteredModules.map((mod: any) => {
+                    {filteredModules.map((mod: { id: string; label: string }) => {
                       const isSelected = selectedModule === mod.id;
                       const IconMap: Record<string, React.ElementType> = {
                         patients: Users, appointments: CalendarDays, cases: FolderOpen,

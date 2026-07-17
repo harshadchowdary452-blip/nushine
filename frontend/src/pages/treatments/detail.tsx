@@ -1,11 +1,9 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useMemo } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
-  ArrowLeft, Play, CheckCircle2, Clock, AlertTriangle, Stethoscope, User, FileText,
-  Calendar, Loader2, Activity, Eye, ChevronRight, Phone, Shield, Pill, Thermometer,
-  Droplets, Syringe, Save, Pause, Beaker, MessageSquare, File
+  ArrowLeft, Play, CheckCircle2, Clock, Stethoscope, User, FileText,
+  Calendar, Loader2, Activity, Eye, Save, Pause, Beaker
 } from "lucide-react"
 import { format } from "date-fns"
 import PageHeader from "@/components/layout/page-header"
@@ -21,6 +19,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { treatmentApi, treatmentSittingsApi, casesApi } from "@/services/endpoints"
 import { formatIndianRupees } from "@/lib/currency"
 import { cn } from "@/lib/utils"
+import AppointmentScheduler from "@/components/appointments/AppointmentScheduler"
+import type { TreatmentPlan, TreatmentSitting, Case, Patient, VisitPayload, WaitingPayload, AppointmentSchedulerSelectData } from "@/types"
 
 const STATUS_COLORS: Record<string, string> = {
   GENERATED: "bg-gray-100 text-gray-600",
@@ -48,7 +48,7 @@ export default function TreatmentDetail() {
   const queryClient = useQueryClient()
 
   const [visitDialogOpen, setVisitDialogOpen] = useState(false)
-  const [viewSitting, setViewSitting] = useState<any>(null)
+  const [viewSitting, setViewSitting] = useState<TreatmentSitting | null>(null)
   const [waitingDialogOpen, setWaitingDialogOpen] = useState(false)
   const [waitingType, setWaitingType] = useState<"WAITING_PATIENT" | "WAITING_LAB">("WAITING_PATIENT")
   const [waitingReason, setWaitingReason] = useState("")
@@ -57,9 +57,7 @@ export default function TreatmentDetail() {
   const [completeOutcome, setCompleteOutcome] = useState("")
   const [completeRemarks, setCompleteRemarks] = useState("")
   const [nextVisitRequired, setNextVisitRequired] = useState(true)
-  const [suggestDays, setSuggestDays] = useState("")
-  const [suggestDate, setSuggestDate] = useState("")
-  const [suggestReason, setSuggestReason] = useState("")
+  const [nextAppointmentSlot, setNextAppointmentSlot] = useState<AppointmentSchedulerSelectData | null>(null)
 
   // Visit form state
   const [visitForm, setVisitForm] = useState({
@@ -100,7 +98,7 @@ export default function TreatmentDetail() {
     enabled: !!plan?.case_id,
   })
 
-  const { data: patientData } = useQuery({
+  const { data: patientData } = useQuery<Patient>({
     queryKey: ["patient", caseData?.patient_id],
     queryFn: () => fetch(`/api/v1/patients/${caseData!.patient_id}`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }
@@ -108,11 +106,11 @@ export default function TreatmentDetail() {
     enabled: !!caseData?.patient_id,
   })
 
-  const sittings: any[] = useMemo(() => Array.isArray(sittingData) ? sittingData : [], [sittingData])
+  const sittings: TreatmentSitting[] = useMemo(() => Array.isArray(sittingData) ? sittingData : [], [sittingData])
   const currentSittingNumber = sittings.length + 1
-  const p = plan as any
-  const c = caseData as any
-  const pat = patientData as any
+  const p = plan as TreatmentPlan | undefined
+  const c = caseData as Case | undefined
+  const pat = patientData as Patient | undefined
 
   const startMutation = useMutation({
     mutationFn: () => treatmentApi.start(id!),
@@ -123,7 +121,7 @@ export default function TreatmentDetail() {
 
   const saveVisitMutation = useMutation({
     mutationFn: async () => {
-      const payload: any = {
+      const payload: VisitPayload = {
         treatment_plan_id: id!,
         sitting_number: currentSittingNumber,
         status: "COMPLETED",
@@ -137,19 +135,19 @@ export default function TreatmentDetail() {
         next_visit_required: nextVisitRequired,
         sitting_date: new Date().toISOString().split("T")[0],
       }
-      if (nextVisitRequired && suggestDate) {
-        payload.next_appointment_date = suggestDate
+      if (nextVisitRequired && nextAppointmentSlot) {
+        payload.next_appointment_date = nextAppointmentSlot.appointment_date
+        payload.next_appointment_time = nextAppointmentSlot.appointment_time
+        payload.next_appointment_doctor_id = nextAppointmentSlot.doctor_id
       }
-      return treatmentSittingsApi.create(payload)
+      return treatmentSittingsApi.create(payload as Record<string, unknown>)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["treatment-sittings", id] })
       queryClient.invalidateQueries({ queryKey: ["treatment-plan", id] })
       setVisitDialogOpen(false)
       setVisitForm({ clinical_notes: "", procedure_performed: "", prescription: "", materials_used: "", duration_minutes: "", notes: "", complications: "" })
-      setSuggestDays("")
-      setSuggestDate("")
-      setSuggestReason("")
+      setNextAppointmentSlot(null)
     },
   })
 
@@ -165,7 +163,7 @@ export default function TreatmentDetail() {
 
   const waitingMutation = useMutation({
     mutationFn: async () => {
-      const payload: any = { reason: waitingReason }
+      const payload: WaitingPayload = { reason: waitingReason }
       if (waitingType === "WAITING_LAB") {
         payload.lab_name = labForm.lab_name
         payload.lab_order_number = labForm.lab_order_number
@@ -277,7 +275,7 @@ export default function TreatmentDetail() {
                 <p className="text-sm text-muted-foreground text-center py-4">No visits recorded yet.</p>
               ) : (
                 <div className="space-y-2">
-                  {sittings.map((s: any) => (
+                  {sittings.map((s) => (
                     <div key={s.id} className="flex items-center gap-3 rounded-lg border p-3 hover:bg-gray-50 cursor-pointer" onClick={() => setViewSitting(s)}>
                       <div className={cn("w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0",
                         s.status === "COMPLETED" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"
@@ -395,37 +393,22 @@ export default function TreatmentDetail() {
                 <Label>Next Visit Required</Label>
                 <div className="flex gap-2">
                   <Button size="sm" variant={nextVisitRequired ? "default" : "outline"} onClick={() => setNextVisitRequired(true)}>Yes</Button>
-                  <Button size="sm" variant={!nextVisitRequired ? "default" : "outline"} onClick={() => setNextVisitRequired(false)}>No</Button>
+                  <Button size="sm" variant={!nextVisitRequired ? "default" : "outline"} onClick={() => { setNextVisitRequired(false); setNextAppointmentSlot(null) }}>No</Button>
                 </div>
               </div>
               {nextVisitRequired && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label>Suggested Days</Label>
-                    <Input type="number" min="1" value={suggestDays} onChange={e => {
-                      setSuggestDays(e.target.value)
-                      if (e.target.value) {
-                        const d = new Date()
-                        d.setDate(d.getDate() + Number(e.target.value))
-                        setSuggestDate(d.toISOString().split("T")[0])
-                      }
-                    }} placeholder="e.g., 7" />
-                  </div>
-                  <div>
-                    <Label>Preferred Date</Label>
-                    <Input type="date" value={suggestDate} onChange={e => setSuggestDate(e.target.value)} />
-                  </div>
-                  <div className="col-span-2">
-                    <Label>Reason</Label>
-                    <Input value={suggestReason} onChange={e => setSuggestReason(e.target.value)} placeholder="Follow-up for next sitting" />
-                  </div>
-                </div>
+                <AppointmentScheduler
+                  showDoctorSelector
+                  showTypeSelector
+                  appointmentType="TREATMENT"
+                  onSelect={(data) => setNextAppointmentSlot(data)}
+                />
               )}
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setVisitDialogOpen(false)}>Cancel</Button>
-            <Button onClick={() => saveVisitMutation.mutate()} disabled={!visitForm.procedure_performed || saveVisitMutation.isPending}>
+            <Button onClick={() => saveVisitMutation.mutate()} disabled={!visitForm.procedure_performed || saveVisitMutation.isPending || (nextVisitRequired && !nextAppointmentSlot)}>
               {saveVisitMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
               Save Visit
             </Button>

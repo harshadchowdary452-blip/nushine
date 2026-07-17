@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { patientsApi, casesApi, appointmentsApi, billingApi, treatmentApi, campaignsApi, crmApi, usersApi, doctorsApi, consentFormsApi } from "@/services/endpoints";
+import { patientsApi, casesApi, appointmentsApi, billingApi, treatmentApi, crmApi, doctorsApi, consentFormsApi } from "@/services/endpoints";
 import api from "@/services/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import AppointmentScheduler from "@/components/appointments/AppointmentScheduler";
 import {
   Dialog,
   DialogContent,
@@ -27,17 +28,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/toast";
 import { formatIndianRupees } from "@/lib/currency";
 import SearchableSelect from "@/components/ui/searchable-select";
-import type { Patient, Case, Appointment, Billing, TreatmentPlan, PatientTimelineEntry } from "@/types";
+import type { Case, Appointment, Billing, TreatmentPlan, PatientTimelineEntry, DoctorListItem, ApiError, ConsentForm, FollowUpResponse } from "@/types";
 import {
   User,
   Phone,
   Mail,
   Calendar,
-  MapPin,
   Activity,
   FileText,
   Clock,
@@ -49,9 +48,6 @@ import {
   ZoomOut,
   RotateCcw,
   MessageSquare,
-  Loader2,
-  CalendarDays,
-  Plus,
   CalendarRange,
   Stethoscope,
   CreditCard,
@@ -126,30 +122,30 @@ export default function PatientDetail() {
     queryKey: ["doctors", "dropdown"],
     queryFn: () => doctorsApi.list({ page_size: 200 }),
   });
-  const doctors: any[] = Array.isArray(doctorsData) ? doctorsData : doctorsData?.items || [];
+  const doctors: DoctorListItem[] = Array.isArray(doctorsData) ? doctorsData : doctorsData?.items || [];
 
   const createApptMutation = useMutation({
-    mutationFn: (data: any) => appointmentsApi.create(data),
+    mutationFn: (data: Record<string, unknown>) => appointmentsApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["patient-appointments", id] });
       queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" });
       addToast({ title: "Success", description: "Appointment created", variant: "success" });
       setApptOpen(false);
     },
-    onError: (err: any) => {
+    onError: (err: ApiError) => {
       addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to create appointment", variant: "destructive" });
     },
   });
 
   const createCaseMutation = useMutation({
-    mutationFn: (data: any) => casesApi.create(data),
+    mutationFn: (data: Record<string, unknown>) => casesApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["patient-cases", id] });
       queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" });
       addToast({ title: "Success", description: "Case created", variant: "success" });
       setCaseOpen(false);
     },
-    onError: (err: any) => {
+    onError: (err: ApiError) => {
       addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to create case", variant: "destructive" });
     },
   });
@@ -178,12 +174,6 @@ export default function PatientDetail() {
     enabled: !!id,
   });
 
-  const { data: interactions } = useQuery({
-    queryKey: ["patient-interactions", id],
-    queryFn: () => campaignsApi.analytics.patientInteractions(id!),
-    enabled: !!id,
-  });
-
   const { data: followUpResponses } = useQuery({
     queryKey: ["patient-follow-up-responses", id],
     queryFn: () => crmApi.followUpResponses.listByPatient(id!),
@@ -201,7 +191,7 @@ export default function PatientDetail() {
     queryFn: () => consentFormsApi.getByPatient(id!),
     enabled: !!id,
   });
-  const consentFormsList: any[] = Array.isArray(consentFormsData) ? consentFormsData : [];
+  const consentFormsList: ConsentForm[] = Array.isArray(consentFormsData) ? consentFormsData : [];
 
   const [timelineModule, setTimelineModule] = useState<string>("all");
   const [timelineSearch, setTimelineSearch] = useState("");
@@ -299,8 +289,7 @@ export default function PatientDetail() {
   const appointmentsList = Array.isArray(appointments) ? appointments : appointments?.items || appointments || [];
   const billingsList = Array.isArray(billings) ? billings : billings?.items || billings || [];
   const treatmentPlansList = Array.isArray(treatmentPlans) ? treatmentPlans : treatmentPlans?.items || treatmentPlans || [];
-  const interactionsList: any[] = interactions || [];
-  const followUpResponsesList: any[] = followUpResponses || [];
+  const followUpResponsesList: FollowUpResponse[] = followUpResponses || [];
 
   function renderTimeline() {
     const timelineEntries: PatientTimelineEntry[] = Array.isArray(timelineData?.entries) ? timelineData.entries : [];
@@ -353,7 +342,7 @@ export default function PatientDetail() {
     );
   }
 
-  const tabs: { value: string; label: string; icon: any; getCount?: () => number | null }[] = [
+  const tabs: { value: string; label: string; icon: typeof User; getCount?: () => number | null }[] = [
     { value: "overview", label: "Overview", icon: User },
     { value: "cases", label: "Case Reports", icon: FileText, getCount: () => casesList.length },
     { value: "appointments", label: "Appointments", icon: Calendar, getCount: () => appointmentsList.length },
@@ -459,22 +448,37 @@ export default function PatientDetail() {
                       <Select value={apptForm.doctor_id} onValueChange={(v) => setApptForm({ ...apptForm, doctor_id: v })} required>
                         <SelectTrigger><SelectValue placeholder="Select doctor" /></SelectTrigger>
                         <SelectContent>
-                          {doctors.map((d: any) => (
+                          {doctors.map((d: DoctorListItem) => (
                             <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="grid gap-2">
-                        <Label>Date</Label>
-                        <Input type="date" value={apptForm.appointment_date} onChange={(e) => setApptForm({ ...apptForm, appointment_date: e.target.value })} required />
+                    {apptForm.doctor_id ? (
+                      <AppointmentScheduler
+                        doctorId={apptForm.doctor_id}
+                        date={apptForm.appointment_date}
+                        selectedTime={apptForm.appointment_time}
+                        showDoctorSelector={false}
+                        showTypeSelector={true}
+                        onSelect={(data) => setApptForm({
+                          ...apptForm,
+                          appointment_date: data.appointment_date,
+                          appointment_time: data.appointment_time,
+                        })}
+                      />
+                    ) : (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="grid gap-2">
+                          <Label>Date</Label>
+                          <Input type="date" value={apptForm.appointment_date} onChange={(e) => setApptForm({ ...apptForm, appointment_date: e.target.value })} required />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label>Time</Label>
+                          <Input type="time" value={apptForm.appointment_time} onChange={(e) => setApptForm({ ...apptForm, appointment_time: e.target.value })} required />
+                        </div>
                       </div>
-                      <div className="grid gap-2">
-                        <Label>Time</Label>
-                        <Input type="time" value={apptForm.appointment_time} onChange={(e) => setApptForm({ ...apptForm, appointment_time: e.target.value })} required />
-                      </div>
-                    </div>
+                    )}
                     <div className="grid gap-2">
                       <Label>Notes</Label>
                       <Textarea value={apptForm.notes} onChange={(e) => setApptForm({ ...apptForm, notes: e.target.value })} rows={2} />
@@ -522,7 +526,7 @@ export default function PatientDetail() {
                       <Select value={caseForm.doctor_id} onValueChange={(v) => setCaseForm({ ...caseForm, doctor_id: v })}>
                         <SelectTrigger><SelectValue placeholder="Select doctor" /></SelectTrigger>
                         <SelectContent>
-                          {doctors.map((d: any) => (
+                          {doctors.map((d: DoctorListItem) => (
                             <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>
                           ))}
                         </SelectContent>
@@ -788,7 +792,7 @@ export default function PatientDetail() {
                   <Button
                     className="bg-primary hover:bg-primary-hover text-white"
                     onClick={() => {
-                      const cleaned: Record<string, any> = {}
+                      const cleaned: Record<string, string | number> = {}
                       for (const [key, value] of Object.entries(editForm)) {
                         if (value === "" || value === null || value === undefined) continue
                         if (key === "age") cleaned[key] = Number(value)
@@ -1159,7 +1163,7 @@ export default function PatientDetail() {
                     </tr>
                   </thead>
                   <tbody>
-                    {followUpResponsesList.map((r: any) => {
+                    {followUpResponsesList.map((r: FollowUpResponse) => {
                       const respColor: Record<string, string> = {
                         POSITIVE: "bg-green-100 text-green-700",
                         NEGATIVE: "bg-red-100 text-red-700",
@@ -1316,7 +1320,7 @@ function ConsentFormsSection({ patientId }: { patientId: string }) {
         <p className="text-center py-8 text-muted-foreground">No consent forms for this patient</p>
       ) : (
         <div className="space-y-2">
-          {items.map((cf: any) => (
+          {items.map((cf: ConsentForm) => (
             <div key={cf.id} className="flex items-center justify-between rounded border p-3">
               <div>
                 <p className="font-medium text-sm">{cf.consent_type}</p>
@@ -1451,83 +1455,4 @@ function CaseImages({ caseId, caseName }: { caseId: string; caseName: string }) 
       </Dialog>
     </Card>
   );
-}
-
-function FollowUpHistory({ patientId }: { patientId: string }) {
-  const { data: history, isLoading } = useQuery({
-    queryKey: ["patient-follow-up-history", patientId],
-    queryFn: () => crmApi.patientFollowUpHistory(patientId),
-    enabled: !!patientId,
-  })
-  const items: any[] = history || []
-
-  if (isLoading) return <Card className="p-12 text-center border-border shadow-card"><Loader2 className="h-8 w-8 animate-spin mx-auto" /></Card>
-
-  if (items.length === 0) return (
-    <Card className="p-12 text-center border-border shadow-card">
-      <CalendarDays className="h-12 w-12 text-text-muted mx-auto mb-3" />
-      <p className="text-text-secondary">No follow-up history found</p>
-    </Card>
-  )
-
-  return (
-    <div className="space-y-3">
-      {items.map((f: any) => (
-        <Card key={f.id} className="p-4 border-border shadow-card">
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <span className="text-sm font-semibold text-text-primary">
-              {f.follow_up_type === "1_DAY_POST_TREATMENT" ? "1-Day Post Treatment" :
-               f.follow_up_type === "6_MONTH_RECALL" ? "6-Month Recall" : "Manual"}
-            </span>
-            <Badge className={`text-xs ${
-              f.status === "COMPLETED" ? "bg-green-50 text-green-700" :
-              f.status === "SCHEDULED" ? "bg-blue-50 text-blue-700" :
-              f.status === "PENDING" ? "bg-yellow-50 text-yellow-700" :
-              "bg-gray-50 text-gray-600"
-            }`}>{f.status}</Badge>
-            {f.doctor_name && <span className="text-xs text-text-secondary">Dr. {f.doctor_name}</span>}
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-            <div>
-              <p className="text-xs text-text-secondary">Created</p>
-              <p className="font-medium">{new Date(f.created_at).toLocaleDateString()}</p>
-            </div>
-            <div>
-              <p className="text-xs text-text-secondary">Due Date</p>
-              <p className="font-medium">{new Date(f.follow_up_date).toLocaleDateString()}</p>
-            </div>
-            {f.completed_date && (
-              <div>
-                <p className="text-xs text-text-secondary">Completed</p>
-                <p className="font-medium">{new Date(f.completed_date).toLocaleDateString()}</p>
-              </div>
-            )}
-            {f.treatment_name && (
-              <div>
-                <p className="text-xs text-text-secondary">Treatment</p>
-                <p className="font-medium">{f.treatment_name}</p>
-              </div>
-            )}
-          </div>
-          {f.notes && <p className="mt-2 text-sm text-text-secondary">{f.notes}</p>}
-          {f.communications && f.communications.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-border">
-              <p className="text-xs font-semibold text-text-secondary mb-2">Communication History</p>
-              <div className="space-y-2">
-                {f.communications.map((c: any) => (
-                  <div key={c.id} className="flex items-center gap-2 text-xs text-text-secondary">
-                    <Badge className={`text-xs ${c.channel === "WHATSAPP" ? "bg-green-50 text-green-700" : "bg-blue-50 text-blue-700"}`}>
-                      {c.channel}
-                    </Badge>
-                    <span className="truncate">{c.message}</span>
-                    <span className="ml-auto">{c.sent_at ? new Date(c.sent_at).toLocaleString() : ""}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </Card>
-      ))}
-    </div>
-  )
 }

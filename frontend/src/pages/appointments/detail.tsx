@@ -6,7 +6,7 @@ import {
   ArrowLeft, Calendar, Clock, User, Stethoscope, FileText, FilePlus,
   RotateCcw, CheckCircle2, XCircle, CalendarClock, ExternalLink,
   Activity, CreditCard, ClipboardList, History, UserCircle,
-  Phone, Mail, Droplets, ShieldCheck, Hash, ArrowUpRight,
+  Phone, Droplets, ShieldCheck, Hash, ArrowUpRight,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -21,7 +21,9 @@ import { Separator } from "@/components/ui/separator"
 import PageHeader from "@/components/layout/page-header"
 import { appointmentsApi, casesApi, doctorsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
-import type { AppointmentFullDetail, Appointment } from "@/types"
+import type { AppointmentFullDetail, User, Case, CasePayload, ReassignDoctorResponse } from "@/types"
+import { extractDetail } from "@/types"
+import AppointmentScheduler from "@/components/appointments/AppointmentScheduler"
 
 const STATUS_COLORS: Record<string, string> = {
   SCHEDULED: "bg-blue-50 text-blue-700 border-blue-200",
@@ -46,7 +48,7 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-function InfoRow({ icon: Icon, label, value, onClick }: { icon: any; label: string; value: React.ReactNode; onClick?: () => void }) {
+function InfoRow({ icon: Icon, label, value, onClick }: { icon: React.ComponentType<{ className?: string }>; label: string; value: React.ReactNode; onClick?: () => void }) {
   return (
     <div className={`flex items-start gap-3 py-2 ${onClick ? "cursor-pointer hover:bg-muted/50 -mx-2 px-2 rounded" : ""}`} onClick={onClick}>
       <Icon className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
@@ -90,7 +92,7 @@ export default function AppointmentDetail() {
     queryKey: ["doctors", "reassign"],
     queryFn: () => doctorsApi.list({ page_size: 200 }),
   })
-  const doctorList: any[] = Array.isArray(doctors) ? doctors : doctors?.items || []
+  const doctorList: User[] = Array.isArray(doctors) ? doctors : doctors?.items || []
 
   const rescheduleMutation = useMutation({
     mutationFn: (data: { appointment_date: string; appointment_time: string; reason?: string }) =>
@@ -102,7 +104,7 @@ export default function AppointmentDetail() {
       addToast({ title: "Appointment Rescheduled", variant: "success" })
       setRescheduleOpen(false); setRescheduleDate(""); setRescheduleTime(""); setRescheduleReason("")
     },
-    onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed", variant: "destructive" }),
+    onError: (err: unknown) => addToast({ title: "Error", description: extractDetail(err) || "Failed", variant: "destructive" }),
   })
 
   const completeMutation = useMutation({
@@ -113,7 +115,7 @@ export default function AppointmentDetail() {
       addToast({ title: "Appointment Completed", variant: "success" })
       setCompleteOpen(false); setCompleteNotes("")
     },
-    onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed", variant: "destructive" }),
+    onError: (err: unknown) => addToast({ title: "Error", description: extractDetail(err) || "Failed", variant: "destructive" }),
   })
 
   const cancelMutation = useMutation({
@@ -124,12 +126,12 @@ export default function AppointmentDetail() {
       addToast({ title: "Appointment Cancelled", variant: "success" })
       setCancelOpen(false); setCancelReason("")
     },
-    onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed", variant: "destructive" }),
+    onError: (err: unknown) => addToast({ title: "Error", description: extractDetail(err) || "Failed", variant: "destructive" }),
   })
 
   const reassignMutation = useMutation({
     mutationFn: (data: { doctor_id: string; reason?: string }) => appointmentsApi.reassignDoctor(id!, data),
-    onSuccess: (resp: any) => {
+    onSuccess: (resp: ReassignDoctorResponse) => {
       queryClient.invalidateQueries({ queryKey: ["appointment-full-detail", id] })
       addToast({ title: "Doctor Reassigned", description: `Changed to ${resp.new_doctor_name}`, variant: "success" })
       setReassignOpen(false); setNewDoctorId(""); setReassignReason("")
@@ -138,8 +140,8 @@ export default function AppointmentDetail() {
   })
 
   const createCaseMutation = useMutation({
-    mutationFn: (data: any) => casesApi.create(data),
-    onSuccess: (newCase: any) => {
+    mutationFn: (data: CasePayload) => casesApi.create(data),
+    onSuccess: (newCase: Case) => {
       addToast({ title: "Case Created", variant: "success" })
       setCreateCaseOpen(false); setCaseComplaint("")
       navigate(`/cases/${newCase.id}`)
@@ -413,16 +415,17 @@ export default function AppointmentDetail() {
             <div className="p-3 rounded-lg bg-muted/50 text-sm">
               <p className="text-muted-foreground">Current: <span className="font-medium">{format(new Date(a.appointment_date), "MMM dd, yyyy")} at {a.appointment_time}</span></p>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label>New Date *</Label>
-                <Input type="date" value={rescheduleDate} onChange={(e) => setRescheduleDate(e.target.value)} required />
-              </div>
-              <div className="grid gap-2">
-                <Label>New Time *</Label>
-                <Input type="time" value={rescheduleTime} onChange={(e) => setRescheduleTime(e.target.value)} required />
-              </div>
-            </div>
+            <AppointmentScheduler
+              doctorId={a.doctor_id}
+              date={rescheduleDate}
+              selectedTime={rescheduleTime}
+              showDoctorSelector={false}
+              showTypeSelector={false}
+              onSelect={(data) => {
+                setRescheduleDate(data.appointment_date)
+                setRescheduleTime(data.appointment_time)
+              }}
+            />
             <div className="grid gap-2">
               <Label>Reason (optional)</Label>
               <Textarea value={rescheduleReason} onChange={(e) => setRescheduleReason(e.target.value)} rows={2} placeholder="Why is this appointment being rescheduled?" />
@@ -494,7 +497,7 @@ export default function AppointmentDetail() {
               <Select value={newDoctorId} onValueChange={setNewDoctorId}>
                 <SelectTrigger><SelectValue placeholder="Select a doctor..." /></SelectTrigger>
                 <SelectContent>
-                  {doctorList.map((d: any) => <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>)}
+                  {doctorList.map((d) => <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

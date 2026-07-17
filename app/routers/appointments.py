@@ -73,7 +73,9 @@ async def _resolve_user_name(db: AsyncSession, user_id: Optional[str]) -> Option
 async def get_doctor_slots(
     doctor_id: str = Query(...),
     date: str = Query(...),
-    duration_minutes: int = Query(30),
+    duration_minutes: Optional[int] = Query(None),
+    procedure_name: Optional[str] = Query(None),
+    appointment_type: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
@@ -83,7 +85,24 @@ async def get_doctor_slots(
     except ValueError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date format")
     service = AppointmentService(db)
-    return await service.get_doctor_slots(doctor_id, appointment_date, duration_minutes)
+    return await service.get_doctor_slots(
+        doctor_id,
+        appointment_date,
+        duration_minutes=duration_minutes,
+        procedure_name=procedure_name,
+        appointment_type=appointment_type,
+    )
+
+
+@router.get("/procedure-durations")
+async def get_procedure_durations(
+    current_user: dict = Depends(get_current_user),
+):
+    from app.models.appointment import PROCEDURE_DURATIONS, TREATMENT_DURATIONS
+    return {
+        "procedures": PROCEDURE_DURATIONS,
+        "defaults": {k.value: v for k, v in TREATMENT_DURATIONS.items()},
+    }
 
 
 @router.post("/", response_model=AppointmentResponse, status_code=status.HTTP_201_CREATED)
@@ -666,6 +685,10 @@ async def reschedule_appointment(appointment_id: str, req: RescheduleRequest, db
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
     await verify_tenant_access(current_user, appointment, "appointment", db)
 
+    await service._validate_appointment_slot(
+        appointment.doctor_id, req.appointment_date, req.appointment_time, appointment.duration_minutes
+    )
+
     old_date = appointment.appointment_date
     old_time = appointment.appointment_time
     now = datetime.now(timezone.utc)
@@ -674,16 +697,15 @@ async def reschedule_appointment(appointment_id: str, req: RescheduleRequest, db
     appointment.previous_time = old_time
     appointment.appointment_date = req.appointment_date
     appointment.appointment_time = req.appointment_time
-    appointment.status = AppointmentStatus.RESCHEDULED
+    appointment.status = AppointmentStatus.SCHEDULED
     appointment.rescheduled_by_id = current_user.get("sub")
     appointment.rescheduled_at = now
     appointment.reschedule_reason = req.reason
     appointment.updated_at = now
     appointment.updated_by_id = current_user.get("sub")
 
-    # Recalculate end_time
-    from datetime import timedelta
-    appointment.end_time = (datetime.min + timedelta(minutes=appointment.duration_minutes)).time()
+    from app.services.appointment_service import compute_end_time
+    appointment.end_time = compute_end_time(req.appointment_time, appointment.duration_minutes)
 
     audit = AuditLog(
         user_id=current_user.get("sub"),

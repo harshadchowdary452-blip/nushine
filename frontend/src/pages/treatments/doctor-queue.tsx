@@ -2,7 +2,7 @@
 import { useState, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { User, Play, Clock, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react"
+import { User, Play, Clock, Loader2 } from "lucide-react"
 import { format } from "date-fns"
 import PageHeader from "@/components/layout/page-header"
 import { Card, CardContent } from "@/components/ui/card"

@@ -7,7 +7,6 @@ import {
   getSortedRowModel,
   flexRender,
   type ColumnDef,
-  type SortingState,
 } from "@tanstack/react-table"
 import { motion } from "framer-motion"
 import { Plus, Eye, Edit, Trash2, Users, UserPlus, SlidersHorizontal } from "lucide-react"
@@ -33,6 +32,7 @@ import { useServerFilters } from "@/hooks/useServerFilters"
 import { FilterChips } from "@/components/ui/filter-bar"
 import PatientFilterBar from "./filter-bar"
 import type { Patient, PaginatedResponse, User } from "@/types"
+import { extractDetail } from "@/types"
 import { useAuthStore } from "@/store/authStore"
 
 const DATE_PRESET_KEYS = new Set(["date_preset"])
@@ -99,9 +99,9 @@ export default function PatientList() {
   const currentUser = useAuthStore((s) => s.user)
 
   const { data, isLoading } = useQuery<PaginatedResponse<Patient>>({
-    queryKey: ["patients", "search", queryKey],
+    queryKey: ["patients", "search", queryKey, page],
     queryFn: () => {
-      const params: Record<string, any> = {
+      const params: Record<string, string | number> = {
         page, page_size: 10,
         sort_by: sortField, sort_order: sortDir,
       }
@@ -148,8 +148,8 @@ export default function PatientList() {
       addToast({ title: "Success", description: "Patient deleted successfully", variant: "success" })
       setDeleteDialogOpen(false); setDeletingPatient(null)
     },
-    onError: (err: any) => {
-      addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to delete patient", variant: "destructive" })
+    onError: (err: unknown) => {
+      addToast({ title: "Error", description: extractDetail(err), variant: "destructive" })
     },
   })
 
@@ -157,7 +157,7 @@ export default function PatientList() {
   function handleDelete() { if (deletingPatient) deleteMutation.mutate(deletingPatient.id) }
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => patientsApi.create(data),
+    mutationFn: (data: Record<string, unknown>) => patientsApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["patients"], refetchType: "all" })
       queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" })
@@ -165,8 +165,8 @@ export default function PatientList() {
       addToast({ title: "Success", description: "Patient created successfully", variant: "success" })
       resetForm()
     },
-    onError: (err: any) => {
-      addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to create patient", variant: "destructive" })
+    onError: (err: unknown) => {
+      addToast({ title: "Error", description: extractDetail(err), variant: "destructive" })
     },
   })
 

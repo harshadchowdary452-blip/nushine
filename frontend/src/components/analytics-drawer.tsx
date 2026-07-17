@@ -1,9 +1,26 @@
 import { useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, TrendingUp, TrendingDown, Calendar } from "lucide-react"
+import { X, TrendingUp, TrendingDown } from "lucide-react"
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, AreaChart, Area } from "recharts"
 import { cn } from "@/lib/utils"
 import { formatIndianRupees, formatIndianNumber } from "@/lib/currency"
+
+interface ChartDataItem {
+  [key: string]: string | number
+}
+
+interface ChartTooltipPayloadItem {
+  color: string
+  name: string
+  value: number | null
+}
+
+interface ChartTooltipProps {
+  active?: boolean
+  payload?: ChartTooltipPayloadItem[]
+  label?: string
+  valueType?: string
+}
 
 interface AnalyticsDrawerProps {
   open: boolean
@@ -11,7 +28,7 @@ interface AnalyticsDrawerProps {
   title: string
   icon?: React.ReactNode
   color?: string
-  data?: any[]
+  data?: ChartDataItem[]
   trend?: { value: number | string; positive: boolean } | null
   metrics?: { label: string; value: string; color?: string }[]
   chartType?: "line" | "bar" | "area"
@@ -40,13 +57,13 @@ const reversePeriodMap: Record<string, string> = {
 
 const drawerPeriods = ["Today", "Week", "Month", "Quarter", "Year"]
 
-const ChartTooltip = ({ active, payload, label, valueType }: any) => {
+const ChartTooltip = ({ active, payload, label, valueType }: ChartTooltipProps) => {
   if (active && payload && payload.length) {
     const fmt = valueType === "number" ? formatIndianNumber : formatIndianRupees
     return (
       <div className="rounded-xl border border-gray-100 bg-white p-3 shadow-lg">
         <p className="text-sm font-semibold text-gray-900 mb-1">{label}</p>
-        {payload.map((p: any, i: number) => (
+        {payload.map((p: ChartTooltipPayloadItem, i: number) => (
           <p key={i} className="text-xs" style={{ color: p.color }}>
             {p.name}: {fmt(p.value != null ? p.value : 0)}
           </p>

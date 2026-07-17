@@ -18,7 +18,7 @@ import PageHeader from "@/components/layout/page-header"
 import KpiCard from "@/components/layout/kpi-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
+
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent } from "@/components/ui/card"
 import {
@@ -41,7 +41,7 @@ import { billingApi, casesApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
 import QuickExport from "@/components/ui/quick-export"
 import { formatIndianRupees } from "@/lib/currency"
-import type { Billing, Case, PaginatedResponse } from "@/types"
+import type { Billing, Case, PaginatedResponse, ApiError } from "@/types"
 import { useAuthStore } from "@/store/authStore"
 
 function StatusBadge({ status }: { status: string }) {
@@ -49,14 +49,8 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={cls}>{status?.replace(/_/g, " ")}</span>;
 }
 
-const statusVariant: Record<string, "default" | "secondary" | "outline" | "destructive" | "success" | "warning"> = {
-  PAID: "success",
-  PARTIAL: "warning",
-  PENDING: "default",
-  OVERDUE: "destructive",
-}
-
 interface InvoiceForm {
+  [key: string]: unknown
   case_id: string
   total_amount: number | null
   paid_amount: number | null
@@ -126,8 +120,8 @@ export default function BillingList() {
       setDeleteDialogOpen(false)
       setDeletingBilling(null)
     },
-    onError: (err: any) => {
-      const msg = err?.response?.data?.detail || "Failed to delete invoice"
+    onError: (err: unknown) => {
+      const msg = (err as ApiError)?.response?.data?.detail || "Failed to delete invoice"
       addToast({ title: "Error", description: msg, variant: "destructive" })
     },
   })
@@ -151,8 +145,8 @@ export default function BillingList() {
       addToast({ title: "Success", description: "Invoice created successfully", variant: "success" })
       resetForm()
     },
-    onError: (err: any) => {
-      addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to create invoice", variant: "destructive" })
+    onError: (err: unknown) => {
+      addToast({ title: "Error", description: (err as ApiError)?.response?.data?.detail || "Failed to create invoice", variant: "destructive" })
     },
   })
 
@@ -198,6 +192,7 @@ export default function BillingList() {
     setDialogOpen(open)
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const columns = useMemo<ColumnDef<Billing>[]>(
     () => [
       {

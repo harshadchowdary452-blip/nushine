@@ -3,14 +3,14 @@ import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "react-router-dom"
 import {
   CalendarDays, Phone, MessageCircle, CheckCircle, Clock, FileText, History,
-  RotateCcw, User, Stethoscope, Loader2, Activity, TrendingUp, Users,
-  BarChart3, PieChart, Target, Send, Award, DollarSign, ArrowRight,
-  ChevronRight, BookOpen, AlertCircle, ThumbsUp, ThumbsDown, Meh,
-  Frown, Smile, HeartPulse, Zap, UserPlus, Search, Filter, X,
+  User, Activity, TrendingUp, Users,
+  BarChart3, Target, Send, Award,
+  ChevronRight, BookOpen, AlertCircle, ThumbsUp,
+  HeartPulse, UserPlus, Filter,
 } from "lucide-react"
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart as RePieChart, Pie, Cell, Legend, LineChart, Line,
+  PieChart as RePieChart, Pie, Cell,
 } from "recharts"
 import { cn } from "@/lib/utils"
 import { formatIndianRupees, formatIndianNumber } from "@/lib/currency"
@@ -18,7 +18,7 @@ import { crmApi, doctorsApi, campaignsApi } from "@/services/endpoints"
 import DashboardDateFilter, { type DateRangePreset } from "@/components/ui/dashboard-date-filter"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -26,7 +26,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import DentalEmptyState from "@/components/ui/dental-empty-state"
 import ExpensesVsRevenueQuickView from "@/components/dashboard/expenses-vs-revenue-quick-view"
-import { useAuthStore } from "@/store/authStore"
 
 const COLORS = ["#4F46E5", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899", "#06B6D4", "#F97316", "#14B8A6", "#84CC16"]
 const GLASS = "bg-white/80 backdrop-blur-xl border border-white/20 shadow-lg"
@@ -54,7 +53,7 @@ const statusColors: Record<string, string> = {
 
 const COLORS_RESPONSE = ["#10B981", "#34D399", "#FBBF24", "#F59E0B", "#9CA3AF", "#EF4444"]
 
-function KpiCard({ title, value, icon: Icon, color, onClick }: any) {
+function KpiCard({ title, value, icon: Icon, color, onClick }: { title: string; value: string | number; icon: React.ComponentType<{ className?: string }>; color: string; onClick?: () => void }) {
   const colorMap: Record<string, string> = {
     primary: "from-indigo-500 to-blue-600", info: "from-blue-500 to-cyan-600",
     success: "from-emerald-500 to-green-600", warning: "from-amber-500 to-yellow-600",
@@ -76,7 +75,7 @@ function KpiCard({ title, value, icon: Icon, color, onClick }: any) {
   )
 }
 
-function FunnelStep({ label, value, total, color, isLast }: any) {
+function FunnelStep({ label, value, total, color, isLast }: { label: string; value: number; total: number; color: string; isLast?: boolean }) {
   const pct = total > 0 ? Math.round((value / total) * 100) : 0
   return (
     <div className="flex flex-col items-center gap-1.5 min-w-0 flex-1">
@@ -91,7 +90,6 @@ function FunnelStep({ label, value, total, color, isLast }: any) {
 
 export default function CrmDashboardPage() {
   const navigate = useNavigate()
-  const { user } = useAuthStore()
   const [period, setPeriod] = useState<DateRangePreset>("today")
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
@@ -175,7 +173,7 @@ export default function CrmDashboardPage() {
     )
   }
 
-  function navToCalendar(filter?: string) {
+  function navToCalendar(_filter?: string) {
     navigate("/crm/enquiry-calendar")
   }
 
@@ -213,7 +211,7 @@ export default function CrmDashboardPage() {
               <SelectTrigger className="h-8 w-40 text-xs rounded-xl"><SelectValue placeholder="All Doctors" /></SelectTrigger>
               <SelectContent className="max-h-[200px]">
                 <SelectItem value="" className="text-xs">All Doctors</SelectItem>
-                {doctorOptions.map((d: any) => (
+                {doctorOptions.map((d: { id: string; full_name?: string; name?: string }) => (
                   <SelectItem key={d.id} value={d.id} className="text-xs">{d.full_name || d.name}</SelectItem>
                 ))}
               </SelectContent>
@@ -325,7 +323,7 @@ export default function CrmDashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {workQueue.map((item: any) => (
+                {workQueue.map((item: Record<string, string>) => (
                   <TableRow key={item.id} className="group hover:bg-gray-50/50">
                     <TableCell className="font-medium text-xs">{item.patient_name}</TableCell>
                     <TableCell className="text-xs text-gray-500">{item.op_number || "-"}</TableCell>
@@ -444,8 +442,8 @@ export default function CrmDashboardPage() {
           {responses.length > 0 ? (
             <ResponsiveContainer width="100%" height={260}>
               <RePieChart>
-                <Pie data={responses} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} label={({ name, percent }: any) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}>
-                  {responses.map((_: any, i: number) => <Cell key={i} fill={COLORS_RESPONSE[i % COLORS_RESPONSE.length]} />)}
+                <Pie data={responses} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} label={({ name, percent }: { name: string; percent: number }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}>
+                  {responses.map((_: Record<string, unknown>, i: number) => <Cell key={i} fill={COLORS_RESPONSE[i % COLORS_RESPONSE.length]} />)}
                 </Pie>
                 <Tooltip />
               </RePieChart>
@@ -487,7 +485,7 @@ export default function CrmDashboardPage() {
           </h2>
           {treatmentPerf.length > 0 ? (
             <div className="space-y-3">
-              {treatmentPerf.slice(0, 8).map((t: any, i: number) => {
+              {treatmentPerf.slice(0, 8).map((t: Record<string, string | number>, i: number) => {
                 const pct = Math.max(t.follow_ups, t.appointments, 1)
                 const fw = (t.follow_ups / pct) * 100
                 const aw = (t.appointments / pct) * 100
@@ -517,7 +515,7 @@ export default function CrmDashboardPage() {
           </h2>
           {doctorEngagement.length > 0 ? (
             <div className="space-y-2 max-h-[300px] overflow-y-auto">
-              {doctorEngagement.map((d: any, i: number) => (
+              {doctorEngagement.map((d: Record<string, string | number>, i: number) => (
                 <div key={d.doctor_id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 transition-colors">
                   <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white",
                     i === 0 ? "bg-amber-400" : i === 1 ? "bg-gray-400" : i === 2 ? "bg-amber-700" : "bg-gray-200 text-gray-500")}>
@@ -562,8 +560,8 @@ export default function CrmDashboardPage() {
             {acquisition.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
                 <RePieChart>
-                  <Pie data={acquisition} dataKey="patients" nameKey="source" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }: any) => `${name ?? ""} ${((percent ?? 0) * 100).toFixed(0)}%`}>
-                    {acquisition.map((_: any, i: number) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                  <Pie data={acquisition} dataKey="patients" nameKey="source" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }: { name: string; percent: number }) => `${name ?? ""} ${((percent ?? 0) * 100).toFixed(0)}%`}>
+                    {acquisition.map((_: Record<string, unknown>, i: number) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                   </Pie>
                   <Tooltip />
                 </RePieChart>
@@ -578,7 +576,7 @@ export default function CrmDashboardPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis dataKey="source" tick={{ fontSize: 9 }} />
                   <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip formatter={(v: any) => formatIndianRupees(v)} />
+                  <Tooltip formatter={(v: string | number | (string | number)[]) => formatIndianRupees(v)} />
                   <Bar dataKey="revenue" fill="#4F46E5" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -598,7 +596,7 @@ export default function CrmDashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {acquisition.slice(0, 6).map((s: any) => (
+                {acquisition.slice(0, 6).map((s: Record<string, string | number>) => (
                   <TableRow key={s.source}>
                     <TableCell className="text-xs font-medium">{s.source}</TableCell>
                     <TableCell className="text-xs text-right">{s.patients}</TableCell>
@@ -623,8 +621,8 @@ export default function CrmDashboardPage() {
         </h2>
         {timeline.length > 0 ? (
           <div className="space-y-1 max-h-[350px] overflow-y-auto">
-            {timeline.slice(0, 25).map((entry: any) => {
-              const iconMap: Record<string, any> = {
+            {timeline.slice(0, 25).map((entry: Record<string, string>) => {
+              const iconMap: Record<string, { icon: React.ComponentType<{ className?: string }>; color: string }> = {
                 CALL: { icon: Phone, color: "text-green-500 bg-green-50" },
                 WHATSAPP: { icon: MessageCircle, color: "text-emerald-500 bg-emerald-50" },
                 SMS: { icon: MessageCircle, color: "text-blue-500 bg-blue-50" },

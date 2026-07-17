@@ -30,7 +30,8 @@ import { doctorsApi, hospitalsApi, groupsApi } from "@/services/endpoints"
 import { useAuthStore } from "@/store/authStore"
 import { useToast } from "@/components/ui/toast"
 import DentalEmptyState from "@/components/ui/dental-empty-state"
-import type { User } from "@/types"
+import type { User, Hospital, AdminGroup } from "@/types"
+import { extractDetail } from "@/types"
 
 interface DoctorForm {
   email: string
@@ -81,20 +82,20 @@ export default function AdminDoctors() {
       addToast({ title: "Success", description: "Doctor created successfully", variant: "success" })
       closeDialog()
     },
-    onError: (err: any) => {
-      addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to create doctor", variant: "destructive" })
+    onError: (err: unknown) => {
+      addToast({ title: "Error", description: extractDetail(err) || "Failed to create doctor", variant: "destructive" })
     },
   })
 
   const updateMutation = useMutation({
-    mutationFn: (data: { id: string; payload: any }) => doctorsApi.update(data.id, data.payload),
+    mutationFn: (data: { id: string; payload: Partial<DoctorForm> }) => doctorsApi.update(data.id, data.payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["doctors"] })
       addToast({ title: "Success", description: "Doctor updated successfully", variant: "success" })
       closeDialog()
     },
-    onError: (err: any) => {
-      addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to update doctor", variant: "destructive" })
+    onError: (err: unknown) => {
+      addToast({ title: "Error", description: extractDetail(err) || "Failed to update doctor", variant: "destructive" })
     },
   })
 
@@ -104,8 +105,8 @@ export default function AdminDoctors() {
       queryClient.invalidateQueries({ queryKey: ["doctors"] })
       addToast({ title: "Success", description: "Doctor deactivated", variant: "success" })
     },
-    onError: (err: any) => {
-      addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to deactivate", variant: "destructive" })
+    onError: (err: unknown) => {
+      addToast({ title: "Error", description: extractDetail(err) || "Failed to deactivate", variant: "destructive" })
     },
   })
 
@@ -115,8 +116,8 @@ export default function AdminDoctors() {
       queryClient.invalidateQueries({ queryKey: ["doctors"] })
       addToast({ title: "Success", description: "Doctor activated", variant: "success" })
     },
-    onError: (err: any) => {
-      addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to activate", variant: "destructive" })
+    onError: (err: unknown) => {
+      addToast({ title: "Error", description: extractDetail(err) || "Failed to activate", variant: "destructive" })
     },
   })
 
@@ -155,7 +156,7 @@ export default function AdminDoctors() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (editingDoctor) {
-      const payload: any = { full_name: form.full_name, phone: form.phone, specialization: form.specialization, license_number: form.license_number }
+      const payload: Partial<DoctorForm> = { full_name: form.full_name, phone: form.phone, specialization: form.specialization, license_number: form.license_number }
       if (form.password) payload.password = form.password
       updateMutation.mutate({ id: editingDoctor.id, payload })
     } else {
@@ -293,7 +294,7 @@ export default function AdminDoctors() {
                     <Select value={form.hospital_id || ""} onValueChange={(v) => setForm({ ...form, hospital_id: v })} required>
                       <SelectTrigger><SelectValue placeholder="Select hospital" /></SelectTrigger>
                       <SelectContent>
-                        {(Array.isArray(hospitals) ? hospitals : []).map((h: any) => (
+                        {(Array.isArray(hospitals) ? hospitals : []).map((h) => (
                           <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>
                         ))}
                       </SelectContent>
@@ -304,7 +305,7 @@ export default function AdminDoctors() {
                     <Select value={form.admin_group_id || ""} onValueChange={(v) => setForm({ ...form, admin_group_id: v })} required>
                       <SelectTrigger><SelectValue placeholder="Select admin group" /></SelectTrigger>
                       <SelectContent>
-                        {(Array.isArray(adminGroups) ? adminGroups : []).map((g: any) => (
+                        {(Array.isArray(adminGroups) ? adminGroups : []).map((g) => (
                           <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
                         ))}
                       </SelectContent>

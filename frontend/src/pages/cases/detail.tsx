@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   Loader2, Printer, PenLine, ArrowLeft, Send
 } from "lucide-react"
@@ -11,9 +11,10 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/components/ui/toast"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import type { Case } from "@/types"
+import type { Case, TreatmentPlanItem, TreatmentPlan, CaseTimeline } from "@/types"
 import ProfessionalOdontogram from "@/components/toothchart/ProfessionalOdontogram"
 import CaseReportForm, { apiToFinding } from "@/components/cases/CaseReportForm"
+import type { TreatmentItem } from "@/components/cases/TreatmentPlanSection"
 
 const statusColors: Record<string, string> = {
   OPEN: "bg-blue-50 text-blue-700 border-blue-200",
@@ -47,10 +48,10 @@ export default function CaseReportDetail() {
     queryFn: () => treatmentPlanItemsApi.listByCase(id!),
     enabled: !!id,
   })
-  const itemList: any[] = Array.isArray(planItems) ? planItems : (planItems?.items || [])
+  const itemList: TreatmentPlanItem[] = Array.isArray(planItems) ? planItems : (planItems?.items || [])
   const isApproved = c?.treatment_plan_status === "APPROVED" || c?.treatment_plan_status === "TREATMENT_IN_PROGRESS" || c?.treatment_plan_status === "COMPLETED"
 
-  async function handleSave(payload: Record<string, any>) {
+  async function handleSave(payload: Record<string, unknown>) {
     if (!id) return
     await casesApi.update(id, payload)
 
@@ -58,7 +59,7 @@ export default function CaseReportDetail() {
     if (Array.isArray(txItems) && txItems.length > 0 && itemList.length > 0) {
       await treatmentPlanItemsApi.create({
         case_id: id,
-        items: txItems.map((item: any) => ({
+        items: (txItems as TreatmentItem[]).map((item) => ({
           procedure_name: item.name || "",
           tooth_numbers: item.toothNumbers || [],
           estimated_visits: item.estimatedVisits ? Number(item.estimatedVisits) : 1,
@@ -74,16 +75,6 @@ export default function CaseReportDetail() {
     addToast({ title: "Case report updated", variant: "success" })
     setEditing(false)
   }
-
-  const submitMutation = useMutation({
-    mutationFn: () => casesApi.submitTreatmentPlan(id!),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["case", id] })
-      addToast({ title: "Submitted for approval", variant: "success" })
-      navigate(`/treatments/approve/${id}`)
-    },
-    onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to submit", variant: "destructive" }),
-  })
 
   if (isFetching) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin" /></div>
@@ -238,7 +229,7 @@ export default function CaseReportDetail() {
             notes: c.notes || "",
             doctor_id: c.doctor_id || "",
             ...(itemList.length > 0 ? {
-              treatment_plan_items: itemList.map((item: any, i: number) => ({
+              treatment_plan_items: itemList.map((item, i) => ({
                 id: item.id || `api-${i}`,
                 name: item.procedure_name || "",
                 toothNumbers: Array.isArray(item.tooth_numbers) ? item.tooth_numbers : (typeof item.tooth_numbers === "string" ? (() => { try { return JSON.parse(item.tooth_numbers) } catch { return [] } })() : []),
@@ -341,9 +332,19 @@ function SectionCard({ title, content }: { title: string; content: string }) {
   )
 }
 
-function parseTreatmentItems(c: Case, itemList: any[]): any[] {
+interface ParsedPlanItem {
+  name: string
+  toothNumbers: string[]
+  estimatedVisits: number | string
+  estimatedCost: number | string
+  remarks: string
+  status?: string
+  assignedDoctor?: string | null
+}
+
+function parseTreatmentItems(c: Case, itemList: TreatmentPlanItem[]): ParsedPlanItem[] {
   if (itemList && itemList.length > 0) {
-    return itemList.map((item: any) => ({
+    return itemList.map((item) => ({
       name: item.procedure_name || "—",
       toothNumbers: Array.isArray(item.tooth_numbers) ? item.tooth_numbers : (typeof item.tooth_numbers === "string" ? (() => { try { return JSON.parse(item.tooth_numbers) } catch { return [] } })() : []),
       estimatedVisits: item.estimated_visits || "",
@@ -361,7 +362,7 @@ function parseTreatmentItems(c: Case, itemList: any[]): any[] {
     } catch { /* ignore */ }
   }
   if (c.treatment_plans && c.treatment_plans.length > 0) {
-    return c.treatment_plans.map((tp: any) => ({
+    return c.treatment_plans.map((tp) => ({
       name: tp.treatment_name || "—",
       toothNumbers: [],
       estimatedVisits: tp.total_sittings || "",
@@ -372,14 +373,14 @@ function parseTreatmentItems(c: Case, itemList: any[]): any[] {
   return []
 }
 
-function TreatmentPlanView({ caseData, itemList }: { caseData: Case; itemList: any[] }) {
+function TreatmentPlanView({ caseData, itemList }: { caseData: Case; itemList: TreatmentPlanItem[] }) {
   const items = parseTreatmentItems(caseData, itemList)
   if (items.length === 0 && !caseData.initial_treatment_plan) return null
 
   const allTeeth = new Set<string>()
-  const totalVisits = items.reduce((s: number, it: any) => s + (parseInt(it.estimatedVisits) || 0), 0)
-  const totalCost = items.reduce((s: number, it: any) => s + (parseFloat(it.estimatedCost) || 0), 0)
-  items.forEach((it: any) => (it.toothNumbers || []).forEach((t: string) => allTeeth.add(t)))
+  const totalVisits = items.reduce((s, it) => s + (parseInt(String(it.estimatedVisits)) || 0), 0)
+  const totalCost = items.reduce((s, it) => s + (parseFloat(String(it.estimatedCost)) || 0), 0)
+  items.forEach((it) => (it.toothNumbers || []).forEach((t) => allTeeth.add(t)))
 
   return (
     <Card>
@@ -393,7 +394,7 @@ function TreatmentPlanView({ caseData, itemList }: { caseData: Case; itemList: a
         {items.length > 0 ? (
           <>
             <div className="space-y-2">
-              {items.map((it: any, i: number) => (
+              {items.map((it, i) => (
                 <div key={i} className="flex items-start justify-between gap-4 rounded-md border border-gray-100 bg-gray-50/50 px-3 py-2">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
@@ -441,7 +442,7 @@ function TimelineView({ caseId }: { caseId: string }) {
     queryKey: ["case-timeline", caseId],
     queryFn: () => casesApi.getTimeline(caseId),
   })
-  const timeline: any[] = Array.isArray(entries) ? entries : []
+  const timeline: CaseTimeline[] = Array.isArray(entries) ? entries : []
 
   if (timeline.length === 0) {
     return <p className="text-muted-foreground text-sm py-4">No timeline entries yet.</p>
@@ -449,7 +450,7 @@ function TimelineView({ caseId }: { caseId: string }) {
 
   return (
     <div className="space-y-3">
-      {timeline.map((entry: any, idx: number) => (
+      {timeline.map((entry, idx) => (
         <div key={entry.id || idx} className="flex gap-3">
           <div className="flex flex-col items-center">
             <div className="w-2.5 h-2.5 rounded-full bg-primary mt-1.5" />
@@ -475,11 +476,10 @@ function TimelineView({ caseId }: { caseId: string }) {
   )
 }
 
-function GeneratedTreatmentsView({ treatmentPlans }: { treatmentPlans: any[] }) {
+function GeneratedTreatmentsView({ treatmentPlans }: { treatmentPlans: TreatmentPlan[] }) {
   if (!treatmentPlans || treatmentPlans.length === 0) return null
-  const totalCost = treatmentPlans.reduce((s: number, tp: any) => s + (tp.cost || 0), 0)
-  const totalPaid = treatmentPlans.reduce((s: number, tp: any) => s + (tp.paid_amount || 0), 0)
-  const allCompleted = treatmentPlans.every((tp: any) => tp.status === "COMPLETED")
+  const totalCost = treatmentPlans.reduce((s, tp) => s + (tp.cost || 0), 0)
+  const allCompleted = treatmentPlans.every((tp) => tp.status === "COMPLETED")
 
   return (
     <Card className="border-green-200">
@@ -494,7 +494,7 @@ function GeneratedTreatmentsView({ treatmentPlans }: { treatmentPlans: any[] }) 
       </CardHeader>
       <CardContent className="py-2">
         <div className="space-y-2">
-          {treatmentPlans.map((tp: any) => {
+          {treatmentPlans.map((tp) => {
             const completed = tp.completed_sittings || 0
             const total = tp.total_sittings || 1
             const remaining = tp.remaining_sittings ?? (total - completed)
