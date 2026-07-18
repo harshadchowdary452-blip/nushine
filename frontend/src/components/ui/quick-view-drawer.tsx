@@ -478,7 +478,7 @@ function PatientContent({ id, onClose }: QuickViewContentProps) {
   )
 }
 
-function MetricCard({ icon: Icon, label, value, color }: { icon: any; label: string; value: string; color: string }) {
+function MetricCard({ icon: Icon, label, value, color }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string; color: string }) {
   const colorMap: Record<string, string> = {
     primary: "bg-primary-soft text-primary",
     info: "bg-info-soft text-info",

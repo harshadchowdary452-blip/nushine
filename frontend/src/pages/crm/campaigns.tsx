@@ -158,13 +158,11 @@ export default function Campaigns() {
   })
   const resendMutation = useMutation({
     mutationFn: (id: string) => campaignsApi.resend(id),
-    onSuccess: (data: { sent_count?: number; recipients_count?: number }) => { description: `Sent to ${data.sent_count || data.recipients_count} recipients`, variant: "success" })
-    },
+    onSuccess: (data: { sent_count?: number; recipients_count?: number }) => { addToast({ title: "Sent", description: `Sent to ${data.sent_count || data.recipients_count} recipients`, variant: "success" }) },
   })
   const launchMutation = useMutation({
     mutationFn: (id: string) => campaignsApi.launch(id),
-    onSuccess: (data: { recipients_count?: number }) => { description: `Sending to ${data.recipients_count} recipients`, variant: "success" })
-    },
+    onSuccess: (data: { recipients_count?: number }) => { addToast({ title: "Launched", description: `Sending to ${data.recipients_count} recipients`, variant: "success" }) },
     onError: (err: unknown) => addToast({ title: "Error", description: extractDetail(err) || "Failed to launch", variant: "destructive" }),
   })
 

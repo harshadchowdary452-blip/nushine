@@ -136,7 +136,7 @@ export default function AppointmentList() {
 
   const totalPages = useMemo(() => {
     if (Array.isArray(data)) return 1
-    return data?.total_pages || 1
+    return data?.total_pages || data?.pages || 1
   }, [data])
 
   // Patient data for create dialog

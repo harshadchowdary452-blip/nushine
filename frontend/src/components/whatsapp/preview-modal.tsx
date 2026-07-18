@@ -15,7 +15,7 @@ interface PreviewData {
   resolved_variables: Record<string, string>
   unresolved_variables: string[]
   validation: Record<string, boolean>
-  variables_panel: Record<string, any>
+  variables_panel: Record<string, Record<string, string | undefined>>
 }
 
 interface Props {

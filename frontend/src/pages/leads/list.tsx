@@ -85,7 +85,7 @@ export default function LeadList() {
   })
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => leadsApi.create(data),
+    mutationFn: (data: Record<string, unknown>) => leadsApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leads"] })
       addToast({ title: "Lead Created", variant: "success" })

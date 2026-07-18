@@ -402,6 +402,7 @@ const inp: React.CSSProperties = {
 
 // ─── Exports ──────────────────────────────────────────────────────────
 
+// eslint-disable-next-line react-refresh/only-export-components
 export { getFindingColor, getFindingLabel }
 
 // ─── Main Component ───────────────────────────────────────────────────

@@ -87,6 +87,7 @@ function CollapsibleSection({ title, defaultOpen, children }: { title: string; d
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function apiToFinding(api: ClinicalFinding & { dentition_type?: string }): ToothFinding {
   const surfaces = api.surface
     ? api.surface.split(",").map((s: string) => CODE_TO_SURFACE[s.trim()]).filter(Boolean) as ToothSurface[]

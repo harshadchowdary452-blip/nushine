@@ -1,0 +1,249 @@
+﻿src/components/analytics-drawer.tsx(186,89): error TS2345: Argument of type 'string | number' is not assignable to parameter of type 'number'.
+  Type 'string' is not assignable to type 'number'.
+src/components/analytics-drawer.tsx(190,80): error TS2365: Operator '+' cannot be applied to types 'number' and 'string | number'.
+src/components/appointments/AppointmentScheduler.tsx(282,15): error TS2322: Type 'string | { msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'ReactNode'.
+  Type '{ msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'ReactNode'.
+    Type '{ msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'Iterable<ReactNode>'.
+      The types returned by '[Symbol.iterator]().next(...)' are incompatible between these types.
+        Type 'IteratorResult<{ msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }, undefined>' is not assignable to type 'IteratorResult<ReactNode, any>'.
+          Type 'IteratorYieldResult<{ msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }>' is not assignable to type 'IteratorResult<ReactNode, any>'.
+            Type 'IteratorYieldResult<{ msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }>' is not assignable to type 'IteratorYieldResult<ReactNode>'.
+              Type '{ msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }' is not assignable to type 'ReactNode'.
+                Type '{ msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }' is missing the following properties from type 'ReactPortal': children, props, key
+src/components/cases/CaseReportForm.tsx(96,5): error TS2322: Type 'string | number' is not assignable to type 'string'.
+  Type 'number' is not assignable to type 'string'.
+src/components/cases/CaseReportForm.tsx(97,27): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+  Type 'null' is not assignable to type 'string'.
+src/components/cases/CaseReportForm.tsx(103,5): error TS2322: Type 'string | undefined' is not assignable to type '"ADULT" | "CHILD" | undefined'.
+  Type 'string' is not assignable to type '"ADULT" | "CHILD" | undefined'.
+src/components/dashboard/financial-dashboard.tsx(172,26): error TS2322: Type 'RevenueExpenseTrendPoint[] | { month: string; revenue: number; expenses: number; profit: number; }[]' is not assignable to type 'ChartData<RevenueExpenseTrendPoint> | undefined'.
+  Type '{ month: string; revenue: number; expenses: number; profit: number; }[]' is not assignable to type 'readonly RevenueExpenseTrendPoint[]'.
+    Property 'profit_margin' is missing in type '{ month: string; revenue: number; expenses: number; profit: number; }' but required in type 'RevenueExpenseTrendPoint'.
+src/components/dashboard/financial-dashboard.tsx(206,23): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(outsideProps: Props<{ category: string; amount: number; }, any>): ReactElement<unknown, string | JSXElementConstructor<any>>', gave the following error.
+    Type '({ category, percent }: { category: string; percent: number; }) => string' is not assignable to type 'PieLabel | undefined'.
+      Type '({ category, percent }: { category: string; percent: number; }) => string' is not assignable to type '(props: PieLabelRenderProps) => ReactNode | ReactElement<SVGElement, string | JSXElementConstructor<any>>'.
+        Types of parameters '__0' and 'props' are incompatible.
+          Property 'category' is missing in type 'PieLabelRenderProps' but required in type '{ category: string; percent: number; }'.
+  Overload 2 of 2, '(outsideProps: Props<any, any>): ReactElement<unknown, string | JSXElementConstructor<any>>', gave the following error.
+    Type '({ category, percent }: { category: string; percent: number; }) => string' is not assignable to type 'PieLabel | undefined'.
+      Type '({ category, percent }: { category: string; percent: number; }) => string' is not assignable to type '(props: PieLabelRenderProps) => ReactNode | ReactElement<SVGElement, string | JSXElementConstructor<any>>'.
+        Types of parameters '__0' and 'props' are incompatible.
+          Property 'category' is missing in type 'PieLabelRenderProps' but required in type '{ category: string; percent: number; }'.
+src/pages/admin/expenses.tsx(151,53): error TS2322: Type 'string | { msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'string | undefined'.
+  Type '{ msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'string'.
+src/pages/admin/expenses.tsx(168,53): error TS2322: Type 'string | { msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'string | undefined'.
+  Type '{ msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'string'.
+src/pages/admin/expenses.tsx(182,53): error TS2322: Type 'string | { msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'string | undefined'.
+  Type '{ msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'string'.
+src/pages/admin/groups.tsx(99,34): error TS2322: Type 'string | { msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'string | undefined'.
+  Type '{ msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'string'.
+src/pages/appointments/detail.tsx(6,31): error TS2300: Duplicate identifier 'User'.
+src/pages/appointments/detail.tsx(24,38): error TS2300: Duplicate identifier 'User'.
+src/pages/appointments/detail.tsx(95,21): error TS2749: 'User' refers to a value, but is being used as a type here. Did you mean 'typeof User'?
+src/pages/billing/list.tsx(125,34): error TS2322: Type 'string | { msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'string | undefined'.
+  Type '{ msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'string'.
+src/pages/billing/list.tsx(149,34): error TS2322: Type 'string | { msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'string | undefined'.
+  Type '{ msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'string'.
+src/pages/cases/CaseReportPrint.tsx(335,15): error TS2322: Type '{ name: string; toothNumbers: never[]; estimatedVisits: number | ""; estimatedCost: number | ""; remarks: string; }[]' is not assignable to type 'ParsedTreatmentItem[]'.
+  Property 'id' is missing in type '{ name: string; toothNumbers: never[]; estimatedVisits: number | ""; estimatedCost: number | ""; remarks: string; }' but required in type 'ParsedTreatmentItem'.
+src/pages/cases/list.tsx(136,83): error TS2339: Property 'username' does not exist on type 'CaseDoctor'.
+src/pages/consultants/list.tsx(68,65): error TS2345: Argument of type 'ConsultantForm' is not assignable to parameter of type 'Record<string, unknown>'.
+  Index signature for type 'string' is missing in type 'ConsultantForm'.
+src/pages/crm/campaign-responses.tsx(250,21): error TS2345: Argument of type '(string | SlotItem)[]' is not assignable to parameter of type 'SetStateAction<string[]>'.
+  Type '(string | SlotItem)[]' is not assignable to type 'string[]'.
+    Type 'string | SlotItem' is not assignable to type 'string'.
+      Type 'SlotItem' is not assignable to type 'string'.
+src/pages/crm/campaign-responses.tsx(564,99): error TS2345: Argument of type 'CampaignResponse' is not assignable to parameter of type 'SetStateAction<{ id: string; message: string; phone?: string | undefined; patientName?: string | undefined; } | null>'.
+  Type 'CampaignResponse' is not assignable to type '{ id: string; message: string; phone?: string | undefined; patientName?: string | undefined; }'.
+    Types of property 'message' are incompatible.
+      Type 'string | undefined' is not assignable to type 'string'.
+        Type 'undefined' is not assignable to type 'string'.
+src/pages/crm/campaign-responses.tsx(719,65): error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/pages/crm/campaigns.tsx(317,35): error TS2538: Type 'undefined' cannot be used as an index type.
+src/pages/crm/campaigns.tsx(350,54): error TS2538: Type 'undefined' cannot be used as an index type.
+src/pages/crm/campaigns.tsx(355,99): error TS2538: Type 'undefined' cannot be used as an index type.
+src/pages/crm/campaigns.tsx(500,67): error TS2322: Type 'CampaignFilters | undefined' is not assignable to type 'Record<string, unknown> | undefined'.
+  Type 'CampaignFilters' is not assignable to type 'Record<string, unknown>'.
+    Index signature for type 'string' is missing in type 'CampaignFilters'.
+src/pages/crm/campaigns.tsx(652,105): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'SetStateAction<string>'.
+  Type 'undefined' is not assignable to type 'SetStateAction<string>'.
+src/pages/crm/crm-settings.tsx(68,80): error TS2345: Argument of type 'Record<string, unknown>' is not assignable to parameter of type '{ treatment_type_id: string; treatment_name?: string | undefined; follow_up_1_day?: boolean | undefined; follow_up_7_day?: boolean | undefined; recall_6_month?: boolean | undefined; recall_12_month?: boolean | undefined; custom_recall_days?: number | undefined; }'.
+  Property 'treatment_type_id' is missing in type 'Record<string, unknown>' but required in type '{ treatment_type_id: string; treatment_name?: string | undefined; follow_up_1_day?: boolean | undefined; follow_up_7_day?: boolean | undefined; recall_6_month?: boolean | undefined; recall_12_month?: boolean | undefined; custom_recall_days?: number | undefined; }'.
+src/pages/crm/crm-settings.tsx(74,60): error TS2322: Type 'string | { msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'string | undefined'.
+  Type '{ msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'string'.
+src/pages/crm/crm-settings.tsx(83,60): error TS2322: Type 'string | { msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'string | undefined'.
+  Type '{ msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'string'.
+src/pages/crm/crm-settings.tsx(99,60): error TS2322: Type 'string | { msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'string | undefined'.
+  Type '{ msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'string'.
+src/pages/crm/crm-settings.tsx(108,60): error TS2322: Type 'string | { msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'string | undefined'.
+  Type '{ msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'string'.
+src/pages/crm/crm-settings.tsx(193,17): error TS2322: Type '{}' is not assignable to type 'boolean | undefined'.
+src/pages/crm/crm-settings.tsx(218,17): error TS2322: Type '{}' is not assignable to type 'string'.
+src/pages/crm/enquiry-calendar.tsx(488,50): error TS18047: 'timelineItem' is possibly 'null'.
+src/pages/crm/enquiry-calendar.tsx(488,50): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/pages/crm/enquiry-calendar.tsx(511,143): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/pages/crm/enquiry-calendar.tsx(613,170): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/pages/crm/enquiry-calendar.tsx(623,49): error TS2538: Type 'undefined' cannot be used as an index type.
+src/pages/crm/enquiry-calendar.tsx(630,81): error TS2538: Type 'undefined' cannot be used as an index type.
+src/pages/crm/lead-analytics.tsx(112,119): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(outsideProps: Props<{ name: string; value: number; fill: string; }, any>): ReactElement<unknown, string | JSXElementConstructor<any>>', gave the following error.
+    Type '({ name, percent }: { name: string; percent?: number; }) => string' is not assignable to type 'PieLabel | undefined'.
+      Type '({ name, percent }: { name: string; percent?: number; }) => string' is not assignable to type '(props: PieLabelRenderProps) => ReactNode | ReactElement<SVGElement, string | JSXElementConstructor<any>>'.
+        Types of parameters '__0' and 'props' are incompatible.
+          Type 'PieLabelRenderProps' is not assignable to type '{ name: string; percent?: number | undefined; }'.
+            Types of property 'name' are incompatible.
+              Type 'string | undefined' is not assignable to type 'string'.
+                Type 'undefined' is not assignable to type 'string'.
+  Overload 2 of 2, '(outsideProps: Props<any, any>): ReactElement<unknown, string | JSXElementConstructor<any>>', gave the following error.
+    Type '({ name, percent }: { name: string; percent?: number; }) => string' is not assignable to type 'PieLabel | undefined'.
+      Type '({ name, percent }: { name: string; percent?: number; }) => string' is not assignable to type '(props: PieLabelRenderProps) => ReactNode | ReactElement<SVGElement, string | JSXElementConstructor<any>>'.
+        Types of parameters '__0' and 'props' are incompatible.
+          Type 'PieLabelRenderProps' is not assignable to type '{ name: string; percent?: number | undefined; }'.
+            Types of property 'name' are incompatible.
+              Type 'string | undefined' is not assignable to type 'string'.
+                Type 'undefined' is not assignable to type 'string'.
+src/pages/crm/revenue-attribution.tsx(92,132): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(outsideProps: Props<{ source: string; leads: number; potentialRevenue: number; convertedLeads: number; fill: string; }, any>): ReactElement<unknown, string | JSXElementConstructor<any>>', gave the following error.
+    Type '({ name, percent }: { name: string; percent: number; }) => string' is not assignable to type 'PieLabel | undefined'.
+      Type '({ name, percent }: { name: string; percent: number; }) => string' is not assignable to type '(props: PieLabelRenderProps) => ReactNode | ReactElement<SVGElement, string | JSXElementConstructor<any>>'.
+        Types of parameters '__0' and 'props' are incompatible.
+          Type 'PieLabelRenderProps' is not assignable to type '{ name: string; percent: number; }'.
+            Types of property 'name' are incompatible.
+              Type 'string | undefined' is not assignable to type 'string'.
+                Type 'undefined' is not assignable to type 'string'.
+  Overload 2 of 2, '(outsideProps: Props<any, any>): ReactElement<unknown, string | JSXElementConstructor<any>>', gave the following error.
+    Type '({ name, percent }: { name: string; percent: number; }) => string' is not assignable to type 'PieLabel | undefined'.
+      Type '({ name, percent }: { name: string; percent: number; }) => string' is not assignable to type '(props: PieLabelRenderProps) => ReactNode | ReactElement<SVGElement, string | JSXElementConstructor<any>>'.
+        Types of parameters '__0' and 'props' are incompatible.
+          Type 'PieLabelRenderProps' is not assignable to type '{ name: string; percent: number; }'.
+            Types of property 'name' are incompatible.
+              Type 'string | undefined' is not assignable to type 'string'.
+                Type 'undefined' is not assignable to type 'string'.
+src/pages/crm/revenue-attribution.tsx(97,28): error TS2322: Type '(value: string | number | (string | number)[]) => string' is not assignable to type 'Formatter<ValueType, NameType> & ((value: ValueType, name: NameType, item: TooltipPayloadEntry, index: number, payload: TooltipPayload) => ReactNode | [...])'.
+  Type '(value: string | number | (string | number)[]) => string' is not assignable to type 'Formatter<ValueType, NameType>'.
+    Types of parameters 'value' and 'value' are incompatible.
+      Type 'ValueType | undefined' is not assignable to type 'string | number | (string | number)[]'.
+        Type 'undefined' is not assignable to type 'string | number | (string | number)[]'.
+src/pages/crm/revenue-attribution.tsx(115,28): error TS2322: Type '(value: string | number | (string | number)[]) => string' is not assignable to type 'Formatter<ValueType, NameType> & ((value: ValueType, name: NameType, item: TooltipPayloadEntry, index: number, payload: TooltipPayload) => ReactNode | [...])'.
+  Type '(value: string | number | (string | number)[]) => string' is not assignable to type 'Formatter<ValueType, NameType>'.
+    Types of parameters 'value' and 'value' are incompatible.
+      Type 'ValueType | undefined' is not assignable to type 'string | number | (string | number)[]'.
+        Type 'undefined' is not assignable to type 'string | number | (string | number)[]'.
+src/pages/dashboard/crm-dashboard.tsx(445,105): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(outsideProps: Props<{ name: any; } & { name: any; } & { name: any; } & { value: any; } & { value: any; } & { value: any; }, any>): ReactElement<unknown, string | JSXElementConstructor<any>>', gave the following error.
+    Type '({ name, percent }: { name: string; percent: number; }) => string' is not assignable to type 'PieLabel | undefined'.
+      Type '({ name, percent }: { name: string; percent: number; }) => string' is not assignable to type '(props: PieLabelRenderProps) => ReactNode | ReactElement<SVGElement, string | JSXElementConstructor<any>>'.
+        Types of parameters '__0' and 'props' are incompatible.
+          Type 'PieLabelRenderProps' is not assignable to type '{ name: string; percent: number; }'.
+            Types of property 'name' are incompatible.
+              Type 'string | undefined' is not assignable to type 'string'.
+                Type 'undefined' is not assignable to type 'string'.
+  Overload 2 of 2, '(outsideProps: Props<any, any>): ReactElement<unknown, string | JSXElementConstructor<any>>', gave the following error.
+    Type '({ name, percent }: { name: string; percent: number; }) => string' is not assignable to type 'PieLabel | undefined'.
+      Type '({ name, percent }: { name: string; percent: number; }) => string' is not assignable to type '(props: PieLabelRenderProps) => ReactNode | ReactElement<SVGElement, string | JSXElementConstructor<any>>'.
+        Types of parameters '__0' and 'props' are incompatible.
+          Type 'PieLabelRenderProps' is not assignable to type '{ name: string; percent: number; }'.
+            Types of property 'name' are incompatible.
+              Type 'string | undefined' is not assignable to type 'string'.
+                Type 'undefined' is not assignable to type 'string'.
+src/pages/dashboard/crm-dashboard.tsx(489,38): error TS2345: Argument of type 'string | number' is not assignable to parameter of type 'number'.
+  Type 'string' is not assignable to type 'number'.
+src/pages/dashboard/crm-dashboard.tsx(490,29): error TS2362: The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+src/pages/dashboard/crm-dashboard.tsx(491,29): error TS2362: The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+src/pages/dashboard/crm-dashboard.tsx(563,114): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(outsideProps: Props<{ source: any; } & { source: any; } & { source: any; } & { patients: any; } & { patients: any; } & { patients: any; }, any>): ReactElement<unknown, string | JSXElementConstructor<any>>', gave the following error.
+    Type '({ name, percent }: { name: string; percent: number; }) => string' is not assignable to type 'PieLabel | undefined'.
+      Type '({ name, percent }: { name: string; percent: number; }) => string' is not assignable to type '(props: PieLabelRenderProps) => ReactNode | ReactElement<SVGElement, string | JSXElementConstructor<any>>'.
+        Types of parameters '__0' and 'props' are incompatible.
+          Type 'PieLabelRenderProps' is not assignable to type '{ name: string; percent: number; }'.
+            Types of property 'name' are incompatible.
+              Type 'string | undefined' is not assignable to type 'string'.
+                Type 'undefined' is not assignable to type 'string'.
+  Overload 2 of 2, '(outsideProps: Props<any, any>): ReactElement<unknown, string | JSXElementConstructor<any>>', gave the following error.
+    Type '({ name, percent }: { name: string; percent: number; }) => string' is not assignable to type 'PieLabel | undefined'.
+      Type '({ name, percent }: { name: string; percent: number; }) => string' is not assignable to type '(props: PieLabelRenderProps) => ReactNode | ReactElement<SVGElement, string | JSXElementConstructor<any>>'.
+        Types of parameters '__0' and 'props' are incompatible.
+          Type 'PieLabelRenderProps' is not assignable to type '{ name: string; percent: number; }'.
+            Types of property 'name' are incompatible.
+              Type 'string | undefined' is not assignable to type 'string'.
+                Type 'undefined' is not assignable to type 'string'.
+src/pages/dashboard/crm-dashboard.tsx(579,28): error TS2322: Type '(v: string | number | (string | number)[]) => string' is not assignable to type 'Formatter<ValueType, NameType> & ((value: ValueType, name: NameType, item: TooltipPayloadEntry, index: number, payload: TooltipPayload) => ReactNode | [...])'.
+  Type '(v: string | number | (string | number)[]) => string' is not assignable to type 'Formatter<ValueType, NameType>'.
+    Types of parameters 'v' and 'value' are incompatible.
+      Type 'ValueType | undefined' is not assignable to type 'string | number | (string | number)[]'.
+        Type 'undefined' is not assignable to type 'string | number | (string | number)[]'.
+src/pages/dashboard/crm-dashboard.tsx(579,104): error TS2345: Argument of type 'string | number | (string | number)[]' is not assignable to parameter of type 'number'.
+  Type 'string' is not assignable to type 'number'.
+src/pages/dashboard/crm-dashboard.tsx(604,97): error TS2345: Argument of type 'string | number' is not assignable to parameter of type 'number'.
+  Type 'string' is not assignable to type 'number'.
+src/pages/dashboard/crm-dashboard.tsx(605,83): error TS2345: Argument of type 'string | number' is not assignable to parameter of type 'number'.
+  Type 'string' is not assignable to type 'number'.
+src/pages/dashboard/doctor.tsx(50,59): error TS2339: Property 'dataKey' does not exist on type '{ color: string; name: string; value: number; }'.
+src/pages/dashboard/hospital-admin.tsx(103,58): error TS7006: Parameter 'd' implicitly has an 'any' type.
+src/pages/dashboard/hospital-admin.tsx(261,30): error TS2322: Type '(value: string | number | (string | number)[]) => string' is not assignable to type 'Formatter<ValueType, NameType> & ((value: ValueType, name: NameType, item: TooltipPayloadEntry, index: number, payload: TooltipPayload) => ReactNode | [...])'.
+  Type '(value: string | number | (string | number)[]) => string' is not assignable to type 'Formatter<ValueType, NameType>'.
+    Types of parameters 'value' and 'value' are incompatible.
+      Type 'ValueType | undefined' is not assignable to type 'string | number | (string | number)[]'.
+        Type 'undefined' is not assignable to type 'string | number | (string | number)[]'.
+src/pages/dashboard/hospital-admin.tsx(514,57): error TS7006: Parameter 'r' implicitly has an 'any' type.
+src/pages/dashboard/super-admin.tsx(45,57): error TS7006: Parameter 'd' implicitly has an 'any' type.
+src/pages/dashboard/super-admin.tsx(49,60): error TS7006: Parameter 'd' implicitly has an 'any' type.
+src/pages/dashboard/super-admin.tsx(53,51): error TS7006: Parameter 'd' implicitly has an 'any' type.
+src/pages/dashboard/super-admin.tsx(112,60): error TS7006: Parameter 'd' implicitly has an 'any' type.
+src/pages/dashboard/super-admin.tsx(112,63): error TS7006: Parameter 'i' implicitly has an 'any' type.
+src/pages/dashboard/super-admin.tsx(121,63): error TS7006: Parameter 'd' implicitly has an 'any' type.
+src/pages/dashboard/super-admin.tsx(121,66): error TS7006: Parameter 'i' implicitly has an 'any' type.
+src/pages/dashboard/super-admin.tsx(130,54): error TS7006: Parameter 'd' implicitly has an 'any' type.
+src/pages/dashboard/super-admin.tsx(130,57): error TS7006: Parameter 'i' implicitly has an 'any' type.
+src/pages/leads/detail.tsx(181,60): error TS2322: Type 'string | { msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'string | undefined'.
+  Type '{ msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'string'.
+src/pages/leads/detail.tsx(195,83): error TS2345: Argument of type 'Record<string, unknown>' is not assignable to parameter of type '{ channel: string; message: string; }'.
+  Type 'Record<string, unknown>' is missing the following properties from type '{ channel: string; message: string; }': channel, message
+src/pages/leads/detail.tsx(205,81): error TS2345: Argument of type 'Record<string, unknown>' is not assignable to parameter of type '{ follow_up_date: string; follow_up_time?: string | undefined; priority?: string | undefined; reason?: string | undefined; notes?: string | undefined; }'.
+  Property 'follow_up_date' is missing in type 'Record<string, unknown>' but required in type '{ follow_up_date: string; follow_up_time?: string | undefined; priority?: string | undefined; reason?: string | undefined; notes?: string | undefined; }'.
+src/pages/leads/detail.tsx(216,82): error TS2345: Argument of type 'Record<string, unknown>' is not assignable to parameter of type '{ appointment_date: string; appointment_time?: string | undefined; doctor_id?: string | undefined; notes?: string | undefined; }'.
+  Property 'appointment_date' is missing in type 'Record<string, unknown>' but required in type '{ appointment_date: string; appointment_time?: string | undefined; doctor_id?: string | undefined; notes?: string | undefined; }'.
+src/pages/leads/detail.tsx(234,60): error TS2322: Type 'string | { msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'string | undefined'.
+  Type '{ msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'string'.
+src/pages/patients/detail.tsx(136,34): error TS2322: Type 'string | { msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'string | undefined'.
+  Type '{ msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'string'.
+src/pages/patients/detail.tsx(149,34): error TS2322: Type 'string | { msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'string | undefined'.
+  Type '{ msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'string'.
+src/pages/patients/detail.tsx(1192,70): error TS2538: Type 'undefined' cannot be used as an index type.
+src/pages/patients/detail.tsx(1198,112): error TS2538: Type 'undefined' cannot be used as an index type.
+src/pages/patients/detail.tsx(1202,85): error TS2538: Type 'undefined' cannot be used as an index type.
+src/pages/settings/profile.tsx(56,24): error TS2345: Argument of type 'string | { msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to parameter of type 'SetStateAction<string>'.
+  Type '{ msg?: string | undefined; type?: string | undefined; loc?: string[] | undefined; }[]' is not assignable to type 'SetStateAction<string>'.
+src/pages/whatsapp/broadcast.tsx(75,82): error TS2339: Property 'next_appointment_date' does not exist on type 'Patient'.
+src/pages/whatsapp/broadcast.tsx(76,79): error TS2339: Property 'next_follow_up' does not exist on type 'Patient'.
+src/pages/whatsapp/messaging.tsx(164,7): error TS2322: Type 'unknown' is not assignable to type 'string'.
+src/pages/whatsapp/messaging.tsx(164,19): error TS18047: 'previewData' is possibly 'null'.
+src/pages/whatsapp/messaging.tsx(165,7): error TS2322: Type 'unknown' is not assignable to type 'string'.
+src/pages/whatsapp/messaging.tsx(165,16): error TS18047: 'previewData' is possibly 'null'.
+src/pages/whatsapp/messaging.tsx(188,31): error TS2322: Type '{ patient_id: unknown; message: unknown; message_type: string; }[]' is not assignable to type 'Record<string, string>[]'.
+  Type '{ patient_id: unknown; message: unknown; message_type: string; }' is not assignable to type 'Record<string, string>'.
+    Property 'patient_id' is incompatible with index signature.
+      Type 'unknown' is not assignable to type 'string'.
+src/pages/whatsapp/messaging.tsx(319,19): error TS2739: Type 'Record<string, unknown>' is missing the following properties from type 'BulkPreviewData': items, totals, message
+src/pages/whatsapp/messaging.tsx(500,27): error TS2322: Type 'unknown' is not assignable to type 'Key | null | undefined'.
+src/pages/whatsapp/messaging.tsx(503,70): error TS2322: Type 'unknown' is not assignable to type 'ReactNode'.
+src/pages/whatsapp/messaging.tsx(504,66): error TS2322: Type 'unknown' is not assignable to type 'ReactNode'.
+src/pages/whatsapp/messaging.tsx(508,49): error TS2322: Type 'unknown' is not assignable to type 'ReactNode'.
+src/pages/whatsapp/messaging.tsx(512,29): error TS2322: Type 'unknown' is not assignable to type 'ReactNode'.
+src/pages/whatsapp/messaging.tsx(518,67): error TS2322: Type '{}' is not assignable to type 'ReactNode'.
+src/pages/whatsapp/messaging.tsx(519,100): error TS2769: No overload matches this call.
+  Overload 1 of 4, '(value: string | number | Date): Date', gave the following error.
+    Argument of type '{}' is not assignable to parameter of type 'string | number | Date'.
+  Overload 2 of 4, '(value: string | number): Date', gave the following error.
+    Argument of type '{}' is not assignable to parameter of type 'string | number'.
+src/pages/whatsapp/messaging.tsx(545,9): error TS2322: Type 'Record<string, unknown> | null' is not assignable to type 'PreviewData | null'.
+  Type 'Record<string, unknown>' is missing the following properties from type 'PreviewData': patient_id, patient_name, patient_phone, doctor_name, and 6 more.
+src/services/api.ts(29,6): error TS2352: Conversion of type 'AxiosResponse<any, any, {}>' to type '{ requestId: string; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Property 'requestId' is missing in type 'AxiosResponse<any, any, {}>' but required in type '{ requestId: string; }'.
+src/services/api.ts(30,6): error TS2352: Conversion of type 'AxiosResponse<any, any, {}>' to type '{ responseTime: string; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Property 'responseTime' is missing in type 'AxiosResponse<any, any, {}>' but required in type '{ responseTime: string; }'.

@@ -46,7 +46,7 @@ export default function WhatsAppConfigPage() {
   }, [config])
 
   const updateMutation = useMutation({
-    mutationFn: (data: any) => whatsappConfigApi.update(hospitalId, data),
+    mutationFn: (data: Record<string, unknown>) => whatsappConfigApi.update(hospitalId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["whatsapp-config", hospitalId] })
       addToast({ title: "WhatsApp configuration saved", variant: "success" })

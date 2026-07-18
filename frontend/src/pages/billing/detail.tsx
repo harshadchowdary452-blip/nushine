@@ -358,7 +358,7 @@ export default function BillingDetail() {
                 <div className="relative">
                   <div className="absolute left-6 top-2 bottom-2 w-0.5 bg-gray-200" />
                   <div className="space-y-0">
-                    {historyEntries.map((entry: any) => {
+                    {historyEntries.map((entry: { id: string; action: string; created_at: string; changes_summary?: string; new_data?: string }) => {
                       const cfg = actionConfig[entry.action] || { icon: "\uD83D\uDCCB", color: "text-gray-600 bg-gray-100", label: entry.action };
                       return (
                         <div key={entry.id} className="relative flex gap-4 pb-6 last:pb-0">

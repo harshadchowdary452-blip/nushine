@@ -15,6 +15,9 @@ import DateFilterBar from "@/components/ui/date-filter-bar"
 const FinancialDashboard = lazy(() => import("@/components/dashboard/financial-dashboard"))
 import { formatIndianRupees, formatIndianNumber } from "@/lib/currency"
 
+interface HospitalPerfItem { id: string; name: string; value: number; revenue?: number; patients?: number; doctors?: number }
+interface DoctorPerfItem { id: string; name: string; value: number }
+
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.04 } } }
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
 
@@ -50,11 +53,11 @@ export default function GroupAdminDashboard() {
   })
 
   const onHospitalClick = useCallback((id?: string) => {
-    const item = (stats?.hospital_performance ?? []).find((h: any) => h.id === id)
+    const item = (stats?.hospital_performance ?? []).find((h: HospitalPerfItem) => h.id === id)
     if (item) setQuickView({ type: "hospital", id: item.id, name: item.name })
   }, [stats?.hospital_performance])
   const onDoctorClick = useCallback((id?: string) => {
-    const item = (stats?.doctor_performance ?? []).find((d: any) => d.id === id)
+    const item = (stats?.doctor_performance ?? []).find((d: DoctorPerfItem) => d.id === id)
     if (item) setQuickView({ type: "doctor", id: item.id, name: item.name })
   }, [stats?.doctor_performance])
 
@@ -96,7 +99,7 @@ export default function GroupAdminDashboard() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Hospitals</SelectItem>
-                  {hospitals.map((h: any) => (
+                  {hospitals.map((h: { id: string; name: string }) => (
                     <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -135,7 +138,7 @@ export default function GroupAdminDashboard() {
                   title="Hospital Performance"
                   valueLabel="Revenue"
                   icon={Hospital}
-                  items={(stats?.hospital_performance ?? []).map((h: any, i: number) => ({
+                  items={(stats?.hospital_performance ?? []).map((h: HospitalPerfItem, i: number) => ({
                     rank: i + 1, name: h.name,
                     value: `${formatIndianRupees(h.revenue ?? h.value)}`,
                     subtitle: `Patients: ${h.patients ?? 0} | Doctors: ${h.doctors ?? 0}`,
@@ -149,7 +152,7 @@ export default function GroupAdminDashboard() {
                   title="Doctor Performance"
                   valueLabel="Revenue"
                   icon={Award}
-                  items={(stats?.doctor_performance ?? []).map((d: any, i: number) => ({
+                  items={(stats?.doctor_performance ?? []).map((d: DoctorPerfItem, i: number) => ({
                     rank: i + 1, name: d.name, value: formatIndianRupees(d.value), id: d.id,
                   }))}
                   onItemClick={onDoctorClick}

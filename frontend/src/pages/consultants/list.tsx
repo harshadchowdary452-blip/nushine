@@ -37,6 +37,7 @@ import { Label } from "@/components/ui/label"
 import { consultantsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
 import type { Consultant, PaginatedResponse } from "@/types"
+import { extractDetail } from "@/types"
 
 interface ConsultantForm {
   full_name: string
@@ -64,15 +65,15 @@ export default function ConsultantList() {
   })
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => consultantsApi.create(data),
+    mutationFn: (data: ConsultantForm) => consultantsApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["consultants"] })
       queryClient.invalidateQueries({ queryKey: ["dash"] })
       addToast({ title: "Success", description: "Consultant created successfully", variant: "success" })
       resetForm()
     },
-    onError: (err: any) => {
-      addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to create consultant", variant: "destructive" })
+    onError: (err: unknown) => {
+      addToast({ title: "Error", description: extractDetail(err) || "Failed to create consultant", variant: "destructive" })
     },
   })
 

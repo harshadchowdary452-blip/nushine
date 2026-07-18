@@ -59,7 +59,7 @@ export default function EmailTemplates() {
 
   function resetForm() { setName(""); setSubject(""); setBody(""); setEditId(null) }
 
-  function editTemplate(t: any) {
+  function editTemplate(t: EmailTemplate) {
     setEditId(t.id); setName(t.name); setSubject(t.subject); setBody(t.body); setOpen(true)
   }
 
@@ -105,7 +105,7 @@ export default function EmailTemplates() {
         ) : !templates || templates.length === 0 ? (
           <div className="col-span-full py-12 text-center text-gray-400">No templates yet. Create your first template.</div>
         ) : (
-          templates.map((t: any) => (
+          templates.map((t: EmailTemplate) => (
             <Card key={t.id} className="group">
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">

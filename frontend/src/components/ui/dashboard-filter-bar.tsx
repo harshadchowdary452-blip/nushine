@@ -217,5 +217,6 @@ function DashboardFilterBar({ filters, onChange, doctors = [] }: DashboardFilter
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export { defaultFilters }
 export default memo(DashboardFilterBar)

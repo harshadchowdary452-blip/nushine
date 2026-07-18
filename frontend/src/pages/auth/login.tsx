@@ -62,11 +62,12 @@ export default function LoginPage() {
       const res = await authApi.login({ email, password })
       setAuth(res.user, res.access_token, res.refresh_token)
       navigate(from, { replace: true })
-    } catch (err: any) {
-      if (err?.code === "ECONNABORTED" || err?.message?.includes("timeout")) {
+    } catch (err: unknown) {
+      const apiErr = err as { code?: string; message?: string; response?: { data?: { detail?: string } } } | undefined
+      if (apiErr?.code === "ECONNABORTED" || apiErr?.message?.includes("timeout")) {
         setError("Request timed out. The server may be busy — please try again.")
       } else {
-        setError(err?.response?.data?.detail || "Invalid credentials. Please try again.")
+        setError(apiErr?.response?.data?.detail || "Invalid credentials. Please try again.")
       }
     } finally {
       setLoading(false)

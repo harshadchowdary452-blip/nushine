@@ -101,7 +101,7 @@ export default function DoctorAvailability() {
   })
 
   const updateOverrideMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => doctorAvailabilityApi.update(doctorId, id, data),
+    mutationFn: ({ id, data }: { id: string; data: Partial<DoctorAvailability> }) => doctorAvailabilityApi.update(doctorId, id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["doctorAvailability", doctorId] })
       addToast({ title: "Success", description: "Override updated", variant: "success" })
@@ -121,7 +121,7 @@ export default function DoctorAvailability() {
   })
 
   const createLeaveMutation = useMutation({
-    mutationFn: (data: any) => doctorLeavesApi.create(doctorId, data),
+    mutationFn: (data: Partial<DoctorLeave>) => doctorLeavesApi.create(doctorId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["doctorLeaves", doctorId] })
       addToast({ title: "Success", description: "Leave request submitted", variant: "success" })
@@ -141,7 +141,7 @@ export default function DoctorAvailability() {
   })
 
   const createBlockMutation = useMutation({
-    mutationFn: (data: any) => doctorBlockedSlotsApi.create(doctorId, data),
+    mutationFn: (data: Partial<DoctorBlockedSlot>) => doctorBlockedSlotsApi.create(doctorId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["doctorBlockedSlots", doctorId] })
       addToast({ title: "Success", description: "Blocked slot created", variant: "success" })
@@ -219,7 +219,7 @@ export default function DoctorAvailability() {
     setShowOverrideDialog(true)
   }
 
-  const tabs: { id: TabId; label: string; icon: any }[] = [
+  const tabs: { id: TabId; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
     { id: "hours", label: "Working Hours", icon: Clock },
     { id: "overrides", label: "Date Overrides", icon: CalendarDays },
     { id: "leaves", label: "Leaves", icon: CalendarOff },

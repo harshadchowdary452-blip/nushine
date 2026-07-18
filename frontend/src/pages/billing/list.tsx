@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, useCallback } from "react"
 import { useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
@@ -161,7 +161,7 @@ export default function BillingList() {
     createMutation.mutate(cleaned)
   }
 
-  const downloadPdf = async (id: string) => {
+  const downloadPdf = useCallback(async (id: string) => {
     try {
       const blob = await billingApi.getPdf(id)
       const url = window.URL.createObjectURL(blob)
@@ -175,7 +175,7 @@ export default function BillingList() {
     } catch {
       addToast({ title: "Error", description: "Failed to download PDF", variant: "destructive" })
     }
-  }
+  }, [addToast])
 
   function resetForm() {
     setForm(getEmptyInvoiceForm())
@@ -277,7 +277,7 @@ export default function BillingList() {
         ),
       },
     ],
-    []
+    [navigate, downloadPdf]
   )
 
   const table = useReactTable({

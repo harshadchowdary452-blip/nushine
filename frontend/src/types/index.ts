@@ -42,8 +42,10 @@ export interface PaginatedResponse<T> {
   items: T[];
   total: number;
   page: number;
-  page_size: number;
-  total_pages: number;
+  page_size?: number;
+  size?: number;
+  total_pages?: number;
+  pages?: number;
 }
 
 export interface PaginationParams {

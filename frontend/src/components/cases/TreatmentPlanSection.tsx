@@ -117,7 +117,7 @@ export default function TreatmentPlanSection({
     onChange(treatments.filter((t) => t.id !== id))
   }
 
-  function updateTreatment(id: string, field: keyof TreatmentItem, value: any) {
+  function updateTreatment(id: string, field: keyof TreatmentItem, value: TreatmentItem[keyof TreatmentItem]) {
     onChange(treatments.map((t) => (t.id === id ? { ...t, [field]: value } : t)))
   }
 

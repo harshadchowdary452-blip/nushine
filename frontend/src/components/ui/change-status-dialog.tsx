@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import api from "@/services/api"
+import { extractDetail } from "@/types"
 
 interface ChangeStatusDialogProps {
   entityType: "patient" | "case" | "appointment" | "treatment" | "follow_up" | "billing"
@@ -46,8 +47,8 @@ export function ChangeStatusDialog({
         setOpen(false)
         onStatusChanged?.()
       }
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || "Failed to update status")
+    } catch (err: unknown) {
+      setError(extractDetail(err) || "Failed to update status")
     } finally {
       setSubmitting(false)
     }

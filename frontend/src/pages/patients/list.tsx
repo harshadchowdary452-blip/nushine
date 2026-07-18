@@ -136,7 +136,7 @@ export default function PatientList() {
 
   const totalPages = useMemo(() => {
     if (Array.isArray(data)) return 1
-    return data?.total_pages || 1
+    return data?.total_pages || data?.pages || 1
   }, [data])
 
   const deleteMutation = useMutation({
