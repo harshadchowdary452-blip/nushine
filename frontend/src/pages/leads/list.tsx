@@ -7,6 +7,7 @@ import { format } from "date-fns"
 import PageHeader from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { NumericInput } from "@/components/ui/numeric-input"
 
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent } from "@/components/ui/card"
@@ -318,7 +319,7 @@ export default function LeadList() {
             <div><Label>Mobile *</Label><Input value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="Phone number" /></div>
             <div><Label>Alternate Mobile</Label><Input value={alternateMobile} onChange={(e) => setAlternateMobile(e.target.value)} placeholder="Alt phone" /></div>
             <div className="col-span-2"><Label>Email</Label><Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email address" /></div>
-            <div><Label>Age</Label><Input type="number" value={age} onChange={(e) => setAge(e.target.value)} placeholder="Age" /></div>
+            <div><Label>Age</Label><NumericInput mode="integer" min={0} max={150} value={age} onChange={(v) => setAge(v)} placeholder="Age" /></div>
             <div><Label>Gender</Label>
               <Select value={gender} onValueChange={setGender}>
                 <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
@@ -339,7 +340,7 @@ export default function LeadList() {
               </Select>
             </div>
             <div><Label>Interested Treatment</Label><Input value={interestedTreatment} onChange={(e) => setInterestedTreatment(e.target.value)} placeholder="e.g. Root Canal" /></div>
-            <div><Label>Budget (if known)</Label><Input type="number" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="Amount" /></div>
+            <div><Label>Budget (if known)</Label><NumericInput mode="currency" prefix="₹" value={budget} onChange={(v) => setBudget(v)} placeholder="Amount" /></div>
             <div className="col-span-2"><Label>Preferred Visit Date</Label><Input type="date" value={preferredVisitDate} onChange={(e) => setPreferredVisitDate(e.target.value)} /></div>
             <div className="col-span-2"><Label>Notes</Label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Additional notes..." rows={3} /></div>
           </div>

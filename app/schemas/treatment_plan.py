@@ -3,6 +3,7 @@ from typing import Optional, List
 from datetime import datetime, date
 from enum import Enum
 import json
+from app.schemas.patient import PatientResponse
 
 
 class TreatmentPlanCreate(BaseModel):
@@ -75,6 +76,7 @@ class TreatmentPlanResponse(BaseModel):
     case_number: Optional[str] = None
     case_status: Optional[str] = None
     hospital_name: Optional[str] = None
+    patient: Optional[PatientResponse] = None
     created_at: datetime
     updated_at: datetime
 

@@ -3,18 +3,18 @@ import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "react-router-dom"
 import {
   CalendarDays, Phone, MessageCircle, CheckCircle, Clock, FileText, History,
-  User, Activity, TrendingUp, Users,
-  BarChart3, Target, Send, Award,
-  ChevronRight, BookOpen, AlertCircle, ThumbsUp,
-  HeartPulse, UserPlus, Filter,
+  User, Activity, TrendingUp, Users, IndianRupee,
+  BarChart3, Target, Send, Award, MessageSquare,
+  ChevronRight, BookOpen, AlertCircle,
+  HeartPulse, UserPlus, Filter, UserMinus,
 } from "lucide-react"
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart as RePieChart, Pie, Cell,
+  PieChart as RePieChart, Pie, Cell, type PieLabelRenderProps,
 } from "recharts"
 import { cn } from "@/lib/utils"
 import { formatIndianRupees, formatIndianNumber } from "@/lib/currency"
-import { crmApi, doctorsApi, campaignsApi } from "@/services/endpoints"
+import { crmApi, doctorsApi, leadsApi, enquiriesApi, whatsappV2Api } from "@/services/endpoints"
 import DashboardDateFilter, { type DateRangePreset } from "@/components/ui/dashboard-date-filter"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -50,8 +50,6 @@ const statusColors: Record<string, string> = {
   COMPLETED: "bg-green-100 text-green-800", NO_RESPONSE: "bg-gray-100 text-gray-500",
   LOST: "bg-red-100 text-red-700", APPOINTMENT_REQUIRED: "bg-purple-100 text-purple-800",
 }
-
-const COLORS_RESPONSE = ["#10B981", "#34D399", "#FBBF24", "#F59E0B", "#9CA3AF", "#EF4444"]
 
 function KpiCard({ title, value, icon: Icon, color, onClick }: { title: string; value: string | number; icon: React.ComponentType<{ className?: string }>; color: string; onClick?: () => void }) {
   const colorMap: Record<string, string> = {
@@ -126,9 +124,21 @@ export default function CrmDashboardPage() {
     staleTime: 30000,
   })
 
-  const { data: campaignWidgets } = useQuery({
-    queryKey: ["campaigns", "dashboard-widgets"],
-    queryFn: () => campaignsApi.dashboardWidgets(),
+  const { data: leadsData } = useQuery({
+    queryKey: ["crm-dashboard-leads"],
+    queryFn: () => leadsApi.list({ page: 1, page_size: 100 }),
+    staleTime: 30000,
+  })
+
+  const { data: enquiriesData } = useQuery({
+    queryKey: ["crm-dashboard-enquiries"],
+    queryFn: () => enquiriesApi.list(),
+    staleTime: 30000,
+  })
+
+  const { data: whatsappHistory } = useQuery({
+    queryKey: ["crm-dashboard-whatsapp"],
+    queryFn: () => whatsappV2Api.history({ page: 1, page_size: 20 }),
     staleTime: 30000,
   })
 
@@ -136,7 +146,6 @@ export default function CrmDashboardPage() {
   const workQueue = useMemo(() => data?.work_queue ?? [], [data])
   const fuSummary = useMemo(() => data?.follow_up_summary ?? {}, [data])
   const funnel = useMemo(() => data?.conversion_funnel ?? {}, [data])
-  const responses = useMemo(() => data?.patient_responses ?? [], [data])
   const conditions = useMemo(() => data?.patient_conditions ?? [], [data])
   const treatmentPerf = useMemo(() => data?.treatment_performance ?? [], [data])
   const doctorEngagement = useMemo(() => data?.doctor_engagement ?? [], [data])
@@ -281,17 +290,48 @@ export default function CrmDashboardPage() {
       </div>
 
       {/* ════════════════════════════════════
-         SECTION 2: CAMPAIGN PERFORMANCE
+         SECTION 2: OPERATIONAL WIDGETS
          ════════════════════════════════════ */}
       <div>
         <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-          <Send className="h-4 w-4 text-indigo-500" /> Campaign Performance
+          <Activity className="h-4 w-4 text-indigo-500" /> Operations
         </h2>
-        <div className="grid gap-3 grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4">
-          <KpiCard title="Campaign Messages Today" value={formatIndianNumber(campaignWidgets?.messages_today ?? 0)} icon={Send} color="primary" />
-          <KpiCard title="Campaign Replies Today" value={formatIndianNumber(campaignWidgets?.replies_today ?? 0)} icon={MessageCircle} color="success" />
-          <KpiCard title="Campaign Appointments" value={formatIndianNumber(campaignWidgets?.appointments ?? 0)} icon={CalendarDays} color="info" />
-          <KpiCard title="Campaign Conversions" value={formatIndianNumber(campaignWidgets?.conversions ?? 0)} icon={TrendingUp} color="warning" />
+        <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+          <KpiCard
+            title="Today's Enquiries"
+            value={formatIndianNumber(enquiriesData?.items?.length ?? enquiriesData?.total ?? 0)}
+            icon={MessageCircle}
+            color="info"
+            onClick={() => navigate("/crm/enquiry-calendar")}
+          />
+          <KpiCard
+            title="Open Leads"
+            value={formatIndianNumber(leadsData?.items?.length ?? leadsData?.total ?? 0)}
+            icon={UserPlus}
+            color="primary"
+            onClick={() => navigate("/leads")}
+          />
+          <KpiCard
+            title="Lead Conversion Rate"
+            value={`${funnel.booking_rate ?? 0}%`}
+            icon={TrendingUp}
+            color="success"
+            onClick={() => navigate("/leads")}
+          />
+          <KpiCard
+            title="Missed Appointments"
+            value={formatIndianNumber(overview.missed_appointments ?? 0)}
+            icon={UserMinus}
+            color="danger"
+            onClick={() => navigate("/crm/enquiry-calendar")}
+          />
+          <KpiCard
+            title="Pending Payments"
+            value={formatIndianNumber(overview.pending_payments ?? 0)}
+            icon={IndianRupee}
+            color="warning"
+            onClick={() => navigate("/billing")}
+          />
         </div>
       </div>
 
@@ -434,23 +474,45 @@ export default function CrmDashboardPage() {
          SECTIONS 6+7: PATIENT RESPONSE + CONDITION (side by side)
          ════════════════════════════════════ */}
       <div className="grid gap-4 md:grid-cols-2">
-        {/* SECTION 5: Patient Response Analytics */}
+        {/* SECTION 5: Recent WhatsApp Activity */}
         <div className={cn(GLASS, "rounded-2xl p-5")}>
           <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-            <ThumbsUp className="h-4 w-4 text-emerald-500" /> Patient Response Analytics
+            <MessageSquare className="h-4 w-4 text-emerald-500" /> Recent WhatsApp Activity
+            <Badge variant="secondary" className="ml-1 text-[10px]">{whatsappHistory?.items?.length ?? 0}</Badge>
           </h2>
-          {responses.length > 0 ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <RePieChart>
-                <Pie data={responses} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} label={({ name, percent }: { name: string; percent: number }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}>
-                  {responses.map((_: Record<string, unknown>, i: number) => <Cell key={i} fill={COLORS_RESPONSE[i % COLORS_RESPONSE.length]} />)}
-                </Pie>
-                <Tooltip />
-              </RePieChart>
-            </ResponsiveContainer>
+          {whatsappHistory?.items?.length > 0 ? (
+            <div className="space-y-1.5 max-h-[260px] overflow-y-auto">
+              {whatsappHistory.items.slice(0, 10).map((msg: Record<string, string>) => (
+                <div key={msg.id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 transition-colors">
+                  <div className={cn("rounded-lg p-1.5",
+                    msg.status === "SENT" ? "bg-green-50 text-green-600" :
+                    msg.status === "FAILED" ? "bg-red-50 text-red-600" :
+                    msg.status === "DELIVERED" ? "bg-blue-50 text-blue-600" :
+                    "bg-gray-50 text-gray-500"
+                  )}>
+                    <MessageSquare className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-gray-800 truncate">{msg.patient_name || msg.recipient || "Unknown"}</p>
+                    <p className="text-[10px] text-gray-500 truncate">{msg.message_type || "Message"}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <Badge className={cn("text-[9px]",
+                      msg.status === "SENT" ? "bg-green-100 text-green-700" :
+                      msg.status === "FAILED" ? "bg-red-100 text-red-700" :
+                      msg.status === "DELIVERED" ? "bg-blue-100 text-blue-700" :
+                      "bg-gray-100 text-gray-600"
+                    )}>{msg.status || "—"}</Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
-            <p className="text-sm text-gray-400 text-center py-12">No response data for this period</p>
+            <p className="text-sm text-gray-400 text-center py-12">No recent WhatsApp activity</p>
           )}
+          <Button variant="ghost" size="sm" className="w-full mt-2 h-7 text-xs gap-1" onClick={() => navigate("/whatsapp")}>
+            View All <ChevronRight className="h-3 w-3" />
+          </Button>
         </div>
 
         {/* SECTION 6: Patient Condition Analytics */}
@@ -486,9 +548,11 @@ export default function CrmDashboardPage() {
           {treatmentPerf.length > 0 ? (
             <div className="space-y-3">
               {treatmentPerf.slice(0, 8).map((t: Record<string, string | number>, i: number) => {
-                const pct = Math.max(t.follow_ups, t.appointments, 1)
-                const fw = (t.follow_ups / pct) * 100
-                const aw = (t.appointments / pct) * 100
+                const fu = Number(t.follow_ups) || 0
+                const ap = Number(t.appointments) || 0
+                const pct = Math.max(fu, ap, 1)
+                const fw = (fu / pct) * 100
+                const aw = (ap / pct) * 100
                 return (
                   <div key={i}>
                     <div className="flex justify-between text-xs mb-1">
@@ -560,7 +624,7 @@ export default function CrmDashboardPage() {
             {acquisition.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
                 <RePieChart>
-                  <Pie data={acquisition} dataKey="patients" nameKey="source" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }: { name: string; percent: number }) => `${name ?? ""} ${((percent ?? 0) * 100).toFixed(0)}%`}>
+                  <Pie data={acquisition} dataKey="patients" nameKey="source" cx="50%" cy="50%" outerRadius={80} label={(props: PieLabelRenderProps) => { const { name, percent } = props as unknown as { name: string; percent: number }; return `${name ?? ""} ${((percent ?? 0) * 100).toFixed(0)}%` }}>
                     {acquisition.map((_: Record<string, unknown>, i: number) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                   </Pie>
                   <Tooltip />
@@ -576,7 +640,7 @@ export default function CrmDashboardPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis dataKey="source" tick={{ fontSize: 9 }} />
                   <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip formatter={(v: string | number | (string | number)[]) => formatIndianRupees(v)} />
+                  <Tooltip formatter={(value) => formatIndianRupees(Number(value))} />
                   <Bar dataKey="revenue" fill="#4F46E5" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -601,8 +665,8 @@ export default function CrmDashboardPage() {
                     <TableCell className="text-xs font-medium">{s.source}</TableCell>
                     <TableCell className="text-xs text-right">{s.patients}</TableCell>
                     <TableCell className="text-xs text-right">{s.conversion_rate}%</TableCell>
-                    <TableCell className="text-xs text-right font-semibold">{formatIndianRupees(s.revenue)}</TableCell>
-                    <TableCell className="text-xs text-right">{formatIndianRupees(s.avg_revenue)}</TableCell>
+                    <TableCell className="text-xs text-right font-semibold">{formatIndianRupees(Number(s.revenue))}</TableCell>
+                    <TableCell className="text-xs text-right">{formatIndianRupees(Number(s.avg_revenue))}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

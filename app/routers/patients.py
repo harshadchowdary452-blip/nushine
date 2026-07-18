@@ -43,6 +43,20 @@ async def create_patient(data: PatientCreate, db: AsyncSession = Depends(get_db)
     await record_timeline_event(db, patient_id=str(patient.id), action="Patient Created",
         module="patient", description=f"Patient '{patient.full_name}' created",
         current_user=current_user)
+    try:
+        from app.crm.events import get_publisher
+        from app.crm.enums import EventType, EventSource
+        await get_publisher().publish(
+            event_type=EventType.PATIENT_REGISTERED,
+            source_module=EventSource.PATIENT,
+            entity_type="PATIENT",
+            entity_id=patient.id,
+            hospital_id=patient.hospital_id,
+            patient_id=patient.id,
+            db=db,
+        )
+    except Exception:
+        pass
     return patient
 
 
@@ -347,6 +361,20 @@ async def update_patient(patient_id: str, data: PatientUpdate, db: AsyncSession 
         await record_timeline_event(db, patient_id=patient_id, action="Patient Updated",
             module="patient", description=f"Patient '{patient.full_name}' updated",
             current_user=current_user, changes=changes)
+    try:
+        from app.crm.events import get_publisher
+        from app.crm.enums import EventType, EventSource
+        await get_publisher().publish(
+            event_type=EventType.PATIENT_UPDATED,
+            source_module=EventSource.PATIENT,
+            entity_type="PATIENT",
+            entity_id=patient.id,
+            hospital_id=patient.hospital_id,
+            patient_id=patient.id,
+            db=db,
+        )
+    except Exception:
+        pass
     return patient
 
 
@@ -362,6 +390,20 @@ async def delete_patient(patient_id: str, db: AsyncSession = Depends(get_db), cu
         module="patient", description=f"Patient '{patient.full_name}' deleted",
         current_user=current_user)
     deleted = await service.delete(patient_id, user_id=current_user.get("sub"))
+    try:
+        from app.crm.events import get_publisher
+        from app.crm.enums import EventType, EventSource
+        await get_publisher().publish(
+            event_type=EventType.PATIENT_DEACTIVATED,
+            source_module=EventSource.PATIENT,
+            entity_type="PATIENT",
+            entity_id=patient_id,
+            hospital_id=getattr(patient, 'hospital_id', None),
+            patient_id=patient_id,
+            db=db,
+        )
+    except Exception:
+        pass
     return MessageResponse(message="Patient deleted successfully")
 
 

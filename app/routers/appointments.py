@@ -158,6 +158,22 @@ async def create_appointment(data: AppointmentCreate, db: AsyncSession = Depends
         module="Appointments",
     )
 
+    try:
+        from app.crm.events import get_publisher
+        from app.crm.enums import EventType, EventSource
+        await get_publisher().publish(
+            event_type=EventType.APPOINTMENT_CREATED,
+            source_module=EventSource.APPOINTMENT,
+            entity_type="APPOINTMENT",
+            entity_id=appointment.id,
+            hospital_id=getattr(appointment, 'hospital_id', None),
+            patient_id=appointment.patient_id,
+            doctor_id=getattr(appointment, 'doctor_id', None),
+            db=db,
+        )
+    except Exception:
+        pass
+
     return appointment
 
 
@@ -626,6 +642,22 @@ async def cancel_appointment(appointment_id: str, req: CancelRequest, db: AsyncS
         changes=[{"field": "status", "old_value": "SCHEDULED", "new_value": "CANCELLED"}],
     )
 
+    try:
+        from app.crm.events import get_publisher
+        from app.crm.enums import EventType, EventSource
+        await get_publisher().publish(
+            event_type=EventType.APPOINTMENT_CANCELLED,
+            source_module=EventSource.APPOINTMENT,
+            entity_type="APPOINTMENT",
+            entity_id=appointment.id,
+            hospital_id=getattr(appointment, 'hospital_id', None),
+            patient_id=appointment.patient_id,
+            doctor_id=getattr(appointment, 'doctor_id', None),
+            db=db,
+        )
+    except Exception:
+        pass
+
     return MessageResponse(message="Appointment cancelled successfully")
 
 
@@ -672,6 +704,23 @@ async def complete_appointment(appointment_id: str, req: CompleteRequest, db: As
     )
 
     await service._attach_names(appointment)
+
+    try:
+        from app.crm.events import get_publisher
+        from app.crm.enums import EventType, EventSource
+        await get_publisher().publish(
+            event_type=EventType.APPOINTMENT_COMPLETED,
+            source_module=EventSource.APPOINTMENT,
+            entity_type="APPOINTMENT",
+            entity_id=appointment.id,
+            hospital_id=getattr(appointment, 'hospital_id', None),
+            patient_id=appointment.patient_id,
+            doctor_id=getattr(appointment, 'doctor_id', None),
+            db=db,
+        )
+    except Exception:
+        pass
+
     return appointment
 
 
@@ -731,6 +780,23 @@ async def reschedule_appointment(appointment_id: str, req: RescheduleRequest, db
     )
 
     await service._attach_names(appointment)
+
+    try:
+        from app.crm.events import get_publisher
+        from app.crm.enums import EventType, EventSource
+        await get_publisher().publish(
+            event_type=EventType.APPOINTMENT_RESCHEDULED,
+            source_module=EventSource.APPOINTMENT,
+            entity_type="APPOINTMENT",
+            entity_id=appointment.id,
+            hospital_id=getattr(appointment, 'hospital_id', None),
+            patient_id=appointment.patient_id,
+            doctor_id=getattr(appointment, 'doctor_id', None),
+            db=db,
+        )
+    except Exception:
+        pass
+
     return appointment
 
 

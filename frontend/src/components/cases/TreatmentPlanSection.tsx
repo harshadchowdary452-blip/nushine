@@ -4,6 +4,7 @@ import { Plus, X, Search, Check, Activity, IndianRupee, Stethoscope, Hash } from
 import { treatmentTypesApi } from "@/services/endpoints"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { NumericInput } from "@/components/ui/numeric-input"
 import { Label } from "@/components/ui/label"
 import ToothNumberPicker from "./ToothNumberPicker"
 
@@ -230,20 +231,20 @@ export default function TreatmentPlanSection({
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <Label className="text-xs font-medium text-gray-500 mb-1 block">Est. Visits <span className="text-red-500">*</span></Label>
-                    <Input
-                      type="number" min="1"
+                    <NumericInput
+                      mode="integer" min={1}
                       value={t.estimatedVisits}
-                      onChange={(e) => updateTreatment(t.id, "estimatedVisits", e.target.value ? Number(e.target.value) : "")}
+                      onChange={(v) => updateTreatment(t.id, "estimatedVisits", v ? Number(v) : "")}
                       className="h-9 text-sm bg-white border-gray-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                       placeholder="1"
                     />
                   </div>
                   <div>
                     <Label className="text-xs font-medium text-gray-500 mb-1 block">Est. Cost (₹) <span className="text-red-500">*</span></Label>
-                    <Input
-                      type="number" min="0"
+                    <NumericInput
+                      mode="currency" prefix="₹" min={0}
                       value={t.estimatedCost}
-                      onChange={(e) => updateTreatment(t.id, "estimatedCost", e.target.value ? Number(e.target.value) : "")}
+                      onChange={(v) => updateTreatment(t.id, "estimatedCost", v ? Number(v) : "")}
                       className="h-9 text-sm bg-white border-gray-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                       placeholder="0"
                     />

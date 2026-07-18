@@ -26,8 +26,10 @@ api.interceptors.response.use((response) => {
   const responseTime = response.headers["x-response-time"];
   if (requestId && responseTime) {
     // Attach for dev tools visibility
-    (response as { requestId: string }).requestId = requestId;
-    (response as { responseTime: string }).responseTime = responseTime;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (response as any).requestId = requestId;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (response as any).responseTime = responseTime;
   }
   return response;
 });

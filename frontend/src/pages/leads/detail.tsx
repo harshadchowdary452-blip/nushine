@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
+import { NumericInput } from "@/components/ui/numeric-input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
@@ -178,7 +179,7 @@ export default function LeadDetail() {
       addToast({ title: "Lead deleted", variant: "success" })
       navigate("/leads?" + searchParams.toString())
     },
-    onError: (err: ApiError) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to delete lead", variant: "destructive" }),
+    onError: (err: ApiError) => addToast({ title: "Error", description: err?.response?.data?.detail as string || "Failed to delete lead", variant: "destructive" }),
   })
 
   const callMutation = useMutation({
@@ -192,7 +193,7 @@ export default function LeadDetail() {
   })
 
   const commMutation = useMutation({
-    mutationFn: (data: Record<string, unknown>) => leadsApi.addCommunication(id!, data),
+    mutationFn: (data: { channel: string; message: string }) => leadsApi.addCommunication(id!, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["lead-communications", id] })
       addToast({ title: "Message sent", variant: "success" })
@@ -202,7 +203,7 @@ export default function LeadDetail() {
   })
 
   const followUpMutation = useMutation({
-    mutationFn: (data: Record<string, unknown>) => leadsApi.createFollowUp(id!, data),
+    mutationFn: (data: { follow_up_date: string; follow_up_time?: string; priority?: string; reason?: string; notes?: string }) => leadsApi.createFollowUp(id!, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["lead-followups", id] })
       queryClient.invalidateQueries({ queryKey: ["lead", id] })
@@ -213,7 +214,7 @@ export default function LeadDetail() {
   })
 
   const apptMutation = useMutation({
-    mutationFn: (data: Record<string, unknown>) => leadsApi.bookAppointment(id!, data),
+    mutationFn: (data: { appointment_date: string; appointment_time?: string; doctor_id?: string; notes?: string }) => leadsApi.bookAppointment(id!, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["lead", id] })
       queryClient.invalidateQueries({ queryKey: ["leads"] })
@@ -231,7 +232,7 @@ export default function LeadDetail() {
       addToast({ title: "Lead converted", variant: "success" })
       setConvertOpen(false)
     },
-    onError: (err: ApiError) => addToast({ title: "Error", description: err?.response?.data?.detail || "Conversion failed", variant: "destructive" }),
+    onError: (err: ApiError) => addToast({ title: "Error", description: err?.response?.data?.detail as string || "Conversion failed", variant: "destructive" }),
   })
 
   const cycleStatus = useCallback(() => {
@@ -757,7 +758,7 @@ export default function LeadDetail() {
             <div className="col-span-2"><Label>Name</Label><Input value={leadName} onChange={(e) => setLeadName(e.target.value)} /></div>
             <div><Label>Mobile</Label><Input value={mobile} onChange={(e) => setMobile(e.target.value)} /></div>
             <div><Label>Email</Label><Input value={email} onChange={(e) => setEmail(e.target.value)} /></div>
-            <div><Label>Age</Label><Input type="number" value={age} onChange={(e) => setAge(e.target.value)} /></div>
+            <div><Label>Age</Label><NumericInput mode="integer" min={0} max={150} value={age} onChange={(v) => setAge(v)} /></div>
             <div><Label>Gender</Label>
               <Select value={gender} onValueChange={setGender}>
                 <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
@@ -780,8 +781,8 @@ export default function LeadDetail() {
               </Select>
             </div>
             <div><Label>Interested Treatment</Label><Input value={interestedTreatment} onChange={(e) => setInterestedTreatment(e.target.value)} /></div>
-            <div><Label>Budget</Label><Input type="number" value={budget} onChange={(e) => setBudget(e.target.value)} /></div>
-            <div><Label>Lead Score</Label><Input type="number" min="0" max="100" value={leadScore} onChange={(e) => setLeadScore(e.target.value)} /></div>
+            <div><Label>Budget</Label><NumericInput mode="currency" prefix="₹" value={budget} onChange={(v) => setBudget(v)} /></div>
+            <div><Label>Lead Score</Label><NumericInput mode="integer" min={0} max={100} value={leadScore} onChange={(v) => setLeadScore(v)} /></div>
             <div><Label>Priority</Label>
               <Select value={priority} onValueChange={setPriority}>
                 <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
@@ -817,7 +818,7 @@ export default function LeadDetail() {
                 </SelectContent>
               </Select>
             </div>
-            <div><Label>Duration (seconds)</Label><Input type="number" value={callDuration} onChange={(e) => setCallDuration(e.target.value)} placeholder="e.g. 120" /></div>
+            <div><Label>Duration (seconds)</Label><NumericInput mode="integer" value={callDuration} onChange={(v) => setCallDuration(v)} placeholder="e.g. 120" /></div>
             <div><Label>Follow-up Date</Label><Input type="date" value={callFollowUp} onChange={(e) => setCallFollowUp(e.target.value)} /></div>
             <div><Label>Notes</Label><Textarea value={callNotes} onChange={(e) => setCallNotes(e.target.value)} rows={3} placeholder="Call notes..." /></div>
           </div>
@@ -903,7 +904,7 @@ export default function LeadDetail() {
             <div className="col-span-2"><Label>Patient Name</Label><Input value={convertPatientName} onChange={(e) => setConvertPatientName(e.target.value)} placeholder="Full name" /></div>
             <div><Label>Phone</Label><Input value={convertPhone} onChange={(e) => setConvertPhone(e.target.value)} /></div>
             <div><Label>Email</Label><Input value={convertEmail} onChange={(e) => setConvertEmail(e.target.value)} /></div>
-            <div><Label>Age</Label><Input type="number" value={convertAge} onChange={(e) => setConvertAge(e.target.value)} /></div>
+            <div><Label>Age</Label><NumericInput mode="integer" min={0} max={150} value={convertAge} onChange={(v) => setConvertAge(v)} /></div>
             <div><Label>Gender</Label>
               <Select value={convertGender} onValueChange={setConvertGender}>
                 <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>

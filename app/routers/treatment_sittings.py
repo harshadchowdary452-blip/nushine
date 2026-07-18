@@ -112,6 +112,25 @@ async def update_sitting(sitting_id: str, data: TreatmentSittingUpdate, db: Asyn
         module="Treatments",
         changes=changes,
     )
+    try:
+        from app.crm.events import get_publisher
+        from app.crm.enums import EventType, EventSource
+        sitting_status = sitting.status.value if hasattr(sitting.status, 'value') else sitting.status
+        if sitting_status == "COMPLETED":
+            plan_result = await db.execute(select(TreatmentPlan).where(TreatmentPlan.id == sitting.treatment_plan_id))
+            plan = plan_result.scalar_one_or_none()
+            await get_publisher().publish(
+                event_type=EventType.TREATMENT_VISIT_COMPLETED,
+                source_module=EventSource.TREATMENT,
+                entity_type="TREATMENT",
+                entity_id=sitting.treatment_plan_id,
+                hospital_id=getattr(plan, 'hospital_id', None) if plan else None,
+                patient_id=patient_id,
+                doctor_id=getattr(plan, 'assigned_doctor_id', None) if plan else None,
+                db=db,
+            )
+    except Exception:
+        pass
     return sitting
 
 

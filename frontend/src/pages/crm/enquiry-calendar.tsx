@@ -485,7 +485,7 @@ export default function EnquiryCalendar() {
   const [timelineItem, setTimelineItem] = useState<CalendarItem | null>(null)
   const { data: timelineData } = useQuery({
     queryKey: ["patient-timeline", timelineItem?.patient_id],
-    queryFn: () => crmApi.patientFollowUpHistory(timelineItem.patient_id),
+    queryFn: () => crmApi.patientFollowUpHistory(timelineItem!.patient_id!),
     enabled: !!timelineItem?.patient_id,
   })
   const timelineEntries: TimelineEntry[] = Array.isArray(timelineData) ? timelineData : []
@@ -508,7 +508,7 @@ export default function EnquiryCalendar() {
   const day7FU = dayItems.filter((i: CalendarItem) => i.follow_up_type === "7_DAY_FOLLOW_UP").length
   const day6m = dayItems.filter((i: CalendarItem) => i.follow_up_type === "6_MONTH_RECALL").length
   const day12m = dayItems.filter((i: CalendarItem) => i.follow_up_type === "12_MONTH_RECALL").length
-  const dayOther = dayItems.filter((i: CalendarItem) => !["1_DAY_FOLLOW_UP", "7_DAY_FOLLOW_UP", "6_MONTH_RECALL", "12_MONTH_RECALL"].includes(i.follow_up_type)).length
+  const dayOther = dayItems.filter((i: CalendarItem) => !["1_DAY_FOLLOW_UP", "7_DAY_FOLLOW_UP", "6_MONTH_RECALL", "12_MONTH_RECALL"].includes(i.follow_up_type || "")).length
 
   return (
     <div className="space-y-6">
@@ -610,7 +610,7 @@ export default function EnquiryCalendar() {
                 </TableHeader>
                 <TableBody>
                   {filteredItems.map((item: CalendarItem) => {
-                    const isOverdue = item.due_date && item.due_date < format(today, "yyyy-MM-dd") && !["COMPLETED", "APPOINTMENT_BOOKED", "LOST", "CONVERTED"].includes(item.status)
+                    const isOverdue = item.due_date && item.due_date < format(today, "yyyy-MM-dd") && !["COMPLETED", "APPOINTMENT_BOOKED", "LOST", "CONVERTED"].includes(item.status || "")
                     return (
                       <TableRow key={`${item.source}-${item.id}`} className={isOverdue ? "bg-red-50/30" : ""}>
                         <TableCell className="font-medium whitespace-nowrap">{item.patient_name}</TableCell>
@@ -620,14 +620,14 @@ export default function EnquiryCalendar() {
                         <TableCell className="text-xs max-w-[100px] truncate">{item.treatment_name || "—"}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-[10px] whitespace-nowrap">
-                            {followUpTypeLabels[item.follow_up_type] || item.follow_up_type}
+                            {followUpTypeLabels[item.follow_up_type || ""] || item.follow_up_type}
                           </Badge>
                         </TableCell>
                         <TableCell className={`text-xs whitespace-nowrap ${isOverdue ? "text-red-600 font-semibold" : ""}`}>
                           {item.due_date || "—"}
                         </TableCell>
                         <TableCell>
-                          <Badge className={`text-[10px] ${followUpStatusColors[item.status] || "bg-gray-50"}`}>
+                          <Badge className={`text-[10px] ${followUpStatusColors[item.status || ""] || "bg-gray-50"}`}>
                             {item.status || "—"}
                           </Badge>
                         </TableCell>

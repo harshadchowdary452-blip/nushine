@@ -183,11 +183,11 @@ export default function AnalyticsDrawer({
                     <>
                       <li className="flex items-start gap-2 text-sm text-gray-600">
                         <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-success" />
-                        Peak value: {dataKeys[0] ? `${dataKeys[0].name}: ${fmt(Math.max(...chartData.map(d => d[dataKeys[0]?.key || "value"] || 0)))}` : "N/A"}
+                        Peak value: {dataKeys[0] ? `${dataKeys[0].name}: ${fmt(Math.max(...chartData.map(d => Number(d[dataKeys[0]?.key || "value"]) || 0)))}` : "N/A"}
                       </li>
                       <li className="flex items-start gap-2 text-sm text-gray-600">
                         <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-warning" />
-                        Average: {dataKeys[0] ? fmt(chartData.reduce((s, d) => s + (d[dataKeys[0]?.key || "value"] || 0), 0) / chartData.length) : "N/A"}
+                        Average: {dataKeys[0] ? fmt(chartData.reduce((s, d) => s + (Number(d[dataKeys[0]?.key || "value"]) || 0), 0) / chartData.length) : "N/A"}
                       </li>
                     </>
                   )}

@@ -5,7 +5,7 @@ import { crmSettingsApi, treatmentTypesApi } from "@/services/endpoints"
 import PageHeader from "@/components/layout/page-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { NumericInput } from "@/components/ui/numeric-input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/components/ui/toast"
@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import type { ApiError } from "@/types"
+import { extractDetail } from "@/types"
 
 interface CrmRule {
   id: string
@@ -65,13 +66,13 @@ export default function CrmSettings() {
   const treatmentTypesList: TreatmentType[] = treatmentTypes || []
 
   const createMutation = useMutation({
-    mutationFn: (data: Record<string, unknown>) => crmSettingsApi.rules.create(data),
+    mutationFn: (data: { treatment_type_id: string; follow_up_1_day?: boolean; follow_up_7_day?: boolean; recall_6_month?: boolean; recall_12_month?: boolean; custom_recall_days?: number }) => crmSettingsApi.rules.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["crm-settings"] })
       addToast({ title: "Rule Created", variant: "success" })
       setOpen(false); setSelectedTypeId(""); setFu1Day(true); setFu7Day(true); setRecall6m(true); setRecall12m(true); setCustomDays("")
     },
-    onError: (err: ApiError) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed", variant: "destructive" }),
+    onError: (err: ApiError) => addToast({ title: "Error", description: extractDetail(err) || "Failed", variant: "destructive" }),
   })
 
   const deleteMutation = useMutation({
@@ -80,7 +81,7 @@ export default function CrmSettings() {
       queryClient.invalidateQueries({ queryKey: ["crm-settings"] })
       addToast({ title: "Deleted", variant: "success" })
     },
-    onError: (err: ApiError) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed", variant: "destructive" }),
+    onError: (err: ApiError) => addToast({ title: "Error", description: extractDetail(err) || "Failed", variant: "destructive" }),
   })
 
   const toggleMutation = useMutation({
@@ -96,7 +97,7 @@ export default function CrmSettings() {
       queryClient.invalidateQueries({ queryKey: ["treatment-types"] })
       addToast({ title: "Seeded", description: `Created ${data.seeded?.length || 0} treatment types`, variant: "success" })
     },
-    onError: (err: ApiError) => addToast({ title: "Error", description: err?.response?.data?.detail || "Seed failed", variant: "destructive" }),
+    onError: (err: ApiError) => addToast({ title: "Error", description: extractDetail(err) || "Seed failed", variant: "destructive" }),
   })
 
   const opdUpdateMutation = useMutation({
@@ -105,7 +106,7 @@ export default function CrmSettings() {
       queryClient.invalidateQueries({ queryKey: ["crm-settings"] })
       addToast({ title: "OPD Settings Updated", variant: "success" })
     },
-    onError: (err: ApiError) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to update OPD settings", variant: "destructive" }),
+    onError: (err: ApiError) => addToast({ title: "Error", description: extractDetail(err) || "Failed to update OPD settings", variant: "destructive" }),
   })
 
   return (
@@ -190,7 +191,7 @@ export default function CrmSettings() {
                 <p className="text-xs text-muted-foreground">Auto-create enquiry when patient status changes to OPD</p>
               </div>
               <Switch
-                checked={opdSetting?.opd_follow_up_enabled ?? true}
+                checked={Boolean(opdSetting?.opd_follow_up_enabled ?? true)}
                 onCheckedChange={(v) => opdUpdateMutation.mutate({ ...opdSetting, opd_follow_up_enabled: v })}
               />
             </div>
@@ -215,7 +216,7 @@ export default function CrmSettings() {
             <div className="space-y-2">
               <Label className="text-sm font-medium">Priority</Label>
               <Select
-                value={opdSetting?.priority ?? "MEDIUM"}
+                value={String(opdSetting?.priority ?? "MEDIUM")}
                 onValueChange={(v) => opdUpdateMutation.mutate({ ...opdSetting, priority: v })}
               >
                 <SelectTrigger className="w-full">
@@ -279,7 +280,7 @@ export default function CrmSettings() {
               </div>
               <div className="space-y-2">
                 <Label>Custom Recall Days (optional)</Label>
-                <Input type="number" value={customDays} onChange={(e) => setCustomDays(e.target.value)} placeholder="e.g. 90" />
+                <NumericInput value={customDays} onChange={(v) => setCustomDays(v)} placeholder="e.g. 90" mode="integer" min={1} />
               </div>
             </div>
             <Button className="w-full" onClick={() => createMutation.mutate({

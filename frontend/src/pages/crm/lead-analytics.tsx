@@ -109,7 +109,7 @@ export default function LeadAnalytics() {
             {analytics.statusData.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
                 <RePie>
-                  <Pie data={analytics.statusData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label={({ name, percent }: { name: string; percent?: number }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}>
+                  <Pie data={analytics.statusData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label={(props) => `${String(props.name ?? "")} ${((Number(props.percent ?? 0)) * 100).toFixed(0)}%`}>
                     {analytics.statusData.map((entry, idx) => (
                       <Cell key={idx} fill={entry.fill} />
                     ))}

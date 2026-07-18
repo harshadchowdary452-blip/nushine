@@ -100,7 +100,7 @@ export default function HospitalAdminDashboard() {
   })
 
   const onDoctorClick = useCallback((id?: string) => {
-    const item = (stats?.doctor_performance ?? []).find((d) => d.id === id)
+    const item = (stats?.doctor_performance ?? []).find((d: Performer) => d.id === id)
     if (item) setQuickView({ type: "doctor", id: item.id, name: item.name })
   }, [stats?.doctor_performance])
 
@@ -258,7 +258,7 @@ export default function HospitalAdminDashboard() {
                         <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value: string | number | (string | number)[]) => formatIndianRupees(Number(value))} />
+                    <Tooltip formatter={(value: unknown) => formatIndianRupees(Number(value))} />
                   </RePieChart>
                 </ResponsiveContainer>
                 <div className="space-y-1.5">
@@ -511,7 +511,7 @@ export default function HospitalAdminDashboard() {
             {consentStats.recent?.length > 0 && (
               <CardContent className="px-5 pb-5">
                 <div className="space-y-2">
-                  {consentStats.recent.slice(0, 5).map((r) => (
+                  {consentStats.recent.slice(0, 5).map((r: { id: string; patient_name: string; consent_type: string; created_at?: string }) => (
                     <div key={r.id} className="flex items-center justify-between text-sm py-1.5 px-2 rounded-lg hover:bg-gray-50 transition-colors">
                       <span className="font-medium text-gray-900">{r.patient_name}</span>
                       <span className="text-xs text-gray-500">{r.consent_type} &middot; {r.created_at ? new Date(r.created_at).toLocaleDateString() : ""}</span>

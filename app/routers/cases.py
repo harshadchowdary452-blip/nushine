@@ -72,6 +72,21 @@ async def create_case(data: CaseCreate, db: AsyncSession = Depends(get_db), curr
         description=f"Case report created: {case.chief_complaint or 'No chief complaint'}",
         module="Case Reports",
     )
+    try:
+        from app.crm.events import get_publisher
+        from app.crm.enums import EventType, EventSource
+        await get_publisher().publish(
+            event_type=EventType.CASE_CREATED,
+            source_module=EventSource.CASE,
+            entity_type="CASE",
+            entity_id=case.id,
+            hospital_id=getattr(case, 'hospital_id', None),
+            patient_id=case.patient_id,
+            doctor_id=getattr(case, 'doctor_id', None),
+            db=db,
+        )
+    except Exception:
+        pass
     case = await _load_case_with_findings(db, case.id)
     return case
 
@@ -233,6 +248,21 @@ async def update_case(case_id: str, data: CaseUpdate, db: AsyncSession = Depends
         module="Case Reports",
         changes=changes,
     )
+    try:
+        from app.crm.events import get_publisher
+        from app.crm.enums import EventType, EventSource
+        await get_publisher().publish(
+            event_type=EventType.CASE_UPDATED,
+            source_module=EventSource.CASE,
+            entity_type="CASE",
+            entity_id=case_id,
+            hospital_id=getattr(updated, 'hospital_id', None),
+            patient_id=updated.patient_id,
+            doctor_id=getattr(updated, 'doctor_id', None),
+            db=db,
+        )
+    except Exception:
+        pass
     updated = await _load_case_with_findings(db, case_id)
     return updated
 
@@ -404,6 +434,21 @@ async def approve_treatment_plan(case_id: str, db: AsyncSession = Depends(get_db
         description=f"Treatment plan approved — {len(items)} item(s) generated as treatments",
         module="Treatments",
     )
+    try:
+        from app.crm.events import get_publisher
+        from app.crm.enums import EventType, EventSource
+        await get_publisher().publish(
+            event_type=EventType.CASE_APPROVED,
+            source_module=EventSource.CASE,
+            entity_type="CASE",
+            entity_id=case_id,
+            hospital_id=getattr(case, 'hospital_id', None),
+            patient_id=case.patient_id,
+            doctor_id=getattr(case, 'doctor_id', None),
+            db=db,
+        )
+    except Exception:
+        pass
     case = await _load_case_with_findings(db, case_id)
     return case
 

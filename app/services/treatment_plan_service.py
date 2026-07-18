@@ -46,6 +46,7 @@ def _enrich_plan(plan: TreatmentPlan):
                 setattr(plan, "patient_id", patient.id)
                 setattr(plan, "patient_name", patient.full_name)
                 setattr(plan, "patient_op_no", getattr(patient, "op_no", None))
+                setattr(plan, "patient", patient)
                 try:
                     hosp = patient.hospital
                     if hosp:

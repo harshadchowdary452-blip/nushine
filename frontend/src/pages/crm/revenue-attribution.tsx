@@ -89,12 +89,12 @@ export default function RevenueAttribution() {
             {revenueData.bySource.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
                 <RePie>
-                  <Pie data={revenueData.bySource} dataKey="potentialRevenue" nameKey="source" cx="50%" cy="50%" outerRadius={100} label={({ name, percent }: { name: string; percent: number }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}>
+                  <Pie data={revenueData.bySource} dataKey="potentialRevenue" nameKey="source" cx="50%" cy="50%" outerRadius={100} label={(props) => `${String(props.name ?? "")} ${((Number(props.percent ?? 0)) * 100).toFixed(0)}%`}>
                     {revenueData.bySource.map((entry, idx) => (
                       <Cell key={idx} fill={entry.fill} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: string | number | (string | number)[]) => formatIndianRupees(Number(value))} />
+                  <Tooltip formatter={(value: unknown) => formatIndianRupees(Number(value))} />
                 </RePie>
               </ResponsiveContainer>
             ) : (
@@ -112,7 +112,7 @@ export default function RevenueAttribution() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                   <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v: number) => `\u20B9${(v / 1000).toFixed(0)}k`} />
                   <YAxis type="category" dataKey="source" tick={{ fontSize: 11 }} width={100} />
-                  <Tooltip formatter={(value: string | number | (string | number)[]) => formatIndianRupees(Number(value))} />
+                  <Tooltip formatter={(value: unknown) => formatIndianRupees(Number(value))} />
                   <Bar dataKey="potentialRevenue" fill="#0EA5E9" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>

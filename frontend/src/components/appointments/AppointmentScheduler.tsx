@@ -12,7 +12,8 @@ import {
 } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
-import type { DoctorSlotResponse, User, PaginatedResponse, ApiError } from "@/types"
+import type { DoctorSlotResponse, User, PaginatedResponse } from "@/types"
+import { extractDetail } from "@/types"
 
 const SLOT_COLORS: Record<string, string> = {
   available: "bg-green-100 text-green-800 border-green-300 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700 cursor-pointer",
@@ -279,7 +280,7 @@ export default function AppointmentScheduler({
               <AlertCircle className="h-4 w-4" /> Failed to load slots
             </p>
             <p className="text-xs text-red-500 dark:text-red-500">
-              {(slotError as ApiError)?.response?.data?.detail || slotError?.message || "Unknown error"}
+              {extractDetail(slotError) || slotError?.message || "Unknown error"}
             </p>
           </div>
         ) : slotData ? (

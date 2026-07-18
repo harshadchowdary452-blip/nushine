@@ -4,8 +4,8 @@ import { motion, AnimatePresence } from "framer-motion"
 import {
   LayoutDashboard, Users, FolderOpen, CalendarDays, Stethoscope, Receipt,
   Settings, ChevronLeft, Building2, Shield, MessageSquare,
-  Activity, Menu, IndianRupee, Mail, BarChart3, FileText,
-  Megaphone, Clock, UserPlus,
+  Activity, Menu, IndianRupee, BarChart3, FileText,
+  Clock, UserPlus,
   Search, Download, LayoutList, Kanban,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -56,11 +56,7 @@ const roleNav: Record<string, NavSection[]> = {
       { label: "CRM Dashboard", icon: LayoutDashboard, path: "/crm/dashboard2" },
       { label: "Leads", icon: UserPlus, path: "/leads" },
       { label: "Enquiry Calendar", icon: CalendarDays, path: "/crm/enquiry-calendar" },
-      { label: "Campaigns", icon: Megaphone, path: "/crm/campaigns" },
-      { label: "Templates", icon: FileText, path: "/crm/campaign-templates" },
-
       { label: "WhatsApp", icon: MessageSquare, path: "/whatsapp" },
-      { label: "Communications", icon: Mail, path: "/crm/communications" },
       { label: "CRM Settings", icon: Settings, path: "/crm/settings" },
     ]},
     { label: "Finance", items: [

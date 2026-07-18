@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
+import { NumericInput } from "@/components/ui/numeric-input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -98,19 +99,11 @@ export default function TreatmentDetail() {
     enabled: !!plan?.case_id,
   })
 
-  const { data: patientData } = useQuery<Patient>({
-    queryKey: ["patient", caseData?.patient_id],
-    queryFn: () => fetch(`/api/v1/patients/${caseData!.patient_id}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }
-    }).then(r => r.json()),
-    enabled: !!caseData?.patient_id,
-  })
-
   const sittings: TreatmentSitting[] = useMemo(() => Array.isArray(sittingData) ? sittingData : [], [sittingData])
   const currentSittingNumber = sittings.length + 1
   const p = plan as TreatmentPlan | undefined
   const c = caseData as Case | undefined
-  const pat = patientData as Patient | undefined
+  const pat = p?.patient as Patient | undefined
 
   const startMutation = useMutation({
     mutationFn: () => treatmentApi.start(id!),
@@ -219,19 +212,29 @@ export default function TreatmentDetail() {
         <div className="lg:col-span-2 space-y-4">
           {/* Patient Summary */}
           <Card>
-            <CardHeader className="py-3"><CardTitle className="text-sm flex items-center gap-2"><User className="h-4 w-4" /> Patient Summary</CardTitle></CardHeader>
+            <CardHeader className="py-3"><CardTitle className="text-sm flex items-center gap-2"><User className="h-4 w-4" /> Patient Information</CardTitle></CardHeader>
             <CardContent className="py-2">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-                <div><span className="text-muted-foreground text-xs">Name</span><p className="font-medium">{p.patient_name || "—"}</p></div>
-                <div><span className="text-muted-foreground text-xs">OP Number</span><p className="font-medium">{pat?.op_no || "—"}</p></div>
-                <div><span className="text-muted-foreground text-xs">Age</span><p className="font-medium">{pat?.date_of_birth ? Math.floor((Date.now() - new Date(pat.date_of_birth).getTime()) / 31557600000) : "—"}</p></div>
+                <div><span className="text-muted-foreground text-xs">Name</span><p className="font-medium">{pat?.full_name || p.patient_name || "—"}</p></div>
+                <div><span className="text-muted-foreground text-xs">OP Number</span><p className="font-medium">{pat?.op_no || p.patient_op_no || "—"}</p></div>
+                <div><span className="text-muted-foreground text-xs">Age</span><p className="font-medium">{pat?.date_of_birth ? `${Math.floor((Date.now() - new Date(pat.date_of_birth).getTime()) / 31557600000)} Years` : pat?.age ? `${pat.age} Years` : "—"}</p></div>
                 <div><span className="text-muted-foreground text-xs">Gender</span><p className="font-medium">{pat?.gender || "—"}</p></div>
                 <div><span className="text-muted-foreground text-xs">Phone</span><p className="font-medium">{pat?.phone || "—"}</p></div>
-                <div className="col-span-2">
-                  <span className="text-muted-foreground text-xs">Medical Alerts</span>
-                  <p className="font-medium text-amber-700">{pat?.medical_history || pat?.allergies ? `Allergies: ${pat?.allergies || "None"}` : "None"}</p>
-                </div>
+                <div><span className="text-muted-foreground text-xs">Email</span><p className="font-medium">{pat?.email || "—"}</p></div>
+                <div><span className="text-muted-foreground text-xs">Blood Group</span><p className="font-medium">{pat?.blood_group || "—"}</p></div>
+                <div><span className="text-muted-foreground text-xs">ABHA ID</span><p className="font-medium">{pat?.abha_id || "—"}</p></div>
+                <div className="col-span-2"><span className="text-muted-foreground text-xs">Address</span><p className="font-medium">{pat?.address || "—"}</p></div>
+                <div><span className="text-muted-foreground text-xs">Emergency Contact</span><p className="font-medium">{pat?.emergency_contact || "—"}</p></div>
               </div>
+              {(pat?.medical_history || pat?.allergies) && (
+                <div className="mt-3 pt-3 border-t">
+                  <span className="text-muted-foreground text-xs">Medical Alerts</span>
+                  <div className="mt-1 space-y-1">
+                    {pat?.allergies && <p className="text-sm font-medium text-amber-700">Allergies: {pat.allergies}</p>}
+                    {pat?.medical_history && <p className="text-sm font-medium text-amber-700">Medical History: {pat.medical_history}</p>}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -381,7 +384,7 @@ export default function TreatmentDetail() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Duration (minutes)</Label>
-                <Input type="number" min="1" value={visitForm.duration_minutes} onChange={e => setVisitForm({ ...visitForm, duration_minutes: e.target.value })} placeholder="30" />
+                <NumericInput mode="integer" min={1} value={visitForm.duration_minutes} onChange={(v) => setVisitForm({ ...visitForm, duration_minutes: v })} placeholder="30" />
               </div>
               <div>
                 <Label>Doctor Notes</Label>
@@ -481,7 +484,7 @@ export default function TreatmentDetail() {
                 <div><Label>Lab Order Number</Label><Input value={labForm.lab_order_number} onChange={e => setLabForm({ ...labForm, lab_order_number: e.target.value })} placeholder="Order #" /></div>
                 <div><Label>Sent Date</Label><Input type="date" value={labForm.lab_sent_date} onChange={e => setLabForm({ ...labForm, lab_sent_date: e.target.value })} /></div>
                 <div><Label>Expected Return</Label><Input type="date" value={labForm.lab_return_date} onChange={e => setLabForm({ ...labForm, lab_return_date: e.target.value })} /></div>
-                <div><Label>Lab Cost</Label><Input type="number" min="0" value={labForm.lab_cost} onChange={e => setLabForm({ ...labForm, lab_cost: e.target.value })} placeholder="0" /></div>
+                <div><Label>Lab Cost</Label><NumericInput mode="currency" prefix="₹" min={0} value={labForm.lab_cost} onChange={(v) => setLabForm({ ...labForm, lab_cost: v })} placeholder="0" /></div>
                 <div><Label>Notes</Label><Input value={labForm.lab_tracking_notes} onChange={e => setLabForm({ ...labForm, lab_tracking_notes: e.target.value })} placeholder="Notes" /></div>
               </div>
             )}

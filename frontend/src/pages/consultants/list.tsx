@@ -65,7 +65,7 @@ export default function ConsultantList() {
   })
 
   const createMutation = useMutation({
-    mutationFn: (data: ConsultantForm) => consultantsApi.create(data),
+    mutationFn: (data: ConsultantForm) => consultantsApi.create(data as unknown as Record<string, unknown>),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["consultants"] })
       queryClient.invalidateQueries({ queryKey: ["dash"] })

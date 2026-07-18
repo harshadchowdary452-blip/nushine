@@ -95,8 +95,8 @@ export default function AdminGroups() {
       setDeletingGroup(null)
     },
     onError: (err: unknown) => {
-      const msg = (err as ApiError)?.response?.data?.detail || "Failed to delete group"
-      addToast({ title: "Error", description: msg, variant: "destructive" })
+      const raw = (err as ApiError)?.response?.data?.detail
+      addToast({ title: "Error", description: typeof raw === "string" ? raw : "Failed to delete group", variant: "destructive" })
     },
   })
 

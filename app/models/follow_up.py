@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone, date, time
-from sqlalchemy import String, DateTime, Text, ForeignKey, Boolean, Date, Time, Enum as SAEnum
+from sqlalchemy import String, DateTime, Text, ForeignKey, Boolean, Date, Time, Integer, Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 from enum import Enum
@@ -18,6 +18,11 @@ class FollowUpStatus(str, Enum):
     SCHEDULED = "SCHEDULED"  # backward compat
     OPEN = "OPEN"  # backward compat
     CANCELLED = "CANCELLED"  # backward compat
+    SKIPPED = "SKIPPED"
+    FAILED = "FAILED"
+    RESCHEDULED = "RESCHEDULED"
+    OVERDUE = "OVERDUE"
+    ESCALATED = "ESCALATED"
 
 
 class FollowUpType(str, Enum):
@@ -80,3 +85,12 @@ class FollowUp(Base):
     contact_channel: Mapped[str] = mapped_column(String(20), nullable=True)
     last_contact_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    # New CRM fields
+    rule_id: Mapped[str] = mapped_column(String(36), ForeignKey("automation_rules.id"), nullable=True)
+    template_id: Mapped[str] = mapped_column(String(36), ForeignKey("follow_up_templates.id"), nullable=True)
+    channel: Mapped[str] = mapped_column(String(20), nullable=True)  # WHATSAPP, SMS, EMAIL, PHONE, TASK
+    priority: Mapped[str] = mapped_column(String(10), nullable=True, default="MEDIUM")
+    escalation_level: Mapped[int] = mapped_column(Integer, nullable=True, default=0)
+    retry_count: Mapped[int] = mapped_column(Integer, nullable=True, default=0)
+    max_retries: Mapped[int] = mapped_column(Integer, nullable=True, default=1)
+    assigned_to: Mapped[str] = mapped_column(String(36), nullable=True)  # User ID for assigned staff

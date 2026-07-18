@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
+import { NumericInput } from "@/components/ui/numeric-input"
 import { useToast } from "@/components/ui/toast"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -246,7 +247,7 @@ export default function CampaignResponses() {
     try {
       const result = await appointmentsApi.slots({ doctor_id: doctorId, date })
       const data: SlotItem[] = Array.isArray(result) ? result : result?.slots || []
-      const available = data.filter((s: SlotItem) => s.available !== false).map((s: SlotItem) => s.time || s)
+      const available = data.filter((s: SlotItem) => s.available !== false).map((s: SlotItem) => String(s.time || s))
       setAvailSlots(available.length > 0 ? available : [])
     } catch {
       setAvailSlots([])
@@ -561,7 +562,7 @@ export default function CampaignResponses() {
                                 >
                                   <MessageCircle className="h-4 w-4 mr-2" /> WhatsApp
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setReplyText(""); setReplyOpen(resp) }}>
+                                <DropdownMenuItem onClick={() => { setReplyText(""); setReplyOpen({ id: resp.id, message: resp.message || "", phone: resp.phone, patientName: resp.patient_name }) }}>
                                   <Send className="h-4 w-4 mr-2" /> Reply
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleOpenNotes(resp)}>
@@ -716,7 +717,7 @@ export default function CampaignResponses() {
                         <SelectItem value="_none" disabled>No doctors available</SelectItem>
                       ) : (
                         doctors.map((d: DoctorOption) => (
-                          <SelectItem key={d.id || d.doctor_id} value={d.id || d.doctor_id}>
+                          <SelectItem key={d.id || d.doctor_id} value={d.id || d.doctor_id || ""}>
                             {d.full_name || d.doctor_name}
                           </SelectItem>
                         ))
@@ -837,7 +838,7 @@ export default function CampaignResponses() {
                     </div>
                     <div className="space-y-2">
                       <Label>Age</Label>
-                      <Input value={convAge} onChange={(e) => setConvAge(e.target.value)} placeholder="Age" type="number" min="0" max="150" />
+                      <NumericInput value={convAge} onChange={(v) => setConvAge(v)} placeholder="Age" mode="integer" min={0} max={150} />
                     </div>
                     <div className="space-y-2">
                       <Label>OP Number</Label>

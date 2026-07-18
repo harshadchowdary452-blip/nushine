@@ -52,8 +52,8 @@ export default function Settings() {
       setPasswordError("")
     },
     onError: (err: unknown) => {
-      const msg = (err as ApiError)?.response?.data?.detail || "Failed to change password."
-      setPasswordError(msg)
+      const raw = (err as ApiError)?.response?.data?.detail
+      setPasswordError(typeof raw === "string" ? raw : "Failed to change password.")
     },
   })
 

@@ -51,6 +51,11 @@ const DoctorAvailability = lazy(() => import("@/pages/doctors/availability"));
 const CrmDashboard = lazy(() => import("@/pages/dashboard/crm-dashboard"));
 // 
 const CrmSettings = lazy(() => import("@/pages/crm/crm-settings"));
+const FollowUpTemplates = lazy(() => import("@/pages/crm/follow-up-templates"));
+const AutomationRules = lazy(() => import("@/pages/crm/automation-rules"));
+const AutomationBuilder = lazy(() => import("@/pages/crm/automation-builder"));
+const CrmCenter = lazy(() => import("@/pages/crm/crm-center"));
+const EventMonitor = lazy(() => import("@/pages/crm/event-monitor"));
 const ConsentFormList = lazy(() => import("@/pages/consent-forms/list"));
 const ConsentFormView = lazy(() => import("@/pages/consent-forms/view"));
 const ExportCenter = lazy(() => import("@/pages/exports/export-center"));
@@ -164,6 +169,11 @@ export const router = createBrowserRouter([
       { path: "/crm/settings", element: withRoles(<CrmSettings />, ["HOSPITAL_ADMIN"]) },
       { path: "/crm/campaigns", element: withRoles(<Campaigns />, ["HOSPITAL_ADMIN"]) },
       { path: "/crm/campaign-templates", element: withRoles(<CampaignTemplates />, ["HOSPITAL_ADMIN"]) },
+      { path: "/crm/follow-up-templates", element: withRoles(<FollowUpTemplates />, ["HOSPITAL_ADMIN"]) },
+      { path: "/crm/automation-rules", element: withRoles(<AutomationRules />, ["HOSPITAL_ADMIN"]) },
+      { path: "/crm/automation-builder", element: withRoles(<AutomationBuilder />, ["SUPER_ADMIN", "GROUP_ADMIN", "HOSPITAL_ADMIN"]) },
+      { path: "/crm/center", element: withRoles(<CrmCenter />, ADMIN_ROLES) },
+      { path: "/crm/events", element: withRoles(<EventMonitor />, ["SUPER_ADMIN", "GROUP_ADMIN", "HOSPITAL_ADMIN"]) },
 
       { path: "/crm/enquiry-calendar", element: withRoles(<EnquiryCalendar />, ["HOSPITAL_ADMIN"]) },
       { path: "/crm/lead-analytics", element: withRoles(<LeadAnalytics />, ADMIN_ROLES) },

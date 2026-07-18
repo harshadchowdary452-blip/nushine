@@ -630,4 +630,55 @@ export const auditLogApi = {
     api.get("/status/audit-logs", { params: { entity_type: entityType, entity_id: entityId, limit: limit || 50 } }).then((r) => r.data),
 };
 
+export const crmEventsApi = {
+  list: (params?: Record<string, unknown>) =>
+    api.get("/crm/events", { params }).then((r) => r.data),
+  get: (eventId: string) =>
+    api.get(`/crm/events/${eventId}`).then((r) => r.data),
+  pending: (params?: Record<string, unknown>) =>
+    api.get("/crm/events/pending", { params }).then((r) => r.data),
+  failed: (params?: Record<string, unknown>) =>
+    api.get("/crm/events/failed", { params }).then((r) => r.data),
+  retry: (eventId: string) =>
+    api.post(`/crm/events/retry/${eventId}`).then((r) => r.data),
+  replay: (eventId: string) =>
+    api.post(`/crm/events/replay/${eventId}`).then((r) => r.data),
+  statistics: () =>
+    api.get("/crm/events/statistics").then((r) => r.data),
+};
+
+export const crmV2Api = {
+  templates: {
+    list: (params?: Record<string, unknown>) =>
+      api.get("/crm/templates/follow-up", { params }).then((r) => r.data),
+    create: (data: Record<string, unknown>) =>
+      api.post("/crm/templates/follow-up", data).then((r) => r.data),
+    update: (id: string, data: Record<string, unknown>) =>
+      api.put(`/crm/templates/follow-up/${id}`, data).then((r) => r.data),
+    delete: (id: string) => api.delete(`/crm/templates/follow-up/${id}`).then((r) => r.data),
+  },
+  rules: {
+    list: (params?: Record<string, unknown>) =>
+      api.get("/crm/automation-rules", { params }).then((r) => r.data),
+    create: (data: Record<string, unknown>) =>
+      api.post("/crm/automation-rules", data).then((r) => r.data),
+    update: (id: string, data: Record<string, unknown>) =>
+      api.put(`/crm/automation-rules/${id}`, data).then((r) => r.data),
+    delete: (id: string) => api.delete(`/crm/automation-rules/${id}`).then((r) => r.data),
+    toggle: (id: string) => api.post(`/crm/automation-rules/${id}/toggle`).then((r) => r.data),
+  },
+  dashboard: () =>
+    api.get("/crm/follow-ups/dashboard").then((r) => r.data),
+  escalate: (id: string) =>
+    api.post(`/crm/follow-ups/${id}/escalate`).then((r) => r.data),
+  patientTimeline: (patientId: string) =>
+    api.get(`/crm/follow-ups/patient/${patientId}`).then((r) => r.data),
+  reports: {
+    performance: (params?: Record<string, unknown>) =>
+      api.get("/crm/reports/performance", { params }).then((r) => r.data),
+    recallEffectiveness: (params?: Record<string, unknown>) =>
+      api.get("/crm/reports/recall-effectiveness", { params }).then((r) => r.data),
+  },
+};
+
 

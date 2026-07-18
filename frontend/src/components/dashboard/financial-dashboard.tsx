@@ -17,7 +17,7 @@ import KpiCard from "@/components/layout/kpi-card"
 import DateFilterBar from "@/components/ui/date-filter-bar"
 import { Button } from "@/components/ui/button"
 import { formatIndianRupees, formatIndianNumber } from "@/lib/currency"
-import type { RevenueExpenseTrendPoint, ExpenseBreakdownItem } from "@/types"
+import type { RevenueExpenseTrendPoint } from "@/types"
 import { cn } from "@/lib/utils"
 
 const PIE_COLORS = ["#4F46E5", "#EF4444", "#F59E0B", "#10B981", "#8B5CF6", "#EC4899", "#06B6D4", "#F97316", "#14B8A6", "#84CC16"]
@@ -169,7 +169,7 @@ function FinancialDashboard({ className }: FinancialDashboardProps) {
           </CardHeader>
           <CardContent className="px-4 pb-4">
             <ResponsiveContainer width="100%" height={260}>
-              <LineChart data={revenueExpenseTrend.length > 0 ? revenueExpenseTrend : [{ month: "No data", revenue: 0, expenses: 0, profit: 0 }]}>
+              <LineChart data={revenueExpenseTrend.length > 0 ? revenueExpenseTrend : ([{ month: "No data", revenue: 0, expenses: 0, profit: 0, profit_margin: 0 }] as RevenueExpenseTrendPoint[])}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
@@ -203,7 +203,7 @@ function FinancialDashboard({ className }: FinancialDashboardProps) {
                       cx="50%" cy="50%"
                       outerRadius={80}
                       innerRadius={40}
-                      label={({ category, percent }: { category: string; percent: number }) => `${category} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                      label={(props) => `${String((props as unknown as Record<string, unknown>).category ?? "")} ${((Number(props.percent ?? 0)) * 100).toFixed(0)}%`}
                     >
                       {expenseBreakdown.map((_, i) => (
                         <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />

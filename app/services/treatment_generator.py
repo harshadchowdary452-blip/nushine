@@ -85,13 +85,29 @@ class TreatmentGenerator:
         await self.db.flush()
 
         try:
-            from app.services.crm_rule_engine import CRMRuleEngine
-            crm_engine = CRMRuleEngine(self.db)
+            from app.crm.events import get_publisher
+            from app.crm.enums import EventType, EventSource
+            publisher = get_publisher()
             for plan in generated:
-                await crm_engine.on_treatment_assigned(plan.id)
-            await self.db.flush()
-        except Exception as e:
-            logger.warning("CRM assigned trigger failed during generation: %s", e)
+                try:
+                    patient_result = await self.db.execute(
+                        select(Patient.id, Patient.hospital_id).join(Case, Case.patient_id == Patient.id).where(Case.id == case_id)
+                    )
+                    patient_row = patient_result.one_or_none()
+                    await publisher.publish(
+                        event_type=EventType.TREATMENT_CREATED,
+                        source_module=EventSource.TREATMENT,
+                        entity_type="TREATMENT",
+                        entity_id=plan.id,
+                        hospital_id=patient_row[1] if patient_row else None,
+                        patient_id=patient_row[0] if patient_row else None,
+                        doctor_id=plan.assigned_doctor_id,
+                        db=self.db,
+                    )
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
         logger.info("Generated %d treatments from %d items for case %s", len(generated), len(items), case_id)
         return generated

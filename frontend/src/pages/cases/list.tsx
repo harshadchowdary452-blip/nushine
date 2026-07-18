@@ -28,6 +28,7 @@ interface CaseDoctor {
   id: string
   full_name?: string
   name?: string
+  username?: string
 }
 
 const STATUS_OPTIONS = [

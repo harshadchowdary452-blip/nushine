@@ -68,6 +68,19 @@ async def create_lead(data: LeadCreate, db: AsyncSession = Depends(get_db), curr
     lead = await service.create(data_dict, user_id=current_user.get("sub"))
     await _recalc_lead_score(db, lead)
     await db.flush()
+    try:
+        from app.crm.events import get_publisher
+        from app.crm.enums import EventType, EventSource
+        await get_publisher().publish(
+            event_type=EventType.LEAD_CREATED,
+            source_module=EventSource.LEAD,
+            entity_type="LEAD",
+            entity_id=lead.id,
+            hospital_id=getattr(lead, 'hospital_id', None),
+            db=db,
+        )
+    except Exception:
+        pass
     return lead
 
 
@@ -152,6 +165,20 @@ async def update_lead_status(lead_id: str, data: LeadStatusUpdate, db: AsyncSess
                 description=f"Lead '{result.lead_name}' status changed from {old_status} to {result.status}",
                 module="CRM",
             )
+    try:
+        from app.crm.events import get_publisher
+        from app.crm.enums import EventType, EventSource
+        if result and result.status in ("LOST", "NOT_INTERESTED", "NO_RESPONSE"):
+            await get_publisher().publish(
+                event_type=EventType.LEAD_LOST,
+                source_module=EventSource.LEAD,
+                entity_type="LEAD",
+                entity_id=lead_id,
+                hospital_id=getattr(result, 'hospital_id', None),
+                db=db,
+            )
+    except Exception:
+        pass
     return result
 
 
@@ -233,6 +260,20 @@ async def convert_lead(lead_id: str, data: LeadConvertCreate, db: AsyncSession =
             description=f"Lead {lead_id} converted to patient",
             module="CRM",
         )
+    try:
+        from app.crm.events import get_publisher
+        from app.crm.enums import EventType, EventSource
+        await get_publisher().publish(
+            event_type=EventType.LEAD_CONVERTED,
+            source_module=EventSource.LEAD,
+            entity_type="LEAD",
+            entity_id=lead_id,
+            hospital_id=getattr(result, 'hospital_id', None),
+            patient_id=result.get("patient_id"),
+            db=db,
+        )
+    except Exception:
+        pass
     return result
 
 

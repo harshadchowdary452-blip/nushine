@@ -30,7 +30,7 @@ import { doctorsApi, hospitalsApi, groupsApi } from "@/services/endpoints"
 import { useAuthStore } from "@/store/authStore"
 import { useToast } from "@/components/ui/toast"
 import DentalEmptyState from "@/components/ui/dental-empty-state"
-import type { User, Hospital, AdminGroup } from "@/types"
+import type { User } from "@/types"
 import { extractDetail } from "@/types"
 
 interface DoctorForm {

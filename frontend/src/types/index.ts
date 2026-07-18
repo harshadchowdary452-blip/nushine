@@ -313,6 +313,7 @@ export interface TreatmentPlan {
   case_number?: string;
   case_status?: string;
   hospital_name?: string;
+  patient?: Patient;
   created_at: string;
   updated_at: string;
   sittings?: TreatmentSitting[];

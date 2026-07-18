@@ -333,6 +333,7 @@ export default function CaseReportPrint({ c }: { c: CasePrintData }) {
           if (!items || items.length === 0) {
             if (c.treatment_plans && c.treatment_plans.length > 0) {
               items = c.treatment_plans.map((tp: TreatmentPlan) => ({
+                id: tp.id,
                 name: tp.treatment_name || "\u2014",
                 toothNumbers: [],
                 estimatedVisits: tp.total_sittings || "",

@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
+import { NumericInput } from "@/components/ui/numeric-input"
 import { useToast } from "@/components/ui/toast"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -314,7 +315,7 @@ interface CampaignRowProps {
 
 function CampaignRow({ campaign: c, onDelete, onArchive, onDuplicate, onResend, onLaunch, onViewRecipients, launchPending }: CampaignRowProps) {
   const [liveProgress, setLiveProgress] = useState<CampaignProgress | null>(null)
-  const ChannelIcon = channelIcon[c.channel] || MessageCircle
+  const ChannelIcon = channelIcon[c.channel || ""] || MessageCircle
   const total = c.patients_targeted || 1
   const sent = c.messages_sent || 0
   const failed = c.messages_failed || 0
@@ -347,12 +348,12 @@ function CampaignRow({ campaign: c, onDelete, onArchive, onDuplicate, onResend, 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-semibold text-gray-900">{c.name}</span>
-            <Badge className={`text-xs ${statusBadge[c.status] || ""}`}>{c.status}</Badge>
+            <Badge className={`text-xs ${statusBadge[c.status || ""] || ""}`}>{c.status}</Badge>
             {c.is_active === false && <Badge className="text-xs bg-gray-50 text-gray-500">Archived</Badge>}
             <span className="text-xs text-gray-400 ml-auto">{c.created_at ? new Date(c.created_at).toLocaleDateString() : ""}</span>
           </div>
           <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-            <span className="flex items-center gap-1"><Target className="h-3 w-3" />{targetLabels[c.target] || c.target}</span>
+            <span className="flex items-center gap-1"><Target className="h-3 w-3" />{targetLabels[c.target || ""] || c.target}</span>
             <span className="flex items-center gap-1"><Send className="h-3 w-3" />{displaySent} sent</span>
             <span className="flex items-center gap-1 text-green-600"><CheckCircle className="h-3 w-3" />{displayDelivered} delivered</span>
             {displayFailed > 0 && <span className="flex items-center gap-1 text-red-500"><AlertCircle className="h-3 w-3" />{displayFailed} failed</span>}
@@ -497,7 +498,7 @@ function CampaignWizard({ quickType, onDone }: { quickType: string | null; onDon
   const previewAudience = async () => {
     setPreviewLoading(true)
     try {
-      const result = await campaignsApi.previewAudience({ target, filters: Object.keys(filters).length ? filters : undefined })
+      const result = await campaignsApi.previewAudience({ target, filters: Object.keys(filters).length ? filters as Record<string, unknown> : undefined })
       setPreviewCount(result.total_count ?? result.count ?? result.total ?? 0)
     } catch { setPreviewCount(0) }
     setPreviewLoading(false)
@@ -609,11 +610,11 @@ function CampaignWizard({ quickType, onDone }: { quickType: string | null; onDon
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Min Age</Label>
-              <Input type="number" value={filters.age_min || ""} onChange={(e) => setFilters((f: CampaignFilters) => ({ ...f, age_min: e.target.value ? Number(e.target.value) : undefined }))} />
+              <NumericInput value={filters.age_min || ""} onChange={(v) => setFilters((f: CampaignFilters) => ({ ...f, age_min: v ? Number(v) : undefined }))} mode="integer" min={0} max={150} />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Max Age</Label>
-              <Input type="number" value={filters.age_max || ""} onChange={(e) => setFilters((f: CampaignFilters) => ({ ...f, age_max: e.target.value ? Number(e.target.value) : undefined }))} />
+              <NumericInput value={filters.age_max || ""} onChange={(v) => setFilters((f: CampaignFilters) => ({ ...f, age_max: v ? Number(v) : undefined }))} mode="integer" min={0} max={150} />
             </div>
           </div>
           <Button variant="outline" size="sm" className="gap-1" onClick={previewAudience} disabled={previewLoading}>
@@ -649,7 +650,7 @@ function CampaignWizard({ quickType, onDone }: { quickType: string | null; onDon
           {templates.length > 0 && (
             <div className="space-y-1 max-h-40 overflow-y-auto border rounded-lg p-2">
                 {templates.map((t: CampaignTemplateItem) => (
-                <button key={t.id} type="button" onClick={() => { setSelectedTemplate(t.id); setMessage(t.message) }}
+                <button key={t.id} type="button" onClick={() => { setSelectedTemplate(t.id); setMessage(t.message || "") }}
                   className={cn("w-full text-left px-3 py-2 rounded-md text-sm transition-colors", selectedTemplate === t.id ? "bg-blue-50 text-blue-700 font-medium" : "hover:bg-gray-50")}>
                   {t.name}
                 </button>

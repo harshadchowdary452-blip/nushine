@@ -7,7 +7,6 @@ import {
 } from "lucide-react"
 import { useAuthStore } from "@/store/authStore"
 import { dashboardApi } from "@/services/endpoints"
-import type { Performer } from "@/types"
 import { Skeleton } from "@/components/ui/skeleton"
 import KpiCard from "@/components/layout/kpi-card"
 import Leaderboard from "@/components/ui/leaderboard"
@@ -42,15 +41,15 @@ export default function SuperAdminDashboard() {
   })
 
   const onGroupClick = useCallback((id?: string) => {
-    const item = (stats?.group_performance ?? []).find((d) => d.id === id)
+    const item = (stats?.group_performance ?? []).find((d: { id?: string; name?: string; value?: number }) => d.id === id)
     if (item) setQuickView({ type: "admin-group", id: item.id, name: item.name })
   }, [stats?.group_performance])
   const onHospitalClick = useCallback((id?: string) => {
-    const item = (stats?.hospital_performance ?? []).find((d) => d.id === id)
+    const item = (stats?.hospital_performance ?? []).find((d: { id?: string; name?: string; value?: number }) => d.id === id)
     if (item) setQuickView({ type: "hospital", id: item.id, name: item.name })
   }, [stats?.hospital_performance])
   const onDoctorClick = useCallback((id?: string) => {
-    const item = (stats?.top_doctors ?? []).find((d) => d.id === id)
+    const item = (stats?.top_doctors ?? []).find((d: { id?: string; name?: string; value?: number }) => d.id === id)
     if (item) setQuickView({ type: "doctor", id: item.id, name: item.name })
   }, [stats?.top_doctors])
 
@@ -109,8 +108,8 @@ export default function SuperAdminDashboard() {
               title="Top Admin Groups"
               valueLabel="Revenue"
               icon={Award}
-              items={(stats?.group_performance ?? []).map((d, i) => ({
-                rank: i + 1, name: d.name, value: formatIndianRupees(d.value), id: d.id,
+              items={(stats?.group_performance ?? []).map((d: { id?: string; name?: string; value?: number }, i: number) => ({
+                rank: i + 1, name: d.name || "", value: formatIndianRupees(d.value || 0), id: d.id || "",
               }))}
               onItemClick={onGroupClick}
             />
@@ -118,8 +117,8 @@ export default function SuperAdminDashboard() {
               title="Top Hospitals"
               valueLabel="Revenue"
               icon={Award}
-              items={(stats?.hospital_performance ?? []).map((d, i) => ({
-                rank: i + 1, name: d.name, value: formatIndianRupees(d.value), id: d.id,
+              items={(stats?.hospital_performance ?? []).map((d: { id?: string; name?: string; value?: number }, i: number) => ({
+                rank: i + 1, name: d.name || "", value: formatIndianRupees(d.value || 0), id: d.id || "",
               }))}
               onItemClick={onHospitalClick}
             />
@@ -127,8 +126,8 @@ export default function SuperAdminDashboard() {
               title="Top Doctors"
               valueLabel="Revenue"
               icon={Award}
-              items={(stats?.top_doctors ?? []).map((d, i) => ({
-                rank: i + 1, name: d.name, value: formatIndianRupees(d.value), id: d.id,
+              items={(stats?.top_doctors ?? []).map((d: { id?: string; name?: string; value?: number }, i: number) => ({
+                rank: i + 1, name: d.name || "", value: formatIndianRupees(d.value || 0), id: d.id || "",
               }))}
               onItemClick={onDoctorClick}
             />

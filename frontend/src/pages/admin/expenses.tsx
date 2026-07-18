@@ -11,6 +11,7 @@ import { format } from "date-fns"
 import PageHeader from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { NumericInput } from "@/components/ui/numeric-input"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Textarea } from "@/components/ui/textarea"
@@ -30,6 +31,7 @@ import { expensesApi, hospitalsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
 import { useAuthStore } from "@/store/authStore"
 import type { HospitalMonthlyExpense, Hospital, ApiError } from "@/types"
+import { extractDetail } from "@/types"
 
 const EXPENSE_CATEGORIES = [
   "Staff Salaries", "Rent", "Electricity", "Water", "Internet",
@@ -148,7 +150,7 @@ export default function AdminExpenses() {
       resetForm()
     },
     onError: (err: ApiError) => {
-      addToast({ title: "Failed to create expense", description: err?.response?.data?.detail || err.message, variant: "destructive" })
+      addToast({ title: "Failed to create expense", description: extractDetail(err) || err.message, variant: "destructive" })
     },
   })
 
@@ -165,7 +167,7 @@ export default function AdminExpenses() {
       resetForm()
     },
     onError: (err: ApiError) => {
-      addToast({ title: "Failed to update expense", description: err?.response?.data?.detail || err.message, variant: "destructive" })
+      addToast({ title: "Failed to update expense", description: extractDetail(err) || err.message, variant: "destructive" })
     },
   })
 
@@ -179,7 +181,7 @@ export default function AdminExpenses() {
       addToast({ title: "Expense deleted", variant: "success" })
     },
     onError: (err: ApiError) => {
-      addToast({ title: "Failed to delete expense", description: err?.response?.data?.detail || err.message, variant: "destructive" })
+      addToast({ title: "Failed to delete expense", description: extractDetail(err) || err.message, variant: "destructive" })
     },
   })
 
@@ -684,13 +686,11 @@ export default function AdminExpenses() {
             </div>
             <div className="relative mt-4">
               <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none z-10 peer-focus:text-primary" />
-              <Input
+              <NumericInput
                 id="amount"
-                type="number"
-                min={1}
-                step={0.01}
+                mode="currency" prefix="₹"
                 value={formData.amount || ""}
-                onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })}
+                onChange={(v) => setFormData({ ...formData, amount: parseFloat(v) || 0 })}
                 placeholder=" "
                 className="peer h-12 pl-9 pt-5 pb-1"
               />

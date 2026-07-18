@@ -47,6 +47,20 @@ async def create_billing(data: BillingCreate, db: AsyncSession = Depends(get_db)
             description=f"Billing created (amount: {billing_obj.total_amount}, status: {billing_obj.payment_status})",
             module="Billing",
         )
+    try:
+        from app.crm.events import get_publisher
+        from app.crm.enums import EventType, EventSource
+        await get_publisher().publish(
+            event_type=EventType.PAYMENT_CREATED,
+            source_module=EventSource.BILLING,
+            entity_type="BILLING",
+            entity_id=billing.id,
+            hospital_id=getattr(billing, 'hospital_id', None),
+            patient_id=patient_id,
+            db=db,
+        )
+    except Exception:
+        pass
     return billing
 
 
@@ -228,6 +242,20 @@ async def update_payment(billing_id: str, data: BillingUpdate, db: AsyncSession 
         module="Billing",
         changes=[{"field": "paid_amount", "old_value": str(old_paid), "new_value": str(updated.paid_amount)}],
     )
+    try:
+        from app.crm.events import get_publisher
+        from app.crm.enums import EventType, EventSource
+        await get_publisher().publish(
+            event_type=EventType.PAYMENT_RECEIVED,
+            source_module=EventSource.BILLING,
+            entity_type="BILLING",
+            entity_id=updated.id,
+            hospital_id=getattr(updated, 'hospital_id', None),
+            patient_id=patient_id,
+            db=db,
+        )
+    except Exception:
+        pass
     return updated
 
 

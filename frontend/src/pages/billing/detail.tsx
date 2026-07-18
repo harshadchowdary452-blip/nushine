@@ -5,6 +5,7 @@ import { billingApi } from "@/services/endpoints";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast";
@@ -298,11 +299,12 @@ export default function BillingDetail() {
             <div className="space-y-4 max-w-md">
               <div>
                 <Label>Amount (₹)</Label>
-                <Input
-                  type="number"
+                <NumericInput
+                  mode="currency"
+                  prefix="₹"
                   placeholder="Enter amount"
                   value={paymentAmount}
-                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  onChange={(v) => setPaymentAmount(v)}
                 />
               </div>
               <div>
@@ -442,16 +444,16 @@ export default function BillingDetail() {
             {discountType === "PERCENTAGE" ? (
               <div>
                 <Label>Discount (%)</Label>
-                <Input type="number" min="0" max="100" placeholder="Enter percentage"
+                <NumericInput mode="percentage" suffix="%" min={0} max={100} placeholder="Enter percentage"
                   value={discountPercent}
-                  onChange={(e) => setDiscountPercent(e.target.value)} />
+                  onChange={(v) => setDiscountPercent(v)} />
               </div>
             ) : (
               <div>
                 <Label>Discount Amount (₹)</Label>
-                <Input type="number" min="0" placeholder="Enter amount"
+                <NumericInput mode="currency" prefix="₹" min={0} placeholder="Enter amount"
                   value={discountFixed}
-                  onChange={(e) => setDiscountFixed(e.target.value)} />
+                  onChange={(v) => setDiscountFixed(v)} />
               </div>
             )}
             <div className="rounded-lg bg-gray-50 p-3 space-y-1 text-sm">

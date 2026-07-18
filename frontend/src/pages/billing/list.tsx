@@ -18,6 +18,7 @@ import PageHeader from "@/components/layout/page-header"
 import KpiCard from "@/components/layout/kpi-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { NumericInput } from "@/components/ui/numeric-input"
 
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent } from "@/components/ui/card"
@@ -41,7 +42,8 @@ import { billingApi, casesApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
 import QuickExport from "@/components/ui/quick-export"
 import { formatIndianRupees } from "@/lib/currency"
-import type { Billing, Case, PaginatedResponse, ApiError } from "@/types"
+import type { Billing, Case, PaginatedResponse } from "@/types"
+import { extractDetail } from "@/types"
 import { useAuthStore } from "@/store/authStore"
 
 function StatusBadge({ status }: { status: string }) {
@@ -121,8 +123,7 @@ export default function BillingList() {
       setDeletingBilling(null)
     },
     onError: (err: unknown) => {
-      const msg = (err as ApiError)?.response?.data?.detail || "Failed to delete invoice"
-      addToast({ title: "Error", description: msg, variant: "destructive" })
+      addToast({ title: "Error", description: extractDetail(err) || "Failed to delete invoice", variant: "destructive" })
     },
   })
 
@@ -146,7 +147,7 @@ export default function BillingList() {
       resetForm()
     },
     onError: (err: unknown) => {
-      addToast({ title: "Error", description: (err as ApiError)?.response?.data?.detail || "Failed to create invoice", variant: "destructive" })
+      addToast({ title: "Error", description: extractDetail(err) || "Failed to create invoice", variant: "destructive" })
     },
   })
 
@@ -462,23 +463,25 @@ export default function BillingList() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="total">Total Amount</Label>
-                  <Input
+                  <NumericInput
                     id="total"
-                    type="number"
+                    mode="currency"
+                    prefix="₹"
                     placeholder="0"
                     required
                     value={form.total_amount ?? ""}
-                    onChange={(e) => setForm({ ...form, total_amount: e.target.value ? Number(e.target.value) : null })}
+                    onChange={(v) => setForm({ ...form, total_amount: v ? Number(v) : null })}
                   />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="paid">Paid Amount</Label>
-                  <Input
+                  <NumericInput
                     id="paid"
-                    type="number"
+                    mode="currency"
+                    prefix="₹"
                     placeholder="0"
                     value={form.paid_amount ?? ""}
-                    onChange={(e) => setForm({ ...form, paid_amount: e.target.value ? Number(e.target.value) : null })}
+                    onChange={(v) => setForm({ ...form, paid_amount: v ? Number(v) : null })}
                   />
               </div>
               <div className="border-t pt-4">
@@ -504,15 +507,16 @@ export default function BillingList() {
                 {form.discount_type === "PERCENTAGE" ? (
                   <div className="grid gap-2">
                     <Label>Discount %</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      max="100"
+                    <NumericInput
+                      mode="percentage"
+                      suffix="%"
+                      min={0}
+                      max={100}
                       step="0.1"
                       placeholder="0"
                       value={form.discount_percent || ""}
-                      onChange={(e) => {
-                        const pct = Math.min(100, Math.max(0, Number(e.target.value) || 0))
+                      onChange={(v) => {
+                        const pct = Math.min(100, Math.max(0, Number(v) || 0))
                         const gross = form.total_amount ?? 0
                         const amt = Math.round(gross * pct / 100 * 100) / 100
                         setForm({ ...form, discount_percent: pct, discount_amount: amt })
@@ -522,15 +526,16 @@ export default function BillingList() {
                 ) : (
                   <div className="grid gap-2">
                     <Label>Discount Amount (Rs.)</Label>
-                    <Input
-                      type="number"
-                      min="0"
+                    <NumericInput
+                      mode="currency"
+                      prefix="₹"
+                      min={0}
                       step="1"
                       placeholder="0"
                       value={form.discount_amount || ""}
-                      onChange={(e) => {
+                      onChange={(v) => {
                         const gross = form.total_amount ?? 0
-                        const amt = Math.min(gross, Math.max(0, Number(e.target.value) || 0))
+                        const amt = Math.min(gross, Math.max(0, Number(v) || 0))
                         const pct = gross > 0 ? Math.round(amt / gross * 100 * 100) / 100 : 0
                         setForm({ ...form, discount_amount: amt, discount_percent: pct })
                       }}

@@ -54,10 +54,13 @@ export default function WhatsAppMessaging() {
   const [template, setTemplate] = useState("")
   const [filterType, setFilterType] = useState("all")
   const [showPreview, setShowPreview] = useState(false)
-  const [previewData, setPreviewData] = useState<Record<string, unknown> | null>(null)
+  interface PreviewPayload { patient_id: string; patient_name: string; patient_phone: string | null; doctor_name: string | null; hospital_name: string | null; rendered_message: string; resolved_variables: Record<string, string>; unresolved_variables: string[]; validation: Record<string, boolean>; variables_panel: Record<string, Record<string, string | undefined>> }
+  const [previewData, setPreviewData] = useState<PreviewPayload | null>(null)
 
+  interface BulkItemPayload { patient_id: string; patient_name: string; patient_phone: string | null; rendered_message: string; resolved_variables: Record<string, string>; unresolved_variables: string[]; validation: Record<string, boolean>; has_phone: boolean; is_valid: boolean }
+  interface BulkPreviewPayload { items: BulkItemPayload[]; totals: { total: number; valid: number; invalid: number; with_phone: number; without_phone: number }; message: string }
   const [showBulkPreview, setShowBulkPreview] = useState(false)
-  const [bulkPreviewData, setBulkPreviewData] = useState<Record<string, unknown> | null>(null)
+  const [bulkPreviewData, setBulkPreviewData] = useState<BulkPreviewPayload | null>(null)
 
   const [historyPage, setHistoryPage] = useState(1)
   const [historyFilter, setHistoryFilter] = useState({ patient_id: "", message_type: "", status: "" })
@@ -160,9 +163,11 @@ export default function WhatsAppMessaging() {
   }
 
   async function handleSendFromPreview(mode: "redirect" | "api") {
+    if (!previewData) return
+    const pd = previewData
     sendMutation.mutate({
-      patient_id: previewData.patient_id,
-      message: previewData.rendered_message,
+      patient_id: pd.patient_id,
+      message: pd.rendered_message,
       send_mode: mode,
     })
   }
@@ -178,12 +183,12 @@ export default function WhatsAppMessaging() {
 
   async function handleBulkSend(mode: "redirect" | "api") {
     if (!bulkPreviewData) return
-    const validItems = (bulkPreviewData.items as Record<string, unknown>[])
+    const validItems = bulkPreviewData.items
       .filter((i) => i.is_valid)
       .map((i) => ({
         patient_id: i.patient_id,
         message: i.rendered_message,
-        message_type: "GENERAL",
+        message_type: "GENERAL" as string,
       }))
     bulkSendMutation.mutate({ items: validItems, send_mode: mode })
   }
@@ -497,26 +502,26 @@ export default function WhatsAppMessaging() {
                       <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">No messages sent yet</td></tr>
                     )}
                     {historyData?.items?.map((item: Record<string, unknown>) => (
-                      <tr key={item.id} className="border-b last:border-0 hover:bg-gray-50">
+                      <tr key={String(item.id)} className="border-b last:border-0 hover:bg-gray-50">
                         <td className="px-4 py-2.5">
                           <div>
-                            <p className="font-medium text-gray-900">{item.patient_name}</p>
-                            <p className="text-xs text-gray-500">{item.patient_phone}</p>
+                            <p className="font-medium text-gray-900">{item.patient_name as string}</p>
+                            <p className="text-xs text-gray-500">{item.patient_phone as string}</p>
                           </div>
                         </td>
                         <td className="px-4 py-2.5">
-                          <Badge variant="info">{item.message_type}</Badge>
+                          <Badge variant="info">{item.message_type as string}</Badge>
                         </td>
                         <td className="px-4 py-2.5">
-                          <Badge variant={item.status === "SENT" || item.status === "DELIVERED" ? "success" : item.status === "FAILED" ? "destructive" : "default"}>
-                            {item.status}
+                          <Badge variant={(item.status === "SENT" || item.status === "DELIVERED") ? "success" : item.status === "FAILED" ? "destructive" : "default"}>
+                            {item.status as string}
                           </Badge>
                         </td>
                         <td className="px-4 py-2.5 text-gray-600">
                           {item.sent_via === "api" ? <><Smartphone className="h-3.5 w-3.5 inline mr-1" />API</> : <><ExternalLink className="h-3.5 w-3.5 inline mr-1" />Redirect</>}
                         </td>
-                        <td className="px-4 py-2.5 text-gray-600">{item.template_name || "-"}</td>
-                        <td className="px-4 py-2.5 text-gray-500 text-xs">{item.sent_at ? new Date(item.sent_at).toLocaleString() : "-"}</td>
+                        <td className="px-4 py-2.5 text-gray-600">{(item.template_name as string) || "-"}</td>
+                        <td className="px-4 py-2.5 text-gray-500 text-xs">{item.sent_at ? new Date(item.sent_at as string).toLocaleString() : "-"}</td>
                       </tr>
                     ))}
                   </tbody>

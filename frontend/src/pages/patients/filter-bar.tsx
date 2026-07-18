@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { Search, X, SlidersHorizontal } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import { NumericInput } from "@/components/ui/numeric-input"
 import { Button } from "@/components/ui/button"
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -191,13 +192,13 @@ export default function PatientFilterBar({
           </FilterField>
 
           <FilterField label="Age From">
-            <Input type="number" placeholder="Min" value={filters.age_from || ""}
-              onChange={(e) => setFilter("age_from", e.target.value)} className="w-[75px] h-9 text-sm" />
+            <NumericInput placeholder="Min" mode="integer" min={0} max={150} value={filters.age_from || ""}
+              onChange={(v) => setFilter("age_from", v)} className="w-[75px] h-9 text-sm" />
           </FilterField>
 
           <FilterField label="Age To">
-            <Input type="number" placeholder="Max" value={filters.age_to || ""}
-              onChange={(e) => setFilter("age_to", e.target.value)} className="w-[75px] h-9 text-sm" />
+            <NumericInput placeholder="Max" mode="integer" min={0} max={150} value={filters.age_to || ""}
+              onChange={(v) => setFilter("age_to", v)} className="w-[75px] h-9 text-sm" />
           </FilterField>
 
           <FilterField label="Case Status">

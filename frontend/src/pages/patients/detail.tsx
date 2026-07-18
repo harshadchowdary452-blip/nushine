@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -32,6 +33,7 @@ import { useToast } from "@/components/ui/toast";
 import { formatIndianRupees } from "@/lib/currency";
 import SearchableSelect from "@/components/ui/searchable-select";
 import type { Case, Appointment, Billing, TreatmentPlan, PatientTimelineEntry, DoctorListItem, ApiError, ConsentForm, FollowUpResponse } from "@/types";
+import { extractDetail } from "@/types";
 import {
   User,
   Phone,
@@ -133,7 +135,7 @@ export default function PatientDetail() {
       setApptOpen(false);
     },
     onError: (err: ApiError) => {
-      addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to create appointment", variant: "destructive" });
+      addToast({ title: "Error", description: extractDetail(err) || "Failed to create appointment", variant: "destructive" });
     },
   });
 
@@ -146,7 +148,7 @@ export default function PatientDetail() {
       setCaseOpen(false);
     },
     onError: (err: ApiError) => {
-      addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to create case", variant: "destructive" });
+      addToast({ title: "Error", description: extractDetail(err) || "Failed to create case", variant: "destructive" });
     },
   });
 
@@ -617,10 +619,12 @@ export default function PatientDetail() {
                         </div>
                         <div className="grid gap-2">
                           <Label>Age</Label>
-                          <Input
-                            type="number"
+                          <NumericInput
+                            mode="integer"
+                            min={0}
+                            max={150}
                             value={editForm.age}
-                            onChange={(e) => setEditForm((f) => ({ ...f, age: e.target.value }))}
+                            onChange={(v) => setEditForm((f) => ({ ...f, age: v }))}
                           />
                         </div>
                       </div>
@@ -740,11 +744,11 @@ export default function PatientDetail() {
                     <div className="grid grid-cols-5 gap-3">
                       <div className="grid gap-1">
                         <Label className="text-xs">Height (cm)</Label>
-                        <Input type="number" step="0.1" className="h-8 text-xs" value={editForm.height} onChange={(e) => setEditForm((f) => ({ ...f, height: e.target.value }))} />
+                        <NumericInput mode="decimal" decimalPlaces={1} className="h-8 text-xs" value={editForm.height} onChange={(v) => setEditForm((f) => ({ ...f, height: v }))} />
                       </div>
                       <div className="grid gap-1">
                         <Label className="text-xs">Weight (kg)</Label>
-                        <Input type="number" step="0.1" className="h-8 text-xs" value={editForm.weight} onChange={(e) => setEditForm((f) => ({ ...f, weight: e.target.value }))} />
+                        <NumericInput mode="decimal" decimalPlaces={1} className="h-8 text-xs" value={editForm.weight} onChange={(v) => setEditForm((f) => ({ ...f, weight: v }))} />
                       </div>
                       <div className="grid gap-1">
                         <Label className="text-xs">BP</Label>
@@ -756,7 +760,7 @@ export default function PatientDetail() {
                       </div>
                       <div className="grid gap-1">
                         <Label className="text-xs">SpO2 (%)</Label>
-                        <Input type="number" step="0.1" className="h-8 text-xs" placeholder="98" value={editForm.spo2} onChange={(e) => setEditForm((f) => ({ ...f, spo2: e.target.value }))} />
+                        <NumericInput mode="decimal" decimalPlaces={1} className="h-8 text-xs" placeholder="98" value={editForm.spo2} onChange={(v) => setEditForm((f) => ({ ...f, spo2: v }))} />
                       </div>
                     </div>
                   </div>
@@ -1189,17 +1193,17 @@ export default function PatientDetail() {
                             {r.created_at ? new Date(r.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "-"}
                           </td>
                           <td className="px-3 py-2.5 text-xs">
-                            <span className="font-medium">{typeLabel[r.follow_up_type] || r.follow_up_type || "-"}</span>
+                            <span className="font-medium">{typeLabel[r.follow_up_type || ""] || r.follow_up_type || "-"}</span>
                           </td>
                           <td className="px-3 py-2.5 text-xs max-w-[200px] truncate">
                             {r.response_message || <span className="text-muted-foreground italic">No message</span>}
                           </td>
                           <td className="px-3 py-2.5">
-                            <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${respColor[r.response_status] || "bg-gray-100 text-gray-600"}`}>
+                            <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${respColor[r.response_status || ""] || "bg-gray-100 text-gray-600"}`}>
                               {r.response_status}
                             </span>
                           </td>
-                          <td className={`px-3 py-2.5 text-xs font-medium ${fbColor[r.feedback] || ""}`}>
+                          <td className={`px-3 py-2.5 text-xs font-medium ${fbColor[r.feedback || ""] || ""}`}>
                             {r.feedback || "-"}
                           </td>
                           <td className="px-3 py-2.5 text-xs">

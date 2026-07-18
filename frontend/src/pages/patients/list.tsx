@@ -14,6 +14,7 @@ import { format } from "date-fns"
 import PageHeader from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { NumericInput } from "@/components/ui/numeric-input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -429,7 +430,7 @@ export default function PatientList() {
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="age">Age</Label>
-                  <Input id="age" type="number" value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} />
+                  <NumericInput id="age" mode="integer" min={0} max={150} value={form.age} onChange={(v) => setForm({ ...form, age: v })} />
                 </div>
               </div>
               <div className="grid gap-2">
@@ -479,11 +480,11 @@ export default function PatientList() {
                 <div className="grid grid-cols-5 gap-3">
                   <div className="grid gap-1">
                     <Label htmlFor="height" className="text-xs">Height (cm)</Label>
-                    <Input id="height" type="number" step="0.1" className="h-8 text-xs" value={form.height} onChange={(e) => setForm({ ...form, height: e.target.value })} />
+                    <NumericInput id="height" mode="decimal" decimalPlaces={1} suffix="cm" className="h-8 text-xs" value={form.height} onChange={(v) => setForm({ ...form, height: v })} />
                   </div>
                   <div className="grid gap-1">
                     <Label htmlFor="weight" className="text-xs">Weight (kg)</Label>
-                    <Input id="weight" type="number" step="0.1" className="h-8 text-xs" value={form.weight} onChange={(e) => setForm({ ...form, weight: e.target.value })} />
+                    <NumericInput id="weight" mode="decimal" decimalPlaces={1} suffix="kg" className="h-8 text-xs" value={form.weight} onChange={(v) => setForm({ ...form, weight: v })} />
                   </div>
                   <div className="grid gap-1">
                     <Label htmlFor="bp" className="text-xs">BP</Label>
@@ -495,7 +496,7 @@ export default function PatientList() {
                   </div>
                   <div className="grid gap-1">
                     <Label htmlFor="spo2" className="text-xs">SpO2 (%)</Label>
-                    <Input id="spo2" type="number" step="0.1" className="h-8 text-xs" placeholder="98" value={form.spo2} onChange={(e) => setForm({ ...form, spo2: e.target.value })} />
+                    <NumericInput id="spo2" mode="decimal" decimalPlaces={1} suffix="%" className="h-8 text-xs" placeholder="98" value={form.spo2} onChange={(v) => setForm({ ...form, spo2: v })} />
                   </div>
                 </div>
               </div>

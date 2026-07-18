@@ -279,6 +279,21 @@ async def send_whatsapp(
         db, req.patient_id, hospital_id, current_user.get("sub"),
         CommunicationChannel.WHATSAPP.value, req.message_type, rendered, status_val)
     await db.commit()
+    try:
+        from app.crm.events import get_publisher
+        from app.crm.enums import EventType, EventSource
+        event_type = EventType.COMMUNICATION_SENT if success else EventType.COMMUNICATION_FAILED
+        await get_publisher().publish(
+            event_type=event_type,
+            source_module=EventSource.COMMUNICATION,
+            entity_type="COMMUNICATION",
+            entity_id=log.id,
+            hospital_id=hospital_id,
+            patient_id=req.patient_id,
+            db=db,
+        )
+    except Exception:
+        pass
     if not success:
         raise HTTPException(status_code=500, detail="Failed to send WhatsApp message")
     return {"success": True, "log_id": log.id, "rendered_message": rendered}
@@ -424,6 +439,20 @@ async def send_email(
         CommunicationStatus.SENT.value, subject=rendered_subject,
         attachment_url=attachment_url)
     await db.commit()
+    try:
+        from app.crm.events import get_publisher
+        from app.crm.enums import EventType, EventSource
+        await get_publisher().publish(
+            event_type=EventType.COMMUNICATION_SENT,
+            source_module=EventSource.COMMUNICATION,
+            entity_type="COMMUNICATION",
+            entity_id=log.id,
+            hospital_id=hospital_id,
+            patient_id=req.patient_id,
+            db=db,
+        )
+    except Exception:
+        pass
     return {"success": True, "log_id": log.id}
 
 
@@ -904,6 +933,20 @@ async def mark_follow_up_completed(
         description=f"Follow-up marked as completed",
         module="CRM",
     )
+    try:
+        from app.crm.events import get_publisher
+        from app.crm.enums import EventType, EventSource
+        await get_publisher().publish(
+            event_type=EventType.FOLLOWUP_COMPLETED,
+            source_module=EventSource.FOLLOW_UP,
+            entity_type="FOLLOW_UP",
+            entity_id=follow_up_id,
+            hospital_id=getattr(fu, 'hospital_id', None),
+            patient_id=fu.patient_id,
+            db=db,
+        )
+    except Exception:
+        pass
     return {"success": True}
 
 

@@ -75,6 +75,20 @@ async def create_enquiry(data: EnquiryCreate, db: AsyncSession = Depends(get_db)
         description=f"Enquiry created for {data.treatment_interest} (status: {enquiry.status})",
         module="CRM",
     )
+    try:
+        from app.crm.events import get_publisher
+        from app.crm.enums import EventType, EventSource
+        await get_publisher().publish(
+            event_type=EventType.ENQUIRY_CREATED,
+            source_module=EventSource.CRM,
+            entity_type="ENQUIRY",
+            entity_id=enquiry.id,
+            hospital_id=getattr(enquiry, 'hospital_id', None),
+            patient_id=enquiry.patient_id,
+            db=db,
+        )
+    except Exception:
+        pass
     return {"id": str(enquiry.id), "status": enquiry.status}
 
 
@@ -311,6 +325,21 @@ async def create_enquiry_follow_up(enquiry_id: str, data: EnquiryFollowUpAction,
         description=f"Follow-up action '{data.action}' performed on enquiry",
         module="CRM",
     )
+    try:
+        from app.crm.events import get_publisher
+        from app.crm.enums import EventType, EventSource
+        if data.action == "CONVERT_TO_TREATMENT":
+            await get_publisher().publish(
+                event_type=EventType.ENQUIRY_CONVERTED,
+                source_module=EventSource.CRM,
+                entity_type="ENQUIRY",
+                entity_id=enquiry_id,
+                hospital_id=getattr(e, 'hospital_id', None),
+                patient_id=e.patient_id,
+                db=db,
+            )
+    except Exception:
+        pass
     return {"success": True, "enquiry_status": e.status}
 
 

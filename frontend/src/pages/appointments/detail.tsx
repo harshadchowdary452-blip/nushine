@@ -21,7 +21,7 @@ import { Separator } from "@/components/ui/separator"
 import PageHeader from "@/components/layout/page-header"
 import { appointmentsApi, casesApi, doctorsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
-import type { AppointmentFullDetail, User, Case, CasePayload, ReassignDoctorResponse } from "@/types"
+import type { AppointmentFullDetail, User as UserType, Case, CasePayload, ReassignDoctorResponse } from "@/types"
 import { extractDetail } from "@/types"
 import AppointmentScheduler from "@/components/appointments/AppointmentScheduler"
 
@@ -92,7 +92,7 @@ export default function AppointmentDetail() {
     queryKey: ["doctors", "reassign"],
     queryFn: () => doctorsApi.list({ page_size: 200 }),
   })
-  const doctorList: User[] = Array.isArray(doctors) ? doctors : doctors?.items || []
+  const doctorList: UserType[] = Array.isArray(doctors) ? doctors : doctors?.items || []
 
   const rescheduleMutation = useMutation({
     mutationFn: (data: { appointment_date: string; appointment_time: string; reason?: string }) =>

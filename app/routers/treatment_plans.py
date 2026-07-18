@@ -283,6 +283,21 @@ async def start_treatment(plan_id: str, db: AsyncSession = Depends(get_db), curr
         description=f"Treatment started",
         module="Treatments",
     )
+    try:
+        from app.crm.events import get_publisher
+        from app.crm.enums import EventType, EventSource
+        await get_publisher().publish(
+            event_type=EventType.TREATMENT_STARTED,
+            source_module=EventSource.TREATMENT,
+            entity_type="TREATMENT",
+            entity_id=plan_id,
+            hospital_id=getattr(result, 'hospital_id', None),
+            patient_id=patient_id,
+            doctor_id=getattr(result, 'assigned_doctor_id', None),
+            db=db,
+        )
+    except Exception:
+        pass
     return result
 
 
@@ -305,6 +320,21 @@ async def complete_treatment(plan_id: str, body: CompleteTreatmentBody = Body(de
         description=f"Treatment completed",
         module="Treatments",
     )
+    try:
+        from app.crm.events import get_publisher
+        from app.crm.enums import EventType, EventSource
+        await get_publisher().publish(
+            event_type=EventType.TREATMENT_COMPLETED,
+            source_module=EventSource.TREATMENT,
+            entity_type="TREATMENT",
+            entity_id=plan_id,
+            hospital_id=getattr(result, 'hospital_id', None),
+            patient_id=patient_id,
+            doctor_id=getattr(result, 'assigned_doctor_id', None),
+            db=db,
+        )
+    except Exception:
+        pass
     try:
         svc = StatusAutomationService(db)
         await svc.update_treatment_status(plan_id, TreatmentPlanStatus.COMPLETED)

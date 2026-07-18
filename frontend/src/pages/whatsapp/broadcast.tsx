@@ -72,8 +72,8 @@ export default function WhatsAppBroadcast() {
     switch (audienceType) {
       case "all_patients": return allPatients.filter((p) => p.phone)
       case "all_leads": return allLeads.filter((l) => l.mobile)
-      case "appointment_tomorrow": return allPatients.filter((p) => p.phone && p.next_appointment_date)
-      case "pending_followups": return allPatients.filter((p) => p.phone && p.next_follow_up)
+      case "appointment_tomorrow": return allPatients.filter((p) => p.phone && (p as unknown as Record<string, unknown>).next_appointment_date)
+      case "pending_followups": return allPatients.filter((p) => p.phone && (p as unknown as Record<string, unknown>).next_follow_up)
       case "six_month_recall": return allPatients.filter((p) => p.phone)
       default: return []
     }

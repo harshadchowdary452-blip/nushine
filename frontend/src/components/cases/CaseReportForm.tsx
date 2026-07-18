@@ -93,14 +93,14 @@ export function apiToFinding(api: ClinicalFinding & { dentition_type?: string })
     ? api.surface.split(",").map((s: string) => CODE_TO_SURFACE[s.trim()]).filter(Boolean) as ToothSurface[]
     : []
   return {
-    id: api.id || `api-${Date.now()}`,
-    toothNumber: parseInt(api.tooth_number) || 0,
+    id: String(api.id || `api-${Date.now()}`),
+    toothNumber: parseInt(api.tooth_number ?? "0") || 0,
     condition: (TYPE_TO_VISUAL[api.finding_type] || "Decayed") as ToothCondition,
     surfaces: surfaces.length > 0 ? surfaces : undefined,
     description: api.notes || undefined,
     date: (api.created_at || new Date().toISOString()).split("T")[0],
     findingType: api.finding_type,
-    dentitionType: api.dentition_type || undefined,
+    dentitionType: (api.dentition_type as 'ADULT' | 'CHILD' | undefined) || undefined,
   }
 }
 

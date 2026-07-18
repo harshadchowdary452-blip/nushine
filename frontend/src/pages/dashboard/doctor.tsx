@@ -40,12 +40,12 @@ export default function DoctorDashboard() {
 
   const hasData = stats && (stats.my_patients || stats.today_appointments || stats.active_cases)
 
-  const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ color: string; name: string; value: number; dataKey: string }>; label?: string }) => {
+  const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ color: string; name: string; value: number; dataKey?: string }>; label?: string }) => {
     if (active && payload && payload.length) {
       return (
         <div className="rounded-xl border border-gray-100 bg-white p-3 shadow-lg">
           <p className="text-sm font-semibold text-gray-900 mb-1">{label}</p>
-          {payload.map((p: { color: string; name: string; value: number }, i: number) => (
+          {payload.map((p: { color: string; name: string; value: number; dataKey?: string }, i: number) => (
             <p key={i} className="text-xs" style={{ color: p.color }}>
               {p.name}: {p.name?.includes("Revenue") || p.dataKey === "revenue" ? formatIndianRupees(p.value) : formatIndianNumber(p.value)}
             </p>
