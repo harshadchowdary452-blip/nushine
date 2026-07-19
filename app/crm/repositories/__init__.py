@@ -6,7 +6,6 @@ from app.crm.repositories.lead_repo import LeadRepository
 from app.crm.repositories.enquiry_repo import EnquiryRepository
 from app.crm.repositories.feedback_repo import FeedbackRepository
 from app.crm.repositories.automation_repo import AutomationRuleRepository, FollowUpTemplateRepository
-from app.crm.repositories.automation_repo import AutomationRuleConditionRepository, AutomationRuleActionRepository, AutomationRuleVersionRepository, AutomationRuleLogRepository, AutomationExecutionQueueRepository
 from app.crm.repositories.notification_repo import NotificationRepository
 
 __all__ = [
@@ -18,10 +17,5 @@ __all__ = [
     "FeedbackRepository",
     "AutomationRuleRepository",
     "FollowUpTemplateRepository",
-    "AutomationRuleConditionRepository",
-    "AutomationRuleActionRepository",
-    "AutomationRuleVersionRepository",
-    "AutomationRuleLogRepository",
-    "AutomationExecutionQueueRepository",
     "NotificationRepository",
 ]
