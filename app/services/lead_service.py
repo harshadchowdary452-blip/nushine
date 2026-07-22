@@ -139,7 +139,6 @@ class LeadService:
         return {
             "message": "Lead converted successfully",
             "patient_id": patient.id,
-            "case_id": case.id,
             "lead_id": lead_id,
             "existing_patient": existing is not None,
         }

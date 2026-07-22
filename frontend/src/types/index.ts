@@ -1104,3 +1104,89 @@ export function extractDetail(err: unknown): string {
   if (Array.isArray(detail) && detail.length > 0) return detail.map((e) => e.msg).filter(Boolean).join(", ")
   return "An unexpected error occurred"
 }
+
+export interface TreatmentCrmRule {
+  id: string
+  hospital_id: string
+  treatment_type_id: string
+  treatment_name: string
+  is_active: boolean
+  follow_up_1_day: boolean
+  follow_up_7_day: boolean
+  recall_6_month: boolean
+  recall_12_month: boolean
+  custom_recall_days: number | null
+  enquiry_enabled: boolean
+  auto_appointment_enabled: boolean
+  assigned_doctor_id: string | null
+  visit_enabled: boolean
+  visit_trigger: string
+  visit_specific_number: number | null
+  visit_delay_days: number
+  visit_enquiry_type: string
+  visit_whatsapp_enabled: boolean
+  visit_whatsapp_template_id: string | null
+  visit_notes: string | null
+  reminder_enabled: boolean
+  reminder_days_before: string
+  reminder_whatsapp_enabled: boolean
+  reminder_whatsapp_template_id: string | null
+  reminder_notes: string | null
+  completion_enabled: boolean
+  completion_delay_days: number
+  completion_enquiry_type: string
+  completion_whatsapp_enabled: boolean
+  completion_whatsapp_template_id: string | null
+  completion_notes: string | null
+  recall_enabled: boolean
+  recall_days: number
+  recall_enquiry_type: string
+  recall_whatsapp_enabled: boolean
+  recall_whatsapp_template_id: string | null
+  recall_notes: string | null
+  missed_enabled: boolean
+  missed_delay_days: number
+  missed_whatsapp_enabled: boolean
+  missed_whatsapp_template_id: string | null
+  missed_notes: string | null
+  auto_assign_role: string
+  priority: string
+  whatsapp_template_id: string | null
+  email_template_id: string | null
+  sms_template_id: string | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+export interface GeneratedEnquiry {
+  id: string
+  hospital_id: string
+  patient_id: string
+  treatment_plan_id: string | null
+  treatment_type_id: string | null
+  appointment_id: string | null
+  doctor_id: string | null
+  assigned_staff_id: string | null
+  rule_id: string | null
+  trigger_event: string
+  treatment_name: string | null
+  visit_number: number | null
+  total_visits: number | null
+  visit_stage: string | null
+  enquiry_type: string
+  notes: string | null
+  due_date: string
+  priority: string
+  follow_up_id: string | null
+  status: string
+  created_at: string | null
+}
+
+export interface GeneratedEnquiriesDashboard {
+  by_status: Record<string, number>
+  today_due: number
+  overdue: number
+  by_enquiry_type: Record<string, number>
+  by_trigger_event: Record<string, number>
+  total: number
+}

@@ -721,6 +721,19 @@ async def complete_appointment(appointment_id: str, req: CompleteRequest, db: As
     except Exception:
         pass
 
+    # CRM Rule Engine — single entry through TreatmentAutomationService
+    try:
+        from app.crm.services.treatment_automation_service import TreatmentAutomationService
+        ta = TreatmentAutomationService(db)
+        await ta.on_appointment_completed(
+            appointment_id=appointment.id,
+            patient_id=appointment.patient_id,
+            hospital_id=getattr(appointment, 'hospital_id', None) or current_user.get("hospital_id"),
+            doctor_id=appointment.doctor_id,
+        )
+    except Exception:
+        pass
+
     return appointment
 
 
@@ -793,6 +806,18 @@ async def reschedule_appointment(appointment_id: str, req: RescheduleRequest, db
             patient_id=appointment.patient_id,
             doctor_id=getattr(appointment, 'doctor_id', None),
             db=db,
+        )
+    except Exception:
+        pass
+
+    # Phase 3.2: Trigger treatment automation
+    try:
+        from app.crm.services.treatment_automation_service import TreatmentAutomationService
+        ta = TreatmentAutomationService(db)
+        await ta.on_appointment_rescheduled(
+            appointment_id=appointment.id,
+            patient_id=appointment.patient_id,
+            hospital_id=getattr(appointment, 'hospital_id', None) or current_user.get("hospital_id"),
         )
     except Exception:
         pass

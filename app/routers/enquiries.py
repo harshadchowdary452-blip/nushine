@@ -223,6 +223,51 @@ async def get_enquiry_calendar(
             "patient_phone": patient.phone if patient else None,
         })
 
+    # Fetch generated enquiries in date range (by due_date) — created by CRM rules
+    try:
+        from app.models.generated_enquiry import GeneratedEnquiry
+        ge_q = select(GeneratedEnquiry).where(
+            GeneratedEnquiry.due_date >= start,
+            GeneratedEnquiry.due_date <= end,
+        )
+        if hospital_id:
+            ge_q = ge_q.where(GeneratedEnquiry.hospital_id == hospital_id)
+        ge_q = ge_q.order_by(GeneratedEnquiry.due_date)
+        ge_rows = (await db.execute(ge_q)).scalars().all()
+
+        for ge in ge_rows:
+            patient = await db.get(Patient, ge.patient_id)
+            staff = await db.get(User, ge.assigned_staff_id) if ge.assigned_staff_id else None
+            tt_name = None
+            if ge.treatment_type_id:
+                tt = await db.get(TreatmentType, ge.treatment_type_id)
+                tt_name = tt.name if tt else None
+            result.append({
+                "id": str(ge.id),
+                "source": "generated_enquiry",
+                "patient_id": str(ge.patient_id),
+                "patient_name": patient.full_name if patient else "Unknown",
+                "op_number": patient.op_no if patient else None,
+                "doctor_name": staff.full_name if staff else None,
+                "doctor_id": str(ge.assigned_staff_id) if ge.assigned_staff_id else None,
+                "treatment_type": tt_name,
+                "treatment_name": ge.treatment_name or ge.enquiry_type,
+                "follow_up_type": ge.trigger_event or "CRM_RULE",
+                "due_date": ge.due_date.isoformat(),
+                "status": ge.status,
+                "response": None,
+                "feedback": ge.notes,
+                "staff_notes": None,
+                "action_required": ge.enquiry_type,
+                "response_status": None,
+                "next_action": None,
+                "contact_channel": None,
+                "last_contact_date": None,
+                "patient_phone": patient.phone if patient else None,
+            })
+    except Exception:
+        pass
+
     # Sort by due_date
     result.sort(key=lambda x: x["due_date"])
     return result

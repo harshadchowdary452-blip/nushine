@@ -562,22 +562,6 @@ export const treatmentTypesApi = {
   seed: (hospitalId?: string) => api.post("/treatment-types/seed", {}, { params: hospitalId ? { hospital_id: hospitalId } : {} }).then((r) => r.data),
 };
 
-export const crmSettingsApi = {
-  rules: {
-    list: () => api.get("/crm/settings/rules").then((r) => r.data),
-    create: (data: { treatment_type_id: string; treatment_name?: string; follow_up_1_day?: boolean; follow_up_7_day?: boolean; recall_6_month?: boolean; recall_12_month?: boolean; custom_recall_days?: number }) =>
-      api.post("/crm/settings/rules", data).then((r) => r.data),
-    update: (id: string, data: { treatment_type_id?: string; treatment_name?: string; follow_up_1_day?: boolean; follow_up_7_day?: boolean; recall_6_month?: boolean; recall_12_month?: boolean; custom_recall_days?: number; is_active?: boolean }) =>
-      api.put(`/crm/settings/rules/${id}`, data).then((r) => r.data),
-    delete: (id: string) => api.delete(`/crm/settings/rules/${id}`).then((r) => r.data),
-  },
-  summary: () => api.get("/crm/settings/summary").then((r) => r.data),
-  opd: {
-    get: () => api.get("/crm/opd-settings/").then((r) => r.data),
-    update: (data: Record<string, unknown>) => api.post("/crm/opd-settings/", data).then((r) => r.data),
-  },
-};
-
 export const consentFormsApi = {
   list: (params?: Record<string, unknown>) =>
     api.get("/consent-forms", { params }).then((r) => r.data),
@@ -647,6 +631,25 @@ export const crmEventsApi = {
     api.get("/crm/events/statistics").then((r) => r.data),
 };
 
+export const treatmentAutomationApi = {
+  rules: {
+    list: (hospitalId?: string) =>
+      api.get("/crm/treatment-automation/rules", { params: hospitalId ? { hospital_id: hospitalId } : {} }).then((r) => r.data),
+    create: (data: { treatment_type_id: string; hospital_id?: string; treatment_name?: string }) =>
+      api.post("/crm/treatment-automation/rules", data).then((r) => r.data),
+    update: (id: string, data: Record<string, unknown>) =>
+      api.put(`/crm/treatment-automation/rules/${id}`, data).then((r) => r.data),
+    delete: (id: string) => api.delete(`/crm/treatment-automation/rules/${id}`).then((r) => r.data),
+    toggle: (id: string) => api.post(`/crm/treatment-automation/rules/${id}/toggle`).then((r) => r.data),
+  },
+  generatedEnquiries: {
+    list: (params?: Record<string, unknown>) =>
+      api.get("/crm/treatment-automation/generated-enquiries", { params }).then((r) => r.data),
+    dashboard: (hospitalId?: string) =>
+      api.get("/crm/treatment-automation/generated-enquiries/dashboard", { params: hospitalId ? { hospital_id: hospitalId } : {} }).then((r) => r.data),
+  },
+};
+
 export const crmV2Api = {
   templates: {
     list: (params?: Record<string, unknown>) =>
@@ -681,4 +684,48 @@ export const crmV2Api = {
   },
 };
 
+export const crmSettingsApi = {
+  crmConfig: {
+    get: (group?: string) => api.get("/master-data/crm-config", { params: group ? { config_group: group } : {} }).then((r) => r.data),
+    update: (configs: Record<string, string>) =>
+      api.put("/master-data/crm-config", { configs }).then((r) => r.data),
+    updateOne: (key: string, value: string) =>
+      api.put(`/master-data/crm-config/${key}`, { config_value: value }).then((r) => r.data),
+  },
+  inlineList: {
+    get: (listKey: string) =>
+      api.get(`/master-data/inline/${listKey}`).then((r) => r.data),
+    add: (listKey: string, name: string) =>
+      api.post(`/master-data/inline/${listKey}`, { name }).then((r) => r.data),
+    update: (listKey: string, itemId: string, name: string) =>
+      api.put(`/master-data/inline/${listKey}/${itemId}`, { name }).then((r) => r.data),
+    remove: (listKey: string, itemId: string) =>
+      api.delete(`/master-data/inline/${listKey}/${itemId}`).then((r) => r.data),
+    seed: (listKey: string) =>
+      api.post(`/master-data/inline/${listKey}/seed`).then((r) => r.data),
+  },
+};
+
+export const crmRulesApi = {
+  lead: {
+    list: () => api.get("/crm/rules/lead").then((r) => r.data),
+    add: (data: { name: string; trigger: string; wait_time: string; action: string; assign_to: string; send_whatsapp: boolean; send_notification: boolean }) =>
+      api.post("/crm/rules/lead", data).then((r) => r.data),
+    update: (id: string, data: Record<string, unknown>) =>
+      api.put(`/crm/rules/lead/${id}`, data).then((r) => r.data),
+    remove: (id: string) => api.delete(`/crm/rules/lead/${id}`).then((r) => r.data),
+  },
+  treatment: {
+    list: (treatmentTypeId?: string) =>
+      api.get("/crm/rules/treatment", { params: treatmentTypeId ? { treatment_type_id: treatmentTypeId } : {} }).then((r) => r.data),
+    listAll: () => api.get("/crm/rules/treatment").then((r) => r.data),
+    add: (data: { name: string; treatment_type_id: string; trigger: string; visit?: string; wait_time: string; action: string; assign_to: string; send_whatsapp: boolean; send_notification: boolean }) =>
+      api.post("/crm/rules/treatment", data).then((r) => r.data),
+    update: (id: string, data: Record<string, unknown>) =>
+      api.put(`/crm/rules/treatment/${id}`, data).then((r) => r.data),
+    remove: (id: string) => api.delete(`/crm/rules/treatment/${id}`).then((r) => r.data),
+  },
+  test: (data: { rule_type: string; trigger: string; patient_id: string; treatment_type_id?: string }) =>
+    api.post("/crm/rules/test", data).then((r) => r.data),
+};
 

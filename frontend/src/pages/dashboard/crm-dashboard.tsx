@@ -142,6 +142,12 @@ export default function CrmDashboardPage() {
     staleTime: 30000,
   })
 
+  const { data: leadAnalytics } = useQuery({
+    queryKey: ["crm-dashboard-lead-analytics"],
+    queryFn: () => leadsApi.analytics(),
+    staleTime: 30000,
+  })
+
   const overview = useMemo(() => data?.overview ?? {}, [data])
   const workQueue = useMemo(() => data?.work_queue ?? [], [data])
   const fuSummary = useMemo(() => data?.follow_up_summary ?? {}, [data])
@@ -676,7 +682,79 @@ export default function CrmDashboardPage() {
       </div>
 
       {/* ════════════════════════════════════
-         SECTION 12: CRM TIMELINE
+         SECTION 12: LEAD ANALYTICS
+         ════════════════════════════════════ */}
+      {leadAnalytics && (
+        <div className={cn(GLASS, "rounded-2xl p-5")}>
+          <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+            <Users className="h-4 w-4 text-indigo-500" /> Lead Analytics
+            <Badge variant="secondary" className="ml-1 text-[10px]">{leadAnalytics.total ?? 0} total</Badge>
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4">
+            <div className="rounded-xl bg-indigo-50 p-3 text-center">
+              <p className="text-[10px] text-gray-500">Total Leads</p>
+              <p className="text-xl font-bold text-indigo-600">{leadAnalytics.total ?? 0}</p>
+            </div>
+            <div className="rounded-xl bg-emerald-50 p-3 text-center">
+              <p className="text-[10px] text-gray-500">Converted</p>
+              <p className="text-xl font-bold text-emerald-600">{leadAnalytics.converted ?? 0}</p>
+            </div>
+            <div className="rounded-xl bg-red-50 p-3 text-center">
+              <p className="text-[10px] text-gray-500">Lost</p>
+              <p className="text-xl font-bold text-red-600">{leadAnalytics.lost ?? 0}</p>
+            </div>
+            <div className="rounded-xl bg-amber-50 p-3 text-center">
+              <p className="text-[10px] text-gray-500">Conversion Rate</p>
+              <p className="text-xl font-bold text-amber-600">{leadAnalytics.conversion_rate ?? 0}%</p>
+            </div>
+            <div className="rounded-xl bg-purple-50 p-3 text-center">
+              <p className="text-[10px] text-gray-500">Avg Score</p>
+              <p className="text-xl font-bold text-purple-600">{leadAnalytics.avg_score ?? 0}</p>
+            </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <p className="text-[10px] font-semibold text-gray-500 uppercase mb-2">Leads by Source</p>
+              {leadAnalytics.by_source && Object.keys(leadAnalytics.by_source).length > 0 ? (
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={Object.entries(leadAnalytics.by_source).map(([name, count]) => ({ name: name.replace(/_/g, " "), count }))}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="name" tick={{ fontSize: 9 }} />
+                    <YAxis tick={{ fontSize: 10 }} />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="#6366F1" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : <p className="text-sm text-gray-400 text-center py-10">No source data</p>}
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold text-gray-500 uppercase mb-2">Leads by Status</p>
+              {leadAnalytics.by_status && Object.keys(leadAnalytics.by_status).length > 0 ? (
+                <ResponsiveContainer width="100%" height={220}>
+                  <RePieChart>
+                    <Pie data={Object.entries(leadAnalytics.by_status).map(([name, count]) => ({ name: name.replace(/_/g, " "), value: count }))}
+                      dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80}
+                      label={(props: PieLabelRenderProps) => { const { name, percent } = props as unknown as { name: string; percent: number }; return `${name ?? ""} ${((percent ?? 0) * 100).toFixed(0)}%` }}>
+                      {Object.entries(leadAnalytics.by_status).map((_: [string, unknown], i: number) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip />
+                  </RePieChart>
+                </ResponsiveContainer>
+              ) : <p className="text-sm text-gray-400 text-center py-10">No status data</p>}
+            </div>
+          </div>
+          {leadAnalytics.high_priority > 0 && (
+            <div className="mt-3 text-center">
+              <Badge className="bg-red-50 text-red-700 border-red-200 text-xs">
+                {leadAnalytics.high_priority} high priority leads need attention
+              </Badge>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ════════════════════════════════════
+         SECTION 13: CRM TIMELINE
          ════════════════════════════════════ */}
       <div className={cn(GLASS, "rounded-2xl p-5")}>
         <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
@@ -723,7 +801,7 @@ export default function CrmDashboardPage() {
       </div>
 
       {/* ════════════════════════════════════
-         SECTION 13: UPCOMING WORK
+         SECTION 14: UPCOMING WORK
          ════════════════════════════════════ */}
       <div className={cn(GLASS, "rounded-2xl p-5")}>
         <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">

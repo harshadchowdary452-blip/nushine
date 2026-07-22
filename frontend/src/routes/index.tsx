@@ -33,14 +33,8 @@ const DoctorQueue = lazy(() => import("@/pages/treatments/doctor-queue"));
 const BillingList = lazy(() => import("@/pages/billing/list"));
 const BillingDetail = lazy(() => import("@/pages/billing/detail"));
 const WhatsAppMessaging = lazy(() => import("@/pages/whatsapp/messaging"));
-const CommunicationHistory = lazy(() => import("@/pages/crm/communications"));
-const EmailTemplates = lazy(() => import("@/pages/crm/email-templates"));
-const Campaigns = lazy(() => import("@/pages/crm/campaigns"));
-const CampaignTemplates = lazy(() => import("@/pages/crm/campaign-templates"));
 
 const EnquiryCalendar = lazy(() => import("@/pages/crm/enquiry-calendar"));
-const LeadAnalytics = lazy(() => import("@/pages/crm/lead-analytics"));
-const RevenueAttribution = lazy(() => import("@/pages/crm/revenue-attribution"));
 const LeadList = lazy(() => import("@/pages/leads/list"));
 const LeadDetail = lazy(() => import("@/pages/leads/detail"));
 const Settings = lazy(() => import("@/pages/settings/profile"));
@@ -49,13 +43,7 @@ const WhatsAppTemplates = lazy(() => import("@/pages/whatsapp/templates"));
 const WhatsAppBroadcast = lazy(() => import("@/pages/whatsapp/broadcast"));
 const DoctorAvailability = lazy(() => import("@/pages/doctors/availability"));
 const CrmDashboard = lazy(() => import("@/pages/dashboard/crm-dashboard"));
-// 
 const CrmSettings = lazy(() => import("@/pages/crm/crm-settings"));
-const FollowUpTemplates = lazy(() => import("@/pages/crm/follow-up-templates"));
-const AutomationRules = lazy(() => import("@/pages/crm/automation-rules"));
-const AutomationBuilder = lazy(() => import("@/pages/crm/automation-builder"));
-const CrmCenter = lazy(() => import("@/pages/crm/crm-center"));
-const EventMonitor = lazy(() => import("@/pages/crm/event-monitor"));
 const ConsentFormList = lazy(() => import("@/pages/consent-forms/list"));
 const ConsentFormView = lazy(() => import("@/pages/consent-forms/view"));
 const ExportCenter = lazy(() => import("@/pages/exports/export-center"));
@@ -162,22 +150,11 @@ export const router = createBrowserRouter([
       { path: "/billing", element: withRoles(<BillingList />, CARE_ROLES) },
       { path: "/billing/:id", element: withRoles(<BillingDetail />, CARE_ROLES) },
       { path: "/whatsapp", element: withRoles(<WhatsAppMessaging />, ["HOSPITAL_ADMIN"]) },
-      { path: "/crm/communications", element: withRoles(<CommunicationHistory />, ["HOSPITAL_ADMIN"]) },
-      { path: "/crm/templates", element: withRoles(<EmailTemplates />, ["HOSPITAL_ADMIN"]) },
       { path: "/crm/dashboard", element: withRoles(<CrmDashboard />, ADMIN_ROLES) },
       { path: "/crm/dashboard2", element: withRoles(<CrmDashboard />, ADMIN_ROLES) },
       { path: "/crm/settings", element: withRoles(<CrmSettings />, ["HOSPITAL_ADMIN"]) },
-      { path: "/crm/campaigns", element: withRoles(<Campaigns />, ["HOSPITAL_ADMIN"]) },
-      { path: "/crm/campaign-templates", element: withRoles(<CampaignTemplates />, ["HOSPITAL_ADMIN"]) },
-      { path: "/crm/follow-up-templates", element: withRoles(<FollowUpTemplates />, ["HOSPITAL_ADMIN"]) },
-      { path: "/crm/automation-rules", element: withRoles(<AutomationRules />, ["HOSPITAL_ADMIN"]) },
-      { path: "/crm/automation-builder", element: withRoles(<AutomationBuilder />, ["SUPER_ADMIN", "GROUP_ADMIN", "HOSPITAL_ADMIN"]) },
-      { path: "/crm/center", element: withRoles(<CrmCenter />, ADMIN_ROLES) },
-      { path: "/crm/events", element: withRoles(<EventMonitor />, ["SUPER_ADMIN", "GROUP_ADMIN", "HOSPITAL_ADMIN"]) },
 
       { path: "/crm/enquiry-calendar", element: withRoles(<EnquiryCalendar />, ["HOSPITAL_ADMIN"]) },
-      { path: "/crm/lead-analytics", element: withRoles(<LeadAnalytics />, ADMIN_ROLES) },
-      { path: "/crm/revenue-attribution", element: withRoles(<RevenueAttribution />, ADMIN_ROLES) },
       { path: "/leads", element: withRoles(<LeadList />, ADMIN_ROLES) },
       { path: "/leads/:id", element: withRoles(<LeadDetail />, ADMIN_ROLES) },
       { path: "/cases", element: withRoles(<CaseList />, CARE_ROLES) },

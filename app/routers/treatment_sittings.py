@@ -129,6 +129,19 @@ async def update_sitting(sitting_id: str, data: TreatmentSittingUpdate, db: Asyn
                 doctor_id=getattr(plan, 'assigned_doctor_id', None) if plan else None,
                 db=db,
             )
+            # CRM Rule Engine — single entry through TreatmentAutomationService
+            try:
+                from app.crm.services.treatment_automation_service import TreatmentAutomationService
+                ta = TreatmentAutomationService(db)
+                await ta.on_visit_completed(
+                    treatment_plan_id=sitting.treatment_plan_id,
+                    sitting_number=sitting.sitting_number,
+                    patient_id=patient_id,
+                    hospital_id=getattr(plan, 'hospital_id', None) if plan else None,
+                    doctor_id=getattr(plan, 'assigned_doctor_id', None) if plan else None,
+                )
+            except Exception:
+                pass
     except Exception:
         pass
     return sitting

@@ -2,7 +2,7 @@ import { useState, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
-import { Plus, Search, Eye, Phone, MessageSquare, Users, UserPlus, Calendar, MoreHorizontal, Star, ArrowUpDown, Target } from "lucide-react"
+import { Plus, Search, Eye, Phone, MessageSquare, Users, UserPlus, Calendar, MoreHorizontal, Star, ArrowUpDown, Target, UserCog } from "lucide-react"
 import { format } from "date-fns"
 import PageHeader from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
@@ -20,7 +20,7 @@ import { Textarea } from "@/components/ui/textarea"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { leadsApi } from "@/services/endpoints"
+import { leadsApi, usersApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
 import DentalEmptyState from "@/components/ui/dental-empty-state"
 import QuickExport from "@/components/ui/quick-export"
@@ -84,6 +84,21 @@ export default function LeadList() {
     queryKey: ["leads", statusFilter, sourceFilter],
     queryFn: () => leadsApi.list({ status: statusFilter || undefined, source: sourceFilter || undefined }),
   })
+
+  const { data: usersData } = useQuery({
+    queryKey: ["users-list-for-leads"],
+    queryFn: () => usersApi.list({ page_size: 500 }),
+    staleTime: 60000,
+  })
+
+  const userMap = useMemo(() => {
+    const users: Array<{ id: string; full_name?: string; name?: string; username?: string }> = Array.isArray(usersData) ? usersData : usersData?.items || []
+    const map: Record<string, string> = {}
+    for (const u of users) {
+      map[u.id] = u.full_name || u.name || u.username || u.id.slice(0, 8)
+    }
+    return map
+  }, [usersData])
 
   const createMutation = useMutation({
     mutationFn: (data: Record<string, unknown>) => leadsApi.create(data),
@@ -210,6 +225,7 @@ export default function LeadList() {
                   <div className="flex items-center gap-1">Score <ArrowUpDown className="h-3 w-3" /></div>
                 </th>
                 <th className="text-left px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">Status</th>
+                <th className="text-left px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">Assigned To</th>
                 <th className="text-right px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
@@ -269,6 +285,18 @@ export default function LeadList() {
                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${statusColors[lead.status] || statusColors.NEW}`}>
                       {lead.status.replace(/_/g, " ")}
                     </span>
+                  </td>
+                  <td className="px-3 py-3">
+                    {lead.assigned_staff_id || lead.assigned_doctor_id ? (
+                      <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                        <UserCog className="h-3 w-3 text-gray-400" />
+                        <span className="truncate max-w-[100px]">
+                          {lead.assigned_doctor_id ? (userMap[lead.assigned_doctor_id] || lead.assigned_doctor_id.slice(0, 8)) : (userMap[lead.assigned_staff_id!] || lead.assigned_staff_id?.slice(0, 8))}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400">—</span>
+                    )}
                   </td>
                   <td className="px-3 py-3 text-right">
                     <DropdownMenu>

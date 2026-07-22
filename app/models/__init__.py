@@ -44,6 +44,11 @@ from app.models.treatment_type import TreatmentType
 from app.models.export_job import ExportJob
 from app.models.crm_opd_setting import CrmOpdSetting
 from app.models.patient_timeline import PatientTimeline
+from app.models.lead_source_master import LeadSourceMaster
+from app.models.enquiry_type_master import EnquiryTypeMaster
+from app.models.communication_template_master import CommunicationTemplateMaster
+from app.models.crm_config import CrmConfig
+from app.models.crm_rule import CrmRule
 
 __all__ = [
     "AdminGroup", "Hospital", "User", "Patient", "Consultant",
@@ -72,4 +77,9 @@ __all__ = [
     "TreatmentType",
     "CrmOpdSetting",
     "PatientTimeline",
+    "LeadSourceMaster",
+    "EnquiryTypeMaster",
+    "CommunicationTemplateMaster",
+    "CrmConfig",
+    "CrmRule",
 ]

@@ -65,6 +65,18 @@ async def check_missed_appointments():
                     patient = await db.get(Patient, apt.patient_id)
                     if patient and patient.phone:
                         await send_missed_appointment(patient.phone, patient.full_name)
+                    # CRM Rule Engine — single entry through TreatmentAutomationService
+                    try:
+                        from app.crm.services.treatment_automation_service import TreatmentAutomationService
+                        ta = TreatmentAutomationService(db)
+                        await ta.on_appointment_missed(
+                            appointment_id=apt.id,
+                            patient_id=apt.patient_id,
+                            hospital_id=getattr(apt, 'hospital_id', None),
+                            doctor_id=getattr(apt, 'doctor_id', None),
+                        )
+                    except Exception:
+                        pass
                 await db.commit()
         except Exception:
             pass
