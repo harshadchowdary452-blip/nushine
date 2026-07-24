@@ -13,6 +13,7 @@ class GeneratedEnquiry(Base):
     treatment_plan_id: Mapped[str] = mapped_column(String(36), ForeignKey("treatment_plans.id"), nullable=True)
     treatment_type_id: Mapped[str] = mapped_column(String(36), ForeignKey("treatment_types.id"), nullable=True)
     appointment_id: Mapped[str] = mapped_column(String(36), ForeignKey("appointments.id"), nullable=True)
+    case_id: Mapped[str] = mapped_column(String(36), ForeignKey("cases.id"), nullable=True)
     doctor_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
     assigned_staff_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
 
@@ -50,6 +51,7 @@ class GeneratedEnquiry(Base):
     treatment_plan = relationship("TreatmentPlan", lazy="selectin")
     treatment_type = relationship("TreatmentType", lazy="selectin")
     appointment = relationship("Appointment", lazy="selectin")
+    case = relationship("Case", lazy="selectin")
     doctor = relationship("User", foreign_keys=[doctor_id], lazy="selectin")
     assigned_staff = relationship("User", foreign_keys=[assigned_staff_id], lazy="selectin")
     follow_up = relationship("FollowUp", lazy="selectin")

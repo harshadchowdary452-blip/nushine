@@ -286,7 +286,10 @@ export default function CaseReportForm({
   }
 
   function setV<K extends keyof CaseFormData>(key: K, value: CaseFormData[K]) {
-    setForm((prev) => ({ ...prev, [key]: value }))
+    setForm((prev) => {
+      if (prev[key] === value) return prev
+      return { ...prev, [key]: value }
+    })
   }
 
   const compact = mode === "create"

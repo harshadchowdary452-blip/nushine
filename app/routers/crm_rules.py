@@ -1,12 +1,12 @@
 """
-CRM Rules Router — CRUD for the dedicated crm_rules table.
+CRM Rules Router — Policy-based CRM configuration.
 
-This is the single source of truth for CRM automation rules.
-Replaces the old JSON-in-crm_configs approach.
+Hospital administrators configure TIMELINE POLICIES, not technical rules.
+The rule engine reads CrmRule rows; this router manages them at policy level.
 """
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, or_, not_
 from pydantic import BaseModel
 from typing import Optional
 import uuid as _uuid
@@ -152,6 +152,7 @@ def _rule_to_dict(r: CrmRule) -> dict:
         "is_active": r.is_active,
         "treatment_type_id": r.treatment_type_id,
         "visit": r.visit_stage,
+        "scope": getattr(r, "scope", "VISIT"),
     }
 
 
@@ -190,6 +191,7 @@ async def add_lead_rule(
         id=str(_uuid.uuid4()),
         hospital_id=hid,
         rule_type="LEAD",
+        scope="LEAD",
         rule_name=data.name,
         trigger_event=be_trigger,
         delay_value=delay_value,
@@ -292,10 +294,17 @@ async def add_treatment_rule(
     verify_permission(current_user, Permission.MANAGE_LEADS)
     hid = current_user.get("hospital_id")
     delay_value, delay_unit = _parse_delay(data.wait_time)
+    trigger = data.trigger
+    scope = "VISIT"
+    if trigger == "APPOINTMENT_CREATED":
+        scope = "APPOINTMENT"
+    elif trigger in ("TREATMENT_COMPLETED", "TREATMENT_COMPLETED_RECALL"):
+        scope = "CASE"
     rule = CrmRule(
         id=str(_uuid.uuid4()),
         hospital_id=hid,
         rule_type="TREATMENT",
+        scope=scope,
         rule_name=data.name,
         trigger_event=data.trigger,
         treatment_type_id=data.treatment_type_id if data.treatment_type_id else None,
@@ -408,3 +417,467 @@ async def test_execute_rule(
     created = await execute_rules(db, hid, be_trigger, event_data, data.rule_type.upper())
     await db.commit()
     return {"created": created, "count": len(created)}
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# POLICY ENDPOINTS — Hospital admin configures policies, not rules
+# ═══════════════════════════════════════════════════════════════════════════
+
+class LeadFollowUpStep(BaseModel):
+    delay_days: int = 2
+    enabled: bool = True
+    send_whatsapp: bool = True
+    send_notification: bool = True
+
+class LeadPolicyData(BaseModel):
+    follow_ups: list[LeadFollowUpStep] = []
+    auto_close_days: int = 30
+
+
+class TreatmentJourneyStep(BaseModel):
+    milestone: str
+    delay_days: int = 2
+    enabled: bool = True
+    send_whatsapp: bool = True
+    send_notification: bool = True
+    label: str = ""
+    visit_stage: Optional[str] = "ANY"
+    action: Optional[str] = None
+
+class TreatmentJourneyData(BaseModel):
+    steps: list[TreatmentJourneyStep] = []
+    notes: str = ""
+
+
+def _get_hid(current_user: dict) -> str:
+    """Get hospital_id from user. Returns empty string for SUPER_ADMIN (who has none)."""
+    hid = current_user.get("hospital_id")
+    if hid:
+        return hid
+    return ""
+
+
+def _delay_to_days(delay_value: int, delay_unit: str) -> int:
+    if delay_unit == "IMMEDIATELY" or delay_value == 0:
+        return 0
+    if delay_unit == "DAYS":
+        return delay_value
+    if delay_unit == "WEEKS":
+        return delay_value * 7
+    if delay_unit == "MONTHS":
+        return delay_value * 30
+    return delay_value
+
+
+# ── Lead Follow-up Policy ──────────────────────────────────────────────
+
+@router.get("/policies/lead")
+async def get_lead_policy(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    verify_permission(current_user, Permission.VIEW_LEADS, Permission.MANAGE_LEADS)
+    hid = _get_hid(current_user)
+    if not hid:
+        return {"policy": {"follow_ups": [], "auto_close_days": 30}}
+    result = await db.execute(
+        select(CrmRule).where(
+            and_(CrmRule.hospital_id == hid, CrmRule.rule_type == "LEAD")
+        ).order_by(CrmRule.delay_value)
+    )
+    rules = list(result.scalars().all())
+
+    steps: list[dict] = []
+    auto_close = 30
+    for r in rules:
+        if r.rule_name.startswith("LEAD_AUTO_CLOSE"):
+            auto_close = _delay_to_days(r.delay_value, r.delay_unit)
+            continue
+        if r.rule_name.startswith("LEAD_FOLLOWUP_"):
+            steps.append({
+                "id": r.id,
+                "delay_days": _delay_to_days(r.delay_value, r.delay_unit),
+                "enabled": r.is_active,
+                "send_whatsapp": r.send_whatsapp,
+                "send_notification": r.send_notification,
+            })
+
+    steps.sort(key=lambda s: s["delay_days"])
+
+    return {"policy": {"follow_ups": steps, "auto_close_days": auto_close}}
+
+
+@router.put("/policies/lead")
+async def save_lead_policy(
+    data: LeadPolicyData,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    verify_permission(current_user, Permission.MANAGE_LEADS)
+    hid = _get_hid(current_user)
+    if not hid:
+        return {"success": True, "count": 0}
+
+    # Remove old lead policy rules
+    old = await db.execute(
+        select(CrmRule).where(
+            and_(CrmRule.hospital_id == hid, CrmRule.rule_type == "LEAD")
+        )
+    )
+    for r in old.scalars().all():
+        await db.delete(r)
+    await db.flush()
+
+    created_ids: list[str] = []
+
+    for idx, step in enumerate(data.follow_ups, 1):
+        rule = CrmRule(
+            id=str(_uuid.uuid4()),
+            hospital_id=hid,
+            rule_type="LEAD",
+            scope="LEAD",
+            rule_name=f"LEAD_FOLLOWUP_{idx}",
+            trigger_event="PATIENT_REGISTERED",
+            delay_value=step.delay_days,
+            delay_unit="DAYS" if step.delay_days > 0 else "IMMEDIATELY",
+            action="GENERAL_FOLLOW_UP",
+            assign_to="RECEPTION",
+            send_whatsapp=step.send_whatsapp,
+            send_notification=step.send_notification,
+            is_active=step.enabled,
+        )
+        db.add(rule)
+        created_ids.append(rule.id)
+
+    # Auto-close rule
+    if data.auto_close_days > 0:
+        rule = CrmRule(
+            id=str(_uuid.uuid4()),
+            hospital_id=hid,
+            rule_type="LEAD",
+            scope="LEAD",
+            rule_name="LEAD_AUTO_CLOSE",
+            trigger_event="NO_ACTIVITY",
+            delay_value=data.auto_close_days,
+            delay_unit="DAYS",
+            action="CLOSE_ENQUIRY",
+            assign_to="RECEPTION",
+            send_whatsapp=False,
+            send_notification=False,
+            is_active=True,
+        )
+        db.add(rule)
+        created_ids.append(rule.id)
+
+    await db.flush()
+    return {"success": True, "count": len(created_ids)}
+
+
+# ── Treatment Journey Policies ──────────────────────────────────────────
+
+@router.get("/policies/treatment-journeys")
+async def get_treatment_journeys(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    verify_permission(current_user, Permission.VIEW_LEADS, Permission.MANAGE_LEADS)
+    hid = _get_hid(current_user)
+
+    from app.models.treatment_type import TreatmentType
+    tt_q = select(TreatmentType).where(TreatmentType.is_active == True)
+    if hid:
+        hosp_names = (
+            select(TreatmentType.name).where(
+                TreatmentType.hospital_id == hid,
+                TreatmentType.is_active == True,
+            )
+        )
+        tt_q = tt_q.where(
+            or_(
+                TreatmentType.hospital_id == hid,
+                and_(
+                    TreatmentType.hospital_id.is_(None),
+                    not_(TreatmentType.name.in_(hosp_names)),
+                ),
+            )
+        )
+    else:
+        tt_q = tt_q.where(TreatmentType.hospital_id.is_(None))
+    tt_result = await db.execute(tt_q.order_by(TreatmentType.name))
+    treatment_types = list(tt_result.scalars().all())
+
+    if hid:
+        rule_result = await db.execute(
+            select(CrmRule).where(
+                and_(
+                    CrmRule.hospital_id == hid,
+                    CrmRule.rule_type == "TREATMENT",
+                    CrmRule.scope.in_(["VISIT", "APPOINTMENT"]),
+                )
+            ).order_by(CrmRule.treatment_type_id, CrmRule.delay_value)
+        )
+        all_rules = list(rule_result.scalars().all())
+    else:
+        all_rules = []
+
+    rules_by_tt: dict[str, list] = {}
+    for r in all_rules:
+        key = r.treatment_type_id or "__global__"
+        rules_by_tt.setdefault(key, []).append(r)
+
+    journeys: list[dict] = []
+    for tt in treatment_types:
+        tt_rules = rules_by_tt.get(tt.id, [])
+        steps: list[dict] = []
+        for r in tt_rules:
+            steps.append({
+                "id": r.id,
+                "milestone": r.trigger_event,
+                "delay_days": _delay_to_days(r.delay_value, r.delay_unit),
+                "enabled": r.is_active,
+                "send_whatsapp": r.send_whatsapp,
+                "send_notification": r.send_notification,
+                "label": r.rule_name,
+                "visit_stage": r.visit_stage,
+                "action": r.action,
+            })
+        journeys.append({
+            "treatment_type_id": tt.id,
+            "treatment_name": tt.name,
+            "steps": steps,
+            "step_count": len(steps),
+            "active_count": sum(1 for s in steps if s["enabled"]),
+        })
+
+    journeys.sort(key=lambda j: (-j["step_count"], j["treatment_name"]))
+    return {"journeys": journeys}
+
+
+@router.put("/policies/treatment-journeys/{treatment_type_id}")
+async def save_treatment_journey(
+    treatment_type_id: str,
+    data: TreatmentJourneyData,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    verify_permission(current_user, Permission.MANAGE_LEADS)
+    hid = _get_hid(current_user)
+    if not hid:
+        return {"success": True, "count": 0}
+
+    # Remove old VISIT/APPOINTMENT rules for this treatment type (not CASE scope)
+    old = await db.execute(
+        select(CrmRule).where(
+            and_(
+                CrmRule.hospital_id == hid,
+                CrmRule.rule_type == "TREATMENT",
+                CrmRule.treatment_type_id == treatment_type_id,
+                CrmRule.scope.in_(["VISIT", "APPOINTMENT"]),
+            )
+        )
+    )
+    for r in old.scalars().all():
+        await db.delete(r)
+    await db.flush()
+
+    from app.models.treatment_type import TreatmentType
+    tt = await db.get(TreatmentType, treatment_type_id)
+    treatment_name = tt.name if tt else "Treatment"
+
+    created_ids: list[str] = []
+    for step in data.steps:
+        delay = step.delay_days
+        unit = "DAYS" if delay > 0 else "IMMEDIATELY"
+        if delay >= 30 and delay % 30 == 0:
+            unit = "MONTHS"
+            delay = delay // 30
+        elif delay >= 7 and delay % 7 == 0:
+            unit = "WEEKS"
+            delay = delay // 7
+
+        label = step.label or f"{step.milestone.replace('_', ' ').title()} — {treatment_name}"
+
+        step_scope = "VISIT"
+        if step.milestone == "APPOINTMENT_CREATED":
+            step_scope = "APPOINTMENT"
+
+        rule = CrmRule(
+            id=str(_uuid.uuid4()),
+            hospital_id=hid,
+            rule_type="TREATMENT",
+            scope=step_scope,
+            rule_name=label,
+            trigger_event=step.milestone,
+            treatment_type_id=treatment_type_id,
+            visit_stage=step.visit_stage or "ANY",
+            delay_value=delay,
+            delay_unit=unit,
+            action=step.action or _milestone_to_action(step.milestone),
+            assign_to="RECEPTION",
+            send_whatsapp=step.send_whatsapp,
+            send_notification=step.send_notification,
+            is_active=step.enabled,
+        )
+        db.add(rule)
+        created_ids.append(rule.id)
+
+    await db.flush()
+    return {"success": True, "count": len(created_ids)}
+
+
+def _milestone_to_action(milestone: str) -> str:
+    mapping = {
+        "VISIT_COMPLETED": "WELLNESS_ENQUIRY",
+        "APPOINTMENT_CREATED": "APPOINTMENT_REMINDER",
+    }
+    return mapping.get(milestone, "GENERAL_FOLLOW_UP")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# CASE JOURNEY POLICY — Recovery + Recall (scope=CASE, no treatment_type)
+# ═══════════════════════════════════════════════════════════════════════════
+
+CASE_JOURNEY_MILESTONES = {
+    "CASE_RECOVERY": {
+        "label": "Recovery Follow-up",
+        "description": "After case is completed — check healing progress",
+        "default_delay": 3,
+        "default_action": "RECOVERY_FOLLOW_UP",
+    },
+    "CASE_RECALL": {
+        "label": "6-Month Recall",
+        "description": "Periodic recall checkup after case completion",
+        "default_delay": 180,
+        "default_action": "RECALL",
+    },
+}
+
+
+class CaseJourneyStep(BaseModel):
+    milestone: str
+    delay_days: int = 3
+    enabled: bool = True
+    send_whatsapp: bool = True
+    send_notification: bool = True
+    label: str = ""
+
+
+class CaseJourneyData(BaseModel):
+    steps: list[CaseJourneyStep] = []
+
+
+@router.get("/policies/case-journey")
+async def get_case_journey(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    verify_permission(current_user, Permission.VIEW_LEADS, Permission.MANAGE_LEADS)
+    hid = _get_hid(current_user)
+    if not hid:
+        steps = []
+        for key, meta in CASE_JOURNEY_MILESTONES.items():
+            steps.append({
+                "milestone": key,
+                "delay_days": meta["default_delay"],
+                "enabled": True,
+                "send_whatsapp": True,
+                "send_notification": True,
+                "label": meta["label"],
+            })
+        return {"policy": {"steps": steps}}
+
+    result = await db.execute(
+        select(CrmRule).where(
+            and_(
+                CrmRule.hospital_id == hid,
+                CrmRule.scope == "CASE",
+            )
+        ).order_by(CrmRule.delay_value)
+    )
+    rules = list(result.scalars().all())
+
+    steps: list[dict] = []
+    for r in rules:
+        milestone_key = _action_to_case_milestone(r.action, r.trigger_event)
+        steps.append({
+            "id": r.id,
+            "milestone": milestone_key,
+            "delay_days": _delay_to_days(r.delay_value, r.delay_unit),
+            "enabled": r.is_active,
+            "send_whatsapp": r.send_whatsapp,
+            "send_notification": r.send_notification,
+            "label": r.rule_name,
+        })
+
+    return {"policy": {"steps": steps}}
+
+
+@router.put("/policies/case-journey")
+async def save_case_journey(
+    data: CaseJourneyData,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    verify_permission(current_user, Permission.MANAGE_LEADS)
+    hid = _get_hid(current_user)
+    if not hid:
+        return {"success": True, "count": 0}
+
+    old = await db.execute(
+        select(CrmRule).where(
+            and_(CrmRule.hospital_id == hid, CrmRule.scope == "CASE")
+        )
+    )
+    for r in old.scalars().all():
+        await db.delete(r)
+    await db.flush()
+
+    created_ids: list[str] = []
+    for step in data.steps:
+        meta = CASE_JOURNEY_MILESTONES.get(step.milestone)
+        if not meta:
+            continue
+
+        delay = step.delay_days
+        unit = "DAYS" if delay > 0 else "IMMEDIATELY"
+        if delay >= 30 and delay % 30 == 0:
+            unit = "MONTHS"
+            delay = delay // 30
+        elif delay >= 7 and delay % 7 == 0:
+            unit = "WEEKS"
+            delay = delay // 7
+
+        label = step.label or meta["label"]
+
+        rule = CrmRule(
+            id=str(_uuid.uuid4()),
+            hospital_id=hid,
+            rule_type="TREATMENT",
+            scope="CASE",
+            rule_name=label,
+            trigger_event="CASE_COMPLETED",
+            treatment_type_id=None,
+            visit_stage=None,
+            delay_value=delay,
+            delay_unit=unit,
+            action=meta["default_action"],
+            assign_to="RECEPTION",
+            send_whatsapp=step.send_whatsapp,
+            send_notification=step.send_notification,
+            is_active=step.enabled,
+        )
+        db.add(rule)
+        created_ids.append(rule.id)
+
+    await db.flush()
+    return {"success": True, "count": len(created_ids)}
+
+
+def _action_to_case_milestone(action: str, trigger_event: str) -> str:
+    if action in ("RECOVERY_FOLLOW_UP",):
+        return "CASE_RECOVERY"
+    if action in ("RECALL", "RECALL_REMINDER"):
+        return "CASE_RECALL"
+    if trigger_event == "CASE_COMPLETED":
+        return "CASE_RECOVERY"
+    return "CASE_RECOVERY"

@@ -53,6 +53,17 @@ async def lifespan(app: FastAPI):
     logger.info("Seeding super admin...")
     await seed_super_admin()
 
+    # Wire CRM Event Dispatcher
+    try:
+        from app.crm.events import get_dispatcher
+        from app.crm.services.event_handlers import CRM_EVENT_HANDLERS
+        dispatcher = get_dispatcher()
+        for event_type, handler in CRM_EVENT_HANDLERS.items():
+            dispatcher.subscribe(event_type, handler)
+        logger.info("CRM event handlers registered: %d handlers", len(CRM_EVENT_HANDLERS))
+    except Exception as e:
+        logger.warning(f"CRM event handler registration failed (non-fatal): {e}")
+
     try:
         from app.utils.case_pdf import _ensure_browser
         await _ensure_browser()

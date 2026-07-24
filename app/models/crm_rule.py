@@ -16,6 +16,8 @@ class CrmRule(Base):
     rule_name: Mapped[str] = mapped_column(String(255), nullable=False)
     rule_type: Mapped[str] = mapped_column(String(20), nullable=False, default="TREATMENT")
     # LEAD | TREATMENT
+    scope: Mapped[str] = mapped_column(String(20), nullable=False, default="VISIT")
+    # LEAD | VISIT | APPOINTMENT | CASE
     description: Mapped[str] = mapped_column(Text, nullable=True)
 
     # Trigger configuration

@@ -14,7 +14,9 @@ WAITING_LAB_OVERDUE_DAYS = 5
 
 async def check_overdue_treatments():
     from app.database import async_session_factory
-    from app.services.crm_rule_engine import CRMRuleEngine
+    from app.crm.services.rule_engine import (
+        create_overdue_followup, create_waiting_patient_followup, create_waiting_lab_followup,
+    )
     from app.services.treatment_notification import (
         notify_treatment_overdue, notify_waiting_patient_expired, notify_waiting_lab_expired,
     )
@@ -35,12 +37,11 @@ async def check_overdue_treatments():
         )
         result = await db.execute(q_overdue)
         overdue_plans = result.scalars().all()
-        crm_engine = CRMRuleEngine(db)
         for plan in overdue_plans:
             plan.status = TreatmentPlanStatus.OVERDUE
             plan.overdue_reason = plan.overdue_reason or "Auto-detected: past expected completion date"
             plan.overdue_delay_type = plan.overdue_delay_type or "Other"
-            await crm_engine.on_treatment_overdue(plan.id, plan.overdue_reason, plan.overdue_delay_type)
+            await create_overdue_followup(db, plan.id, plan.overdue_reason, plan.overdue_delay_type)
             try:
                 days_overdue = (today - plan.expected_completion_date).days if plan.expected_completion_date else 1
                 await notify_treatment_overdue(db, plan, days_overdue)
@@ -58,7 +59,7 @@ async def check_overdue_treatments():
         result = await db.execute(q_wp)
         wp_plans = result.scalars().all()
         for plan in wp_plans:
-            await crm_engine.on_waiting_patient(plan.id)
+            await create_waiting_patient_followup(db, plan.id)
             try:
                 days_waiting = (today - plan.updated_at.date()).days if plan.updated_at else WAITING_PATIENT_OVERDUE_DAYS
                 await notify_waiting_patient_expired(db, plan, days_waiting)
@@ -76,7 +77,7 @@ async def check_overdue_treatments():
         result = await db.execute(q_wl)
         wl_plans = result.scalars().all()
         for plan in wl_plans:
-            await crm_engine.on_waiting_lab(plan.id)
+            await create_waiting_lab_followup(db, plan.id)
             try:
                 days_waiting = (today - plan.updated_at.date()).days if plan.updated_at else WAITING_LAB_OVERDUE_DAYS
                 await notify_waiting_lab_expired(db, plan, days_waiting)

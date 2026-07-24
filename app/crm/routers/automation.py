@@ -323,12 +323,7 @@ async def test_rule(
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    from app.crm.services.automation_engine import AutomationEngine
-    engine = AutomationEngine(db)
-    result = await engine.test_rule(rule_id, req.event_type, req.payload)
-    if "error" in result:
-        raise HTTPException(status_code=400, detail=result["error"])
-    return success_response(result, "Test completed — no data was modified")
+    return success_response({"rule_id": rule_id, "status": "deprecated", "message": "Use /crm/rules/test instead"}, "Test endpoint migrated to CRM Rule Engine")
 
 
 # --- Logs ---

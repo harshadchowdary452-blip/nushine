@@ -57,19 +57,16 @@ class EventService:
         # 2. Persist to event log
         await self.store.persist(event, status="PROCESSING")
 
-        # 3. Process through CRM engine
+        # 3. Process through CRM rule engine
         try:
-            from app.services.crm_event_engine import CRMEventEngine
-            engine = CRMEventEngine(self.db)
-            await engine.process_event(
-                event_type=event.event_type,
-                entity_type=event.entity_type,
-                entity_id=event.entity_id,
-                hospital_id=event.hospital_id,
-                patient_id=event.patient_id,
-                doctor_id=event.doctor_id,
-                payload=event.payload,
-            )
+            from app.crm.services.rule_engine import execute_rules
+            if event.hospital_id:
+                await execute_rules(
+                    self.db,
+                    event.hospital_id,
+                    event.event_type,
+                    json.loads(event.payload_json) if event.payload_json else {},
+                )
             elapsed = (_time.monotonic() - start) * 1000
             await self.store.update_status(event.event_id, "COMPLETED", processing_time_ms=elapsed)
             logger.info("EVENT_PROCESSED: %s in %.1fms", event.event_id, elapsed)
@@ -150,20 +147,17 @@ class EventService:
         event.status = "RETRYING"
         await self.db.flush()
 
-        # Re-process through CRM engine
+        # Re-process through CRM rule engine
         start = _time.monotonic()
         try:
-            from app.services.crm_event_engine import CRMEventEngine
-            engine = CRMEventEngine(self.db)
-            await engine.process_event(
-                event_type=event.event_type,
-                entity_type=event.entity_type,
-                entity_id=event.entity_id,
-                hospital_id=event.hospital_id,
-                patient_id=event.patient_id,
-                doctor_id=event.doctor_id,
-                payload=json.loads(event.payload_json) if event.payload_json else {},
-            )
+            from app.crm.services.rule_engine import execute_rules
+            if event.hospital_id:
+                await execute_rules(
+                    self.db,
+                    event.hospital_id,
+                    event.event_type,
+                    json.loads(event.payload_json) if event.payload_json else {},
+                )
             elapsed = (_time.monotonic() - start) * 1000
             event.status = "COMPLETED"
             event.processed_at = datetime.now(timezone.utc)

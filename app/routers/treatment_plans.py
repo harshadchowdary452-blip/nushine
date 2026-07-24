@@ -10,7 +10,6 @@ from app.dependencies import get_current_user
 from app.core.permissions import verify_permission, verify_tenant_access, Permission, Role
 from app.services.treatment_plan_service import TreatmentPlanService
 from app.services.status_automation import StatusAutomationService
-from app.services.crm_rule_engine import CRMRuleEngine
 from app.services.treatment_notification import (
     notify_treatment_completed, notify_treatment_overdue,
     notify_treatment_assigned, notify_pending_assignment,
@@ -237,11 +236,11 @@ async def update_treatment_plan_status(plan_id: str, status: str = Query(...), d
     svc = StatusAutomationService(db)
     await svc.update_treatment_status(plan_id, TreatmentPlanStatus(status))
     try:
-        crm_engine = CRMRuleEngine(db)
+        from app.crm.services.rule_engine import create_treatment_completed_followups, create_overdue_followup
         if status == TreatmentPlanStatus.COMPLETED.value:
-            await crm_engine.on_treatment_completed(plan_id)
+            await create_treatment_completed_followups(db, plan_id)
         elif status == "OVERDUE":
-            await crm_engine.on_treatment_overdue(plan_id)
+            await create_overdue_followup(db, plan_id)
     except Exception as e:
         logger.warning("CRM status task failed: %s", e)
     await db.commit()
@@ -412,11 +411,11 @@ async def set_waiting(plan_id: str, waiting_type: str = Query(...), body: SetWai
         module="Treatments",
     )
     try:
-        crm_engine = CRMRuleEngine(db)
+        from app.crm.services.rule_engine import create_waiting_patient_followup, create_waiting_lab_followup
         if waiting_type == "WAITING_PATIENT":
-            await crm_engine.on_waiting_patient(plan_id)
+            await create_waiting_patient_followup(db, plan_id)
         elif waiting_type == "WAITING_LAB":
-            await crm_engine.on_waiting_lab(plan_id)
+            await create_waiting_lab_followup(db, plan_id)
     except Exception as e:
         logger.warning("CRM waiting task failed: %s", e)
     return result

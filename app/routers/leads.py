@@ -274,6 +274,17 @@ async def convert_lead(lead_id: str, data: LeadConvertCreate, db: AsyncSession =
         )
     except Exception:
         pass
+    try:
+        patient_id = result.get("patient_id")
+        if patient_id:
+            from app.crm.services.rule_engine import cancel_lead_followups
+            await cancel_lead_followups(
+                db,
+                hospital_id=getattr(result, 'hospital_id', None) or current_user.get("hospital_id"),
+                patient_id=patient_id,
+            )
+    except Exception:
+        pass
     return result
 
 

@@ -306,6 +306,21 @@ async def complete_case(case_id: str, db: AsyncSession = Depends(get_db), curren
         description="Case report completed",
         module="Case Reports",
     )
+    try:
+        from app.crm.events import get_publisher
+        from app.crm.enums import EventType, EventSource
+        await get_publisher().publish(
+            event_type=EventType.CASE_COMPLETED,
+            source_module=EventSource.CASE,
+            entity_type="CASE",
+            entity_id=case_id,
+            hospital_id=getattr(case, 'hospital_id', None),
+            patient_id=patient_id,
+            doctor_id=getattr(case, 'doctor_id', None),
+            db=db,
+        )
+    except Exception:
+        pass
     updated = await _load_case_with_findings(db, case.id)
     return updated
 
@@ -341,6 +356,23 @@ async def update_case_status(case_id: str, status: str = Query(...), db: AsyncSe
     updated = await service.update(case_id, {"status": status}, user_id=current_user.get("sub"), user_role=current_user.get("role"))
     svc = StatusAutomationService(db)
     await svc.update_patient_status(updated.patient_id)
+    if status == "OPEN" and old_status != "OPEN":
+        try:
+            from app.crm.events import get_publisher
+            from app.crm.enums import EventType, EventSource
+            await get_publisher().publish(
+                event_type=EventType.CASE_REOPENED,
+                source_module=EventSource.CASE,
+                entity_type="CASE",
+                entity_id=case_id,
+                hospital_id=str(updated.hospital_id) if getattr(updated, 'hospital_id', None) else None,
+                patient_id=updated.patient_id,
+                doctor_id=str(updated.doctor_id) if getattr(updated, 'doctor_id', None) else None,
+                payload={"case_id": case_id, "patient_id": str(updated.patient_id)},
+                db=db,
+            )
+        except Exception:
+            pass
     await db.commit()
     await record_timeline_event(
         db, current_user=current_user, patient_id=updated.patient_id,

@@ -95,10 +95,14 @@ export default function TreatmentPlanSection({
     }
   }, [treatments])
 
+  const visitsCbRef = useRef(onEstimatedVisitsChange)
+  const costCbRef = useRef(onEstimatedCostChange)
+  useEffect(() => { visitsCbRef.current = onEstimatedVisitsChange })
+  useEffect(() => { costCbRef.current = onEstimatedCostChange })
   useEffect(() => {
-    onEstimatedVisitsChange(String(totals.visits))
-    onEstimatedCostChange(String(totals.cost))
-  }, [totals.visits, totals.cost, onEstimatedCostChange, onEstimatedVisitsChange])
+    visitsCbRef.current(String(totals.visits))
+    costCbRef.current(String(totals.cost))
+  }, [totals.visits, totals.cost])
 
   function addTreatment(name: string) {
     if (treatments.some((t) => t.name === name)) return

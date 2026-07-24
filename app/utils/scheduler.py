@@ -65,15 +65,21 @@ async def check_missed_appointments():
                     patient = await db.get(Patient, apt.patient_id)
                     if patient and patient.phone:
                         await send_missed_appointment(patient.phone, patient.full_name)
-                    # CRM Rule Engine — single entry through TreatmentAutomationService
+                    # Publish APPOINTMENT_MISSED event — dispatcher handles CRM automation
                     try:
-                        from app.crm.services.treatment_automation_service import TreatmentAutomationService
-                        ta = TreatmentAutomationService(db)
-                        await ta.on_appointment_missed(
-                            appointment_id=apt.id,
-                            patient_id=apt.patient_id,
-                            hospital_id=getattr(apt, 'hospital_id', None),
-                            doctor_id=getattr(apt, 'doctor_id', None),
+                        from app.crm.events import get_publisher
+                        from app.crm.enums import EventType, EventSource
+                        publisher = get_publisher()
+                        await publisher.publish(
+                            event_type=EventType.APPOINTMENT_MISSED,
+                            source_module=EventSource.SYSTEM,
+                            entity_type="APPOINTMENT",
+                            entity_id=str(apt.id),
+                            hospital_id=str(apt.hospital_id) if getattr(apt, 'hospital_id', None) else None,
+                            patient_id=str(apt.patient_id),
+                            doctor_id=str(apt.doctor_id) if getattr(apt, 'doctor_id', None) else None,
+                            payload={"appointment_id": str(apt.id), "patient_id": str(apt.patient_id)},
+                            db=db,
                         )
                     except Exception:
                         pass

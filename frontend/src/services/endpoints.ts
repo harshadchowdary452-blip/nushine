@@ -727,5 +727,19 @@ export const crmRulesApi = {
   },
   test: (data: { rule_type: string; trigger: string; patient_id: string; treatment_type_id?: string }) =>
     api.post("/crm/rules/test", data).then((r) => r.data),
+  policies: {
+    getLeadPolicy: () =>
+      api.get("/crm/rules/policies/lead").then((r) => r.data),
+    saveLeadPolicy: (data: { follow_ups: { delay_days: number; enabled: boolean; send_whatsapp: boolean; send_notification: boolean }[]; auto_close_days: number }) =>
+      api.put("/crm/rules/policies/lead", data).then((r) => r.data),
+    getTreatmentJourneys: () =>
+      api.get("/crm/rules/policies/treatment-journeys").then((r) => r.data),
+    saveTreatmentJourney: (treatmentTypeId: string, data: { steps: { milestone: string; delay_days: number; enabled: boolean; send_whatsapp: boolean; send_notification: boolean; label: string; visit_stage?: string; action?: string }[]; notes: string }) =>
+      api.put(`/crm/rules/policies/treatment-journeys/${treatmentTypeId}`, data).then((r) => r.data),
+    getCaseJourney: () =>
+      api.get("/crm/rules/policies/case-journey").then((r) => r.data),
+    saveCaseJourney: (data: { steps: { milestone: string; delay_days: number; enabled: boolean; send_whatsapp: boolean; send_notification: boolean; label: string }[] }) =>
+      api.put("/crm/rules/policies/case-journey", data).then((r) => r.data),
+  },
 };
 
