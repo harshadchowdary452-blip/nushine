@@ -1,11 +1,12 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   Users, Stethoscope, Settings, Save, Plus, Trash2,
-  MessageCircle, Bell, Clock, ChevronDown, ChevronRight,
-  CheckCircle2, CircleDot, CalendarClock, Phone,
+  Bell, Clock, CalendarClock, Phone, ChevronDown, ChevronRight,
+  CheckCircle2, CircleDot, Eye, Search, RotateCcw, CalendarDays,
+  AlertTriangle,
 } from "lucide-react"
-import { crmRulesApi, crmSettingsApi } from "@/services/endpoints"
+import { crmSettingsApi } from "@/services/endpoints"
 import PageHeader from "@/components/layout/page-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -17,791 +18,837 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { ApiError } from "@/types"
 import { extractDetail } from "@/types"
 
-interface LeadFollowUp {
+interface FollowUpConfig {
   id?: string
-  delay_days: number
   enabled: boolean
-  send_whatsapp: boolean
-  send_notification: boolean
+  start_delay_days: number
+  num_follow_ups: number
+  gap_days: number
+  auto_close_on_completion: boolean
 }
 
-interface TreatmentJourneyStep {
-  id?: string
-  milestone: string
-  delay_days: number
-  enabled: boolean
-  send_whatsapp: boolean
-  send_notification: boolean
-  label: string
-  visit_stage?: string
-  action?: string
-}
-
-interface TreatmentJourney {
+interface TreatmentItem {
   treatment_type_id: string
   treatment_name: string
-  steps: TreatmentJourneyStep[]
-  step_count: number
-  active_count: number
+  config: FollowUpConfig
 }
 
-const MILESTONE_META: Record<string, { label: string; icon: typeof CircleDot; description: string; default_delay: number; default_action: string; default_visit_stage?: string }> = {
-  VISIT_COMPLETED: {
-    label: "Visit Completed",
-    icon: CheckCircle2,
-    description: "After a visit is completed",
-    default_delay: 2,
-    default_action: "WELLNESS_ENQUIRY",
-    default_visit_stage: "ANY",
+function defaultFollowUp(): FollowUpConfig {
+  return { enabled: true, start_delay_days: 0, num_follow_ups: 3, gap_days: 2, auto_close_on_completion: false }
+}
+
+function formatTimestamp(date: Date): string {
+  return date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) +
+    " " + date.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NUMERIC INPUT — hides spinner, disables wheel, selects on focus
+// ═══════════════════════════════════════════════════════════════════════════
+
+function NumericInput({ value, onChange, min = 0, max = 999, className }: {
+  value: number
+  onChange: (v: number) => void
+  min?: number
+  max?: number
+  className?: string
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  return (
+    <Input
+      ref={inputRef}
+      type="number"
+      min={min}
+      max={max}
+      value={value}
+      onChange={(e) => onChange(Math.max(min, Math.min(max, parseInt(e.target.value) || min)))}
+      onFocus={(e) => e.target.select()}
+      onWheel={(e) => e.currentTarget.blur()}
+      className={`[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${className || ""}`}
+    />
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// UNSAVED CHANGES HOOK — detects dirty state across the page
+// ═══════════════════════════════════════════════════════════════════════════
+
+const UnsavedChangesContext = {
+  _listeners: new Set<() => void>(),
+  _hasUnsaved: false,
+  get hasUnsaved() { return this._hasUnsaved },
+  set hasUnsaved(val: boolean) {
+    this._hasUnsaved = val
+    this._listeners.forEach((l) => l())
   },
-  APPOINTMENT_CREATED: {
-    label: "Next Appointment Reminder",
-    icon: CalendarClock,
-    description: "Before the next appointment",
-    default_delay: 1,
-    default_action: "APPOINTMENT_REMINDER",
+  subscribe(listener: () => void) {
+    this._listeners.add(listener)
+    return () => { this._listeners.delete(listener) }
   },
 }
 
-const DEFAULT_LEAD_STEPS: LeadFollowUp[] = [
-  { delay_days: 2, enabled: true, send_whatsapp: true, send_notification: true },
-  { delay_days: 5, enabled: true, send_whatsapp: true, send_notification: false },
-  { delay_days: 10, enabled: true, send_whatsapp: true, send_notification: false },
-]
+function useUnsavedChangesWarning(hasUnsaved: boolean) {
+  useEffect(() => {
+    UnsavedChangesContext.hasUnsaved = hasUnsaved
+  }, [hasUnsaved])
 
-const DEFAULT_TREATMENT_STEPS: TreatmentJourneyStep[] = [
-  { milestone: "VISIT_COMPLETED", delay_days: 2, enabled: true, send_whatsapp: true, send_notification: true, label: "Wellness Follow-up", visit_stage: "ANY", action: "WELLNESS_ENQUIRY" },
-  { milestone: "APPOINTMENT_CREATED", delay_days: 1, enabled: true, send_whatsapp: true, send_notification: false, label: "Appointment Reminder", action: "APPOINTMENT_REMINDER" },
-]
+  useEffect(() => {
+    function onBeforeUnload(e: BeforeUnloadEvent) {
+      if (UnsavedChangesContext.hasUnsaved) {
+        e.preventDefault()
+      }
+    }
+    window.addEventListener("beforeunload", onBeforeUnload)
+    return () => window.removeEventListener("beforeunload", onBeforeUnload)
+  }, [])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LIVE PREVIEW COMPONENT — reused across all tabs
+// ═══════════════════════════════════════════════════════════════════════════
+
+function FollowUpPreview({ config, label }: { config: FollowUpConfig; label?: string }) {
+  if (!config.enabled || config.num_follow_ups === 0) {
+    return (
+      <div className="bg-muted/30 rounded-lg p-3 border border-dashed">
+        <p className="text-xs text-muted-foreground">Follow-ups are disabled.</p>
+      </div>
+    )
+  }
+
+  const days: number[] = []
+  for (let i = 0; i < config.num_follow_ups; i++) {
+    days.push(config.start_delay_days + i * config.gap_days)
+  }
+
+  return (
+    <div className="bg-muted/30 rounded-lg p-3 space-y-2">
+      {label && <p className="text-xs font-medium text-muted-foreground">{label}</p>}
+      <div className="flex flex-wrap gap-2">
+        {days.map((day, idx) => (
+          <div key={idx} className="flex items-center gap-1.5 bg-white rounded-full px-3 py-1 border text-xs">
+            <CheckCircle2 className="h-3 w-3 text-primary" />
+            <span className="font-medium">Day {day}</span>
+          </div>
+        ))}
+      </div>
+      {config.auto_close_on_completion && (
+        <p className="text-xs text-muted-foreground italic">Stops when treatment is completed.</p>
+      )}
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FOLLOW-UP CONFIG FORM — reusable form for a single follow-up config
+// ═══════════════════════════════════════════════════════════════════════════
+
+function FollowUpForm({ config, onChange }: { config: FollowUpConfig; onChange: (c: FollowUpConfig) => void }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between p-3 rounded-lg border">
+        <div>
+          <p className="text-sm font-medium">Enabled</p>
+          <p className="text-xs text-muted-foreground">Turn follow-ups on or off</p>
+        </div>
+        <Switch checked={config.enabled} onCheckedChange={(v) => onChange({ ...config, enabled: v })} />
+      </div>
+
+      {config.enabled && (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Start Delay (days)</Label>
+              <NumericInput value={config.start_delay_days} min={0} max={365} onChange={(v) => onChange({ ...config, start_delay_days: v })} className="h-8 text-xs" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Number of Follow-ups</Label>
+              <NumericInput value={config.num_follow_ups} min={0} max={20} onChange={(v) => onChange({ ...config, num_follow_ups: v })} className="h-8 text-xs" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Gap Between (days)</Label>
+              <NumericInput value={config.gap_days} min={0} max={90} onChange={(v) => onChange({ ...config, gap_days: v })} className="h-8 text-xs" />
+            </div>
+          </div>
+          <div className="flex items-center justify-between p-3 rounded-lg border">
+            <div>
+              <p className="text-sm font-medium">Auto-close on completion</p>
+              <p className="text-xs text-muted-foreground">Stop follow-ups when treatment is completed</p>
+            </div>
+            <Switch checked={config.auto_close_on_completion} onCheckedChange={(v) => onChange({ ...config, auto_close_on_completion: v })} />
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SAVE STATUS INDICATOR — shows last saved timestamp
+// ═══════════════════════════════════════════════════════════════════════════
+
+function SavedIndicator({ lastSaved }: { lastSaved: Date | null }) {
+  if (!lastSaved) return null
+  return (
+    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      <CheckCircle2 className="h-3 w-3 text-green-600" />
+      <span>Last Saved: {formatTimestamp(lastSaved)}</span>
+    </div>
+  )
+}
+
 
 export default function CrmSettings() {
-  const queryClient = useQueryClient()
-  const { addToast } = useToast()
-  const [activeTab, setActiveTab] = useState("lead-policy")
+  const [activeTab, setActiveTab] = useState("lead")
+  const [anyDirty, setAnyDirty] = useState(false)
+  const [lastSaved, setLastSaved] = useState<Date | null>(null)
 
-  const { data: crmConfig } = useQuery({
-    queryKey: ["crm-config"],
-    queryFn: () => crmSettingsApi.crmConfig.get(),
-  })
-  const config: Record<string, string> = crmConfig || {}
-
-  const updateConfigMutation = useMutation({
-    mutationFn: (configs: Record<string, string>) => crmSettingsApi.crmConfig.update(configs),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["crm-config"] }); addToast({ title: "Settings saved", variant: "success" }) },
-    onError: (err: ApiError) => addToast({ title: "Error", description: extractDetail(err), variant: "destructive" }),
-  })
-  const setConfig = (key: string, value: string) => updateConfigMutation.mutate({ [key]: value })
+  useUnsavedChangesWarning(anyDirty)
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="CRM Settings"
-        description="Configure when and how the clinic follows up with patients"
-      />
+      <div className="flex items-start justify-between">
+        <PageHeader
+          title="CRM Settings"
+          description="Configure follow-ups and CRM behaviour for your hospital"
+        />
+        {lastSaved && <div className="mt-2"><SavedIndicator lastSaved={lastSaved} /></div>}
+      </div>
+
+      {anyDirty && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs">
+          <AlertTriangle className="h-3.5 w-3.5" />
+          <span>You have unsaved changes. Save before leaving this page.</span>
+        </div>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="flex flex-wrap h-auto gap-1 p-1 bg-muted/50">
-          <TabsTrigger value="lead-policy" className="text-xs gap-1.5"><Users className="h-3.5 w-3.5" /> Lead Follow-up</TabsTrigger>
-          <TabsTrigger value="treatment-journeys" className="text-xs gap-1.5"><Stethoscope className="h-3.5 w-3.5" /> Treatment Journeys</TabsTrigger>
-          <TabsTrigger value="case-journey" className="text-xs gap-1.5"><Phone className="h-3.5 w-3.5" /> Case Journey</TabsTrigger>
           <TabsTrigger value="general" className="text-xs gap-1.5"><Settings className="h-3.5 w-3.5" /> General</TabsTrigger>
+          <TabsTrigger value="lead" className="text-xs gap-1.5"><Users className="h-3.5 w-3.5" /> Lead</TabsTrigger>
+          <TabsTrigger value="opd" className="text-xs gap-1.5"><Stethoscope className="h-3.5 w-3.5" /> OPD</TabsTrigger>
+          <TabsTrigger value="treatment" className="text-xs gap-1.5"><Stethoscope className="h-3.5 w-3.5" /> Treatment</TabsTrigger>
+          <TabsTrigger value="case" className="text-xs gap-1.5"><Phone className="h-3.5 w-3.5" /> Case</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="lead-policy">
-          <LeadFollowUpPolicy />
-        </TabsContent>
-
-        <TabsContent value="treatment-journeys">
-          <TreatmentJourneyPolicies />
-        </TabsContent>
-
-        <TabsContent value="case-journey">
-          <CaseJourneyPolicy />
-        </TabsContent>
-
-        <TabsContent value="general">
-          <GeneralSettings config={config} setConfig={setConfig} addToast={addToast} />
-        </TabsContent>
+        <TabsContent value="general"><GeneralSettingsTab onDirtyChange={setAnyDirty} onSaved={() => setLastSaved(new Date())} /></TabsContent>
+        <TabsContent value="lead"><FollowUpTab context="lead" title="Lead Follow-up" description="Configure follow-ups when a new lead/enquiry is created." apiGet="getLead" apiUpdate="updateLead" defaultConfig={{ ...defaultFollowUp(), start_delay_days: 1 }} onDirtyChange={setAnyDirty} onSaved={() => setLastSaved(new Date())} /></TabsContent>
+        <TabsContent value="opd"><FollowUpTab context="opd" title="OPD Follow-up" description="Configure follow-ups when a patient status is set to OPD." apiGet="getOpd" apiUpdate="updateOpd" defaultConfig={defaultFollowUp()} onDirtyChange={setAnyDirty} onSaved={() => setLastSaved(new Date())} /></TabsContent>
+        <TabsContent value="treatment"><TreatmentSettingsTab onDirtyChange={setAnyDirty} onSaved={() => setLastSaved(new Date())} /></TabsContent>
+        <TabsContent value="case"><CaseSettingsTab onDirtyChange={setAnyDirty} onSaved={() => setLastSaved(new Date())} /></TabsContent>
       </Tabs>
     </div>
   )
 }
 
+
 // ═══════════════════════════════════════════════════════════════════════════
-// LEAD FOLLOW-UP POLICY
+// GENERAL SETTINGS TAB
 // ═══════════════════════════════════════════════════════════════════════════
 
-function LeadFollowUpPolicy() {
+const WORKING_DAY_OPTIONS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
+
+function GeneralSettingsTab({ onDirtyChange, onSaved }: { onDirtyChange: (d: boolean) => void; onSaved: () => void }) {
   const queryClient = useQueryClient()
   const { addToast } = useToast()
 
   const { data, isLoading } = useQuery({
-    queryKey: ["crm-lead-policy"],
-    queryFn: () => crmRulesApi.policies.getLeadPolicy(),
+    queryKey: ["crm-config-general"],
+    queryFn: () => crmSettingsApi.crmConfig.getGeneral(),
   })
 
-  const policy = data?.policy
-  const [steps, setSteps] = useState<LeadFollowUp[]>(DEFAULT_LEAD_STEPS)
-  const [autoCloseDays, setAutoCloseDays] = useState(30)
+  const [crmEnabled, setCrmEnabled] = useState(true)
+  const [workingDays, setWorkingDays] = useState<string[]>(["MON", "TUE", "WED", "THU", "FRI", "SAT"])
+  const [businessStart, setBusinessStart] = useState("09:00")
+  const [businessEnd, setBusinessEnd] = useState("18:00")
+  const [reminderTime, setReminderTime] = useState("09:00")
+  const [reminderOffset, setReminderOffset] = useState("1")
+  const [timezone, setTimezone] = useState("Asia/Kolkata")
+  const [weekendPolicy, setWeekendPolicy] = useState("SKIP")
+  const [holidays, setHolidays] = useState<string[]>([])
+  const [newHoliday, setNewHoliday] = useState("")
   const [initialized, setInitialized] = useState(false)
+  const savedRef = useRef("")
+
+  function currentSnapshot() {
+    return JSON.stringify({ crmEnabled, workingDays, businessStart, businessEnd, reminderTime, reminderOffset, timezone, weekendPolicy, holidays })
+  }
 
   useEffect(() => {
-    if (policy && !initialized) {
-      if (policy.follow_ups && policy.follow_ups.length > 0) {
-        setSteps(policy.follow_ups.map((s: LeadFollowUp) => ({ ...s })))
-      }
-      if (policy.auto_close_days) {
-        setAutoCloseDays(policy.auto_close_days)
+    if (data && !initialized) {
+      setCrmEnabled(data.crm_enabled !== "false")
+      setWorkingDays(data.crm_working_days ? data.crm_working_days.split(",") : ["MON", "TUE", "WED", "THU", "FRI", "SAT"])
+      setBusinessStart(data.crm_business_start || "09:00")
+      setBusinessEnd(data.crm_business_end || "18:00")
+      setReminderTime(data.crm_reminder_time || "09:00")
+      setReminderOffset(data.crm_reminder_offset || "1")
+      setTimezone(data.crm_timezone || "Asia/Kolkata")
+      setWeekendPolicy(data.crm_weekend_policy || "SKIP")
+      try {
+        const parsed = JSON.parse(data.crm_holidays)
+        setHolidays(Array.isArray(parsed) ? parsed : [])
+      } catch {
+        setHolidays([])
       }
       setInitialized(true)
     }
-  }, [policy, initialized])
+  }, [data, initialized])
+
+  useEffect(() => {
+    if (initialized) savedRef.current = currentSnapshot()
+  }, [initialized])
+
+  const isDirty = initialized && savedRef.current !== currentSnapshot()
+
+  useEffect(() => { onDirtyChange(isDirty) }, [isDirty])
 
   const saveMutation = useMutation({
-    mutationFn: () => crmRulesApi.policies.saveLeadPolicy({ follow_ups: steps, auto_close_days: autoCloseDays }),
+    mutationFn: () => crmSettingsApi.crmConfig.updateGeneral({
+      crm_enabled: String(crmEnabled),
+      crm_working_days: workingDays.join(","),
+      crm_business_start: businessStart,
+      crm_business_end: businessEnd,
+      crm_reminder_time: reminderTime,
+      crm_reminder_offset: reminderOffset,
+      crm_timezone: timezone,
+      crm_weekend_policy: weekendPolicy,
+      crm_holidays: JSON.stringify(holidays),
+    }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["crm-lead-policy"] })
-      addToast({ title: "Lead follow-up policy saved", variant: "success" })
+      queryClient.invalidateQueries({ queryKey: ["crm-config-general"] })
+      addToast({ title: "Settings saved successfully.", variant: "success" })
+      savedRef.current = currentSnapshot()
+      onDirtyChange(false)
+      onSaved()
     },
     onError: (err: ApiError) => addToast({ title: "Error", description: extractDetail(err), variant: "destructive" }),
   })
 
-  function addStep() {
-    const lastDelay = steps.length > 0 ? steps[steps.length - 1].delay_days : 0
-    setSteps([...steps, { delay_days: lastDelay + 5, enabled: true, send_whatsapp: true, send_notification: false }])
+  function toggleDay(day: string) {
+    setWorkingDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort((a, b) => WORKING_DAY_OPTIONS.indexOf(a) - WORKING_DAY_OPTIONS.indexOf(b)))
   }
 
-  function removeStep(idx: number) {
-    setSteps(steps.filter((_, i) => i !== idx))
-  }
-
-  function updateStep(idx: number, field: keyof LeadFollowUp, value: boolean | number) {
-    setSteps(steps.map((s, i) => i === idx ? { ...s, [field]: value } : s))
-  }
-
-  if (isLoading) {
-    return <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">Loading policy...</CardContent></Card>
-  }
-
-  return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Lead Follow-up Policy</CardTitle>
-          <p className="text-xs text-muted-foreground">
-            Configure how the clinic follows up with new enquiries before they become patients.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {steps.length === 0 ? (
-            <div className="py-8 text-center border border-dashed rounded-lg">
-              <p className="text-sm text-muted-foreground mb-3">No follow-up steps configured.</p>
-              <Button variant="outline" size="sm" onClick={addStep}>
-                <Plus className="h-4 w-4 mr-1" /> Add First Follow-up
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-0">
-              {steps.map((step, idx) => (
-                <div key={idx} className="relative">
-                  <div className={`flex items-start gap-4 p-4 rounded-lg border transition-colors ${step.enabled ? "bg-white" : "bg-gray-50 opacity-70"}`}>
-                    <div className="flex flex-col items-center gap-1 pt-1 shrink-0">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${step.enabled ? "bg-primary text-primary-foreground" : "bg-gray-200 text-gray-500"}`}>
-                        {idx + 1}
-                      </div>
-                      {idx < steps.length - 1 && (
-                        <div className="w-px h-6 bg-gray-200" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0 space-y-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900">Follow-up {idx + 1}</p>
-                          <p className="text-xs text-muted-foreground">Sends {step.delay_days} day{step.delay_days !== 1 ? "s" : ""} after enquiry is created</p>
-                        </div>
-                        <Switch checked={step.enabled} onCheckedChange={(v) => updateStep(idx, "enabled", v)} />
-                      </div>
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <div className="flex items-center gap-1.5">
-                          <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                          <Label className="text-xs text-muted-foreground">After</Label>
-                          <Input
-                            type="number"
-                            min={1}
-                            max={365}
-                            value={step.delay_days}
-                            onChange={(e) => updateStep(idx, "delay_days", Math.max(1, parseInt(e.target.value) || 1))}
-                            className="h-7 w-16 text-xs text-center"
-                          />
-                          <Label className="text-xs text-muted-foreground">day{step.delay_days !== 1 ? "s" : ""}</Label>
-                        </div>
-                        <div className="flex items-center gap-3 ml-auto">
-                          <div className="flex items-center gap-1.5" title="Send WhatsApp message">
-                            <MessageCircle className={`h-3.5 w-3.5 ${step.send_whatsapp ? "text-green-600" : "text-gray-400"}`} />
-                            <Switch
-                              checked={step.send_whatsapp}
-                              onCheckedChange={(v) => updateStep(idx, "send_whatsapp", v)}
-                              className="scale-75"
-                            />
-                          </div>
-                          <div className="flex items-center gap-1.5" title="Notify staff">
-                            <Bell className={`h-3.5 w-3.5 ${step.send_notification ? "text-amber-600" : "text-gray-400"}`} />
-                            <Switch
-                              checked={step.send_notification}
-                              onCheckedChange={(v) => updateStep(idx, "send_notification", v)}
-                              className="scale-75"
-                            />
-                          </div>
-                          {steps.length > 1 && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-gray-400 hover:text-red-500"
-                              onClick={() => removeStep(idx)}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {steps.length > 0 && steps.length < 5 && (
-            <Button variant="outline" size="sm" className="w-full" onClick={addStep}>
-              <Plus className="h-4 w-4 mr-1" /> Add Another Follow-up
-            </Button>
-          )}
-
-          <div className="border-t pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label className="text-sm font-medium">Auto-close enquiry after</Label>
-                <p className="text-xs text-muted-foreground">Close enquiries with no response</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Input
-                  type="number"
-                  min={1}
-                  max={365}
-                  value={autoCloseDays}
-                  onChange={(e) => setAutoCloseDays(Math.max(1, parseInt(e.target.value) || 30))}
-                  className="h-8 w-20 text-xs text-center"
-                />
-                <Label className="text-xs text-muted-foreground">days</Label>
-              </div>
-            </div>
-          </div>
-
-          <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="w-full">
-            <Save className="h-4 w-4 mr-1" />
-            {saveMutation.isPending ? "Saving..." : "Save Lead Follow-up Policy"}
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// TREATMENT JOURNEY POLICIES
-// ═══════════════════════════════════════════════════════════════════════════
-
-function TreatmentJourneyPolicies() {
-  const [expandedId, setExpandedId] = useState<string | null>(null)
-
-  const { data, isLoading } = useQuery({
-    queryKey: ["crm-treatment-journeys"],
-    queryFn: () => crmRulesApi.policies.getTreatmentJourneys(),
-  })
-
-  const journeys: TreatmentJourney[] = data?.journeys || []
-
-  if (isLoading) {
-    return <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">Loading treatment journeys...</CardContent></Card>
-  }
-
-  return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Treatment Journey Policies</CardTitle>
-          <p className="text-xs text-muted-foreground">
-            Select a treatment to view and configure its patient follow-up timeline.
-          </p>
-        </CardHeader>
-        <CardContent>
-          {journeys.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground">
-              <p className="text-sm">No treatments found. Add treatments in Treatment Master first.</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {journeys.map((journey) => (
-                <JourneyCard
-                  key={journey.treatment_type_id}
-                  journey={journey}
-                  isExpanded={expandedId === journey.treatment_type_id}
-                  onToggle={() => setExpandedId(expandedId === journey.treatment_type_id ? null : journey.treatment_type_id)}
-                />
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
-
-function JourneyCard({
-  journey,
-  isExpanded,
-  onToggle,
-}: {
-  journey: TreatmentJourney
-  isExpanded: boolean
-  onToggle: () => void
-}) {
-  return (
-    <div className={`rounded-lg border overflow-hidden transition-all ${isExpanded ? "ring-1 ring-primary/20" : ""}`}>
-      <div
-        className={`flex items-center justify-between p-4 cursor-pointer transition-colors ${isExpanded ? "bg-primary/5" : "hover:bg-muted/50"}`}
-        onClick={onToggle}
-      >
-        <div className="flex items-center gap-3">
-          <Stethoscope className="h-4 w-4 text-muted-foreground shrink-0" />
-          <div>
-            <span className="text-sm font-medium">{journey.treatment_name}</span>
-            <div className="flex items-center gap-2 mt-0.5">
-              {journey.step_count > 0 ? (
-                <>
-                  <span className="text-[10px] text-muted-foreground">{journey.active_count} active</span>
-                  <span className="text-[10px] text-muted-foreground">·</span>
-                  <span className="text-[10px] text-muted-foreground">{journey.step_count} steps</span>
-                </>
-              ) : (
-                <span className="text-[10px] text-muted-foreground">No steps configured</span>
-              )}
-            </div>
-          </div>
-        </div>
-        {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-      </div>
-      {isExpanded && (
-        <JourneyTimeline journey={journey} />
-      )}
-    </div>
-  )
-}
-
-function JourneyTimeline({ journey }: { journey: TreatmentJourney }) {
-  const queryClient = useQueryClient()
-  const { addToast } = useToast()
-
-  const [steps, setSteps] = useState<TreatmentJourneyStep[]>(journey.steps.length > 0 ? journey.steps : DEFAULT_TREATMENT_STEPS)
-  const [notes, setNotes] = useState("")
-
-  useEffect(() => {
-    setSteps(journey.steps.length > 0 ? journey.steps : DEFAULT_TREATMENT_STEPS)
-  }, [journey.treatment_type_id, journey.steps])
-
-  const saveMutation = useMutation({
-    mutationFn: () => crmRulesApi.policies.saveTreatmentJourney(journey.treatment_type_id, { steps, notes }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["crm-treatment-journeys"] })
-      addToast({ title: `${journey.treatment_name} journey saved`, variant: "success" })
-    },
-    onError: (err: ApiError) => addToast({ title: "Error", description: extractDetail(err), variant: "destructive" }),
-  })
-
-  function addStep(milestone: string) {
-    const meta = MILESTONE_META[milestone]
-    if (!meta) return
-    setSteps([...steps, {
-      milestone,
-      delay_days: meta.default_delay,
-      enabled: true,
-      send_whatsapp: true,
-      send_notification: false,
-      label: meta.label,
-      visit_stage: meta.default_visit_stage,
-      action: meta.default_action,
-    }])
-  }
-
-  function removeStep(idx: number) {
-    setSteps(steps.filter((_, i) => i !== idx))
-  }
-
-  function updateStep(idx: number, field: keyof TreatmentJourneyStep, value: boolean | number | string) {
-    setSteps(steps.map((s, i) => i === idx ? { ...s, [field]: value } : s))
-  }
-
-  const availableMilestones = Object.keys(MILESTONE_META).filter(
-    (m) => !steps.some((s) => s.milestone === m)
-  )
-
-  return (
-    <div className="p-4 bg-muted/20 border-t space-y-4">
-      {steps.length > 0 ? (
-        <div className="space-y-0">
-          {steps.map((step, idx) => {
-            const meta = MILESTONE_META[step.milestone] || MILESTONE_META.VISIT_COMPLETED
-            const Icon = meta.icon
-            return (
-              <div key={idx} className="relative">
-                <div className={`flex items-start gap-3 p-3 rounded-lg transition-colors ${step.enabled ? "bg-white border" : "bg-gray-50 border opacity-70"}`}>
-                  <div className="flex flex-col items-center gap-0.5 pt-0.5 shrink-0">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center ${step.enabled ? "bg-primary/10 text-primary" : "bg-gray-100 text-gray-400"}`}>
-                      <Icon className="h-3 w-3" />
-                    </div>
-                    {idx < steps.length - 1 && <div className="w-px h-4 bg-gray-200 my-0.5" />}
-                  </div>
-                  <div className="flex-1 min-w-0 space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <p className="text-xs font-semibold text-gray-900">{step.label || meta.label}</p>
-                        <p className="text-[10px] text-muted-foreground">{meta.description}</p>
-                      </div>
-                      <Switch checked={step.enabled} onCheckedChange={(v) => updateStep(idx, "enabled", v)} />
-                    </div>
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <div className="flex items-center gap-1.5">
-                        <Clock className="h-3 w-3 text-muted-foreground" />
-                        <Label className="text-[10px] text-muted-foreground">
-                          {step.milestone === "APPOINTMENT_CREATED" ? "Before" : "After"}
-                        </Label>
-                        <Input
-                          type="number"
-                          min={0}
-                          max={365}
-                          value={step.delay_days}
-                          onChange={(e) => updateStep(idx, "delay_days", Math.max(0, parseInt(e.target.value) || 0))}
-                          className="h-6 w-14 text-[10px] text-center"
-                        />
-                        <Label className="text-[10px] text-muted-foreground">
-                          day{step.delay_days !== 1 ? "s" : ""}
-                        </Label>
-                      </div>
-                      <div className="flex items-center gap-2 ml-auto">
-                        <div className="flex items-center gap-0.5" title="WhatsApp">
-                          <MessageCircle className={`h-3 w-3 ${step.send_whatsapp ? "text-green-600" : "text-gray-400"}`} />
-                          <Switch
-                            checked={step.send_whatsapp}
-                            onCheckedChange={(v) => updateStep(idx, "send_whatsapp", v)}
-                            className="scale-[0.6]"
-                          />
-                        </div>
-                        <div className="flex items-center gap-0.5" title="Notification">
-                          <Bell className={`h-3 w-3 ${step.send_notification ? "text-amber-600" : "text-gray-400"}`} />
-                          <Switch
-                            checked={step.send_notification}
-                            onCheckedChange={(v) => updateStep(idx, "send_notification", v)}
-                            className="scale-[0.6]"
-                          />
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-gray-400 hover:text-red-500"
-                          onClick={() => removeStep(idx)}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      ) : (
-        <div className="py-6 text-center border border-dashed rounded-lg">
-          <p className="text-xs text-muted-foreground">No follow-up steps configured for this treatment.</p>
-        </div>
-      )}
-
-      {availableMilestones.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {availableMilestones.map((m) => {
-            const meta = MILESTONE_META[m]
-            return (
-              <Button
-                key={m}
-                variant="outline"
-                size="sm"
-                className="h-7 text-[10px] gap-1"
-                onClick={() => addStep(m)}
-              >
-                <Plus className="h-3 w-3" />
-                {meta.label}
-              </Button>
-            )
-          })}
-        </div>
-      )}
-
-      <div className="space-y-1.5">
-        <Label className="text-xs font-medium">Staff Notes (optional)</Label>
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Internal instructions for staff handling this treatment journey..."
-          className="flex w-full rounded-md border border-input bg-white px-3 py-2 text-xs min-h-[60px] placeholder:text-muted-foreground"
-        />
-      </div>
-
-      <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} size="sm" className="w-full">
-        <Save className="h-3.5 w-3.5 mr-1" />
-        {saveMutation.isPending ? "Saving..." : `Save ${journey.treatment_name} Journey`}
-      </Button>
-    </div>
-  )
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// CASE JOURNEY POLICY — Recovery + Recall (scope=CASE)
-// ═══════════════════════════════════════════════════════════════════════════
-
-interface CaseJourneyStep {
-  id?: string
-  milestone: string
-  delay_days: number
-  enabled: boolean
-  send_whatsapp: boolean
-  send_notification: boolean
-  label: string
-}
-
-const CASE_MILESTONE_META: Record<string, { label: string; icon: typeof CircleDot; description: string; default_delay: number }> = {
-  CASE_RECOVERY: {
-    label: "Recovery Follow-up",
-    icon: CheckCircle2,
-    description: "Check healing progress after case completion",
-    default_delay: 3,
-  },
-  CASE_RECALL: {
-    label: "6-Month Recall",
-    icon: Phone,
-    description: "Periodic recall checkup after case completion",
-    default_delay: 180,
-  },
-}
-
-const DEFAULT_CASE_STEPS: CaseJourneyStep[] = [
-  { milestone: "CASE_RECOVERY", delay_days: 3, enabled: true, send_whatsapp: true, send_notification: true, label: "Recovery Follow-up" },
-  { milestone: "CASE_RECALL", delay_days: 180, enabled: true, send_whatsapp: true, send_notification: false, label: "6-Month Recall" },
-]
-
-function CaseJourneyPolicy() {
-  const queryClient = useQueryClient()
-  const { addToast } = useToast()
-
-  const { data, isLoading } = useQuery({
-    queryKey: ["crm-case-journey"],
-    queryFn: () => crmRulesApi.policies.getCaseJourney(),
-  })
-
-  const policy = data?.policy
-  const [steps, setSteps] = useState<CaseJourneyStep[]>(DEFAULT_CASE_STEPS)
-  const [initialized, setInitialized] = useState(false)
-
-  useEffect(() => {
-    if (policy && !initialized) {
-      if (policy.steps && policy.steps.length > 0) {
-        setSteps(policy.steps.map((s: CaseJourneyStep) => ({ ...s })))
-      }
-      setInitialized(true)
+  function addHoliday() {
+    if (newHoliday && !holidays.includes(newHoliday)) {
+      setHolidays((prev) => [...prev, newHoliday].sort())
+      setNewHoliday("")
     }
-  }, [policy, initialized])
+  }
 
-  const saveMutation = useMutation({
-    mutationFn: () => crmRulesApi.policies.saveCaseJourney({ steps }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["crm-case-journey"] })
-      addToast({ title: "Case journey policy saved", variant: "success" })
-    },
-    onError: (err: ApiError) => addToast({ title: "Error", description: extractDetail(err), variant: "destructive" }),
-  })
+  function removeHoliday(h: string) {
+    setHolidays((prev) => prev.filter((x) => x !== h))
+  }
 
-  function updateStep(idx: number, field: keyof CaseJourneyStep, value: boolean | number | string) {
-    setSteps(steps.map((s, i) => i === idx ? { ...s, [field]: value } : s))
+  function resetGeneral() {
+    if (data) {
+      setCrmEnabled(data.crm_enabled !== "false")
+      setWorkingDays(data.crm_working_days ? data.crm_working_days.split(",") : ["MON", "TUE", "WED", "THU", "FRI", "SAT"])
+      setBusinessStart(data.crm_business_start || "09:00")
+      setBusinessEnd(data.crm_business_end || "18:00")
+      setReminderTime(data.crm_reminder_time || "09:00")
+      setReminderOffset(data.crm_reminder_offset || "1")
+      setTimezone(data.crm_timezone || "Asia/Kolkata")
+      setWeekendPolicy(data.crm_weekend_policy || "SKIP")
+      try {
+        const parsed = JSON.parse(data.crm_holidays)
+        setHolidays(Array.isArray(parsed) ? parsed : [])
+      } catch {
+        setHolidays([])
+      }
+    }
   }
 
   if (isLoading) {
-    return <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">Loading case journey policy...</CardContent></Card>
+    return <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">Loading settings...</CardContent></Card>
   }
 
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Case Journey Policy</CardTitle>
-          <p className="text-xs text-muted-foreground">
-            Configure follow-ups that trigger when an entire case (all treatments) is completed.
-            These are separate from per-treatment milestones.
-          </p>
+          <CardTitle className="text-base">General CRM Settings</CardTitle>
+          <p className="text-xs text-muted-foreground">Core CRM behaviour used by the follow-up engine.</p>
         </CardHeader>
         <CardContent className="space-y-6">
-          {steps.length > 0 ? (
-            <div className="space-y-0">
-              {steps.map((step, idx) => {
-                const meta = CASE_MILESTONE_META[step.milestone] || CASE_MILESTONE_META.CASE_RECOVERY
-                const Icon = meta.icon
-                return (
-                  <div key={idx} className="relative">
-                    <div className={`flex items-start gap-4 p-4 rounded-lg border transition-colors ${step.enabled ? "bg-white" : "bg-gray-50 opacity-70"}`}>
-                      <div className="flex flex-col items-center gap-1 pt-1 shrink-0">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${step.enabled ? "bg-primary/10 text-primary" : "bg-gray-100 text-gray-400"}`}>
-                          <Icon className="h-4 w-4" />
-                        </div>
-                        {idx < steps.length - 1 && (
-                          <div className="w-px h-6 bg-gray-200" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0 space-y-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-semibold text-gray-900">{step.label || meta.label}</p>
-                            <p className="text-xs text-muted-foreground">{meta.description}</p>
-                          </div>
-                          <Switch checked={step.enabled} onCheckedChange={(v) => updateStep(idx, "enabled", v)} />
-                        </div>
-                        <div className="flex items-center gap-3 flex-wrap">
-                          <div className="flex items-center gap-1.5">
-                            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                            <Label className="text-xs text-muted-foreground">After</Label>
-                            <Input
-                              type="number"
-                              min={1}
-                              max={365}
-                              value={step.delay_days}
-                              onChange={(e) => updateStep(idx, "delay_days", Math.max(1, parseInt(e.target.value) || 1))}
-                              className="h-7 w-16 text-xs text-center"
-                            />
-                            <Label className="text-xs text-muted-foreground">day{step.delay_days !== 1 ? "s" : ""}</Label>
-                          </div>
-                          <div className="flex items-center gap-3 ml-auto">
-                            <div className="flex items-center gap-1.5" title="Send WhatsApp message">
-                              <MessageCircle className={`h-3.5 w-3.5 ${step.send_whatsapp ? "text-green-600" : "text-gray-400"}`} />
-                              <Switch
-                                checked={step.send_whatsapp}
-                                onCheckedChange={(v) => updateStep(idx, "send_whatsapp", v)}
-                                className="scale-75"
-                              />
-                            </div>
-                            <div className="flex items-center gap-1.5" title="Notify staff">
-                              <Bell className={`h-3.5 w-3.5 ${step.send_notification ? "text-amber-600" : "text-gray-400"}`} />
-                              <Switch
-                                checked={step.send_notification}
-                                onCheckedChange={(v) => updateStep(idx, "send_notification", v)}
-                                className="scale-75"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
+          <div className="flex items-center justify-between p-3 rounded-lg border">
+            <div>
+              <p className="text-sm font-medium">CRM Enabled</p>
+              <p className="text-xs text-muted-foreground">Turn CRM follow-ups on or off for this hospital</p>
             </div>
-          ) : (
-            <div className="py-8 text-center border border-dashed rounded-lg">
-              <p className="text-sm text-muted-foreground">No case journey steps configured.</p>
-            </div>
-          )}
-
-          <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="w-full">
-            <Save className="h-4 w-4 mr-1" />
-            {saveMutation.isPending ? "Saving..." : "Save Case Journey Policy"}
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
-
-
-// ═══════════════════════════════════════════════════════════════════════════
-// GENERAL SETTINGS
-// ═══════════════════════════════════════════════════════════════════════════
-
-function GeneralSettings({
-  config,
-  setConfig,
-  addToast,
-}: {
-  config: Record<string, string>
-  setConfig: (key: string, value: string) => void
-  addToast: (t: { title: string; variant: "success" | "destructive" }) => void
-}) {
-  const [crmEnabled, setCrmEnabled] = useState(config.crm_enabled !== "false")
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">General Settings</CardTitle>
-        <p className="text-xs text-muted-foreground">Basic CRM preferences for the clinic.</p>
-      </CardHeader>
-      <CardContent className="space-y-6 max-w-lg">
-        <div className="flex items-center justify-between">
-          <div>
-            <Label className="text-sm font-medium">CRM Enabled</Label>
-            <p className="text-xs text-muted-foreground">Turn CRM features on or off for this clinic</p>
+            <Switch checked={crmEnabled} onCheckedChange={setCrmEnabled} />
           </div>
-          <Switch
-            checked={crmEnabled}
-            onCheckedChange={(v) => {
-              setCrmEnabled(v)
-              setConfig("crm_enabled", String(v))
-            }}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Working Days</Label>
-          <p className="text-xs text-muted-foreground">Follow-ups are only scheduled on working days.</p>
-          <div className="flex gap-2">
-            {["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map((day) => {
-              const days = (config.crm_working_days || "MON,TUE,WED,THU,FRI,SAT").split(",")
-              const isActive = days.includes(day)
-              return (
+
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Working Days</Label>
+            <div className="flex flex-wrap gap-2">
+              {WORKING_DAY_OPTIONS.map((day) => (
                 <Button
                   key={day}
-                  variant={isActive ? "default" : "outline"}
+                  variant={workingDays.includes(day) ? "default" : "outline"}
                   size="sm"
-                  className="h-9 w-12 text-xs"
-                  onClick={() => {
-                    const current = (config.crm_working_days || "MON,TUE,WED,THU,FRI,SAT").split(",")
-                    const next = isActive ? current.filter((d) => d !== day) : [...current, day]
-                    setConfig("crm_working_days", next.join(","))
-                  }}
+                  className="h-8 text-xs"
+                  onClick={() => toggleDay(day)}
                 >
                   {day}
                 </Button>
-              )
-            })}
+              ))}
+            </div>
           </div>
-        </div>
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Reminder Time</Label>
-          <p className="text-xs text-muted-foreground">What time should follow-up reminders be sent?</p>
-          <Input
-            type="time"
-            className="h-9 w-40"
-            value={config.crm_reminder_time || "09:00"}
-            onChange={(e) => setConfig("crm_reminder_time", e.target.value)}
-          />
-        </div>
-        <Button onClick={() => addToast({ title: "Settings saved", variant: "success" })}>
-          <Save className="h-4 w-4 mr-1" /> Save Settings
-        </Button>
-      </CardContent>
-    </Card>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Business Hours Start</Label>
+              <Input type="time" value={businessStart} onChange={(e) => setBusinessStart(e.target.value)} className="h-8 text-xs" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Business Hours End</Label>
+              <Input type="time" value={businessEnd} onChange={(e) => setBusinessEnd(e.target.value)} className="h-8 text-xs" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Reminder Time</Label>
+              <Input type="time" value={reminderTime} onChange={(e) => setReminderTime(e.target.value)} className="h-8 text-xs" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Reminder Offset (days before)</Label>
+              <NumericInput value={parseInt(reminderOffset) || 1} min={0} max={30} onChange={(v) => setReminderOffset(String(v))} className="h-8 text-xs" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Timezone</Label>
+              <Input value={timezone} onChange={(e) => setTimezone(e.target.value)} className="h-8 text-xs" />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Weekend Policy</Label>
+            <div className="flex gap-2">
+              {["SKIP", "INCLUDE"].map((p) => (
+                <Button key={p} variant={weekendPolicy === p ? "default" : "outline"} size="sm" className="h-8 text-xs" onClick={() => setWeekendPolicy(p)}>
+                  {p === "SKIP" ? "Skip Weekends" : "Include Weekends"}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm font-medium flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5" /> Holiday Calendar</Label>
+            <p className="text-xs text-muted-foreground">Add dates when the clinic is closed. Follow-ups will skip these days.</p>
+            <div className="flex gap-2">
+              <Input
+                type="date"
+                value={newHoliday}
+                onChange={(e) => setNewHoliday(e.target.value)}
+                className="h-8 text-xs flex-1"
+              />
+              <Button variant="outline" size="sm" className="h-8" onClick={addHoliday} disabled={!newHoliday}>
+                <Plus className="h-3 w-3 mr-1" /> Add
+              </Button>
+            </div>
+            {holidays.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {holidays.map((h) => (
+                  <span key={h} className="inline-flex items-center gap-1 text-xs bg-muted px-2 py-0.5 rounded-full">
+                    {h}
+                    <button onClick={() => removeHoliday(h)} className="text-muted-foreground hover:text-destructive">
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-2">
+            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || !isDirty} className="flex-1">
+              {saveMutation.isPending ? (
+                <><span className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" /> Saving...</>
+              ) : (
+                <><Save className="h-4 w-4 mr-1" /> Save General Settings</>
+              )}
+            </Button>
+            <Button variant="outline" onClick={resetGeneral} disabled={!isDirty}>
+              <RotateCcw className="h-4 w-4 mr-1" /> Reset
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GENERIC FOLLOW-UP TAB — used for Lead and OPD
+// ═══════════════════════════════════════════════════════════════════════════
+
+function FollowUpTab({ context, title, description, apiGet, apiUpdate, defaultConfig, onDirtyChange, onSaved }: {
+  context: string
+  title: string
+  description: string
+  apiGet: "getLead" | "getOpd"
+  apiUpdate: "updateLead" | "updateOpd"
+  defaultConfig: FollowUpConfig
+  onDirtyChange: (d: boolean) => void
+  onSaved: () => void
+}) {
+  const queryClient = useQueryClient()
+  const { addToast } = useToast()
+
+  const { data, isLoading } = useQuery({
+    queryKey: [`crm-${context}-config`],
+    queryFn: () => crmSettingsApi.crmConfig[apiGet](),
+  })
+
+  const raw = data?.config
+  const [config, setConfig] = useState<FollowUpConfig>(defaultConfig)
+  const [initialized, setInitialized] = useState(false)
+  const savedRef = useRef("")
+
+  useEffect(() => {
+    if (raw && !initialized) {
+      setConfig({
+        enabled: raw.enabled ?? true,
+        start_delay_days: raw.start_delay_days ?? 0,
+        num_follow_ups: raw.num_follow_ups ?? 3,
+        gap_days: raw.gap_days ?? 2,
+        auto_close_on_completion: raw.auto_close_on_completion ?? false,
+      })
+      setInitialized(true)
+    }
+  }, [raw, initialized])
+
+  useEffect(() => {
+    if (initialized) savedRef.current = JSON.stringify(config)
+  }, [initialized])
+
+  const isDirty = initialized && savedRef.current !== JSON.stringify(config)
+
+  useEffect(() => { onDirtyChange(isDirty) }, [isDirty])
+
+  const saveMutation = useMutation({
+    mutationFn: () => crmSettingsApi.crmConfig[apiUpdate](config),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`crm-${context}-config`] })
+      addToast({ title: "Settings saved successfully.", variant: "success" })
+      savedRef.current = JSON.stringify(config)
+      onDirtyChange(false)
+      onSaved()
+    },
+    onError: (err: ApiError) => addToast({ title: "Error", description: extractDetail(err), variant: "destructive" }),
+  })
+
+  function resetConfig() {
+    if (raw) {
+      setConfig({
+        enabled: raw.enabled ?? true,
+        start_delay_days: raw.start_delay_days ?? 0,
+        num_follow_ups: raw.num_follow_ups ?? 3,
+        gap_days: raw.gap_days ?? 2,
+        auto_close_on_completion: raw.auto_close_on_completion ?? false,
+      })
+    }
+  }
+
+  if (isLoading) {
+    return <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">Loading {context} settings...</CardContent></Card>
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{title}</CardTitle>
+          <p className="text-xs text-muted-foreground">{description}</p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <FollowUpForm config={config} onChange={setConfig} />
+          <div className="border-t pt-4 space-y-2">
+            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1"><Eye className="h-3 w-3" /> Preview</p>
+            <FollowUpPreview config={config} label={`Follow-up schedule for ${context.toUpperCase()}`} />
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || !isDirty} className="flex-1">
+              {saveMutation.isPending ? (
+                <><span className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" /> Saving...</>
+              ) : (
+                <><Save className="h-4 w-4 mr-1" /> Save {title}</>
+              )}
+            </Button>
+            <Button variant="outline" onClick={resetConfig} disabled={!isDirty}>
+              <RotateCcw className="h-4 w-4 mr-1" /> Reset
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TREATMENT SETTINGS TAB — auto-loads all treatment types
+// ═══════════════════════════════════════════════════════════════════════════
+
+function TreatmentSettingsTab({ onDirtyChange, onSaved }: { onDirtyChange: (d: boolean) => void; onSaved: () => void }) {
+  const queryClient = useQueryClient()
+  const { addToast } = useToast()
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [search, setSearch] = useState("")
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["crm-config-treatment"],
+    queryFn: () => crmSettingsApi.crmConfig.getTreatment(),
+  })
+
+  const allItems: TreatmentItem[] = data?.items || []
+  const items = search
+    ? allItems.filter((i) => i.treatment_name.toLowerCase().includes(search.toLowerCase()))
+    : allItems
+
+  const debouncedConfigs = useRef<Map<string, FollowUpConfig>>(new Map())
+  const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const [dirtyCount, setDirtyCount] = useState(0)
+
+  useEffect(() => { onDirtyChange(dirtyCount > 0) }, [dirtyCount])
+
+  const saveMutation = useMutation({
+    mutationFn: (item: TreatmentItem) =>
+      crmSettingsApi.crmConfig.updateTreatment(item.treatment_type_id, item.config),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["crm-config-treatment"] })
+      addToast({ title: "Settings saved successfully.", variant: "success" })
+      setDirtyCount(0)
+      onSaved()
+    },
+    onError: (err: ApiError) => addToast({ title: "Error", description: extractDetail(err), variant: "destructive" }),
+  })
+
+  const updateItemConfig = useCallback((treatmentTypeId: string, newConfig: FollowUpConfig) => {
+    debouncedConfigs.current.set(treatmentTypeId, newConfig)
+    const existing = timers.current.get(treatmentTypeId)
+    if (existing) clearTimeout(existing)
+    const timer = setTimeout(() => {
+      const cfg = debouncedConfigs.current.get(treatmentTypeId)
+      if (cfg) {
+        const item = allItems.find((i) => i.treatment_type_id === treatmentTypeId)
+        if (item) {
+          saveMutation.mutate({ ...item, config: cfg })
+        }
+      }
+    }, 600)
+    timers.current.set(treatmentTypeId, timer)
+  }, [allItems, saveMutation])
+
+  if (isLoading) {
+    return <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">Loading treatment settings...</CardContent></Card>
+  }
+
+  if (allItems.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center">
+          <p className="text-sm text-muted-foreground mb-2">No treatment types found.</p>
+          <p className="text-xs text-muted-foreground">Add treatment types in Clinical Settings first.</p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Treatment Follow-up Settings</CardTitle>
+          <p className="text-xs text-muted-foreground">Configure follow-ups per treatment type. Changes save automatically after a short delay.</p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {allItems.length > 5 && (
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Search treatment types..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-8 text-xs pl-8"
+              />
+            </div>
+          )}
+          {items.length === 0 && search && (
+            <p className="text-xs text-muted-foreground text-center py-4">No treatment types match "{search}"</p>
+          )}
+          {items.map((item) => {
+            const isExpanded = expandedId === item.treatment_type_id
+            const cfg = item.config
+            return (
+              <div key={item.treatment_type_id} className="border rounded-lg overflow-hidden">
+                <button
+                  className="w-full flex items-center justify-between p-3 text-left hover:bg-muted/50 transition-colors"
+                  onClick={() => setExpandedId(isExpanded ? null : item.treatment_type_id)}
+                >
+                  <div className="flex items-center gap-3">
+                    {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                    <span className="text-sm font-medium">{item.treatment_name}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${cfg.enabled ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                      {cfg.enabled ? "Enabled" : "Disabled"}
+                    </span>
+                    {cfg.enabled && (
+                      <span className="text-xs text-muted-foreground">
+                        {cfg.num_follow_ups} follow-ups, {cfg.gap_days}d gap
+                      </span>
+                    )}
+                  </div>
+                </button>
+                {isExpanded && (
+                  <div className="p-4 border-t bg-muted/20 space-y-4">
+                    <FollowUpForm config={cfg} onChange={(newCfg) => updateItemConfig(item.treatment_type_id, newCfg)} />
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground flex items-center gap-1"><Eye className="h-3 w-3" /> Preview</p>
+                      <FollowUpPreview config={cfg} label={`Follow-up schedule for ${item.treatment_name}`} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CASE SETTINGS TAB — Recovery + Recall
+// ═══════════════════════════════════════════════════════════════════════════
+
+function CaseSettingsTab({ onDirtyChange, onSaved }: { onDirtyChange: (d: boolean) => void; onSaved: () => void }) {
+  const queryClient = useQueryClient()
+  const { addToast } = useToast()
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["crm-config-case"],
+    queryFn: () => crmSettingsApi.crmConfig.getCase(),
+  })
+
+  const [recovery, setRecovery] = useState<FollowUpConfig>({ enabled: true, start_delay_days: 3, num_follow_ups: 2, gap_days: 3, auto_close_on_completion: false })
+  const [recall, setRecall] = useState<FollowUpConfig>({ enabled: true, start_delay_days: 180, num_follow_ups: 1, gap_days: 0, auto_close_on_completion: false })
+  const [initialized, setInitialized] = useState(false)
+  const recoveryRef = useRef("")
+  const recallRef = useRef("")
+
+  useEffect(() => {
+    if (data && !initialized) {
+      if (data.recovery) setRecovery({ ...recovery, ...data.recovery })
+      if (data.recall) setRecall({ ...recall, ...data.recall })
+      setInitialized(true)
+    }
+  }, [data, initialized])
+
+  useEffect(() => {
+    if (initialized) {
+      recoveryRef.current = JSON.stringify(recovery)
+      recallRef.current = JSON.stringify(recall)
+    }
+  }, [initialized])
+
+  const isRecoveryDirty = initialized && recoveryRef.current !== JSON.stringify(recovery)
+  const isRecallDirty = initialized && recallRef.current !== JSON.stringify(recall)
+  const anyCaseDirty = isRecoveryDirty || isRecallDirty
+
+  useEffect(() => { onDirtyChange(anyCaseDirty) }, [anyCaseDirty])
+
+  const saveRecoveryMutation = useMutation({
+    mutationFn: () => crmSettingsApi.crmConfig.updateCase("recovery", recovery),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["crm-config-case"] })
+      addToast({ title: "Settings saved successfully.", variant: "success" })
+      recoveryRef.current = JSON.stringify(recovery)
+      onDirtyChange(false)
+      onSaved()
+    },
+    onError: (err: ApiError) => addToast({ title: "Error", description: extractDetail(err), variant: "destructive" }),
+  })
+
+  const saveRecallMutation = useMutation({
+    mutationFn: () => crmSettingsApi.crmConfig.updateCase("recall", recall),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["crm-config-case"] })
+      addToast({ title: "Settings saved successfully.", variant: "success" })
+      recallRef.current = JSON.stringify(recall)
+      onDirtyChange(false)
+      onSaved()
+    },
+    onError: (err: ApiError) => addToast({ title: "Error", description: extractDetail(err), variant: "destructive" }),
+  })
+
+  function resetRecovery() {
+    if (data?.recovery) setRecovery({ ...recovery, ...data.recovery })
+  }
+
+  function resetRecall() {
+    if (data?.recall) setRecall({ ...recall, ...data.recall })
+  }
+
+  if (isLoading) {
+    return <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">Loading case settings...</CardContent></Card>
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Case Recovery Follow-up</CardTitle>
+          <p className="text-xs text-muted-foreground">Configure follow-ups after a case/treatment is completed.</p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <FollowUpForm config={recovery} onChange={setRecovery} />
+          <div className="border-t pt-4 space-y-2">
+            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1"><Eye className="h-3 w-3" /> Preview</p>
+            <FollowUpPreview config={recovery} label="Recovery follow-up schedule" />
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={() => saveRecoveryMutation.mutate()} disabled={saveRecoveryMutation.isPending || !isRecoveryDirty} className="flex-1">
+              {saveRecoveryMutation.isPending ? (
+                <><span className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" /> Saving...</>
+              ) : (
+                <><Save className="h-4 w-4 mr-1" /> Save Recovery Settings</>
+              )}
+            </Button>
+            <Button variant="outline" onClick={resetRecovery} disabled={!isRecoveryDirty}>
+              <RotateCcw className="h-4 w-4 mr-1" /> Reset
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Case Recall Follow-up</CardTitle>
+          <p className="text-xs text-muted-foreground">Configure periodic recall follow-ups to bring patients back.</p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <FollowUpForm config={recall} onChange={setRecall} />
+          <div className="border-t pt-4 space-y-2">
+            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1"><Eye className="h-3 w-3" /> Preview</p>
+            <FollowUpPreview config={recall} label="Recall follow-up schedule" />
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={() => saveRecallMutation.mutate()} disabled={saveRecallMutation.isPending || !isRecallDirty} className="flex-1">
+              {saveRecallMutation.isPending ? (
+                <><span className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" /> Saving...</>
+              ) : (
+                <><Save className="h-4 w-4 mr-1" /> Save Recall Settings</>
+              )}
+            </Button>
+            <Button variant="outline" onClick={resetRecall} disabled={!isRecallDirty}>
+              <RotateCcw className="h-4 w-4 mr-1" /> Reset
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   )
 }

@@ -65,7 +65,7 @@ class EventService:
                     self.db,
                     event.hospital_id,
                     event.event_type,
-                    json.loads(event.payload_json) if event.payload_json else {},
+                    event.payload or {},
                 )
             elapsed = (_time.monotonic() - start) * 1000
             await self.store.update_status(event.event_id, "COMPLETED", processing_time_ms=elapsed)
@@ -152,11 +152,12 @@ class EventService:
         try:
             from app.crm.services.rule_engine import execute_rules
             if event.hospital_id:
+                payload = json.loads(event.payload_json) if event.payload_json else {}
                 await execute_rules(
                     self.db,
                     event.hospital_id,
                     event.event_type,
-                    json.loads(event.payload_json) if event.payload_json else {},
+                    payload,
                 )
             elapsed = (_time.monotonic() - start) * 1000
             event.status = "COMPLETED"

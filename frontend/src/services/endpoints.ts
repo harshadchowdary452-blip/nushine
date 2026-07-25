@@ -528,18 +528,6 @@ export const enquiriesApi = {
     api.get("/crm/enquiries/calendar", { params }).then((r) => r.data),
 };
 
-export const treatmentFollowUpsApi = {
-  list: (params?: { type?: string; status?: string; doctor_id?: string }) =>
-    api.get("/crm/treatment-follow-ups", { params }).then((r) => r.data),
-  autoCreate: (treatmentId: string) =>
-    api.post(`/crm/treatment-follow-ups/auto-create/${treatmentId}`).then((r) => r.data),
-  complete: (id: string, data: { outcome: string; notes?: string }) =>
-    api.put(`/crm/treatment-follow-ups/${id}/complete`, data).then((r) => r.data),
-  doctorFollowUps: () => api.get("/crm/treatment-follow-ups/doctor").then((r) => r.data),
-  doctorRecallPatients: () => api.get("/crm/treatment-follow-ups/doctor/recall-patients").then((r) => r.data),
-  stats: () => api.get("/crm/treatment-follow-ups/stats").then((r) => r.data),
-};
-
 export const recallsApi = {
   list: (params?: { type?: string; status?: string; overdue_only?: boolean }) =>
     api.get("/crm/recalls", { params }).then((r) => r.data),
@@ -554,9 +542,9 @@ export const recallsApi = {
 export const treatmentTypesApi = {
   list: (hospitalId?: string) => api.get("/treatment-types", { params: hospitalId ? { hospital_id: hospitalId } : {} }).then((r) => r.data),
   get: (id: string) => api.get(`/treatment-types/${id}`).then((r) => r.data),
-  create: (data: { name: string; description?: string; hospital_id?: string }) =>
+  create: (data: { name: string; description?: string; hospital_id?: string; treatment_category_id?: string; estimated_duration?: number; default_cost?: number }) =>
     api.post("/treatment-types", data).then((r) => r.data),
-  update: (id: string, data: { name?: string; description?: string; is_active?: boolean }) =>
+  update: (id: string, data: { name?: string; description?: string; is_active?: boolean; treatment_category_id?: string; estimated_duration?: number; default_cost?: number }) =>
     api.put(`/treatment-types/${id}`, data).then((r) => r.data),
   delete: (id: string) => api.delete(`/treatment-types/${id}`).then((r) => r.data),
   seed: (hospitalId?: string) => api.post("/treatment-types/seed", {}, { params: hospitalId ? { hospital_id: hospitalId } : {} }).then((r) => r.data),
@@ -631,25 +619,6 @@ export const crmEventsApi = {
     api.get("/crm/events/statistics").then((r) => r.data),
 };
 
-export const treatmentAutomationApi = {
-  rules: {
-    list: (hospitalId?: string) =>
-      api.get("/crm/treatment-automation/rules", { params: hospitalId ? { hospital_id: hospitalId } : {} }).then((r) => r.data),
-    create: (data: { treatment_type_id: string; hospital_id?: string; treatment_name?: string }) =>
-      api.post("/crm/treatment-automation/rules", data).then((r) => r.data),
-    update: (id: string, data: Record<string, unknown>) =>
-      api.put(`/crm/treatment-automation/rules/${id}`, data).then((r) => r.data),
-    delete: (id: string) => api.delete(`/crm/treatment-automation/rules/${id}`).then((r) => r.data),
-    toggle: (id: string) => api.post(`/crm/treatment-automation/rules/${id}/toggle`).then((r) => r.data),
-  },
-  generatedEnquiries: {
-    list: (params?: Record<string, unknown>) =>
-      api.get("/crm/treatment-automation/generated-enquiries", { params }).then((r) => r.data),
-    dashboard: (hospitalId?: string) =>
-      api.get("/crm/treatment-automation/generated-enquiries/dashboard", { params: hospitalId ? { hospital_id: hospitalId } : {} }).then((r) => r.data),
-  },
-};
-
 export const crmV2Api = {
   templates: {
     list: (params?: Record<string, unknown>) =>
@@ -686,11 +655,21 @@ export const crmV2Api = {
 
 export const crmSettingsApi = {
   crmConfig: {
-    get: (group?: string) => api.get("/master-data/crm-config", { params: group ? { config_group: group } : {} }).then((r) => r.data),
-    update: (configs: Record<string, string>) =>
-      api.put("/master-data/crm-config", { configs }).then((r) => r.data),
-    updateOne: (key: string, value: string) =>
-      api.put(`/master-data/crm-config/${key}`, { config_value: value }).then((r) => r.data),
+    getGeneral: () => api.get("/crm-config/general").then((r) => r.data),
+    updateGeneral: (data: Record<string, string>) =>
+      api.put("/crm-config/general", data).then((r) => r.data),
+    getLead: () => api.get("/crm-config/lead").then((r) => r.data),
+    updateLead: (data: { enabled: boolean; start_delay_days: number; num_follow_ups: number; gap_days: number; auto_close_on_completion: boolean }) =>
+      api.put("/crm-config/lead", data).then((r) => r.data),
+    getOpd: () => api.get("/crm-config/opd").then((r) => r.data),
+    updateOpd: (data: { enabled: boolean; start_delay_days: number; num_follow_ups: number; gap_days: number; auto_close_on_completion: boolean }) =>
+      api.put("/crm-config/opd", data).then((r) => r.data),
+    getTreatment: () => api.get("/crm-config/treatment").then((r) => r.data),
+    updateTreatment: (treatmentTypeId: string, data: { enabled: boolean; start_delay_days: number; num_follow_ups: number; gap_days: number; auto_close_on_completion: boolean }) =>
+      api.put(`/crm-config/treatment/${treatmentTypeId}`, data).then((r) => r.data),
+    getCase: () => api.get("/crm-config/case").then((r) => r.data),
+    updateCase: (section: string, data: { enabled: boolean; start_delay_days: number; num_follow_ups: number; gap_days: number; auto_close_on_completion: boolean }) =>
+      api.put(`/crm-config/case/${section}`, data).then((r) => r.data),
   },
   inlineList: {
     get: (listKey: string) =>

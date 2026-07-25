@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
@@ -7,6 +8,8 @@ from app.core.permissions import verify_permission, Permission
 from app.services.lead_service import LeadService
 from app.services.timeline_helper import record_timeline_event
 from app.schemas.lead import LeadCreate, LeadUpdate, LeadResponse, LeadStatusUpdate, LeadConvertCreate, LeadFollowUpCreate, LeadAppointmentCreate, LeadCallCreate, LeadCallResponse, LeadCommunicationCreate, LeadCommunicationResponse
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/leads", tags=["Leads"])
 
@@ -71,16 +74,18 @@ async def create_lead(data: LeadCreate, db: AsyncSession = Depends(get_db), curr
     try:
         from app.crm.events import get_publisher
         from app.crm.enums import EventType, EventSource
-        await get_publisher().publish(
+        publisher = get_publisher()
+        await publisher.publish(
             event_type=EventType.LEAD_CREATED,
             source_module=EventSource.LEAD,
             entity_type="LEAD",
             entity_id=lead.id,
             hospital_id=getattr(lead, 'hospital_id', None),
+            payload={"lead_id": lead.id, "lead_name": getattr(lead, 'lead_name', None)},
             db=db,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error("Failed to publish LEAD_CREATED event: %s", str(e), exc_info=True)
     return lead
 
 
@@ -277,11 +282,12 @@ async def convert_lead(lead_id: str, data: LeadConvertCreate, db: AsyncSession =
     try:
         patient_id = result.get("patient_id")
         if patient_id:
-            from app.crm.services.rule_engine import cancel_lead_followups
-            await cancel_lead_followups(
+            from app.crm.services.rule_engine import cancel_lead_followups_by_patient
+            await cancel_lead_followups_by_patient(
                 db,
                 hospital_id=getattr(result, 'hospital_id', None) or current_user.get("hospital_id"),
                 patient_id=patient_id,
+                cancelled_by_event="LEAD_CONVERTED",
             )
     except Exception:
         pass

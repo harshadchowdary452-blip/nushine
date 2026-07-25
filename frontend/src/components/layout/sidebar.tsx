@@ -53,11 +53,10 @@ const roleNav: Record<string, NavSection[]> = {
       { label: "Consent Forms", icon: FileText, path: "/consent-forms" },
     ]},
     { label: "CRM", items: [
-      { label: "CRM Dashboard", icon: LayoutDashboard, path: "/crm/dashboard2" },
+      { label: "Dashboard", icon: LayoutDashboard, path: "/crm/dashboard2" },
       { label: "Leads", icon: UserPlus, path: "/leads" },
-      { label: "Enquiry Calendar", icon: CalendarDays, path: "/crm/enquiry-calendar" },
+      { label: "Enquiries", icon: CalendarDays, path: "/crm/enquiry-calendar" },
       { label: "WhatsApp", icon: MessageSquare, path: "/whatsapp" },
-      { label: "CRM Settings", icon: Settings, path: "/crm/settings" },
     ]},
     { label: "Finance", items: [
       { label: "Expenses", icon: IndianRupee, path: "/admin/expenses" },
@@ -65,6 +64,8 @@ const roleNav: Record<string, NavSection[]> = {
     ]},
     { label: "Settings", items: [
       { label: "Settings", icon: Settings, path: "/settings" },
+      { label: "Clinical Settings", icon: Stethoscope, path: "/settings/clinical" },
+      { label: "CRM Settings", icon: Activity, path: "/crm/settings" },
       { label: "WhatsApp Config", icon: MessageSquare, path: "/settings/whatsapp" },
     ]},
   ],

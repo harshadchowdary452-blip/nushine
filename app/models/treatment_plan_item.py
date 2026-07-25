@@ -9,6 +9,7 @@ class TreatmentPlanItem(Base):
     __tablename__ = "treatment_plan_items"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     case_id: Mapped[str] = mapped_column(String(36), ForeignKey("cases.id"), nullable=False, index=True)
+    treatment_type_id: Mapped[str] = mapped_column(String(36), ForeignKey("treatment_types.id"), nullable=True)
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     is_current: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     procedure_name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -28,6 +29,7 @@ class TreatmentPlanItem(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     case = relationship("Case", back_populates="treatment_plan_items", lazy="selectin")
+    treatment_type = relationship("TreatmentType", foreign_keys=[treatment_type_id], lazy="selectin")
     dependency_item = relationship("TreatmentPlanItem", remote_side="TreatmentPlanItem.id", foreign_keys=[dependency_item_id], lazy="selectin")
     generated_treatment = relationship("TreatmentPlan", foreign_keys=[generated_treatment_id], lazy="selectin")
     assigned_doctor = relationship("User", foreign_keys=[assigned_doctor_id], lazy="selectin")

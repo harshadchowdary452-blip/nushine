@@ -334,6 +334,12 @@ async def delete_case(case_id: str, db: AsyncSession = Depends(get_db), current_
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case Report not found")
     await verify_tenant_access(current_user, case, "case", db)
     patient_id = case.patient_id
+    from app.models.follow_up import FollowUp
+    from sqlalchemy import update
+    await db.execute(
+        update(FollowUp).where(FollowUp.case_id == case_id).values(case_id=None)
+    )
+    await db.flush()
     await service.delete(case_id, user_id=current_user.get("sub"))
     await record_timeline_event(
         db, current_user=current_user, patient_id=patient_id,

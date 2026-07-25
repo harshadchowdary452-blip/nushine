@@ -20,12 +20,9 @@ from app.core.permissions import Role
 from app.core.logging import setup_logging, correlation_id, generate_correlation_id
 from app.core.middleware import RequestIDMiddleware
 from app.utils.scheduler import check_appointment_reminders, check_same_day_appointments, check_missed_appointments, check_overdue_treatments
-from app.routers import auth, admin_groups, hospitals, doctors, consultants, patients, cases, consultant_notes, treatment_plans, treatment_sittings, treatment_plan_items, appointments, billings, pre_ops, post_ops, dashboards, whatsapp_messaging, whatsapp_config, notifications, hospital_monthly_expenses, reports, crm, crm_v2, calendar, status_audit, campaigns, campaign_templates, leads, doctor_working_hours, doctor_availability, doctor_leaves, doctor_blocked_slots, consent_forms, enquiries, treatment_follow_ups, recalls, crm_settings, exports, treatment_types, crm_opd_settings, doctor_queue, clinical_progress_notes, master_data, crm_rules
-from app.crm.routers import follow_ups as crm_v3_follow_ups
-from app.crm.routers import templates as crm_v3_templates
+from app.routers import auth, admin_groups, hospitals, doctors, consultants, patients, cases, consultant_notes, treatment_plans, treatment_sittings, treatment_plan_items, appointments, billings, pre_ops, post_ops, dashboards, whatsapp_messaging, whatsapp_config, notifications, hospital_monthly_expenses, reports, crm, crm_v2, calendar, status_audit, campaigns, campaign_templates, leads, doctor_working_hours, doctor_availability, doctor_leaves, doctor_blocked_slots, consent_forms, enquiries, treatment_follow_ups, recalls, crm_settings, exports, treatment_types, crm_opd_settings, doctor_queue, clinical_progress_notes, master_data, crm_rules, crm_config_settings
 from app.crm.routers import events as crm_events
-from app.crm.routers import automation as crm_automation
-from app.crm.routers import treatment_automation as crm_treatment_automation
+from app.crm.routers import event_test as crm_event_test
 
 setup_logging(settings.ENVIRONMENT)
 logger = logging.getLogger("app")
@@ -53,16 +50,27 @@ async def lifespan(app: FastAPI):
     logger.info("Seeding super admin...")
     await seed_super_admin()
 
-    # Wire CRM Event Dispatcher
+    # Wire CRM Event Dispatcher — Phase 3.3
+    try:
+        from app.crm.services.event_dispatcher import get_central_dispatcher
+        from app.crm.services.rule_engine import get_rule_engine
+        dispatcher = get_central_dispatcher()
+        rule_engine = get_rule_engine()
+        dispatcher.set_rule_engine(rule_engine)
+        logger.info("CRM Phase 3.3: Central dispatcher + rule engine wired")
+    except Exception as e:
+        logger.warning(f"CRM Phase 3.3 wiring failed (non-fatal): {e}")
+
+    # Wire CRM Event Handlers to legacy EventDispatcher
     try:
         from app.crm.events import get_dispatcher
         from app.crm.services.event_handlers import CRM_EVENT_HANDLERS
-        dispatcher = get_dispatcher()
+        legacy_dispatcher = get_dispatcher()
         for event_type, handler in CRM_EVENT_HANDLERS.items():
-            dispatcher.subscribe(event_type, handler)
-        logger.info("CRM event handlers registered: %d handlers", len(CRM_EVENT_HANDLERS))
+            legacy_dispatcher.subscribe(event_type, handler)
+        logger.info("CRM: %d event handlers wired to legacy dispatcher", len(CRM_EVENT_HANDLERS))
     except Exception as e:
-        logger.warning(f"CRM event handler registration failed (non-fatal): {e}")
+        logger.warning(f"CRM handler wiring failed (non-fatal): {e}")
 
     try:
         from app.utils.case_pdf import _ensure_browser
@@ -110,10 +118,17 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 @app.exception_handler(IntegrityError)
 async def integrity_error_handler(request: Request, exc: IntegrityError):
     cid = correlation_id.get("")
+    msg = str(exc.orig).lower() if exc.orig else ""
     logger.error(f"IntegrityError on {request.method} {request.url.path}", exc_info=True, extra={"correlation_id": cid})
+    if "unique" in msg or "duplicate" in msg:
+        detail = "A record with this name already exists. Please use a different name."
+    elif "foreign key" in msg or "referenced" in msg:
+        detail = "This record has related data and cannot be deleted. Try deactivating it instead."
+    else:
+        detail = "Operation failed due to a data constraint violation."
     return JSONResponse(
         status_code=409,
-        content={"detail": "Operation failed: this record has related data and cannot be deleted. Try deactivating it instead.", "correlation_id": cid},
+        content={"detail": detail, "correlation_id": cid},
     )
 
 
@@ -162,11 +177,8 @@ app.include_router(hospital_monthly_expenses.router, prefix="/api/v1")
 app.include_router(reports.router, prefix="/api/v1")
 app.include_router(crm.router, prefix="/api/v1")
 app.include_router(crm_v2.router, prefix="/api/v1")
-app.include_router(crm_v3_follow_ups.router, prefix="/api/v1/crm")
-app.include_router(crm_v3_templates.router, prefix="/api/v1/crm")
 app.include_router(crm_events.router, prefix="/api/v1/crm")
-app.include_router(crm_automation.router, prefix="/api/v1/crm")
-app.include_router(crm_treatment_automation.router, prefix="/api/v1")
+app.include_router(crm_event_test.router, prefix="/api/v1")
 app.include_router(campaigns.router, prefix="/api/v1")
 app.include_router(campaign_templates.router, prefix="/api/v1")
 app.include_router(calendar.router, prefix="/api/v1")
@@ -189,6 +201,7 @@ app.include_router(doctor_queue.router, prefix="/api/v1")
 app.include_router(clinical_progress_notes.router, prefix="/api/v1")
 app.include_router(master_data.router, prefix="/api/v1")
 app.include_router(crm_rules.router, prefix="/api/v1")
+app.include_router(crm_config_settings.router, prefix="/api/v1")
 
 
 @app.get("/")

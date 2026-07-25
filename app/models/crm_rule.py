@@ -25,6 +25,8 @@ class CrmRule(Base):
     # VISIT_COMPLETED | TREATMENT_COMPLETED | APPOINTMENT_MISSED | APPOINTMENT_COMPLETED
     # APPOINTMENT_CREATED | PATIENT_REGISTERED | LEAD_CREATED | LEAD_CONVERTED | MANUAL
     treatment_type_id: Mapped[str] = mapped_column(String(36), ForeignKey("treatment_types.id"), nullable=True)
+    treatment_category: Mapped[str] = mapped_column(String(50), nullable=True)
+    # For priority matching: treatment_type > treatment_category > global
     visit_stage: Mapped[str] = mapped_column(String(20), nullable=True)
     # ANY | FIRST | MIDDLE | FINAL
 
@@ -40,6 +42,7 @@ class CrmRule(Base):
 
     # Notifications
     send_whatsapp: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    whatsapp_template_id: Mapped[str] = mapped_column(String(36), ForeignKey("whatsapp_templates.id"), nullable=True)
     send_notification: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Status

@@ -1,5 +1,6 @@
 """CRM Event System — standardized event model, publisher, and dispatcher."""
 from __future__ import annotations
+import json
 import uuid
 import logging
 import time as _time
@@ -195,8 +196,8 @@ class EventStore:
             doctor_id=event.doctor_id,
             triggered_by=event.triggered_by,
             correlation_id=event.correlation_id,
-            payload_json=str(event.payload) if event.payload else None,
-            metadata_json=str(event.metadata) if event.metadata else None,
+            payload_json=json.dumps(event.payload) if event.payload else None,
+            metadata_json=json.dumps(event.metadata) if event.metadata else None,
             status=status,
             created_at=datetime.now(timezone.utc),
         )

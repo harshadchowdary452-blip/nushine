@@ -41,6 +41,8 @@ from app.models.enquiry import Enquiry, EnquiryStatus, TreatmentInterest, Enquir
 from app.models.treatment_follow_up_rule import TreatmentFollowUpRule
 from app.models.treatment_template import TreatmentTemplate
 from app.models.treatment_type import TreatmentType
+from app.models.treatment_category import TreatmentCategory
+from app.models.crm_follow_up_config import CrmFollowUpConfig
 from app.models.export_job import ExportJob
 from app.models.crm_opd_setting import CrmOpdSetting
 from app.models.patient_timeline import PatientTimeline
@@ -75,6 +77,8 @@ __all__ = [
     "TreatmentFollowUpRule",
     "TreatmentTemplate",
     "TreatmentType",
+    "TreatmentCategory",
+    "CrmFollowUpConfig",
     "CrmOpdSetting",
     "PatientTimeline",
     "LeadSourceMaster",

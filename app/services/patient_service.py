@@ -204,6 +204,14 @@ class PatientService:
             await self.db.execute(sa_delete(CommunicationLog).where(CommunicationLog.patient_id == patient_id))
             await self.db.execute(sa_delete(PatientFeedback).where(PatientFeedback.patient_id == patient_id))
             await self.db.execute(sa_delete(Lead).where(Lead.converted_patient_id == patient_id))
+            from app.models.patient_timeline import PatientTimeline
+            from app.models.generated_enquiry import GeneratedEnquiry
+            from app.models.follow_up_response import FollowUpResponse
+            await self.db.execute(sa_delete(PatientTimeline).where(PatientTimeline.patient_id == patient_id))
+            await self.db.execute(sa_delete(GeneratedEnquiry).where(GeneratedEnquiry.patient_id == patient_id))
+            await self.db.execute(sa_delete(FollowUpResponse).where(FollowUpResponse.patient_id == patient_id))
+            from app.models.campaign import CampaignRecipient
+            await self.db.execute(sa_delete(CampaignRecipient).where(CampaignRecipient.patient_id == patient_id))
             cases = (await self.db.execute(select(Case).where(Case.patient_id == patient_id))).scalars().all()
             for c in cases:
                 await self.db.execute(sa_delete(PreOp).where(PreOp.case_id == c.id))

@@ -382,76 +382,9 @@ async def delete_communication_template(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# CRM CONFIG
+# CRM CONFIG — DEPRECATED: Use /api/v1/crm-config/* endpoints instead
+# These endpoints are kept for backward compatibility only.
 # ═══════════════════════════════════════════════════════════════════════════
-
-@router.get("/crm-config")
-async def get_crm_config(
-    config_group: Optional[str] = Query(None),
-    db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    verify_permission(current_user, Permission.VIEW_LEADS, Permission.MANAGE_LEADS)
-    from app.models.crm_config import CrmConfig
-    q = select(CrmConfig)
-    hid = current_user.get("hospital_id")
-    if hid:
-        q = q.where(CrmConfig.hospital_id == hid)
-    if config_group:
-        q = q.where(CrmConfig.config_group == config_group)
-    result = await db.execute(q)
-    configs = result.scalars().all()
-    return {c.config_key: c.config_value for c in configs}
-
-
-@router.put("/crm-config")
-async def update_crm_config(
-    data: CrmConfigBulkUpdate,
-    db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    verify_permission(current_user, Permission.MANAGE_LEADS)
-    from app.models.crm_config import CrmConfig
-    hid = current_user.get("hospital_id")
-    updated = 0
-    for key, value in data.configs.items():
-        existing = (await db.execute(
-            select(CrmConfig).where(
-                and_(CrmConfig.config_key == key, CrmConfig.hospital_id == hid)
-            ).limit(1)
-        )).scalar_one_or_none()
-        if existing:
-            existing.config_value = value
-        else:
-            cfg = CrmConfig(hospital_id=hid, config_key=key, config_value=value)
-            db.add(cfg)
-        updated += 1
-    await db.flush()
-    return {"updated": updated}
-
-
-@router.put("/crm-config/{config_key}")
-async def update_single_crm_config(
-    config_key: str,
-    data: CrmConfigUpdate,
-    db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    verify_permission(current_user, Permission.MANAGE_LEADS)
-    from app.models.crm_config import CrmConfig
-    hid = current_user.get("hospital_id")
-    existing = (await db.execute(
-        select(CrmConfig).where(
-            and_(CrmConfig.config_key == config_key, CrmConfig.hospital_id == hid)
-        ).limit(1)
-    )).scalar_one_or_none()
-    if existing:
-        existing.config_value = data.config_value
-    else:
-        cfg = CrmConfig(hospital_id=hid, config_key=config_key, config_value=data.config_value)
-        db.add(cfg)
-    await db.flush()
-    return {"config_key": config_key, "config_value": data.config_value}
 
 
 # ═══════════════════════════════════════════════════════════════════════════

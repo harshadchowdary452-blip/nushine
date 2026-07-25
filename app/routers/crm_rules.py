@@ -19,6 +19,18 @@ from app.models.crm_rule import CrmRule
 router = APIRouter(prefix="/crm/rules", tags=["CRM Rules"])
 
 
+async def _safe_delete_rule(db: AsyncSession, rule) -> None:
+    """Delete a CrmRule after nullifying FK references in GeneratedEnquiry."""
+    from app.models.generated_enquiry import GeneratedEnquiry
+    from sqlalchemy import update as sa_update
+    await db.execute(
+        sa_update(GeneratedEnquiry)
+        .where(GeneratedEnquiry.crm_rule_id == rule.id)
+        .values(crm_rule_id=None)
+    )
+    await db.delete(rule)
+
+
 # ─── Schemas ──────────────────────────────────────────────────────────────
 
 class LeadRuleData(BaseModel):
@@ -255,7 +267,7 @@ async def delete_lead_rule(
     rule = result.scalar_one_or_none()
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
-    await db.delete(rule)
+    await _safe_delete_rule(db, rule)
     await db.flush()
     return {"status": "deleted"}
 
@@ -366,7 +378,7 @@ async def delete_treatment_rule(
     rule = result.scalar_one_or_none()
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
-    await db.delete(rule)
+    await _safe_delete_rule(db, rule)
     await db.flush()
     return {"status": "deleted"}
 
@@ -524,7 +536,17 @@ async def save_lead_policy(
             and_(CrmRule.hospital_id == hid, CrmRule.rule_type == "LEAD")
         )
     )
-    for r in old.scalars().all():
+    old_rules = list(old.scalars().all())
+    if old_rules:
+        from app.models.generated_enquiry import GeneratedEnquiry
+        from sqlalchemy import update as sa_update
+        rule_ids = [r.id for r in old_rules]
+        await db.execute(
+            sa_update(GeneratedEnquiry)
+            .where(GeneratedEnquiry.crm_rule_id.in_(rule_ids))
+            .values(crm_rule_id=None)
+        )
+    for r in old_rules:
         await db.delete(r)
     await db.flush()
 
@@ -676,7 +698,21 @@ async def save_treatment_journey(
             )
         )
     )
-    for r in old.scalars().all():
+    old_rules = list(old.scalars().all())
+    # Nullify FK references in GeneratedEnquiry before deleting rules
+    if old_rules:
+        from app.models.generated_enquiry import GeneratedEnquiry
+        rule_ids = [r.id for r in old_rules]
+        await db.execute(
+            select(GeneratedEnquiry).where(GeneratedEnquiry.crm_rule_id.in_(rule_ids))
+        )
+        from sqlalchemy import update as sa_update
+        await db.execute(
+            sa_update(GeneratedEnquiry)
+            .where(GeneratedEnquiry.crm_rule_id.in_(rule_ids))
+            .values(crm_rule_id=None)
+        )
+    for r in old_rules:
         await db.delete(r)
     await db.flush()
 
@@ -828,7 +864,17 @@ async def save_case_journey(
             and_(CrmRule.hospital_id == hid, CrmRule.scope == "CASE")
         )
     )
-    for r in old.scalars().all():
+    old_rules = list(old.scalars().all())
+    if old_rules:
+        from app.models.generated_enquiry import GeneratedEnquiry
+        from sqlalchemy import update as sa_update
+        rule_ids = [r.id for r in old_rules]
+        await db.execute(
+            sa_update(GeneratedEnquiry)
+            .where(GeneratedEnquiry.crm_rule_id.in_(rule_ids))
+            .values(crm_rule_id=None)
+        )
+    for r in old_rules:
         await db.delete(r)
     await db.flush()
 
