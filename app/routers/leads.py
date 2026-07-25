@@ -72,10 +72,9 @@ async def create_lead(data: LeadCreate, db: AsyncSession = Depends(get_db), curr
     await _recalc_lead_score(db, lead)
     await db.flush()
     try:
-        from app.crm.events import get_publisher
+        from app.crm.services.event_dispatcher import publish_event
         from app.crm.enums import EventType, EventSource
-        publisher = get_publisher()
-        await publisher.publish(
+        await publish_event(
             event_type=EventType.LEAD_CREATED,
             source_module=EventSource.LEAD,
             entity_type="LEAD",
@@ -171,10 +170,10 @@ async def update_lead_status(lead_id: str, data: LeadStatusUpdate, db: AsyncSess
                 module="CRM",
             )
     try:
-        from app.crm.events import get_publisher
+        from app.crm.services.event_dispatcher import publish_event
         from app.crm.enums import EventType, EventSource
         if result and result.status in ("LOST", "NOT_INTERESTED", "NO_RESPONSE"):
-            await get_publisher().publish(
+            await publish_event(
                 event_type=EventType.LEAD_LOST,
                 source_module=EventSource.LEAD,
                 entity_type="LEAD",
@@ -266,9 +265,9 @@ async def convert_lead(lead_id: str, data: LeadConvertCreate, db: AsyncSession =
             module="CRM",
         )
     try:
-        from app.crm.events import get_publisher
+        from app.crm.services.event_dispatcher import publish_event
         from app.crm.enums import EventType, EventSource
-        await get_publisher().publish(
+        await publish_event(
             event_type=EventType.LEAD_CONVERTED,
             source_module=EventSource.LEAD,
             entity_type="LEAD",

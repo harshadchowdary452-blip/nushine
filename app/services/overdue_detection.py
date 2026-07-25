@@ -14,9 +14,7 @@ WAITING_LAB_OVERDUE_DAYS = 5
 
 async def check_overdue_treatments():
     from app.database import async_session_factory
-    from app.crm.services.rule_engine import (
-        create_overdue_followup, create_waiting_patient_followup, create_waiting_lab_followup,
-    )
+    from app.services.clinical_followups import create_overdue_followup, create_waiting_patient_followup, create_waiting_lab_followup
     from app.services.treatment_notification import (
         notify_treatment_overdue, notify_waiting_patient_expired, notify_waiting_lab_expired,
     )

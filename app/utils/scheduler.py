@@ -67,10 +67,9 @@ async def check_missed_appointments():
                         await send_missed_appointment(patient.phone, patient.full_name)
                     # Publish APPOINTMENT_MISSED event — dispatcher handles CRM automation
                     try:
-                        from app.crm.events import get_publisher
+                        from app.crm.services.event_dispatcher import publish_event
                         from app.crm.enums import EventType, EventSource
-                        publisher = get_publisher()
-                        await publisher.publish(
+                        await publish_event(
                             event_type=EventType.APPOINTMENT_MISSED,
                             source_module=EventSource.SYSTEM,
                             entity_type="APPOINTMENT",

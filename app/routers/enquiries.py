@@ -76,9 +76,9 @@ async def create_enquiry(data: EnquiryCreate, db: AsyncSession = Depends(get_db)
         module="CRM",
     )
     try:
-        from app.crm.events import get_publisher
+        from app.crm.services.event_dispatcher import publish_event
         from app.crm.enums import EventType, EventSource
-        await get_publisher().publish(
+        await publish_event(
             event_type=EventType.ENQUIRY_CREATED,
             source_module=EventSource.CRM,
             entity_type="ENQUIRY",
@@ -371,10 +371,10 @@ async def create_enquiry_follow_up(enquiry_id: str, data: EnquiryFollowUpAction,
         module="CRM",
     )
     try:
-        from app.crm.events import get_publisher
+        from app.crm.services.event_dispatcher import publish_event
         from app.crm.enums import EventType, EventSource
         if data.action == "CONVERT_TO_TREATMENT":
-            await get_publisher().publish(
+            await publish_event(
                 event_type=EventType.ENQUIRY_CONVERTED,
                 source_module=EventSource.CRM,
                 entity_type="ENQUIRY",

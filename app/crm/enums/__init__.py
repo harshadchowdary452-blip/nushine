@@ -1,4 +1,8 @@
-"""Centralized CRM enums — single source of truth for all CRM-related enumerations."""
+"""Centralized CRM enums — single source of truth for CRM-related enumerations.
+
+Only enums actively imported from this module are kept.
+Model-specific enums (LeadStatus, CampaignStatus, etc.) live in their respective model files.
+"""
 import enum
 
 
@@ -14,7 +18,6 @@ class FollowUpStatus(str, enum.Enum):
     NO_SHOW = "NO_SHOW"
     OVERDUE = "OVERDUE"
     ESCALATED = "ESCALATED"
-    # Legacy values for backward compat
     INTERESTED = "INTERESTED"
     NOT_INTERESTED = "NOT_INTERESTED"
     NEEDS_MORE_TIME = "NEEDS_MORE_TIME"
@@ -36,80 +39,6 @@ class FollowUpType(str, enum.Enum):
     LEAD_FOLLOW_UP = "LEAD_FOLLOW_UP"
     ENQUIRY_FOLLOW_UP = "ENQUIRY_FOLLOW_UP"
     PATIENT_SATISFACTION = "PATIENT_SATISFACTION"
-
-
-class FollowUpResponseStatus(str, enum.Enum):
-    INTERESTED = "INTERESTED"
-    NOT_INTERESTED = "NOT_INTERESTED"
-    NEEDS_MORE_TIME = "NEEDS_MORE_TIME"
-    REQUESTED_CALLBACK = "REQUESTED_CALLBACK"
-    BUSY = "BUSY"
-    NO_RESPONSE = "NO_RESPONSE"
-    WRONG_NUMBER = "WRONG_NUMBER"
-    TREATMENT_COMPLETED = "TREATMENT_COMPLETED"
-    NEEDS_REVIEW = "NEEDS_REVIEW"
-
-
-class LeadStatus(str, enum.Enum):
-    NEW = "NEW"
-    CONTACTED = "CONTACTED"
-    INTERESTED = "INTERESTED"
-    QUALIFIED = "QUALIFIED"
-    PROPOSAL_SENT = "PROPOSAL_SENT"
-    NEGOTIATION = "NEGOTIATION"
-    CONVERTED = "CONVERTED"
-    LOST = "LOST"
-    UNRESPONSIVE = "UNRESPONSIVE"
-    FOLLOW_UP_REQUIRED = "FOLLOW_UP_REQUIRED"
-
-
-class EnquiryStatus(str, enum.Enum):
-    NEW = "NEW"
-    CONTACTED = "CONTACTED"
-    INTERESTED = "INTERESTED"
-    BOOKED = "BOOKED"
-    COMPLETED = "COMPLETED"
-    CANCELLED = "CANCELLED"
-    LOST = "LOST"
-
-
-class TreatmentInterest(str, enum.Enum):
-    CONSULTATION = "CONSULTATION"
-    CLEANING = "CLEANING"
-    FILLING = "FILLING"
-    CROWN = "CROWN"
-    BRIDGE = "BRIDGE"
-    IMPLANT = "IMPLANT"
-    EXTRACTION = "EXTRACTION"
-    ROOT_CANAL = "ROOT_CANAL"
-    ORTHODONTICS = "ORTHODONTICS"
-    WHITENING = "WHITENING"
-    OTHER = "OTHER"
-
-
-class CampaignStatus(str, enum.Enum):
-    DRAFT = "DRAFT"
-    SCHEDULED = "SCHEDULED"
-    SENDING = "SENDING"
-    SENT = "SENT"
-    PAUSED = "PAUSED"
-    CANCELLED = "CANCELLED"
-    COMPLETED = "COMPLETED"
-
-
-class CampaignType(str, enum.Enum):
-    WHATSAPP = "WHATSAPP"
-    EMAIL = "EMAIL"
-    SMS = "SMS"
-
-
-class CampaignRecipientStatus(str, enum.Enum):
-    PENDING = "PENDING"
-    SENT = "SENT"
-    DELIVERED = "DELIVERED"
-    READ = "READ"
-    FAILED = "FAILED"
-    BOUNCED = "BOUNCED"
 
 
 class CommunicationChannel(str, enum.Enum):
@@ -139,99 +68,38 @@ class MessageType(str, enum.Enum):
     TRANSACTIONAL = "TRANSACTIONAL"
 
 
-# --- Event & Rule Enums ---
-
-class TriggerEvent(str, enum.Enum):
-    PATIENT_REGISTERED = "PATIENT_REGISTERED"
-    APPOINTMENT_COMPLETED = "APPOINTMENT_COMPLETED"
-    APPOINTMENT_MISSED = "APPOINTMENT_MISSED"
-    APPOINTMENT_CREATED = "APPOINTMENT_CREATED"
-    TREATMENT_STARTED = "TREATMENT_STARTED"
-    VISIT_COMPLETED = "VISIT_COMPLETED"
-    TREATMENT_COMPLETED = "TREATMENT_COMPLETED"
-    CASE_COMPLETED = "CASE_COMPLETED"
-    BILL_GENERATED = "BILL_GENERATED"
-    PAYMENT_OVERDUE = "PAYMENT_OVERDUE"
-    PATIENT_INACTIVE = "PATIENT_INACTIVE"
-    PATIENT_BIRTHDAY = "PATIENT_BIRTHDAY"
-    MANUAL = "MANUAL"
-
-
-class ReminderChannel(str, enum.Enum):
-    WHATSAPP = "WHATSAPP"
-    SMS = "SMS"
-    EMAIL = "EMAIL"
-    PHONE = "PHONE"
-    TASK = "TASK"
-    NOTIFICATION = "NOTIFICATION"
-
-
-class Priority(str, enum.Enum):
-    HIGH = "HIGH"
-    MEDIUM = "MEDIUM"
-    LOW = "LOW"
-
-
-class ResponsibleRole(str, enum.Enum):
-    RECEPTION = "RECEPTION"
-    DOCTOR = "DOCTOR"
-    CRM_EXECUTIVE = "CRM_EXECUTIVE"
-    HOSPITAL_ADMIN = "HOSPITAL_ADMIN"
-
-
-# --- Event System Enums ---
-
 class EventType(str, enum.Enum):
-    # Patient events
     PATIENT_REGISTERED = "PATIENT_REGISTERED"
     PATIENT_UPDATED = "PATIENT_UPDATED"
     PATIENT_DEACTIVATED = "PATIENT_DEACTIVATED"
-    # Lead events
     LEAD_CREATED = "LEAD_CREATED"
     LEAD_CONVERTED = "LEAD_CONVERTED"
     LEAD_LOST = "LEAD_LOST"
-    # Enquiry events
     ENQUIRY_CREATED = "ENQUIRY_CREATED"
     ENQUIRY_CONVERTED = "ENQUIRY_CONVERTED"
-    # Case events
     CASE_CREATED = "CASE_CREATED"
     CASE_UPDATED = "CASE_UPDATED"
     CASE_APPROVED = "CASE_APPROVED"
     CASE_COMPLETED = "CASE_COMPLETED"
     CASE_CANCELLED = "CASE_CANCELLED"
-    # Treatment events
     TREATMENT_CREATED = "TREATMENT_CREATED"
     TREATMENT_STARTED = "TREATMENT_STARTED"
     TREATMENT_VISIT_COMPLETED = "TREATMENT_VISIT_COMPLETED"
     TREATMENT_COMPLETED = "TREATMENT_COMPLETED"
     TREATMENT_CANCELLED = "TREATMENT_CANCELLED"
-    # Appointment events
     APPOINTMENT_CREATED = "APPOINTMENT_CREATED"
     APPOINTMENT_RESCHEDULED = "APPOINTMENT_RESCHEDULED"
     APPOINTMENT_CANCELLED = "APPOINTMENT_CANCELLED"
     APPOINTMENT_COMPLETED = "APPOINTMENT_COMPLETED"
     APPOINTMENT_MISSED = "APPOINTMENT_MISSED"
-    # Payment events
     PAYMENT_CREATED = "PAYMENT_CREATED"
     PAYMENT_RECEIVED = "PAYMENT_RECEIVED"
     PAYMENT_OVERDUE = "PAYMENT_OVERDUE"
-    # Follow-up events
     FOLLOWUP_COMPLETED = "FOLLOWUP_COMPLETED"
     FOLLOWUP_FAILED = "FOLLOWUP_FAILED"
-    # Campaign events
     CAMPAIGN_COMPLETED = "CAMPAIGN_COMPLETED"
-    # Communication events
     COMMUNICATION_SENT = "COMMUNICATION_SENT"
     COMMUNICATION_FAILED = "COMMUNICATION_FAILED"
-
-
-class EventStatus(str, enum.Enum):
-    PENDING = "PENDING"
-    PROCESSING = "PROCESSING"
-    COMPLETED = "COMPLETED"
-    FAILED = "FAILED"
-    RETRYING = "RETRYING"
-    SKIPPED = "SKIPPED"
 
 
 class EventSource(str, enum.Enum):
@@ -248,67 +116,3 @@ class EventSource(str, enum.Enum):
     RECALL = "RECALL"
     CRM = "CRM"
     SYSTEM = "SYSTEM"
-
-
-# --- Automation Rule Enums ---
-
-class RuleStatus(str, enum.Enum):
-    ACTIVE = "ACTIVE"
-    DISABLED = "DISABLED"
-    DRAFT = "DRAFT"
-    ARCHIVED = "ARCHIVED"
-
-
-class RuleActionType(str, enum.Enum):
-    CREATE_FOLLOW_UP = "CREATE_FOLLOW_UP"
-    CREATE_RECALL = "CREATE_RECALL"
-    CREATE_TASK = "CREATE_TASK"
-    SEND_WHATSAPP = "SEND_WHATSAPP"
-    SEND_EMAIL = "SEND_EMAIL"
-    ASSIGN_RECEPTION = "ASSIGN_RECEPTION"
-    ASSIGN_CRM_EXECUTIVE = "ASSIGN_CRM_EXECUTIVE"
-    ASSIGN_DOCTOR = "ASSIGN_DOCTOR"
-    ESCALATE_FOLLOW_UP = "ESCALATE_FOLLOW_UP"
-    SCHEDULE_REMINDER = "SCHEDULE_REMINDER"
-    CREATE_NOTIFICATION = "CREATE_NOTIFICATION"
-    ENROLL_CAMPAIGN = "ENROLL_CAMPAIGN"
-    ADD_TIMELINE_ENTRY = "ADD_TIMELINE_ENTRY"
-    UPDATE_PATIENT_TAG = "UPDATE_PATIENT_TAG"
-    MARK_HIGH_PRIORITY = "MARK_HIGH_PRIORITY"
-
-
-class ConditionOperator(str, enum.Enum):
-    EQUALS = "EQUALS"
-    NOT_EQUALS = "NOT_EQUALS"
-    CONTAINS = "CONTAINS"
-    NOT_CONTAINS = "NOT_CONTAINS"
-    GREATER_THAN = "GREATER_THAN"
-    LESS_THAN = "LESS_THAN"
-    GREATER_EQUAL = "GREATER_EQUAL"
-    LESS_EQUAL = "LESS_EQUAL"
-    IN = "IN"
-    NOT_IN = "NOT_IN"
-    IS_NULL = "IS_NULL"
-    IS_NOT_NULL = "IS_NOT_NULL"
-
-
-class ConditionLogic(str, enum.Enum):
-    AND = "AND"
-    OR = "OR"
-
-
-class ExecutionStatus(str, enum.Enum):
-    QUEUED = "QUEUED"
-    WAITING = "WAITING"
-    PROCESSING = "PROCESSING"
-    COMPLETED = "COMPLETED"
-    FAILED = "FAILED"
-    RETRYING = "RETRYING"
-    CANCELLED = "CANCELLED"
-
-
-class EscalationLevel(str, enum.Enum):
-    NONE = "NONE"
-    LEVEL_1 = "LEVEL_1"
-    LEVEL_2 = "LEVEL_2"
-    LEVEL_3 = "LEVEL_3"

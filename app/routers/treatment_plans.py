@@ -236,7 +236,7 @@ async def update_treatment_plan_status(plan_id: str, status: str = Query(...), d
     svc = StatusAutomationService(db)
     await svc.update_treatment_status(plan_id, TreatmentPlanStatus(status))
     try:
-        from app.crm.services.rule_engine import create_treatment_completed_followups, create_overdue_followup
+        from app.services.clinical_followups import create_treatment_completed_followups, create_overdue_followup
         if status == TreatmentPlanStatus.COMPLETED.value:
             await create_treatment_completed_followups(db, plan_id)
         elif status == "OVERDUE":
@@ -283,9 +283,9 @@ async def start_treatment(plan_id: str, db: AsyncSession = Depends(get_db), curr
         module="Treatments",
     )
     try:
-        from app.crm.events import get_publisher
+        from app.crm.services.event_dispatcher import publish_event
         from app.crm.enums import EventType, EventSource
-        await get_publisher().publish(
+        await publish_event(
             event_type=EventType.TREATMENT_STARTED,
             source_module=EventSource.TREATMENT,
             entity_type="TREATMENT",
@@ -320,9 +320,9 @@ async def complete_treatment(plan_id: str, body: CompleteTreatmentBody = Body(de
         module="Treatments",
     )
     try:
-        from app.crm.events import get_publisher
+        from app.crm.services.event_dispatcher import publish_event
         from app.crm.enums import EventType, EventSource
-        await get_publisher().publish(
+        await publish_event(
             event_type=EventType.TREATMENT_COMPLETED,
             source_module=EventSource.TREATMENT,
             entity_type="TREATMENT",
@@ -411,7 +411,7 @@ async def set_waiting(plan_id: str, waiting_type: str = Query(...), body: SetWai
         module="Treatments",
     )
     try:
-        from app.crm.services.rule_engine import create_waiting_patient_followup, create_waiting_lab_followup
+        from app.services.clinical_followups import create_waiting_patient_followup, create_waiting_lab_followup
         if waiting_type == "WAITING_PATIENT":
             await create_waiting_patient_followup(db, plan_id)
         elif waiting_type == "WAITING_LAB":

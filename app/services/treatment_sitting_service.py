@@ -105,12 +105,43 @@ class TreatmentSittingService:
             await self._auto_create_appointment_from_sitting(sitting)
             await self._recalculate_plan_sitting_counts(treatment_plan_id, user_id=user_id)
             if sitting.status == TreatmentSittingStatus.COMPLETED.value:
-                from app.services.treatment_enquiry_service import TreatmentEnquiryService
-                enquiry_svc = TreatmentEnquiryService(self.db)
-                await enquiry_svc.on_sitting_completed(treatment_plan_id, sitting.sitting_number)
+                from app.crm.services.event_dispatcher import publish_event
                 plan = await self.db.get(TreatmentPlan, treatment_plan_id)
                 if plan and plan.remaining_sittings <= 0:
-                    await enquiry_svc.on_treatment_plan_completed(treatment_plan_id)
+                    await publish_event(
+                        event_type="TREATMENT_COMPLETED",
+                        source_module="TREATMENT_SITTING_SERVICE",
+                        entity_type="TREATMENT",
+                        entity_id=treatment_plan_id,
+                        patient_id=str(plan.patient_id) if plan.patient_id else None,
+                        payload={
+                            "patient_id": str(plan.patient_id) if plan.patient_id else None,
+                            "treatment_plan_id": treatment_plan_id,
+                            "case_id": str(plan.case_id) if plan.case_id else None,
+                            "treatment_type_id": str(plan.treatment_type_id) if plan.treatment_type_id else None,
+                            "treatment_name": plan.treatment_name,
+                            "doctor_id": str(plan.doctor_id) if plan.doctor_id else None,
+                        },
+                        db=self.db,
+                    )
+                else:
+                    await publish_event(
+                        event_type="TREATMENT_VISIT_COMPLETED",
+                        source_module="TREATMENT_SITTING_SERVICE",
+                        entity_type="TREATMENT",
+                        entity_id=treatment_plan_id,
+                        patient_id=str(plan.patient_id) if plan.patient_id else None,
+                        payload={
+                            "patient_id": str(plan.patient_id) if plan.patient_id else None,
+                            "treatment_plan_id": treatment_plan_id,
+                            "case_id": str(plan.case_id) if plan.case_id else None,
+                            "treatment_type_id": str(plan.treatment_type_id) if plan.treatment_type_id else None,
+                            "treatment_name": plan.treatment_name,
+                            "doctor_id": str(plan.doctor_id) if plan.doctor_id else None,
+                            "sitting_number": sitting.sitting_number,
+                        },
+                        db=self.db,
+                    )
             logger.info("CREATE_TREATMENT_SITTING - Success: %s", sitting.id)
             await self.audit_log_repo.create(user_id=user_id, action="CREATE_TREATMENT_SITTING", entity_type="TREATMENT_SITTING", entity_id=str(sitting.id), details=f"Sitting #{sitting.sitting_number} created")
             return sitting
@@ -179,15 +210,44 @@ class TreatmentSittingService:
                 await self.audit_log_repo.create(user_id=user_id, action="UPDATE_TREATMENT_SITTING", entity_type="TREATMENT_SITTING", entity_id=sitting_id, details="Treatment sitting updated")
                 await self._recalculate_plan_sitting_counts(sitting.treatment_plan_id, user_id=user_id)
                 now_completed = sitting.status == TreatmentSittingStatus.COMPLETED.value
-                if now_completed and not was_completed:
-                    from app.services.treatment_enquiry_service import TreatmentEnquiryService
-                    enquiry_svc = TreatmentEnquiryService(self.db)
-                    await enquiry_svc.on_sitting_completed(sitting.treatment_plan_id, sitting.sitting_number)
                 plan = await self.db.get(TreatmentPlan, sitting.treatment_plan_id)
-                if plan and plan.remaining_sittings <= 0:
-                    from app.services.treatment_enquiry_service import TreatmentEnquiryService
-                    enquiry_svc = TreatmentEnquiryService(self.db)
-                    await enquiry_svc.on_treatment_plan_completed(sitting.treatment_plan_id)
+                if now_completed and not was_completed:
+                    from app.crm.services.event_dispatcher import publish_event
+                    if plan and plan.remaining_sittings <= 0:
+                        await publish_event(
+                            event_type="TREATMENT_COMPLETED",
+                            source_module="TREATMENT_SITTING_SERVICE",
+                            entity_type="TREATMENT",
+                            entity_id=sitting.treatment_plan_id,
+                            patient_id=str(plan.patient_id) if plan.patient_id else None,
+                            payload={
+                                "patient_id": str(plan.patient_id) if plan.patient_id else None,
+                                "treatment_plan_id": sitting.treatment_plan_id,
+                                "case_id": str(plan.case_id) if plan.case_id else None,
+                                "treatment_type_id": str(plan.treatment_type_id) if plan.treatment_type_id else None,
+                                "treatment_name": plan.treatment_name,
+                                "doctor_id": str(plan.doctor_id) if plan.doctor_id else None,
+                            },
+                            db=self.db,
+                        )
+                    else:
+                        await publish_event(
+                            event_type="TREATMENT_VISIT_COMPLETED",
+                            source_module="TREATMENT_SITTING_SERVICE",
+                            entity_type="TREATMENT",
+                            entity_id=sitting.treatment_plan_id,
+                            patient_id=str(plan.patient_id) if plan.patient_id else None,
+                            payload={
+                                "patient_id": str(plan.patient_id) if plan.patient_id else None,
+                                "treatment_plan_id": sitting.treatment_plan_id,
+                                "case_id": str(plan.case_id) if plan.case_id else None,
+                                "treatment_type_id": str(plan.treatment_type_id) if plan.treatment_type_id else None,
+                                "treatment_name": plan.treatment_name,
+                                "doctor_id": str(plan.doctor_id) if plan.doctor_id else None,
+                                "sitting_number": sitting.sitting_number,
+                            },
+                            db=self.db,
+                        )
             return sitting
         except Exception as e:
             logger.exception("UPDATE_TREATMENT_SITTING - Error: %s", str(e))

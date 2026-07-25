@@ -149,9 +149,9 @@ async def launch_campaign(
     result = await svc.launch(campaign_id, hospital_id)
     await db.commit()
     try:
-        from app.crm.events import get_publisher
+        from app.crm.services.event_dispatcher import publish_event
         from app.crm.enums import EventType, EventSource
-        await get_publisher().publish(
+        await publish_event(
             event_type=EventType.CAMPAIGN_COMPLETED,
             source_module=EventSource.CAMPAIGN,
             entity_type="CAMPAIGN",

@@ -28,9 +28,8 @@ class FollowUpSnapshot:
     """Immutable snapshot of a single follow-up config."""
     enabled: bool = True
     start_delay_days: int = 0
-    num_follow_ups: int = 3
-    gap_days: int = 2
     auto_close_on_completion: bool = False
+    skip_wellness_if_appointment: bool = False
 
 
 @dataclass
@@ -117,9 +116,8 @@ class CRMSettingsService:
             snap = FollowUpSnapshot(
                 enabled=row.enabled,
                 start_delay_days=row.start_delay_days,
-                num_follow_ups=row.num_follow_ups,
-                gap_days=row.gap_days,
                 auto_close_on_completion=row.auto_close_on_completion,
+                skip_wellness_if_appointment=getattr(row, 'skip_wellness_if_appointment', False),
             )
             if row.context_type == "TREATMENT" and row.treatment_type_id:
                 out[f"TREATMENT:{row.treatment_type_id}"] = snap
@@ -207,10 +205,6 @@ class CRMSettingsService:
             if snap:
                 if snap.start_delay_days < 0:
                     errors.append("Follow-up start delay must be >= 0")
-                if snap.num_follow_ups < 0:
-                    errors.append("Follow-up count must be >= 0")
-                if snap.gap_days < 0:
-                    errors.append("Follow-up gap must be >= 0")
         return errors
 
     # --- Parsing helpers ---

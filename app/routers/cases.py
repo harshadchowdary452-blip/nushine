@@ -73,9 +73,9 @@ async def create_case(data: CaseCreate, db: AsyncSession = Depends(get_db), curr
         module="Case Reports",
     )
     try:
-        from app.crm.events import get_publisher
+        from app.crm.services.event_dispatcher import publish_event
         from app.crm.enums import EventType, EventSource
-        await get_publisher().publish(
+        await publish_event(
             event_type=EventType.CASE_CREATED,
             source_module=EventSource.CASE,
             entity_type="CASE",
@@ -249,9 +249,9 @@ async def update_case(case_id: str, data: CaseUpdate, db: AsyncSession = Depends
         changes=changes,
     )
     try:
-        from app.crm.events import get_publisher
+        from app.crm.services.event_dispatcher import publish_event
         from app.crm.enums import EventType, EventSource
-        await get_publisher().publish(
+        await publish_event(
             event_type=EventType.CASE_UPDATED,
             source_module=EventSource.CASE,
             entity_type="CASE",
@@ -307,9 +307,9 @@ async def complete_case(case_id: str, db: AsyncSession = Depends(get_db), curren
         module="Case Reports",
     )
     try:
-        from app.crm.events import get_publisher
+        from app.crm.services.event_dispatcher import publish_event
         from app.crm.enums import EventType, EventSource
-        await get_publisher().publish(
+        await publish_event(
             event_type=EventType.CASE_COMPLETED,
             source_module=EventSource.CASE,
             entity_type="CASE",
@@ -364,9 +364,9 @@ async def update_case_status(case_id: str, status: str = Query(...), db: AsyncSe
     await svc.update_patient_status(updated.patient_id)
     if status == "OPEN" and old_status != "OPEN":
         try:
-            from app.crm.events import get_publisher
+            from app.crm.services.event_dispatcher import publish_event
             from app.crm.enums import EventType, EventSource
-            await get_publisher().publish(
+            await publish_event(
                 event_type=EventType.CASE_REOPENED,
                 source_module=EventSource.CASE,
                 entity_type="CASE",
@@ -473,9 +473,9 @@ async def approve_treatment_plan(case_id: str, db: AsyncSession = Depends(get_db
         module="Treatments",
     )
     try:
-        from app.crm.events import get_publisher
+        from app.crm.services.event_dispatcher import publish_event
         from app.crm.enums import EventType, EventSource
-        await get_publisher().publish(
+        await publish_event(
             event_type=EventType.CASE_APPROVED,
             source_module=EventSource.CASE,
             entity_type="CASE",

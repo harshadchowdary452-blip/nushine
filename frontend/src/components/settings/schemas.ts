@@ -1,0 +1,111 @@
+import { z } from "zod";
+
+export const SettingsSchema = z.object({
+  general: z.object({
+    welcome_message: z.string().min(1, "Welcome message is required"),
+    reminder_days: z.number().min(0, "Cannot be negative").max(30, "Max 30 days"),
+    reminder_template_id: z.string().nullable(),
+    notification_enabled: z.boolean(),
+    default_priority: z.enum(["low", "medium", "high"]),
+    auto_assign_enabled: z.boolean(),
+    reminder_time: z.string(),
+    opd_slot_duration: z.number().min(5, "Min 5 minutes").max(120, "Max 120 minutes"),
+    recall_interval_days: z.number().min(0).max(365),
+    wellness_interval_days: z.number().min(0).max(365),
+  }),
+  lead: z.object({
+    lead_first_follow_up: z.number().min(0, "Cannot be negative").max(30),
+    lead_second_follow_up: z.number().min(0, "Cannot be negative").max(30),
+    lead_first_call: z.number().min(0, "Cannot be negative").max(30),
+    lead_second_call: z.number().min(0, "Cannot be negative").max(30),
+    lead_missed_call: z.number().min(0, "Cannot be negative").max(30),
+    lead_opd_conversion: z.number().min(0, "Cannot be negative").max(30),
+    lead_no_response: z.number().min(0, "Cannot be negative").max(30),
+    lead_converted: z.number().min(0, "Cannot be negative").max(30),
+    lead_lost: z.number().min(0, "Cannot be negative").max(30),
+    lead_manual: z.number().min(0, "Cannot be negative").max(30),
+    assign_to: z.string().nullable(),
+  }),
+  opd: z.object({
+    opd_visit_completed: z.number().min(0, "Cannot be negative").max(30),
+    opd_no_show: z.number().min(0, "Cannot be negative").max(30),
+    opd_converted: z.number().min(0, "Cannot be negative").max(30),
+    opd_no_response: z.number().min(0, "Cannot be negative").max(30),
+    assign_to: z.string().nullable(),
+  }),
+  treatment: z.object({
+    treatment_completed: z.number().min(0, "Cannot be negative").max(30),
+    treatment_visit_completed: z.number().min(0, "Cannot be negative").max(30),
+    treatment_no_show: z.number().min(0, "Cannot be negative").max(30),
+    treatment_converted: z.number().min(0, "Cannot be negative").max(30),
+    treatment_no_response: z.number().min(0, "Cannot be negative").max(30),
+    assign_to: z.string().nullable(),
+    skip_wellness_if_appointment: z.boolean(),
+  }),
+  case_follow_up: z.object({
+    case_follow_up: z.number().min(0, "Cannot be negative").max(30),
+    case_completed: z.number().min(0, "Cannot be negative").max(30),
+    case_created: z.number().min(0, "Cannot be negative").max(30),
+    case_approved: z.number().min(0, "Cannot be negative").max(30),
+    case_no_show: z.number().min(0, "Cannot be negative").max(30),
+    case_no_response: z.number().min(0, "Cannot be negative").max(30),
+    assign_to: z.string().nullable(),
+  }),
+});
+
+export type SettingsFormType = z.infer<typeof SettingsSchema>;
+
+export function getDefaults(data: any): SettingsFormType {
+  return {
+    general: {
+      welcome_message: data?.welcome_message ?? "Thank you for visiting Nushine Dental! We're here to help you achieve your best smile.",
+      reminder_days: data?.reminder_days ?? 1,
+      reminder_template_id: data?.reminder_template_id ?? null,
+      notification_enabled: data?.notification_enabled ?? true,
+      default_priority: data?.default_priority ?? "medium",
+      auto_assign_enabled: data?.auto_assign_enabled ?? false,
+      reminder_time: data?.reminder_time ?? "10:00",
+      opd_slot_duration: data?.opd_slot_duration ?? 30,
+      recall_interval_days: data?.recall_interval_days ?? 90,
+      wellness_interval_days: data?.wellness_interval_days ?? 90,
+    },
+    lead: {
+      lead_first_follow_up: data?.lead_first_follow_up ?? 1,
+      lead_second_follow_up: data?.lead_second_follow_up ?? 3,
+      lead_first_call: data?.lead_first_call ?? 0,
+      lead_second_call: data?.lead_second_call ?? 2,
+      lead_missed_call: data?.lead_missed_call ?? 0,
+      lead_opd_conversion: data?.lead_opd_conversion ?? 0,
+      lead_no_response: data?.lead_no_response ?? 7,
+      lead_converted: data?.lead_converted ?? 0,
+      lead_lost: data?.lead_lost ?? 30,
+      lead_manual: data?.lead_manual ?? 0,
+      assign_to: data?.assign_to ?? null,
+    },
+    opd: {
+      opd_visit_completed: data?.opd_visit_completed ?? 0,
+      opd_no_show: data?.opd_no_show ?? 1,
+      opd_converted: data?.opd_converted ?? 0,
+      opd_no_response: data?.opd_no_response ?? 3,
+      assign_to: data?.assign_to ?? null,
+    },
+    treatment: {
+      treatment_completed: data?.treatment_completed ?? 0,
+      treatment_visit_completed: data?.treatment_visit_completed ?? 0,
+      treatment_no_show: data?.treatment_no_show ?? 1,
+      treatment_converted: data?.treatment_converted ?? 0,
+      treatment_no_response: data?.treatment_no_response ?? 3,
+      assign_to: data?.assign_to ?? null,
+      skip_wellness_if_appointment: data?.skip_wellness_if_appointment ?? false,
+    },
+    case_follow_up: {
+      case_follow_up: data?.case_follow_up ?? 3,
+      case_completed: data?.case_completed ?? 0,
+      case_created: data?.case_created ?? 0,
+      case_approved: data?.case_approved ?? 0,
+      case_no_show: data?.case_no_show ?? 1,
+      case_no_response: data?.case_no_response ?? 3,
+      assign_to: data?.assign_to ?? null,
+    },
+  };
+}

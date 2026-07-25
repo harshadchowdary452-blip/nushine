@@ -85,16 +85,15 @@ class TreatmentGenerator:
         await self.db.flush()
 
         try:
-            from app.crm.events import get_publisher
+            from app.crm.services.event_dispatcher import publish_event
             from app.crm.enums import EventType, EventSource
-            publisher = get_publisher()
             for plan in generated:
                 try:
                     patient_result = await self.db.execute(
                         select(Patient.id, Patient.hospital_id).join(Case, Case.patient_id == Patient.id).where(Case.id == case_id)
                     )
                     patient_row = patient_result.one_or_none()
-                    await publisher.publish(
+                    await publish_event(
                         event_type=EventType.TREATMENT_CREATED,
                         source_module=EventSource.TREATMENT,
                         entity_type="TREATMENT",

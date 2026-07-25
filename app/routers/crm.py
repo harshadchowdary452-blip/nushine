@@ -280,10 +280,10 @@ async def send_whatsapp(
         CommunicationChannel.WHATSAPP.value, req.message_type, rendered, status_val)
     await db.commit()
     try:
-        from app.crm.events import get_publisher
+        from app.crm.services.event_dispatcher import publish_event
         from app.crm.enums import EventType, EventSource
         event_type = EventType.COMMUNICATION_SENT if success else EventType.COMMUNICATION_FAILED
-        await get_publisher().publish(
+        await publish_event(
             event_type=event_type,
             source_module=EventSource.COMMUNICATION,
             entity_type="COMMUNICATION",
@@ -440,9 +440,9 @@ async def send_email(
         attachment_url=attachment_url)
     await db.commit()
     try:
-        from app.crm.events import get_publisher
+        from app.crm.services.event_dispatcher import publish_event
         from app.crm.enums import EventType, EventSource
-        await get_publisher().publish(
+        await publish_event(
             event_type=EventType.COMMUNICATION_SENT,
             source_module=EventSource.COMMUNICATION,
             entity_type="COMMUNICATION",
@@ -934,9 +934,9 @@ async def mark_follow_up_completed(
         module="CRM",
     )
     try:
-        from app.crm.events import get_publisher
+        from app.crm.services.event_dispatcher import publish_event
         from app.crm.enums import EventType, EventSource
-        await get_publisher().publish(
+        await publish_event(
             event_type=EventType.FOLLOWUP_COMPLETED,
             source_module=EventSource.FOLLOW_UP,
             entity_type="FOLLOW_UP",

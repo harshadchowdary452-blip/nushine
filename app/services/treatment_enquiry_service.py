@@ -9,7 +9,6 @@ from app.models.case import Case
 from app.models.patient import Patient
 from app.models.hospital import Hospital
 from app.models.treatment_follow_up_rule import TreatmentFollowUpRule
-from app.models.enquiry import Enquiry, TreatmentInterest, EnquiryStatus
 from app.models.appointment import Appointment, AppointmentType, AppointmentStatus
 from app.models.case_timeline import CaseTimeline
 from app.models.communication_log import CommunicationLog, CommunicationStatus, CommunicationChannel, MessageType
@@ -169,46 +168,6 @@ class TreatmentEnquiryService:
             field_name=field_name, new_value=new_value, performed_by=user_id,
         ))
 
-    async def _create_enquiry(self, plan, ctx):
-        rule = await self._find_matching_rule(plan, ctx["hospital_id"])
-        if not rule or not rule.enquiry_enabled:
-            return None
-        patient = await self.db.get(Patient, ctx["patient_id"])
-        treatment_name = plan.treatment_name
-        interest_map = {
-            "IMPLANT": TreatmentInterest.IMPLANT.value,
-            "BRACES": TreatmentInterest.BRACES.value,
-            "SMILE_DESIGN": TreatmentInterest.SMILE_DESIGN.value,
-            "CROWN": TreatmentInterest.CROWN.value,
-            "BRIDGE": TreatmentInterest.BRIDGE.value,
-            "VENEER": TreatmentInterest.VENEER.value,
-            "RCT": TreatmentInterest.RCT.value,
-            "EXTRACTION": TreatmentInterest.EXTRACTION.value,
-            "DENTURE": TreatmentInterest.DENTURE.value,
-            "SCALING": TreatmentInterest.SCALING.value,
-            "FILLING": TreatmentInterest.FILLING.value,
-        }
-        interest = TreatmentInterest.OTHER.value
-        for keyword, mapped in interest_map.items():
-            if keyword in treatment_name.upper():
-                interest = mapped
-                break
-        enquiry = Enquiry(
-            hospital_id=ctx["hospital_id"],
-            patient_id=ctx["patient_id"],
-            assigned_staff_id=rule.assigned_doctor_id,
-            treatment_interest=interest,
-            notes=f"Auto-generated from completed treatment: {treatment_name} (Plan: {plan.id})",
-            status=EnquiryStatus.NEW.value,
-        )
-        self.db.add(enquiry)
-        await self.db.flush()
-        case_id = ctx["case"].id if ctx["case"] else None
-        if case_id:
-            await self._add_timeline(case_id, "Enquiry Created", new_value=f"Treatment: {treatment_name}, Interest: {interest}")
-        logger.info("Created enquiry %s for plan %s", enquiry.id, plan.id)
-        return enquiry
-
     async def create_waiting_patient_task(self, plan_id: str, patient_id: str, follow_up_date_str: str) -> None:
         ctx = await self._get_plan_context(plan_id)
         if not ctx:
@@ -277,7 +236,6 @@ class TreatmentEnquiryService:
         today = date.today()
         treatment_name = plan.treatment_name
         created = []
-        enquiry = await self._create_enquiry(plan, ctx)
         if rule.recall_6_month:
             existing = await self.db.execute(
                 select(FollowUp).where(

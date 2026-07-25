@@ -87,6 +87,8 @@ async def test_generic_event(
 
     dispatcher = get_central_dispatcher()
     dispatcher.set_rule_engine(get_rule_engine())
+    from app.crm.services.enquiry_executor import get_enquiry_executor
+    dispatcher.set_executor(get_enquiry_executor())
 
     result = await dispatcher.dispatch(
         event_type=req.event_type,
@@ -102,7 +104,7 @@ async def test_generic_event(
 
     return {
         "success": True,
-        "message": f"Event '{req.event_type}' evaluated (no records created)",
+        "message": f"Event '{req.event_type}' dispatched and executed",
         "data": result,
     }
 
@@ -121,6 +123,8 @@ async def test_lead_event(
 
     dispatcher = get_central_dispatcher()
     dispatcher.set_rule_engine(get_rule_engine())
+    from app.crm.services.enquiry_executor import get_enquiry_executor
+    dispatcher.set_executor(get_enquiry_executor())
 
     event_type = "LEAD_CREATED" if req.status == "NEW" else "PATIENT_REGISTERED"
     entity_id = req.lead_id or req.patient_id or "test-entity-001"
@@ -143,7 +147,7 @@ async def test_lead_event(
 
     return {
         "success": True,
-        "message": f"Lead event '{event_type}' evaluated (no records created)",
+        "message": f"Lead event '{event_type}' dispatched and executed",
         "data": result,
     }
 
@@ -162,6 +166,8 @@ async def test_treatment_event(
 
     dispatcher = get_central_dispatcher()
     dispatcher.set_rule_engine(get_rule_engine())
+    from app.crm.services.enquiry_executor import get_enquiry_executor
+    dispatcher.set_executor(get_enquiry_executor())
 
     event_type = "TREATMENT_COMPLETED"
 
@@ -184,7 +190,7 @@ async def test_treatment_event(
 
     return {
         "success": True,
-        "message": f"Treatment event '{event_type}' evaluated (no records created)",
+        "message": f"Treatment event '{event_type}' dispatched and executed",
         "data": result,
     }
 
@@ -203,6 +209,8 @@ async def test_appointment_event(
 
     dispatcher = get_central_dispatcher()
     dispatcher.set_rule_engine(get_rule_engine())
+    from app.crm.services.enquiry_executor import get_enquiry_executor
+    dispatcher.set_executor(get_enquiry_executor())
 
     event_type = "APPOINTMENT_CREATED"
 
@@ -223,7 +231,7 @@ async def test_appointment_event(
 
     return {
         "success": True,
-        "message": f"Appointment event '{event_type}' evaluated (no records created)",
+        "message": f"Appointment event '{event_type}' dispatched and executed",
         "data": result,
     }
 
@@ -242,6 +250,8 @@ async def test_case_event(
 
     dispatcher = get_central_dispatcher()
     dispatcher.set_rule_engine(get_rule_engine())
+    from app.crm.services.enquiry_executor import get_enquiry_executor
+    dispatcher.set_executor(get_enquiry_executor())
 
     event_type = "CASE_COMPLETED"
 
@@ -261,7 +271,7 @@ async def test_case_event(
 
     return {
         "success": True,
-        "message": f"Case event '{event_type}' evaluated (no records created)",
+        "message": f"Case event '{event_type}' dispatched and executed",
         "data": result,
     }
 

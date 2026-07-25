@@ -1,5 +1,4 @@
-"""Event Service — orchestrates event publishing, processing, and monitoring."""
-from __future__ import annotations
+"""Event Service — orchestrates event querying, retry, and monitoring."""
 import json
 import logging
 import time as _time
@@ -8,78 +7,14 @@ from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update
 
-from app.crm.events import EventPayload, EventStore, get_publisher, get_dispatcher
-from app.crm.enums import EventType, EventStatus
-
 logger = logging.getLogger("crm.event_service")
 
 
 class EventService:
-    """Central orchestration service for CRM events."""
+    """Central orchestration service for CRM event monitoring."""
 
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.store = EventStore(db)
-        self.publisher = get_publisher()
-
-    async def publish_and_process(
-        self,
-        event_type: EventType | str,
-        source_module: str,
-        entity_type: str,
-        entity_id: str,
-        hospital_id: Optional[str] = None,
-        group_id: Optional[str] = None,
-        patient_id: Optional[str] = None,
-        doctor_id: Optional[str] = None,
-        triggered_by: Optional[str] = None,
-        payload: Optional[dict] = None,
-        metadata: Optional[dict] = None,
-    ) -> EventPayload:
-        """Publish event, persist to store, and process through CRM engine."""
-        start = _time.monotonic()
-
-        # 1. Create event
-        event = EventPayload(
-            event_type=str(event_type),
-            source_module=source_module,
-            entity_type=entity_type,
-            entity_id=entity_id,
-            hospital_id=hospital_id,
-            group_id=group_id,
-            patient_id=patient_id,
-            doctor_id=doctor_id,
-            triggered_by=triggered_by,
-            payload=payload or {},
-            metadata=metadata or {},
-        )
-
-        # 2. Persist to event log
-        await self.store.persist(event, status="PROCESSING")
-
-        # 3. Process through CRM rule engine
-        try:
-            from app.crm.services.rule_engine import execute_rules
-            if event.hospital_id:
-                await execute_rules(
-                    self.db,
-                    event.hospital_id,
-                    event.event_type,
-                    event.payload or {},
-                )
-            elapsed = (_time.monotonic() - start) * 1000
-            await self.store.update_status(event.event_id, "COMPLETED", processing_time_ms=elapsed)
-            logger.info("EVENT_PROCESSED: %s in %.1fms", event.event_id, elapsed)
-        except Exception as exc:
-            elapsed = (_time.monotonic() - start) * 1000
-            await self.store.update_status(
-                event.event_id, "FAILED",
-                error_message=str(exc),
-                processing_time_ms=elapsed,
-            )
-            logger.error("EVENT_PROCESSING_FAILED: %s error=%s", event.event_id, str(exc), exc_info=True)
-
-        return event
 
     async def get_events(
         self,
@@ -132,8 +67,9 @@ class EventService:
         return self._log_to_dict(event) if event else None
 
     async def retry_event(self, event_id: str) -> Optional[dict]:
-        """Retry a failed event through the CRM engine."""
+        """Retry a failed event through the CentralEventDispatcher."""
         from app.models.event_log import EventLog
+        from app.crm.services.event_dispatcher import get_central_dispatcher
         query = select(EventLog).where(EventLog.event_id == event_id)
         result = await self.db.execute(query)
         event = result.scalar_one_or_none()
@@ -142,23 +78,26 @@ class EventService:
         if event.status not in ("FAILED", "RETRYING", "PENDING"):
             return {"error": f"Cannot retry event with status {event.status}"}
 
-        # Update retry count
         event.retry_count = (event.retry_count or 0) + 1
         event.status = "RETRYING"
         await self.db.flush()
 
-        # Re-process through CRM rule engine
         start = _time.monotonic()
         try:
-            from app.crm.services.rule_engine import execute_rules
-            if event.hospital_id:
-                payload = json.loads(event.payload_json) if event.payload_json else {}
-                await execute_rules(
-                    self.db,
-                    event.hospital_id,
-                    event.event_type,
-                    payload,
-                )
+            dispatcher = get_central_dispatcher()
+            payload = json.loads(event.payload_json) if event.payload_json else {}
+            await dispatcher.dispatch(
+                event_type=event.event_type,
+                source_module=event.source_module,
+                entity_type=event.entity_type,
+                entity_id=event.entity_id,
+                hospital_id=event.hospital_id,
+                patient_id=event.patient_id,
+                doctor_id=event.doctor_id,
+                triggered_by=event.triggered_by,
+                payload=payload,
+                db=self.db,
+            )
             elapsed = (_time.monotonic() - start) * 1000
             event.status = "COMPLETED"
             event.processed_at = datetime.now(timezone.utc)
@@ -174,16 +113,18 @@ class EventService:
             return {"error": str(exc), "retry_count": event.retry_count}
 
     async def replay_event(self, event_id: str) -> Optional[dict]:
-        """Replay an event — re-publish and re-process from scratch."""
+        """Replay an event — re-dispatch from scratch."""
         from app.models.event_log import EventLog
+        from app.crm.services.event_dispatcher import get_central_dispatcher
         query = select(EventLog).where(EventLog.event_id == event_id)
         result = await self.db.execute(query)
         old_event = result.scalar_one_or_none()
         if not old_event:
             return None
 
-        # Create a new event with same data
-        new_event = await self.publish_and_process(
+        dispatcher = get_central_dispatcher()
+        payload = json.loads(old_event.payload_json) if old_event.payload_json else {}
+        await dispatcher.dispatch(
             event_type=old_event.event_type,
             source_module=old_event.source_module,
             entity_type=old_event.entity_type,
@@ -192,13 +133,45 @@ class EventService:
             patient_id=old_event.patient_id,
             doctor_id=old_event.doctor_id,
             triggered_by=old_event.triggered_by,
-            payload=json.loads(old_event.payload_json) if old_event.payload_json else None,
+            payload=payload,
+            db=self.db,
         )
-        return self._log_to_dict(new_event)
+
+        # Fetch the newly created event log
+        new_query = select(EventLog).order_by(EventLog.created_at.desc()).limit(1)
+        new_result = await self.db.execute(new_query)
+        new_event = new_result.scalar_one_or_none()
+        return self._log_to_dict(new_event) if new_event else None
 
     async def get_statistics(self) -> dict:
         """Get event processing statistics."""
-        return await self.store.get_statistics()
+        from app.models.event_log import EventLog
+        today = datetime.now(timezone.utc).date()
+
+        status_query = select(EventLog.status, func.count()).group_by(EventLog.status)
+        status_result = await self.db.execute(status_query)
+        by_status = {row[0]: row[1] for row in status_result.all()}
+
+        today_query = select(func.count()).where(func.date(EventLog.created_at) == today)
+        today_result = await self.db.execute(today_query)
+        today_count = today_result.scalar() or 0
+
+        avg_query = select(func.avg(EventLog.processing_time_ms)).where(
+            EventLog.processing_time_ms.isnot(None)
+        )
+        avg_result = await self.db.execute(avg_query)
+        avg_time = avg_result.scalar()
+
+        return {
+            "today_count": today_count,
+            "by_status": by_status,
+            "total": sum(by_status.values()),
+            "avg_processing_time_ms": round(avg_time, 1) if avg_time else None,
+            "pending": by_status.get("PENDING", 0),
+            "completed": by_status.get("COMPLETED", 0),
+            "failed": by_status.get("FAILED", 0),
+            "retrying": by_status.get("RETRYING", 0),
+        }
 
     def _log_to_dict(self, log) -> dict:
         return {

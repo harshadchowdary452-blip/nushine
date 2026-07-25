@@ -48,9 +48,9 @@ async def create_billing(data: BillingCreate, db: AsyncSession = Depends(get_db)
             module="Billing",
         )
     try:
-        from app.crm.events import get_publisher
+        from app.crm.services.event_dispatcher import publish_event
         from app.crm.enums import EventType, EventSource
-        await get_publisher().publish(
+        await publish_event(
             event_type=EventType.PAYMENT_CREATED,
             source_module=EventSource.BILLING,
             entity_type="BILLING",
@@ -243,9 +243,9 @@ async def update_payment(billing_id: str, data: BillingUpdate, db: AsyncSession 
         changes=[{"field": "paid_amount", "old_value": str(old_paid), "new_value": str(updated.paid_amount)}],
     )
     try:
-        from app.crm.events import get_publisher
+        from app.crm.services.event_dispatcher import publish_event
         from app.crm.enums import EventType, EventSource
-        await get_publisher().publish(
+        await publish_event(
             event_type=EventType.PAYMENT_RECEIVED,
             source_module=EventSource.BILLING,
             entity_type="BILLING",

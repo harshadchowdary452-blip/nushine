@@ -659,16 +659,16 @@ export const crmSettingsApi = {
     updateGeneral: (data: Record<string, string>) =>
       api.put("/crm-config/general", data).then((r) => r.data),
     getLead: () => api.get("/crm-config/lead").then((r) => r.data),
-    updateLead: (data: { enabled: boolean; start_delay_days: number; num_follow_ups: number; gap_days: number; auto_close_on_completion: boolean }) =>
+    updateLead: (data: { enabled: boolean; start_delay_days: number; auto_close_on_completion: boolean; skip_wellness_if_appointment: boolean }) =>
       api.put("/crm-config/lead", data).then((r) => r.data),
     getOpd: () => api.get("/crm-config/opd").then((r) => r.data),
-    updateOpd: (data: { enabled: boolean; start_delay_days: number; num_follow_ups: number; gap_days: number; auto_close_on_completion: boolean }) =>
+    updateOpd: (data: { enabled: boolean; start_delay_days: number; auto_close_on_completion: boolean; skip_wellness_if_appointment: boolean }) =>
       api.put("/crm-config/opd", data).then((r) => r.data),
     getTreatment: () => api.get("/crm-config/treatment").then((r) => r.data),
-    updateTreatment: (treatmentTypeId: string, data: { enabled: boolean; start_delay_days: number; num_follow_ups: number; gap_days: number; auto_close_on_completion: boolean }) =>
+    updateTreatment: (treatmentTypeId: string, data: { enabled: boolean; start_delay_days: number; auto_close_on_completion: boolean; skip_wellness_if_appointment: boolean }) =>
       api.put(`/crm-config/treatment/${treatmentTypeId}`, data).then((r) => r.data),
     getCase: () => api.get("/crm-config/case").then((r) => r.data),
-    updateCase: (section: string, data: { enabled: boolean; start_delay_days: number; num_follow_ups: number; gap_days: number; auto_close_on_completion: boolean }) =>
+    updateCase: (section: string, data: { enabled: boolean; start_delay_days: number; auto_close_on_completion: boolean; skip_wellness_if_appointment: boolean }) =>
       api.put(`/crm-config/case/${section}`, data).then((r) => r.data),
   },
   inlineList: {

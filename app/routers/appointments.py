@@ -159,9 +159,9 @@ async def create_appointment(data: AppointmentCreate, db: AsyncSession = Depends
     )
 
     try:
-        from app.crm.events import get_publisher
+        from app.crm.services.event_dispatcher import publish_event
         from app.crm.enums import EventType, EventSource
-        await get_publisher().publish(
+        await publish_event(
             event_type=EventType.APPOINTMENT_CREATED,
             source_module=EventSource.APPOINTMENT,
             entity_type="APPOINTMENT",
@@ -643,9 +643,9 @@ async def cancel_appointment(appointment_id: str, req: CancelRequest, db: AsyncS
     )
 
     try:
-        from app.crm.events import get_publisher
+        from app.crm.services.event_dispatcher import publish_event
         from app.crm.enums import EventType, EventSource
-        await get_publisher().publish(
+        await publish_event(
             event_type=EventType.APPOINTMENT_CANCELLED,
             source_module=EventSource.APPOINTMENT,
             entity_type="APPOINTMENT",
@@ -706,9 +706,9 @@ async def complete_appointment(appointment_id: str, req: CompleteRequest, db: As
     await service._attach_names(appointment)
 
     try:
-        from app.crm.events import get_publisher
+        from app.crm.services.event_dispatcher import publish_event
         from app.crm.enums import EventType, EventSource
-        await get_publisher().publish(
+        await publish_event(
             event_type=EventType.APPOINTMENT_COMPLETED,
             source_module=EventSource.APPOINTMENT,
             entity_type="APPOINTMENT",
@@ -782,9 +782,9 @@ async def reschedule_appointment(appointment_id: str, req: RescheduleRequest, db
     await service._attach_names(appointment)
 
     try:
-        from app.crm.events import get_publisher
+        from app.crm.services.event_dispatcher import publish_event
         from app.crm.enums import EventType, EventSource
-        await get_publisher().publish(
+        await publish_event(
             event_type=EventType.APPOINTMENT_RESCHEDULED,
             source_module=EventSource.APPOINTMENT,
             entity_type="APPOINTMENT",

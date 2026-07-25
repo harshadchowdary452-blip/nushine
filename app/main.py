@@ -54,23 +54,17 @@ async def lifespan(app: FastAPI):
     try:
         from app.crm.services.event_dispatcher import get_central_dispatcher
         from app.crm.services.rule_engine import get_rule_engine
+        from app.crm.services.enquiry_executor import get_enquiry_executor
         dispatcher = get_central_dispatcher()
         rule_engine = get_rule_engine()
+        executor = get_enquiry_executor()
         dispatcher.set_rule_engine(rule_engine)
-        logger.info("CRM Phase 3.3: Central dispatcher + rule engine wired")
+        dispatcher.set_executor(executor)
+        logger.info("CRM Phase 3.3: Central dispatcher + rule engine + executor wired")
     except Exception as e:
         logger.warning(f"CRM Phase 3.3 wiring failed (non-fatal): {e}")
 
-    # Wire CRM Event Handlers to legacy EventDispatcher
-    try:
-        from app.crm.events import get_dispatcher
-        from app.crm.services.event_handlers import CRM_EVENT_HANDLERS
-        legacy_dispatcher = get_dispatcher()
-        for event_type, handler in CRM_EVENT_HANDLERS.items():
-            legacy_dispatcher.subscribe(event_type, handler)
-        logger.info("CRM: %d event handlers wired to legacy dispatcher", len(CRM_EVENT_HANDLERS))
-    except Exception as e:
-        logger.warning(f"CRM handler wiring failed (non-fatal): {e}")
+    # Legacy CRM handler wiring removed — all events route through CentralEventDispatcher
 
     try:
         from app.utils.case_pdf import _ensure_browser

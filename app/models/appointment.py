@@ -73,7 +73,9 @@ PROCEDURE_DURATIONS: dict[str, int] = {
 }
 
 
-def resolve_duration(procedure_name: str | None, appointment_type: AppointmentType | str | None) -> int:
+def resolve_duration(procedure_name: str | None, appointment_type: AppointmentType | str | None, override_minutes: int | None = None) -> int:
+    if override_minutes and override_minutes > 0:
+        return override_minutes
     if procedure_name:
         normalized = procedure_name.strip()
         if normalized in PROCEDURE_DURATIONS:

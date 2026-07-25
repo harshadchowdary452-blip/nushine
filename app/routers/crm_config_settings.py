@@ -63,9 +63,8 @@ def _follow_up_to_dict(c: CrmFollowUpConfig) -> dict:
         "treatment_type_id": c.treatment_type_id,
         "enabled": c.enabled,
         "start_delay_days": c.start_delay_days,
-        "num_follow_ups": c.num_follow_ups,
-        "gap_days": c.gap_days,
         "auto_close_on_completion": c.auto_close_on_completion,
+        "skip_wellness_if_appointment": getattr(c, 'skip_wellness_if_appointment', False),
         "created_at": c.created_at.isoformat() if c.created_at else None,
         "updated_at": c.updated_at.isoformat() if c.updated_at else None,
     }
@@ -88,36 +87,29 @@ class GeneralSettingsUpdate(BaseModel):
 class FollowUpConfigData(BaseModel):
     enabled: bool = True
     start_delay_days: int = 0
-    num_follow_ups: int = 3
-    gap_days: int = 2
     auto_close_on_completion: bool = False
+    skip_wellness_if_appointment: bool = False
 
 
 class TreatmentFollowUpSave(BaseModel):
     treatment_type_id: str
     enabled: bool = True
     start_delay_days: int = 0
-    num_follow_ups: int = 3
-    gap_days: int = 2
     auto_close_on_completion: bool = False
+    skip_wellness_if_appointment: bool = False
 
 
 class CaseConfigSave(BaseModel):
     enabled: bool = True
     start_delay_days: int = 3
-    num_follow_ups: int = 2
-    gap_days: int = 3
     auto_close_on_completion: bool = False
+    skip_wellness_if_appointment: bool = False
 
 
 def _validate_follow_up(data):
     errors = []
     if data.start_delay_days < 0:
         errors.append("start_delay_days must be >= 0")
-    if data.num_follow_ups < 0:
-        errors.append("num_follow_ups must be >= 0")
-    if data.gap_days < 0:
-        errors.append("gap_days must be >= 0")
     if errors:
         raise HTTPException(status_code=422, detail="; ".join(errors))
 
@@ -160,7 +152,7 @@ async def update_general_settings(
     current_user: dict = Depends(get_current_user),
 ):
     verify_permission(current_user, Permission.MANAGE_LEADS)
-    hid = current_user.get("hospital_id")
+    hid = _verify_hospital_admin(current_user)
     updates = data.model_dump(exclude_unset=True)
     if not updates:
         return {"updated": 0}
@@ -204,8 +196,8 @@ async def get_lead_settings(
     if configs:
         return {"config": _follow_up_to_dict(configs[0])}
     return {"config": {
-        "enabled": True, "start_delay_days": 1, "num_follow_ups": 3,
-        "gap_days": 2, "auto_close_on_completion": False,
+        "enabled": True, "start_delay_days": 1,
+        "auto_close_on_completion": False, "skip_wellness_if_appointment": False,
     }}
 
 
@@ -226,15 +218,14 @@ async def update_lead_settings(
     if config:
         config.enabled = data.enabled
         config.start_delay_days = data.start_delay_days
-        config.num_follow_ups = data.num_follow_ups
-        config.gap_days = data.gap_days
         config.auto_close_on_completion = data.auto_close_on_completion
+        config.skip_wellness_if_appointment = data.skip_wellness_if_appointment
     else:
         config = CrmFollowUpConfig(
             hospital_id=hid, context_type="LEAD", treatment_type_id=None,
             enabled=data.enabled, start_delay_days=data.start_delay_days,
-            num_follow_ups=data.num_follow_ups, gap_days=data.gap_days,
             auto_close_on_completion=data.auto_close_on_completion,
+            skip_wellness_if_appointment=data.skip_wellness_if_appointment,
         )
         db.add(config)
     await db.commit()
@@ -263,8 +254,8 @@ async def get_opd_settings(
     if configs:
         return {"config": _follow_up_to_dict(configs[0])}
     return {"config": {
-        "enabled": True, "start_delay_days": 0, "num_follow_ups": 3,
-        "gap_days": 2, "auto_close_on_completion": False,
+        "enabled": True, "start_delay_days": 0,
+        "auto_close_on_completion": False, "skip_wellness_if_appointment": False,
     }}
 
 
@@ -285,15 +276,14 @@ async def update_opd_settings(
     if config:
         config.enabled = data.enabled
         config.start_delay_days = data.start_delay_days
-        config.num_follow_ups = data.num_follow_ups
-        config.gap_days = data.gap_days
         config.auto_close_on_completion = data.auto_close_on_completion
+        config.skip_wellness_if_appointment = data.skip_wellness_if_appointment
     else:
         config = CrmFollowUpConfig(
             hospital_id=hid, context_type="OPD", treatment_type_id=None,
             enabled=data.enabled, start_delay_days=data.start_delay_days,
-            num_follow_ups=data.num_follow_ups, gap_days=data.gap_days,
             auto_close_on_completion=data.auto_close_on_completion,
+            skip_wellness_if_appointment=data.skip_wellness_if_appointment,
         )
         db.add(config)
     await db.commit()
@@ -350,8 +340,8 @@ async def get_treatment_settings(
             "treatment_type_id": tt.id,
             "treatment_name": tt.name,
             "config": _follow_up_to_dict(cfg) if cfg else {
-                "enabled": False, "start_delay_days": 0, "num_follow_ups": 3,
-                "gap_days": 2, "auto_close_on_completion": False,
+                "enabled": False, "start_delay_days": 0,
+                "auto_close_on_completion": False, "skip_wellness_if_appointment": False,
             },
         })
     return {"items": items}
@@ -384,15 +374,14 @@ async def update_treatment_follow_up(
     if config:
         config.enabled = data.enabled
         config.start_delay_days = data.start_delay_days
-        config.num_follow_ups = data.num_follow_ups
-        config.gap_days = data.gap_days
         config.auto_close_on_completion = data.auto_close_on_completion
+        config.skip_wellness_if_appointment = data.skip_wellness_if_appointment
     else:
         config = CrmFollowUpConfig(
             hospital_id=hid, context_type="TREATMENT", treatment_type_id=treatment_type_id,
             enabled=data.enabled, start_delay_days=data.start_delay_days,
-            num_follow_ups=data.num_follow_ups, gap_days=data.gap_days,
             auto_close_on_completion=data.auto_close_on_completion,
+            skip_wellness_if_appointment=data.skip_wellness_if_appointment,
         )
         db.add(config)
     await db.commit()
@@ -425,16 +414,15 @@ async def bulk_update_treatment_follow_ups(
         if config:
             config.enabled = item.enabled
             config.start_delay_days = item.start_delay_days
-            config.num_follow_ups = item.num_follow_ups
-            config.gap_days = item.gap_days
             config.auto_close_on_completion = item.auto_close_on_completion
+            config.skip_wellness_if_appointment = item.skip_wellness_if_appointment
         else:
             config = CrmFollowUpConfig(
                 hospital_id=hid, context_type="TREATMENT",
                 treatment_type_id=item.treatment_type_id,
                 enabled=item.enabled, start_delay_days=item.start_delay_days,
-                num_follow_ups=item.num_follow_ups, gap_days=item.gap_days,
                 auto_close_on_completion=item.auto_close_on_completion,
+                skip_wellness_if_appointment=item.skip_wellness_if_appointment,
             )
             db.add(config)
         saved += 1
@@ -457,8 +445,8 @@ async def get_case_settings(
     verify_permission(current_user, Permission.VIEW_LEADS, Permission.MANAGE_LEADS)
     hid = current_user.get("hospital_id")
     defaults = {
-        "recovery": {"enabled": True, "start_delay_days": 3, "num_follow_ups": 2, "gap_days": 3, "auto_close_on_completion": False},
-        "recall": {"enabled": True, "start_delay_days": 180, "num_follow_ups": 1, "gap_days": 0, "auto_close_on_completion": False},
+        "recovery": {"enabled": True, "start_delay_days": 3, "auto_close_on_completion": False, "skip_wellness_if_appointment": False},
+        "recall": {"enabled": True, "start_delay_days": 180, "auto_close_on_completion": False, "skip_wellness_if_appointment": False},
     }
     if not hid:
         return defaults
@@ -500,15 +488,14 @@ async def update_case_setting(
     if config:
         config.enabled = data.enabled
         config.start_delay_days = data.start_delay_days
-        config.num_follow_ups = data.num_follow_ups
-        config.gap_days = data.gap_days
         config.auto_close_on_completion = data.auto_close_on_completion
+        config.skip_wellness_if_appointment = data.skip_wellness_if_appointment
     else:
         config = CrmFollowUpConfig(
             hospital_id=hid, context_type=context_type, treatment_type_id=None,
             enabled=data.enabled, start_delay_days=data.start_delay_days,
-            num_follow_ups=data.num_follow_ups, gap_days=data.gap_days,
             auto_close_on_completion=data.auto_close_on_completion,
+            skip_wellness_if_appointment=data.skip_wellness_if_appointment,
         )
         db.add(config)
     await db.commit()

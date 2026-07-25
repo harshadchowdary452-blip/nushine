@@ -92,8 +92,6 @@ class PatientService:
             patient = await self.repo.update(patient_id, **clean_data)
             if patient:
                 await self.audit_log_repo.create(user_id=user_id, action="UPDATE_PATIENT", entity_type="PATIENT", entity_id=patient_id, details="Patient updated")
-            if clean_data.get("status") == PatientStatus.OPD:
-                await self._auto_create_opd_enquiry(patient, user_id)
             return patient
         except Exception as e:
             logger.exception("UPDATE_PATIENT - Error: %s", str(e))

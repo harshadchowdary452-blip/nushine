@@ -44,9 +44,9 @@ async def create_patient(data: PatientCreate, db: AsyncSession = Depends(get_db)
         module="patient", description=f"Patient '{patient.full_name}' created",
         current_user=current_user)
     try:
-        from app.crm.events import get_publisher
+        from app.crm.services.event_dispatcher import publish_event
         from app.crm.enums import EventType, EventSource
-        await get_publisher().publish(
+        await publish_event(
             event_type=EventType.PATIENT_REGISTERED,
             source_module=EventSource.PATIENT,
             entity_type="PATIENT",
@@ -362,9 +362,9 @@ async def update_patient(patient_id: str, data: PatientUpdate, db: AsyncSession 
             module="patient", description=f"Patient '{patient.full_name}' updated",
             current_user=current_user, changes=changes)
     try:
-        from app.crm.events import get_publisher
+        from app.crm.services.event_dispatcher import publish_event
         from app.crm.enums import EventType, EventSource
-        await get_publisher().publish(
+        await publish_event(
             event_type=EventType.PATIENT_UPDATED,
             source_module=EventSource.PATIENT,
             entity_type="PATIENT",
@@ -391,9 +391,9 @@ async def delete_patient(patient_id: str, db: AsyncSession = Depends(get_db), cu
         current_user=current_user)
     deleted = await service.delete(patient_id, user_id=current_user.get("sub"))
     try:
-        from app.crm.events import get_publisher
+        from app.crm.services.event_dispatcher import publish_event
         from app.crm.enums import EventType, EventSource
-        await get_publisher().publish(
+        await publish_event(
             event_type=EventType.PATIENT_DEACTIVATED,
             source_module=EventSource.PATIENT,
             entity_type="PATIENT",
