@@ -27,6 +27,7 @@ logger = logging.getLogger("crm.enquiry_executor")
 
 class EnquiryType:
     LEAD_FOLLOW_UP = "LEAD_FOLLOW_UP"
+    OPD_FOLLOW_UP = "OPD_FOLLOW_UP"
     APPOINTMENT_REMINDER = "APPOINTMENT_REMINDER"
     TREATMENT_WELLNESS = "TREATMENT_WELLNESS"
     CASE_WELLNESS = "CASE_WELLNESS"
@@ -34,7 +35,6 @@ class EnquiryType:
     MISSED_APPOINTMENT = "MISSED_APPOINTMENT"
     GENERAL_FOLLOW_UP = "GENERAL_FOLLOW_UP"
     PATIENT_SATISFACTION = "PATIENT_SATISFACTION"
-    OPD_FOLLOW_UP = "OPD_FOLLOW_UP"
 
 
 # ============================================================
@@ -201,14 +201,21 @@ class EnquiryExecutor:
         enquiry_type: str,
         due_date: date,
     ) -> bool:
-        """Check enterprise idempotency key before creating enquiry."""
+        """Check enterprise idempotency key before creating enquiry.
+
+        Checks ALL active statuses (PENDING, CONTACTED, INTERESTED, etc.)
+        NOT just PENDING — this prevents duplicate creation after CANCEL.
+        Only COMPLETED and CANCELLED are excluded (terminal states).
+        """
         from app.models.generated_enquiry import GeneratedEnquiry
+
+        terminal_statuses = ["COMPLETED", "CANCELLED", "LOST", "CONVERTED"]
 
         conditions = [
             GeneratedEnquiry.hospital_id == hospital_id,
             GeneratedEnquiry.enquiry_type == enquiry_type,
             GeneratedEnquiry.due_date == due_date,
-            GeneratedEnquiry.status == "PENDING",
+            GeneratedEnquiry.status.notin_(terminal_statuses),
         ]
 
         if patient_id:

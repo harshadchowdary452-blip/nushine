@@ -28,6 +28,7 @@ SUPPORTED_EVENTS = {
     "LEAD_CREATED", "LEAD_UPDATED", "LEAD_CONVERTED", "LEAD_LOST",
     "PATIENT_REGISTERED", "PATIENT_UPDATED", "PATIENT_STATUS_CHANGED",
     "PATIENT_INACTIVE", "PATIENT_DEACTIVATED",
+    "OPD_CONSULTATION_COMPLETED",
     "APPOINTMENT_CREATED", "APPOINTMENT_UPDATED", "APPOINTMENT_CANCELLED",
     "APPOINTMENT_COMPLETED", "APPOINTMENT_RESCHEDULED", "APPOINTMENT_MISSED",
     "TREATMENT_CREATED", "TREATMENT_STARTED", "TREATMENT_COMPLETED", "TREATMENT_VISIT_COMPLETED",
@@ -196,10 +197,10 @@ class CentralEventDispatcher:
         event.hospital_id = resolved_hospital_id
 
         # Rule Engine — the SINGLE decision maker
-        decision = None
+        decisions = []
         if self._rule_engine:
             try:
-                decision = await self._rule_engine.evaluate(
+                decisions = await self._rule_engine.evaluate(
                     db=db, hospital_id=resolved_hospital_id,
                     event_type=event_type, entity_type=entity_type,
                     entity_id=entity_id, payload=payload or {},
@@ -207,37 +208,38 @@ class CentralEventDispatcher:
             except Exception as exc:
                 logger.error("RULE_ENGINE_FAILED: event=%s error=%s", event.event_id, str(exc), exc_info=True)
 
-        # Execute — only if decision is not None
+        # Execute — each Decision creates/cancels one enquiry
         execution_results = []
-        if decision and self._executor:
-            try:
-                result = await self._executor.execute(
-                    db=db,
-                    hospital_id=resolved_hospital_id,
-                    decision=decision,
-                    event_data=payload or {},
-                )
-                execution_results = [result]
-                logger.info(
-                    "ENQUIRY_EXECUTED: event=%s action=%s created=%d skipped=%d",
-                    event.event_id, decision.action,
-                    result.enquiries_created, result.enquiries_skipped,
-                )
-            except Exception as exc:
-                logger.error("ENQUIRY_EXECUTION_FAILED: event=%s error=%s", event.event_id, str(exc), exc_info=True)
+        if decisions and self._executor:
+            for decision in decisions:
+                try:
+                    result = await self._executor.execute(
+                        db=db,
+                        hospital_id=resolved_hospital_id,
+                        decision=decision,
+                        event_data=payload or {},
+                    )
+                    execution_results.append(result)
+                    logger.info(
+                        "ENQUIRY_EXECUTED: event=%s action=%s type=%s created=%d skipped=%d",
+                        event.event_id, decision.action, decision.enquiry_type,
+                        result.enquiries_created, result.enquiries_skipped,
+                    )
+                except Exception as exc:
+                    logger.error("ENQUIRY_EXECUTION_FAILED: event=%s error=%s", event.event_id, str(exc), exc_info=True)
 
         elapsed = (_time.monotonic() - start) * 1000
-        await self._log_event(db, event, decision, elapsed)
+        await self._log_event(db, event, decisions, elapsed)
 
         logger.info(
-            "EVENT_DISPATCHED: type=%s entity=%s/%s hospital=%s decision=%s elapsed=%.1fms",
+            "EVENT_DISPATCHED: type=%s entity=%s/%s hospital=%s decisions=%d elapsed=%.1fms",
             event_type, entity_type, entity_id, resolved_hospital_id,
-            decision.action if decision else "NONE", elapsed,
+            len(decisions), elapsed,
         )
 
         return {
             "event": event.to_dict(),
-            "decision": decision.to_dict() if decision else None,
+            "decisions": [d.to_dict() for d in decisions],
             "execution_results": [asdict(r) if hasattr(r, '__dataclass_fields__') else r for r in execution_results],
             "processing_time_ms": elapsed,
         }
@@ -288,7 +290,7 @@ class CentralEventDispatcher:
             logger.warning("HOSPITAL_RESOLVE_FAILED: entity=%s/%s error=%s", event.entity_type, event.entity_id, str(exc))
         return None
 
-    async def _log_event(self, db, event, decision, processing_time_ms, error=None):
+    async def _log_event(self, db, event, decisions, processing_time_ms, error=None):
         if not db:
             return
         try:
@@ -307,8 +309,8 @@ class CentralEventDispatcher:
                 correlation_id=event.correlation_id,
                 payload_json=json.dumps(event.payload) if event.payload else None,
                 metadata_json=json.dumps({
-                    "action": decision.action if decision else None,
-                    "enquiry_type": decision.enquiry_type if decision else None,
+                    "decisions_count": len(decisions) if decisions else 0,
+                    "decision_types": [d.enquiry_type for d in decisions] if decisions else [],
                     "reason": error,
                 }),
                 status="COMPLETED" if not error else "FAILED",

@@ -524,8 +524,18 @@ export const enquiriesApi = {
   createFollowUp: (id: string, data: { action: string; notes?: string; next_follow_up_date?: string }) =>
     api.post(`/crm/enquiries/${id}/follow-ups`, data).then((r) => r.data),
   listFollowUps: (id: string) => api.get(`/crm/enquiries/${id}/follow-ups`).then((r) => r.data),
-  calendar: (params: { start_date: string; end_date: string; status?: string; type?: string }) =>
+  calendar: (params: { start_date: string; end_date: string; status?: string; type?: string; search?: string; doctor_id?: string; patient_id?: string; priority?: string; include_terminal?: boolean; page?: number; page_size?: number }) =>
     api.get("/crm/enquiries/calendar", { params }).then((r) => r.data),
+  calendarSummary: (params: { start_date: string; end_date: string; include_terminal?: boolean }) =>
+    api.get("/crm/enquiries/calendar/summary", { params }).then((r) => r.data),
+  calendarOverdue: (params: { type?: string; doctor_id?: string; patient_id?: string; include_terminal?: boolean; page?: number; page_size?: number }) =>
+    api.get("/crm/enquiries/calendar/overdue", { params }).then((r) => r.data),
+  reschedule: (id: string, data: { new_date: string }) =>
+    api.patch(`/crm/enquiries/${id}/reschedule`, data).then((r) => r.data),
+  updateStatus: (id: string, data: { status: string }) =>
+    api.patch(`/crm/enquiries/${id}/status`, data).then((r) => r.data),
+  assign: (id: string, data: { assigned_staff_id: string }) =>
+    api.patch(`/crm/enquiries/${id}/assign`, data).then((r) => r.data),
 };
 
 export const recallsApi = {

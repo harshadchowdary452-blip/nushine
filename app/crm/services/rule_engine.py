@@ -28,6 +28,7 @@ logger = logging.getLogger("crm.rule_engine")
 EVENT_TO_TRIGGER = {
     "LEAD_CREATED": "LEAD_CREATED",
     "PATIENT_REGISTERED": "PATIENT_REGISTERED",
+    "OPD_CONSULTATION_COMPLETED": "OPD_CONSULTATION_COMPLETED",
     "APPOINTMENT_CREATED": "APPOINTMENT_CREATED",
     "APPOINTMENT_CANCELLED": "APPOINTMENT_CANCELLED",
     "APPOINTMENT_COMPLETED": "APPOINTMENT_COMPLETED",
@@ -94,12 +95,12 @@ class RuleEngine:
         entity_type: str,
         entity_id: str,
         payload: Optional[dict] = None,
-    ) -> Optional["Decision"]:
+    ) -> list["Decision"]:
         """
         Evaluate CRM rules for a given event.
 
-        Returns a Decision object if an enquiry should be created,
-        or None if no action is needed.
+        Returns a list of Decisions (each = one enquiry to create/cancel).
+        Empty list = no action needed.
         """
         from app.crm.services.event_dispatcher import Decision
 
@@ -109,29 +110,38 @@ class RuleEngine:
         settings = await self._load_crm_settings(db, hospital_id)
         if not settings or not settings.enabled:
             logger.debug("CRM_DISABLED: hospital=%s", hospital_id)
-            return None
+            return []
 
         # 2. Map event to trigger
         trigger_event = EVENT_TO_TRIGGER.get(event_type)
         if trigger_event is None:
             logger.debug("NO_TRIGGER: event=%s", event_type)
-            return None
+            return []
 
         # 3. Apply business rules based on event type
-        decision = await self._apply_business_rules(
+        result = await self._apply_business_rules(
             db, hospital_id, event_type, trigger_event,
             entity_type, entity_id, payload, settings,
         )
 
-        if decision:
-            logger.info(
-                "DECISION_MADE: hospital=%s event=%s action=%s type=%s entity=%s",
-                hospital_id, event_type, decision.action, decision.enquiry_type, entity_id,
-            )
+        # Normalize: single Decision → list
+        if result is None:
+            decisions = []
+        elif isinstance(result, list):
+            decisions = result
+        else:
+            decisions = [result]
+
+        if decisions:
+            for d in decisions:
+                logger.info(
+                    "DECISION_MADE: hospital=%s event=%s action=%s type=%s entity=%s",
+                    hospital_id, event_type, d.action, d.enquiry_type, entity_id,
+                )
         else:
             logger.debug("NO_DECISION: hospital=%s event=%s entity=%s", hospital_id, event_type, entity_id)
 
-        return decision
+        return decisions
 
     # ============================================================
     # Business Rules — the SINGLE source of truth
@@ -147,8 +157,8 @@ class RuleEngine:
         entity_id: str,
         payload: dict,
         settings,
-    ) -> Optional["Decision"]:
-        """Apply business rules based on event type. Returns Decision or None."""
+    ) -> Optional[list["Decision"] | "Decision"]:
+        """Apply business rules based on event type. Returns Decision, list of Decisions, or None."""
 
         if event_type == "LEAD_CREATED":
             return await self._rule_lead_created(db, hospital_id, payload, settings)
@@ -157,6 +167,9 @@ class RuleEngine:
             # Patient registration does NOT create Lead Follow-up
             # Only used for tracking — no enquiry needed
             return None
+
+        elif event_type == "OPD_CONSULTATION_COMPLETED":
+            return await self._rule_opd_consultation_completed(db, hospital_id, payload, settings)
 
         elif event_type == "APPOINTMENT_CREATED":
             return await self._rule_appointment_created(db, hospital_id, payload, settings)
@@ -235,7 +248,15 @@ class RuleEngine:
         if not enabled:
             return None
 
-        today = date.today()
+        visit_date = payload.get("visit_date")
+        if visit_date:
+            from datetime import datetime as _dt
+            if isinstance(visit_date, str):
+                visit_date = _dt.fromisoformat(visit_date).date() if "T" in visit_date else date.fromisoformat(visit_date)
+            today = visit_date
+        else:
+            today = date.today()
+
         due_date = today + timedelta(days=delay_days)
 
         return Decision(
@@ -249,6 +270,72 @@ class RuleEngine:
             assigned_staff_id=payload.get("assigned_staff_id"),
             trigger_event="LEAD_CREATED",
             description=f"Lead follow-up for new lead",
+        )
+
+    async def _rule_opd_consultation_completed(
+        self, db: AsyncSession, hospital_id: str, payload: dict, settings
+    ) -> Optional["Decision"]:
+        """Rule: OPD Follow-Up — create when consultation completed and treatment has NOT started."""
+        from app.crm.services.event_dispatcher import Decision
+        from app.models.generated_enquiry import GeneratedEnquiry
+
+        patient_id = payload.get("patient_id")
+
+        if not patient_id:
+            return None
+
+        # Load OPD follow-up config (default: enabled with 3-day delay)
+        follow_up_config = settings.opd_follow_up
+        delay_days = follow_up_config.start_delay_days if follow_up_config else 3
+        enabled = follow_up_config.enabled if follow_up_config is not None else True
+
+        if not enabled:
+            logger.debug("OPD_SKIP: disabled for hospital=%s", hospital_id)
+            return None
+
+        # Business Rule: Check if treatment has already started for this patient
+        # If treatment_started event exists, no OPD follow-up needed
+        treatment_started = payload.get("treatment_started", False)
+        if treatment_started:
+            logger.debug("OPD_SKIP: treatment_started for patient=%s", patient_id)
+            return None
+
+        # Business Rule: No duplicate OPD follow-up for this patient
+        existing = await db.execute(
+            select(GeneratedEnquiry).where(
+                and_(
+                    GeneratedEnquiry.hospital_id == hospital_id,
+                    GeneratedEnquiry.patient_id == patient_id,
+                    GeneratedEnquiry.enquiry_type == "OPD_FOLLOW_UP",
+                    GeneratedEnquiry.status == "PENDING",
+                )
+            ).limit(1)
+        )
+        if existing.scalar_one_or_none():
+            logger.debug("OPD_DUPLICATE: patient=%s already has OPD follow-up", patient_id)
+            return None
+
+        visit_date = payload.get("visit_date")
+        if visit_date:
+            from datetime import datetime as _dt
+            if isinstance(visit_date, str):
+                visit_date = _dt.fromisoformat(visit_date).date() if "T" in visit_date else date.fromisoformat(visit_date)
+            due_date = visit_date + timedelta(days=delay_days)
+        else:
+            due_date = date.today() + timedelta(days=delay_days)
+
+        return Decision(
+            action="CREATE",
+            enquiry_type="OPD_FOLLOW_UP",
+            due_date=due_date,
+            priority="MEDIUM",
+            patient_id=patient_id,
+            case_id=payload.get("case_id"),
+            treatment_type_id=payload.get("treatment_type_id"),
+            doctor_id=payload.get("doctor_id"),
+            assigned_staff_id=payload.get("assigned_staff_id"),
+            trigger_event="OPD_CONSULTATION_COMPLETED",
+            description="OPD follow-up: ask patient if they wish to proceed with treatment",
         )
 
     async def _rule_appointment_created(
@@ -340,6 +427,7 @@ class RuleEngine:
 
         return Decision(
             action="CANCEL",
+            patient_id=payload.get("patient_id"),
             cancel_enquiry_types=["APPOINTMENT_REMINDER"],
             cancel_reason="APPOINTMENT_CANCELLED",
             appointment_id=appointment_id,
@@ -352,12 +440,23 @@ class RuleEngine:
         """Rule: Missed Appointment Follow-Up — create one follow-up for missed appointments."""
         from app.crm.services.event_dispatcher import Decision
         from app.models.generated_enquiry import GeneratedEnquiry
+        from app.models.appointment import Appointment
 
         appointment_id = payload.get("appointment_id") or payload.get("entity_id")
         patient_id = payload.get("patient_id")
 
         if not appointment_id or not patient_id:
             return None
+
+        # Business Rule: Appointment must be in the past (not a future appointment)
+        appt = await db.get(Appointment, appointment_id)
+        if appt and appt.appointment_date:
+            appt_date = appt.appointment_date
+            if isinstance(appt_date, datetime):
+                appt_date = appt_date.date()
+            if appt_date >= date.today():
+                logger.debug("MISSED_SKIP: appointment %s date %s is not in the past", appointment_id, appt_date)
+                return None
 
         # Business Rule: No duplicate missed appointment follow-up
         existing = await db.execute(
@@ -374,7 +473,14 @@ class RuleEngine:
         if existing.scalar_one_or_none():
             return None
 
-        due_date = date.today() + timedelta(days=1)
+        visit_date = payload.get("visit_date")
+        if visit_date:
+            from datetime import datetime as _dt
+            if isinstance(visit_date, str):
+                visit_date = _dt.fromisoformat(visit_date).date() if "T" in visit_date else date.fromisoformat(visit_date)
+            due_date = visit_date + timedelta(days=1)
+        else:
+            due_date = date.today() + timedelta(days=1)
 
         return Decision(
             action="CREATE",
@@ -495,6 +601,18 @@ class RuleEngine:
             )
 
         # No future appointment → create Treatment Wellness
+        # Load treatment-specific config
+        follow_up_config = None
+        if treatment_type_id:
+            follow_up_config = settings.treatment_follow_ups.get(f"TREATMENT:{treatment_type_id}")
+        if not follow_up_config:
+            follow_up_config = settings.opd_follow_up
+
+        enabled = follow_up_config.enabled if follow_up_config is not None else True
+        if not enabled:
+            logger.debug("TREATMENT_WELLNESS_DISABLED: hospital=%s treatment_type=%s", hospital_id, treatment_type_id)
+            return None
+
         # Business Rule: No duplicate wellness for this treatment plan
         existing = await db.execute(
             select(GeneratedEnquiry).where(
@@ -514,16 +632,16 @@ class RuleEngine:
         # Auto-close completed enquiries
         await self._auto_close_enquiries(db, hospital_id, patient_id, ["TREATMENT_WELLNESS", "APPOINTMENT_REMINDER"])
 
-        # Load treatment-specific config
-        follow_up_config = None
-        if treatment_type_id:
-            follow_up_config = settings.treatment_follow_ups.get(f"TREATMENT:{treatment_type_id}")
-        if not follow_up_config:
-            follow_up_config = settings.opd_follow_up
-
         delay_days = follow_up_config.start_delay_days if follow_up_config else 3
 
-        due_date = date.today() + timedelta(days=delay_days)
+        visit_date = payload.get("visit_date")
+        if visit_date:
+            from datetime import datetime as _dt
+            if isinstance(visit_date, str):
+                visit_date = _dt.fromisoformat(visit_date).date() if "T" in visit_date else date.fromisoformat(visit_date)
+            due_date = visit_date + timedelta(days=delay_days)
+        else:
+            due_date = date.today() + timedelta(days=delay_days)
 
         # Get treatment name
         treatment_name = payload.get("treatment_name", "")
@@ -548,8 +666,8 @@ class RuleEngine:
 
     async def _rule_case_completed(
         self, db: AsyncSession, hospital_id: str, payload: dict, settings
-    ) -> Optional["Decision"]:
-        """Rule: Case Wellness — create ONE Case Wellness after case completion."""
+    ) -> list["Decision"]:
+        """Rule: Case Wellness + Recall — create both after case completion."""
         from app.crm.services.event_dispatcher import Decision
         from app.models.generated_enquiry import GeneratedEnquiry
 
@@ -558,10 +676,22 @@ class RuleEngine:
         treatment_type_id = payload.get("treatment_type_id")
 
         if not patient_id or not case_id:
-            return None
+            return []
 
-        # Business Rule: No duplicate case wellness for this case
-        existing = await db.execute(
+        decisions = []
+
+        visit_date = payload.get("visit_date")
+        if visit_date:
+            from datetime import datetime as _dt
+            if isinstance(visit_date, str):
+                visit_date = _dt.fromisoformat(visit_date).date() if "T" in visit_date else date.fromisoformat(visit_date)
+            base_date = visit_date
+        else:
+            base_date = date.today()
+
+        # Duplicate check FIRST — before auto-close destroys existing PENDING records
+        # Case Wellness
+        existing_wellness = await db.execute(
             select(GeneratedEnquiry).where(
                 and_(
                     GeneratedEnquiry.hospital_id == hospital_id,
@@ -572,31 +702,64 @@ class RuleEngine:
                 )
             ).limit(1)
         )
-        if existing.scalar_one_or_none():
-            return None
+        if not existing_wellness.scalar_one_or_none():
+            follow_up_config = settings.case_recovery
+            wellness_enabled = follow_up_config.enabled if follow_up_config is not None else True
+            if wellness_enabled:
+                delay_days = follow_up_config.start_delay_days if follow_up_config else 15
+                due_date = base_date + timedelta(days=delay_days)
+                decisions.append(Decision(
+                    action="CREATE",
+                    enquiry_type="CASE_WELLNESS",
+                    due_date=due_date,
+                    priority="MEDIUM",
+                    patient_id=patient_id,
+                    case_id=case_id,
+                    treatment_type_id=treatment_type_id,
+                    doctor_id=payload.get("doctor_id"),
+                    assigned_staff_id=payload.get("assigned_staff_id"),
+                    trigger_event="CASE_COMPLETED",
+                    description="Case wellness follow-up",
+                ))
 
-        # Auto-close stale enquiries
-        await self._auto_close_enquiries(db, hospital_id, patient_id, ["CASE_WELLNESS", "RECALL"])
-
-        # Load config
-        follow_up_config = settings.case_recovery
-        delay_days = follow_up_config.start_delay_days if follow_up_config else 15
-
-        due_date = date.today() + timedelta(days=delay_days)
-
-        return Decision(
-            action="CREATE",
-            enquiry_type="CASE_WELLNESS",
-            due_date=due_date,
-            priority="MEDIUM",
-            patient_id=patient_id,
-            case_id=case_id,
-            treatment_type_id=treatment_type_id,
-            doctor_id=payload.get("doctor_id"),
-            assigned_staff_id=payload.get("assigned_staff_id"),
-            trigger_event="CASE_COMPLETED",
-            description="Case wellness follow-up",
+        # Recall
+        existing_recall = await db.execute(
+            select(GeneratedEnquiry).where(
+                and_(
+                    GeneratedEnquiry.hospital_id == hospital_id,
+                    GeneratedEnquiry.patient_id == patient_id,
+                    GeneratedEnquiry.case_id == case_id,
+                    GeneratedEnquiry.enquiry_type == "RECALL",
+                    GeneratedEnquiry.status == "PENDING",
+                )
+            ).limit(1)
         )
+        if not existing_recall.scalar_one_or_none():
+            recall_enabled = settings.case_recall.enabled if settings.case_recall is not None else True
+            if recall_enabled:
+                recall_delay = 180
+                if settings.case_recall:
+                    recall_delay = settings.case_recall.start_delay_days if settings.case_recall.start_delay_days else 180
+                recall_due = base_date + timedelta(days=recall_delay)
+                decisions.append(Decision(
+                    action="CREATE",
+                    enquiry_type="RECALL",
+                    due_date=recall_due,
+                    priority="LOW",
+                    patient_id=patient_id,
+                    case_id=case_id,
+                    treatment_type_id=treatment_type_id,
+                    doctor_id=payload.get("doctor_id"),
+                    assigned_staff_id=payload.get("assigned_staff_id"),
+                    trigger_event="CASE_COMPLETED",
+                    description="Patient is due for routine dental recall",
+                ))
+
+        # Auto-close stale enquiries from OTHER cases (after duplicate check)
+        if decisions:
+            await self._auto_close_stale_case_enquiries(db, hospital_id, patient_id, case_id, ["CASE_WELLNESS", "RECALL"])
+
+        return decisions
 
     async def _rule_lead_converted(
         self, db: AsyncSession, hospital_id: str, payload: dict
@@ -628,7 +791,7 @@ class RuleEngine:
 
         return Decision(
             action="CANCEL",
-            cancel_enquiry_types=["LEAD_FOLLOW_UP", "APPOINTMENT_REMINDER", "TREATMENT_WELLNESS", "CASE_WELLNESS", "RECALL", "MISSED_APPOINTMENT"],
+            cancel_enquiry_types=["LEAD_FOLLOW_UP", "OPD_FOLLOW_UP", "APPOINTMENT_REMINDER", "TREATMENT_WELLNESS", "CASE_WELLNESS", "RECALL", "MISSED_APPOINTMENT"],
             cancel_reason="PATIENT_INACTIVE",
             patient_id=patient_id,
             trigger_event="PATIENT_INACTIVE",
@@ -696,6 +859,34 @@ class RuleEngine:
         if count:
             await db.flush()
             logger.info("AUTO_CLOSED: patient=%s types=%s count=%d", patient_id, enquiry_types, count)
+
+    async def _auto_close_stale_case_enquiries(
+        self, db: AsyncSession, hospital_id: str, patient_id: str, current_case_id: str, enquiry_types: list
+    ):
+        """Close existing PENDING enquiries of specified types for a patient, EXCLUDING the current case."""
+        from app.models.generated_enquiry import GeneratedEnquiry
+        from datetime import datetime, timezone
+
+        result = await db.execute(
+            select(GeneratedEnquiry).where(
+                and_(
+                    GeneratedEnquiry.hospital_id == hospital_id,
+                    GeneratedEnquiry.patient_id == patient_id,
+                    GeneratedEnquiry.enquiry_type.in_(enquiry_types),
+                    GeneratedEnquiry.status == "PENDING",
+                    GeneratedEnquiry.case_id != current_case_id,
+                )
+            )
+        )
+        now = datetime.now(timezone.utc)
+        count = 0
+        for ge in result.scalars().all():
+            ge.status = "COMPLETED"
+            ge.cancelled_at = now
+            count += 1
+        if count:
+            await db.flush()
+            logger.info("AUTO_CLOSED_STALE: patient=%s case=%s types=%s count=%d", patient_id, current_case_id, enquiry_types, count)
 
     async def _load_crm_settings(self, db: AsyncSession, hospital_id: str):
         """Load CRM settings from CRMSettingsService (cached)."""

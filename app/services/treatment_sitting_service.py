@@ -83,6 +83,28 @@ class TreatmentSittingService:
                 await send_appointment_reminder(patient_obj.phone, patient_obj.full_name, appt.appointment_date.isoformat(), appt.appointment_time.strftime("%H:%M"))
         except Exception as e:
             logger.warning("Failed to send WhatsApp for auto-created appointment: %s", e)
+        try:
+            from app.crm.services.event_dispatcher import publish_event
+            from app.crm.enums import EventType, EventSource
+            await publish_event(
+                event_type=EventType.APPOINTMENT_CREATED,
+                source_module=EventSource.APPOINTMENT,
+                entity_type="APPOINTMENT",
+                entity_id=str(appt.id),
+                hospital_id=str(case.hospital_id) if getattr(case, 'hospital_id', None) else None,
+                patient_id=str(case.patient_id),
+                doctor_id=str(doctor_id) if doctor_id else None,
+                payload={
+                    "appointment_id": str(appt.id),
+                    "patient_id": str(case.patient_id),
+                    "doctor_id": str(doctor_id) if doctor_id else None,
+                    "appointment_date": appt.appointment_date.isoformat(),
+                    "status": "SCHEDULED",
+                },
+                db=self.db,
+            )
+        except Exception as e:
+            logger.warning("Failed to fire APPOINTMENT_CREATED for auto-created appointment: %s", e)
         return appt
 
     async def create(self, data: dict, user_id: str = None) -> TreatmentSitting:
@@ -121,6 +143,7 @@ class TreatmentSittingService:
                             "treatment_type_id": str(plan.treatment_type_id) if plan.treatment_type_id else None,
                             "treatment_name": plan.treatment_name,
                             "doctor_id": str(plan.doctor_id) if plan.doctor_id else None,
+                            "visit_date": sitting.sitting_date.isoformat() if sitting.sitting_date else date.today().isoformat(),
                         },
                         db=self.db,
                     )
@@ -139,6 +162,7 @@ class TreatmentSittingService:
                             "treatment_name": plan.treatment_name,
                             "doctor_id": str(plan.doctor_id) if plan.doctor_id else None,
                             "sitting_number": sitting.sitting_number,
+                            "visit_date": sitting.sitting_date.isoformat() if sitting.sitting_date else date.today().isoformat(),
                         },
                         db=self.db,
                     )
@@ -227,6 +251,7 @@ class TreatmentSittingService:
                                 "treatment_type_id": str(plan.treatment_type_id) if plan.treatment_type_id else None,
                                 "treatment_name": plan.treatment_name,
                                 "doctor_id": str(plan.doctor_id) if plan.doctor_id else None,
+                                "visit_date": sitting.sitting_date.isoformat() if sitting.sitting_date else date.today().isoformat(),
                             },
                             db=self.db,
                         )
@@ -245,6 +270,7 @@ class TreatmentSittingService:
                                 "treatment_name": plan.treatment_name,
                                 "doctor_id": str(plan.doctor_id) if plan.doctor_id else None,
                                 "sitting_number": sitting.sitting_number,
+                                "visit_date": sitting.sitting_date.isoformat() if sitting.sitting_date else date.today().isoformat(),
                             },
                             db=self.db,
                         )

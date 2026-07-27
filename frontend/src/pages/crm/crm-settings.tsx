@@ -9,14 +9,13 @@ import {
   Stethoscope,
   ClipboardList,
   HeartPulse,
-  Bell,
-  Calendar,
-  Clock,
-  UserCheck,
-  Zap,
   Eye,
   Info,
   CheckCircle2,
+  Clock,
+  Globe,
+  Calendar,
+  Zap,
 } from "lucide-react";
 import {
   SettingsPage,
@@ -37,6 +36,10 @@ import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import { crmSettingsApi } from "@/services/endpoints";
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// Tabs — 5 pages aligned with Dental ERP lifecycle
+// ═══════════════════════════════════════════════════════════════════════════════
+
 const TABS = [
   { key: "general", label: "General", icon: Settings2, color: "from-blue-500 to-indigo-600" },
   { key: "lead", label: "Lead", icon: Users, color: "from-emerald-500 to-teal-600" },
@@ -47,35 +50,18 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"];
 
-const TAB_TO_API_SECTION: Record<TabKey, string> = {
-  general: "general",
-  lead: "lead",
-  opd: "opd",
-  treatment: "treatment",
-  case: "case_follow_up",
-};
-
-const TAB_TO_FORM_KEY: Record<TabKey, keyof SettingsFormType> = {
-  general: "general",
-  lead: "lead",
-  opd: "opd",
-  treatment: "treatment",
-  case: "case_follow_up",
-};
-
-const ASSIGN_OPTIONS = [
-  { value: "", label: "Auto-assign (Round Robin)" },
-  { value: "admin", label: "Admin" },
-  { value: "reception", label: "Reception" },
-  { value: "doctor", label: "Doctor" },
-  { value: "manager", label: "Manager" },
+const WEEKEND_OPTIONS = [
+  { value: "SKIP", label: "Skip (skip non-working days)" },
+  { value: "INCLUDE", label: "Include" },
 ];
 
-const PRIORITY_OPTIONS = [
-  { value: "low", label: "Low" },
-  { value: "medium", label: "Medium" },
-  { value: "high", label: "High" },
-];
+const DAY_LABELS: Record<string, string> = {
+  MON: "Mon", TUE: "Tue", WED: "Wed", THU: "Thu", FRI: "Fri", SAT: "Sat", SUN: "Sun",
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Main Page
+// ═══════════════════════════════════════════════════════════════════════════════
 
 export default function CrmSettingsPage() {
   const queryClient = useQueryClient();
@@ -85,10 +71,19 @@ export default function CrmSettingsPage() {
 
   const { data: settingsData, isLoading: settingsLoading } = useQuery({
     queryKey: ["crmSettings"],
-    queryFn: () => crmSettingsApi.crmConfig.getGeneral().then((r: any) => r),
+    queryFn: async () => {
+      const [general, lead, opd, treatment, caseSettings] = await Promise.all([
+        crmSettingsApi.crmConfig.getGeneral(),
+        crmSettingsApi.crmConfig.getLead(),
+        crmSettingsApi.crmConfig.getOpd(),
+        crmSettingsApi.crmConfig.getTreatment(),
+        crmSettingsApi.crmConfig.getCase(),
+      ]);
+      return { general: general?.data ?? general, lead: lead?.config ?? lead, opd: opd?.config ?? opd, treatment: treatment?.items ?? treatment, case: caseSettings };
+    },
   });
 
-  const data = settingsData?.data ?? settingsData;
+  const data = settingsData;
 
   const form = useForm<SettingsFormType>({
     resolver: zodResolver(SettingsSchema),
@@ -121,27 +116,65 @@ export default function CrmSettingsPage() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [isDirty]);
 
+  // ─── Save Logic ──────────────────────────────────────────────────────────
+
   const saveMutation = useMutation({
     mutationFn: async (values: SettingsFormType) => {
-      const section = TAB_TO_API_SECTION[activeTab];
-      const payload = values[TAB_TO_FORM_KEY[activeTab]];
       const api = crmSettingsApi.crmConfig;
-      switch (section) {
-        case "general": return api.updateGeneral(payload as any);
-        case "lead": return api.updateLead(payload as any);
-        case "opd": return api.updateOpd(payload as any);
-        case "treatment": return api.updateTreatment("", payload as any);
-        case "case_follow_up": return api.updateCase("follow_up", payload as any);
-        default: throw new Error(`Unknown section: ${section}`);
+      switch (activeTab) {
+        case "general": {
+          const g = values.general;
+          return api.updateGeneral({
+            crm_enabled: String(g.enabled),
+            crm_working_days: g.working_days,
+            crm_reminder_time: g.reminder_time,
+            crm_business_start: g.business_start,
+            crm_business_end: g.business_end,
+            crm_timezone: g.timezone,
+            crm_reminder_offset: String(g.reminder_offset_days),
+            crm_weekend_policy: g.weekend_policy,
+          });
+        }
+        case "lead":
+          return api.updateLead(values.lead);
+        case "opd":
+          return api.updateOpd(values.opd);
+        case "treatment": {
+          // Save global treatment defaults
+          const t = values.treatment;
+          return api.updateTreatment("", {
+            enabled: t.enabled,
+            start_delay_days: t.start_delay_days,
+            skip_wellness_if_appointment: t.skip_wellness_if_appointment,
+            auto_close_on_completion: t.auto_close_on_completion,
+          });
+        }
+        case "case": {
+          const c = values.case;
+          await api.updateCase("recovery", {
+            enabled: c.recovery.enabled,
+            start_delay_days: c.recovery.start_delay_days,
+            auto_close_on_completion: false,
+            skip_wellness_if_appointment: false,
+          });
+          return api.updateCase("recall", {
+            enabled: c.recall.enabled,
+            start_delay_days: c.recall.start_delay_days,
+            auto_close_on_completion: false,
+            skip_wellness_if_appointment: false,
+          });
+        }
+        default:
+          throw new Error(`Unknown tab: ${activeTab}`);
       }
     },
     onSuccess: () => {
-      addToast({ variant: "success", title: "Settings saved successfully" });
+      addToast({ variant: "success", title: "Settings saved" });
       queryClient.invalidateQueries({ queryKey: ["crmSettings"] });
       reset(getValues());
     },
-    onError: (error: any) => {
-      addToast({ variant: "destructive", title: error?.message || "Failed to save settings" });
+    onError: (err: any) => {
+      addToast({ variant: "destructive", title: err?.message || "Save failed" });
     },
   });
 
@@ -153,11 +186,13 @@ export default function CrmSettingsPage() {
     reset(getDefaults(data));
   }, [reset, data]);
 
+  // ─── Loading ─────────────────────────────────────────────────────────────
+
   if (settingsLoading) {
     return (
       <SettingsPage
         title="CRM Settings"
-        description="Configure your CRM follow-up and notification settings"
+        description="Configure automation rules for the Dental ERP lifecycle"
         icon={<Settings2 className="w-5 h-5" />}
       >
         <SettingsSkeleton />
@@ -171,7 +206,7 @@ export default function CrmSettingsPage() {
     <>
       <SettingsPage
         title="CRM Settings"
-        description="Configure your CRM follow-up and notification settings"
+        description="Configure automation rules for the Dental ERP lifecycle"
         icon={<Settings2 className="w-5 h-5" />}
         actions={
           <button
@@ -260,246 +295,385 @@ export default function CrmSettingsPage() {
   );
 }
 
-// ─── General Tab ─────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// General Tab — Global CRM behaviour
+// ═══════════════════════════════════════════════════════════════════════════════
+
 function GeneralTab({ form }: { form: any }) {
+  const workingDays = form.watch("general.working_days") || "";
+  const selectedDays = workingDays.split(",").map((d: string) => d.trim()).filter(Boolean);
+
+  const toggleDay = (day: string) => {
+    const current = form.getValues("general.working_days") || "";
+    const days = current.split(",").map((d: string) => d.trim()).filter(Boolean);
+    const next = days.includes(day) ? days.filter((d: string) => d !== day) : [...days, day].sort((a, b) => {
+      const order = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+      return order.indexOf(a) - order.indexOf(b);
+    });
+    form.setValue("general.working_days", next.join(","), { shouldDirty: true });
+  };
+
   return (
     <div className="space-y-5">
-      <SettingsSection title="Welcome & Notifications" description="Configure your welcome message and notification preferences" icon={<Bell className="w-4 h-4" />}>
-        <SettingsField label="Welcome Message" description="Displayed to patients after their first interaction" error={form.formState.errors.general?.welcome_message?.message}>
-          <SettingsTextInput
-            value={form.watch("general.welcome_message")}
-            onChange={(val) => form.setValue("general.welcome_message", val, { shouldDirty: true })}
-            placeholder="Enter welcome message..."
-            multiline
+      <SettingsSection
+        title="Global Behaviour"
+        description="Control the overall CRM system for your hospital"
+        icon={<Zap className="w-4 h-4" />}
+      >
+        <SettingsField
+          label="Enable CRM Automation"
+          description="Master switch for all automated follow-ups and reminders"
+          layout="horizontal"
+        >
+          <SettingsSwitch
+            checked={form.watch("general.enabled")}
+            onCheckedChange={(val) => form.setValue("general.enabled", val, { shouldDirty: true })}
           />
         </SettingsField>
+
         <SettingsGrid columns={2} className="mt-4">
-          <SettingsField label="Default Priority" description="Priority for new leads">
-            <SettingsDropdown
-              value={form.watch("general.default_priority")}
-              onValueChange={(val) => form.setValue("general.default_priority", val as any, { shouldDirty: true })}
-              options={PRIORITY_OPTIONS}
-            />
-          </SettingsField>
-          <SettingsField label="Reminder Time" description="Time for daily reminders">
+          <SettingsField label="Reminder Time" description="Time for daily follow-up reminders">
             <SettingsTextInput
               value={form.watch("general.reminder_time")}
               onChange={(val) => form.setValue("general.reminder_time", val, { shouldDirty: true })}
-              placeholder="10:00"
+              placeholder="09:00"
+            />
+          </SettingsField>
+          <SettingsField
+            label="Reminder Offset"
+            description="Days before appointment to send reminder"
+            error={form.formState.errors.general?.reminder_offset_days?.message}
+          >
+            <SettingsNumberInput
+              value={form.watch("general.reminder_offset_days")}
+              onChange={(val) => form.setValue("general.reminder_offset_days", val === "" ? 0 : val, { shouldDirty: true })}
+              suffix="days"
+              min={0}
+              max={30}
             />
           </SettingsField>
         </SettingsGrid>
       </SettingsSection>
 
-      <SettingsSection title="Follow-Up Intervals" description="Default intervals for follow-up scheduling" icon={<Clock className="w-4 h-4" />}>
-        <SettingsGrid columns={3}>
-          <SettingsField label="Follow-Up Reminder" description="Days" error={form.formState.errors.general?.reminder_days?.message}>
-            <SettingsNumberInput value={form.watch("general.reminder_days")} onChange={(val) => form.setValue("general.reminder_days", val === "" ? 0 : val, { shouldDirty: true })} suffix="days" min={0} max={30} />
+      <SettingsSection
+        title="Working Hours"
+        description="Business hours for scheduling and follow-up calculations"
+        icon={<Clock className="w-4 h-4" />}
+      >
+        <SettingsGrid columns={2}>
+          <SettingsField label="Business Start" description="Start of working hours">
+            <SettingsTextInput
+              value={form.watch("general.business_start")}
+              onChange={(val) => form.setValue("general.business_start", val, { shouldDirty: true })}
+              placeholder="09:00"
+            />
           </SettingsField>
-          <SettingsField label="Recall Interval" description="Days between recalls">
-            <SettingsNumberInput value={form.watch("general.recall_interval_days")} onChange={(val) => form.setValue("general.recall_interval_days", val === "" ? 0 : val, { shouldDirty: true })} suffix="days" min={0} max={365} />
-          </SettingsField>
-          <SettingsField label="Wellness Interval" description="Days between wellness checks">
-            <SettingsNumberInput value={form.watch("general.wellness_interval_days")} onChange={(val) => form.setValue("general.wellness_interval_days", val === "" ? 0 : val, { shouldDirty: true })} suffix="days" min={0} max={365} />
+          <SettingsField label="Business End" description="End of working hours">
+            <SettingsTextInput
+              value={form.watch("general.business_end")}
+              onChange={(val) => form.setValue("general.business_end", val, { shouldDirty: true })}
+              placeholder="18:00"
+            />
           </SettingsField>
         </SettingsGrid>
       </SettingsSection>
 
-      <SettingsSection title="OPD Settings" description="Outpatient department configuration" icon={<Stethoscope className="w-4 h-4" />}>
-        <SettingsField label="Slot Duration" description="Default appointment slot duration">
-          <SettingsNumberInput value={form.watch("general.opd_slot_duration")} onChange={(val) => form.setValue("general.opd_slot_duration", val === "" ? 30 : val, { shouldDirty: true })} suffix="min" min={5} max={120} className="max-w-[180px]" />
-        </SettingsField>
+      <SettingsSection
+        title="Working Days"
+        description="Select which days the hospital is open"
+        icon={<Calendar className="w-4 h-4" />}
+      >
+        <div className="flex gap-2 flex-wrap">
+          {Object.entries(DAY_LABELS).map(([key, label]) => {
+            const isSelected = selectedDays.includes(key);
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => toggleDay(key)}
+                className={cn(
+                  "px-4 py-2 rounded-lg text-sm font-medium transition-all border",
+                  isSelected
+                    ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)]"
+                    : "bg-white text-[var(--color-text-secondary)] border-[var(--color-border)] hover:border-[var(--color-primary)]"
+                )}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        <SettingsGrid columns={2} className="mt-4">
+          <SettingsField label="Timezone" description="Hospital timezone for scheduling">
+            <SettingsTextInput
+              value={form.watch("general.timezone")}
+              onChange={(val) => form.setValue("general.timezone", val, { shouldDirty: true })}
+              placeholder="Asia/Kolkata"
+            />
+          </SettingsField>
+          <SettingsField label="Weekend Policy" description="How to handle non-working days">
+            <SettingsDropdown
+              value={form.watch("general.weekend_policy")}
+              onValueChange={(val) => form.setValue("general.weekend_policy", val as "SKIP" | "INCLUDE", { shouldDirty: true })}
+              options={WEEKEND_OPTIONS}
+            />
+          </SettingsField>
+        </SettingsGrid>
       </SettingsSection>
+    </div>
+  );
+}
 
-      <SettingsSection title="Automation" description="Enable or disable automatic CRM actions" icon={<Zap className="w-4 h-4" />}>
-        <div className="space-y-4">
-          <SettingsField label="Enable Notifications" description="Send push notifications for follow-up reminders" layout="horizontal">
-            <SettingsSwitch checked={form.watch("general.notification_enabled")} onCheckedChange={(val) => form.setValue("general.notification_enabled", val, { shouldDirty: true })} />
-          </SettingsField>
-          <SettingsField label="Auto-Assign" description="Automatically assign leads to team members" layout="horizontal">
-            <SettingsSwitch checked={form.watch("general.auto_assign_enabled")} onCheckedChange={(val) => form.setValue("general.auto_assign_enabled", val, { shouldDirty: true })} />
-          </SettingsField>
+// ═══════════════════════════════════════════════════════════════════════════════
+// Lead Tab — Patients who have not yet visited
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function LeadTab({ form }: { form: any }) {
+  return (
+    <div className="space-y-5">
+      <SettingsSection
+        title="Lead Follow-Up"
+        description="Configure automatic follow-up for new leads (patients who have not yet visited)"
+        icon={<Users className="w-4 h-4" />}
+      >
+        <SettingsField
+          label="Enable Lead Follow-Up"
+          description="Generate a follow-up enquiry when a new lead is created"
+          layout="horizontal"
+        >
+          <SettingsSwitch
+            checked={form.watch("lead.enabled")}
+            onCheckedChange={(val) => form.setValue("lead.enabled", val, { shouldDirty: true })}
+          />
+        </SettingsField>
+
+        <div className="mt-4">
+          <SettingsGrid columns={2}>
+            <SettingsField
+              label="Follow-Up Delay"
+              description="Days to wait before generating the follow-up enquiry"
+              error={form.formState.errors.lead?.start_delay_days?.message}
+            >
+              <SettingsNumberInput
+                value={form.watch("lead.start_delay_days")}
+                onChange={(val) => form.setValue("lead.start_delay_days", val === "" ? 0 : val, { shouldDirty: true })}
+                suffix="days"
+                min={0}
+                max={30}
+              />
+            </SettingsField>
+            <SettingsField
+              label="Auto-Close on Conversion"
+              description="Automatically close the follow-up when lead becomes a patient"
+              layout="horizontal"
+            >
+              <SettingsSwitch
+                checked={form.watch("lead.auto_close_on_completion")}
+                onCheckedChange={(val) => form.setValue("lead.auto_close_on_completion", val, { shouldDirty: true })}
+              />
+            </SettingsField>
+          </SettingsGrid>
         </div>
       </SettingsSection>
     </div>
   );
 }
 
-// ─── Lead Tab ────────────────────────────────────────────────────────────────
-function LeadTab({ form }: { form: any }) {
-  return (
-    <div className="space-y-5">
-      <SettingsSection title="Follow-Up Delays" description="Configure automatic follow-up timing for leads at each stage" icon={<Calendar className="w-4 h-4" />}>
-        <SettingsGrid columns={3}>
-          <SettingsField label="First Follow-Up" error={form.formState.errors.lead?.lead_first_follow_up?.message}>
-            <SettingsNumberInput value={form.watch("lead.lead_first_follow_up")} onChange={(val) => form.setValue("lead.lead_first_follow_up", val === "" ? 0 : val, { shouldDirty: true })} suffix="days" min={0} max={30} />
-          </SettingsField>
-          <SettingsField label="Second Follow-Up" error={form.formState.errors.lead?.lead_second_follow_up?.message}>
-            <SettingsNumberInput value={form.watch("lead.lead_second_follow_up")} onChange={(val) => form.setValue("lead.lead_second_follow_up", val === "" ? 0 : val, { shouldDirty: true })} suffix="days" min={0} max={30} />
-          </SettingsField>
-          <SettingsField label="First Call" error={form.formState.errors.lead?.lead_first_call?.message}>
-            <SettingsNumberInput value={form.watch("lead.lead_first_call")} onChange={(val) => form.setValue("lead.lead_first_call", val === "" ? 0 : val, { shouldDirty: true })} suffix="days" min={0} max={30} />
-          </SettingsField>
-          <SettingsField label="Second Call">
-            <SettingsNumberInput value={form.watch("lead.lead_second_call")} onChange={(val) => form.setValue("lead.lead_second_call", val === "" ? 0 : val, { shouldDirty: true })} suffix="days" min={0} max={30} />
-          </SettingsField>
-          <SettingsField label="Missed Call">
-            <SettingsNumberInput value={form.watch("lead.lead_missed_call")} onChange={(val) => form.setValue("lead.lead_missed_call", val === "" ? 0 : val, { shouldDirty: true })} suffix="days" min={0} max={30} />
-          </SettingsField>
-          <SettingsField label="OPD Conversion">
-            <SettingsNumberInput value={form.watch("lead.lead_opd_conversion")} onChange={(val) => form.setValue("lead.lead_opd_conversion", val === "" ? 0 : val, { shouldDirty: true })} suffix="days" min={0} max={30} />
-          </SettingsField>
-          <SettingsField label="No Response">
-            <SettingsNumberInput value={form.watch("lead.lead_no_response")} onChange={(val) => form.setValue("lead.lead_no_response", val === "" ? 0 : val, { shouldDirty: true })} suffix="days" min={0} max={30} />
-          </SettingsField>
-          <SettingsField label="Converted">
-            <SettingsNumberInput value={form.watch("lead.lead_converted")} onChange={(val) => form.setValue("lead.lead_converted", val === "" ? 0 : val, { shouldDirty: true })} suffix="days" min={0} max={30} />
-          </SettingsField>
-          <SettingsField label="Lost">
-            <SettingsNumberInput value={form.watch("lead.lead_lost")} onChange={(val) => form.setValue("lead.lead_lost", val === "" ? 0 : val, { shouldDirty: true })} suffix="days" min={0} max={30} />
-          </SettingsField>
-        </SettingsGrid>
-      </SettingsSection>
+// ═══════════════════════════════════════════════════════════════════════════════
+// OPD Tab — Patient visited, consultation completed, treatment not started
+// ═══════════════════════════════════════════════════════════════════════════════
 
-      <SettingsSection title="Assignment" description="Control how leads are assigned to team members" icon={<UserCheck className="w-4 h-4" />}>
-        <SettingsField label="Default Assignee" description="Who receives new leads by default">
-          <SettingsDropdown
-            value={form.watch("lead.assign_to") || ""}
-            onValueChange={(val) => form.setValue("lead.assign_to", val || null, { shouldDirty: true })}
-            options={ASSIGN_OPTIONS}
-            placeholder="Auto-assign (Round Robin)"
-          />
-        </SettingsField>
-      </SettingsSection>
-    </div>
-  );
-}
-
-// ─── OPD Tab ─────────────────────────────────────────────────────────────────
 function OpdTab({ form }: { form: any }) {
   return (
     <div className="space-y-5">
-      <SettingsSection title="OPD Follow-Up Delays" description="Configure automatic follow-up timing for OPD visits" icon={<Stethoscope className="w-4 h-4" />}>
-        <SettingsGrid columns={2}>
-          <SettingsField label="Visit Completed" description="Days after a completed visit to trigger follow-up">
-            <SettingsNumberInput value={form.watch("opd.opd_visit_completed")} onChange={(val) => form.setValue("opd.opd_visit_completed", val === "" ? 0 : val, { shouldDirty: true })} suffix="days" min={0} max={30} />
-          </SettingsField>
-          <SettingsField label="No Show" description="Days after a missed appointment">
-            <SettingsNumberInput value={form.watch("opd.opd_no_show")} onChange={(val) => form.setValue("opd.opd_no_show", val === "" ? 0 : val, { shouldDirty: true })} suffix="days" min={0} max={30} />
-          </SettingsField>
-          <SettingsField label="Converted" description="Days after OPD-to-treatment conversion">
-            <SettingsNumberInput value={form.watch("opd.opd_converted")} onChange={(val) => form.setValue("opd.opd_converted", val === "" ? 0 : val, { shouldDirty: true })} suffix="days" min={0} max={30} />
-          </SettingsField>
-          <SettingsField label="No Response" description="Days before escalating no-response cases">
-            <SettingsNumberInput value={form.watch("opd.opd_no_response")} onChange={(val) => form.setValue("opd.opd_no_response", val === "" ? 0 : val, { shouldDirty: true })} suffix="days" min={0} max={30} />
-          </SettingsField>
-        </SettingsGrid>
-      </SettingsSection>
-
-      <SettingsSection title="Assignment" description="Default assignee for OPD follow-ups" icon={<UserCheck className="w-4 h-4" />}>
-        <SettingsField label="Default Assignee">
-          <SettingsDropdown
-            value={form.watch("opd.assign_to") || ""}
-            onValueChange={(val) => form.setValue("opd.assign_to", val || null, { shouldDirty: true })}
-            options={ASSIGN_OPTIONS}
-            placeholder="Auto-assign (Round Robin)"
+      <SettingsSection
+        title="OPD Follow-Up"
+        description="Contact patients after consultation to ask if they wish to proceed with treatment"
+        icon={<Stethoscope className="w-4 h-4" />}
+      >
+        <SettingsField
+          label="Enable OPD Follow-Up"
+          description="Generate a follow-up enquiry when OPD consultation is completed"
+          layout="horizontal"
+        >
+          <SettingsSwitch
+            checked={form.watch("opd.enabled")}
+            onCheckedChange={(val) => form.setValue("opd.enabled", val, { shouldDirty: true })}
           />
         </SettingsField>
+
+        <div className="mt-4">
+          <SettingsGrid columns={2}>
+            <SettingsField
+              label="Follow-Up Delay"
+              description="Days to wait after consultation before generating enquiry"
+              error={form.formState.errors.opd?.start_delay_days?.message}
+            >
+              <SettingsNumberInput
+                value={form.watch("opd.start_delay_days")}
+                onChange={(val) => form.setValue("opd.start_delay_days", val === "" ? 0 : val, { shouldDirty: true })}
+                suffix="days"
+                min={0}
+                max={30}
+              />
+            </SettingsField>
+            <SettingsField
+              label="Auto-Close"
+              description="Automatically close when patient starts treatment"
+              layout="horizontal"
+            >
+              <SettingsSwitch
+                checked={form.watch("opd.auto_close_on_completion")}
+                onCheckedChange={(val) => form.setValue("opd.auto_close_on_completion", val, { shouldDirty: true })}
+              />
+            </SettingsField>
+          </SettingsGrid>
+        </div>
       </SettingsSection>
     </div>
   );
 }
 
-// ─── Treatment Tab ───────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// Treatment Tab — Follow-up AFTER treatment completion
+// ═══════════════════════════════════════════════════════════════════════════════
+
 function TreatmentTab({ form }: { form: any }) {
   return (
     <div className="space-y-5">
-      <SettingsSection title="Treatment Follow-Up Delays" description="Configure automatic follow-up timing for treatment stages" icon={<ClipboardList className="w-4 h-4" />}>
-        <SettingsGrid columns={3}>
-          <SettingsField label="Treatment Completed" description="After final treatment completion">
-            <SettingsNumberInput value={form.watch("treatment.treatment_completed")} onChange={(val) => form.setValue("treatment.treatment_completed", val === "" ? 0 : val, { shouldDirty: true })} suffix="days" min={0} max={30} />
-          </SettingsField>
-          <SettingsField label="Visit Completed" description="After each treatment visit">
-            <SettingsNumberInput value={form.watch("treatment.treatment_visit_completed")} onChange={(val) => form.setValue("treatment.treatment_visit_completed", val === "" ? 0 : val, { shouldDirty: true })} suffix="days" min={0} max={30} />
-          </SettingsField>
-          <SettingsField label="No Show" description="After a missed treatment visit">
-            <SettingsNumberInput value={form.watch("treatment.treatment_no_show")} onChange={(val) => form.setValue("treatment.treatment_no_show", val === "" ? 0 : val, { shouldDirty: true })} suffix="days" min={0} max={30} />
-          </SettingsField>
-          <SettingsField label="Converted">
-            <SettingsNumberInput value={form.watch("treatment.treatment_converted")} onChange={(val) => form.setValue("treatment.treatment_converted", val === "" ? 0 : val, { shouldDirty: true })} suffix="days" min={0} max={30} />
-          </SettingsField>
-          <SettingsField label="No Response">
-            <SettingsNumberInput value={form.watch("treatment.treatment_no_response")} onChange={(val) => form.setValue("treatment.treatment_no_response", val === "" ? 0 : val, { shouldDirty: true })} suffix="days" min={0} max={30} />
-          </SettingsField>
-        </SettingsGrid>
-      </SettingsSection>
-
-      <SettingsSection title="Wellness Behavior" description="Control wellness follow-up behavior for treatments" icon={<HeartPulse className="w-4 h-4" />}>
-        <SettingsField label="Skip Wellness if Appointment Scheduled" description="Don't create wellness enquiry if patient has an upcoming appointment" layout="horizontal">
-          <SettingsSwitch checked={form.watch("treatment.skip_wellness_if_appointment")} onCheckedChange={(val) => form.setValue("treatment.skip_wellness_if_appointment", val, { shouldDirty: true })} />
-        </SettingsField>
-      </SettingsSection>
-
-      <SettingsSection title="Assignment" description="Default assignee for treatment follow-ups" icon={<UserCheck className="w-4 h-4" />}>
-        <SettingsField label="Default Assignee">
-          <SettingsDropdown
-            value={form.watch("treatment.assign_to") || ""}
-            onValueChange={(val) => form.setValue("treatment.assign_to", val || null, { shouldDirty: true })}
-            options={ASSIGN_OPTIONS}
-            placeholder="Auto-assign (Round Robin)"
+      <SettingsSection
+        title="Treatment Wellness"
+        description="Follow-up after treatment completion. Skipped if patient has a future appointment."
+        icon={<ClipboardList className="w-4 h-4" />}
+      >
+        <SettingsField
+          label="Enable Treatment Wellness"
+          description="Generate a wellness follow-up when treatment is completed"
+          layout="horizontal"
+        >
+          <SettingsSwitch
+            checked={form.watch("treatment.enabled")}
+            onCheckedChange={(val) => form.setValue("treatment.enabled", val, { shouldDirty: true })}
           />
         </SettingsField>
+
+        <div className="mt-4">
+          <SettingsGrid columns={2}>
+            <SettingsField
+              label="Wellness Delay"
+              description="Days to wait after treatment completion before generating enquiry"
+              error={form.formState.errors.treatment?.start_delay_days?.message}
+            >
+              <SettingsNumberInput
+                value={form.watch("treatment.start_delay_days")}
+                onChange={(val) => form.setValue("treatment.start_delay_days", val === "" ? 0 : val, { shouldDirty: true })}
+                suffix="days"
+                min={0}
+                max={30}
+              />
+            </SettingsField>
+            <SettingsField
+              label="Skip if Future Appointment"
+              description="Don't create wellness if patient has an upcoming appointment"
+              layout="horizontal"
+            >
+              <SettingsSwitch
+                checked={form.watch("treatment.skip_wellness_if_appointment")}
+                onCheckedChange={(val) => form.setValue("treatment.skip_wellness_if_appointment", val, { shouldDirty: true })}
+              />
+            </SettingsField>
+          </SettingsGrid>
+        </div>
       </SettingsSection>
     </div>
   );
 }
 
-// ─── Case Tab ────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// Case Tab — Recovery + Recall after complete case
+// ═══════════════════════════════════════════════════════════════════════════════
+
 function CaseTab({ form }: { form: any }) {
   return (
     <div className="space-y-5">
-      <SettingsSection title="Case Follow-Up Delays" description="Configure automatic follow-up timing for dental cases" icon={<HeartPulse className="w-4 h-4" />}>
-        <SettingsGrid columns={3}>
-          <SettingsField label="Case Follow-Up" description="General case follow-up interval">
-            <SettingsNumberInput value={form.watch("case_follow_up.case_follow_up")} onChange={(val) => form.setValue("case_follow_up.case_follow_up", val === "" ? 0 : val, { shouldDirty: true })} suffix="days" min={0} max={30} />
-          </SettingsField>
-          <SettingsField label="Case Completed" description="After case is marked complete">
-            <SettingsNumberInput value={form.watch("case_follow_up.case_completed")} onChange={(val) => form.setValue("case_follow_up.case_completed", val === "" ? 0 : val, { shouldDirty: true })} suffix="days" min={0} max={30} />
-          </SettingsField>
-          <SettingsField label="Case Created" description="After a new case is created">
-            <SettingsNumberInput value={form.watch("case_follow_up.case_created")} onChange={(val) => form.setValue("case_follow_up.case_created", val === "" ? 0 : val, { shouldDirty: true })} suffix="days" min={0} max={30} />
-          </SettingsField>
-          <SettingsField label="Case Approved" description="After case is approved by admin">
-            <SettingsNumberInput value={form.watch("case_follow_up.case_approved")} onChange={(val) => form.setValue("case_follow_up.case_approved", val === "" ? 0 : val, { shouldDirty: true })} suffix="days" min={0} max={30} />
-          </SettingsField>
-          <SettingsField label="No Show">
-            <SettingsNumberInput value={form.watch("case_follow_up.case_no_show")} onChange={(val) => form.setValue("case_follow_up.case_no_show", val === "" ? 0 : val, { shouldDirty: true })} suffix="days" min={0} max={30} />
-          </SettingsField>
-          <SettingsField label="No Response">
-            <SettingsNumberInput value={form.watch("case_follow_up.case_no_response")} onChange={(val) => form.setValue("case_follow_up.case_no_response", val === "" ? 0 : val, { shouldDirty: true })} suffix="days" min={0} max={30} />
-          </SettingsField>
-        </SettingsGrid>
-      </SettingsSection>
-
-      <SettingsSection title="Assignment" description="Default assignee for case follow-ups" icon={<UserCheck className="w-4 h-4" />}>
-        <SettingsField label="Default Assignee">
-          <SettingsDropdown
-            value={form.watch("case_follow_up.assign_to") || ""}
-            onValueChange={(val) => form.setValue("case_follow_up.assign_to", val || null, { shouldDirty: true })}
-            options={ASSIGN_OPTIONS}
-            placeholder="Auto-assign (Round Robin)"
+      <SettingsSection
+        title="Recovery Wellness"
+        description="Follow-up after a complete dental case is finished"
+        icon={<HeartPulse className="w-4 h-4" />}
+      >
+        <SettingsField
+          label="Enable Recovery Wellness"
+          description="Generate a wellness enquiry when a case is completed"
+          layout="horizontal"
+        >
+          <SettingsSwitch
+            checked={form.watch("case.recovery.enabled")}
+            onCheckedChange={(val) => form.setValue("case.recovery.enabled", val, { shouldDirty: true })}
           />
         </SettingsField>
+
+        <div className="mt-4">
+          <SettingsGrid columns={1}>
+            <SettingsField
+              label="Recovery Delay"
+              description="Days to wait after case completion before generating enquiry"
+              error={form.formState.errors.case?.recovery?.start_delay_days?.message}
+            >
+              <SettingsNumberInput
+                value={form.watch("case.recovery.start_delay_days")}
+                onChange={(val) => form.setValue("case.recovery.start_delay_days", val === "" ? 0 : val, { shouldDirty: true })}
+                suffix="days"
+                min={0}
+                max={30}
+              />
+            </SettingsField>
+          </SettingsGrid>
+        </div>
+      </SettingsSection>
+
+      <SettingsSection
+        title="Recall"
+        description="Periodic dental check-up reminder after case completion"
+        icon={<Clock className="w-4 h-4" />}
+      >
+        <SettingsField
+          label="Enable Recall"
+          description="Generate a recall enquiry when a case is completed"
+          layout="horizontal"
+        >
+          <SettingsSwitch
+            checked={form.watch("case.recall.enabled")}
+            onCheckedChange={(val) => form.setValue("case.recall.enabled", val, { shouldDirty: true })}
+          />
+        </SettingsField>
+
+        <div className="mt-4">
+          <SettingsGrid columns={1}>
+            <SettingsField
+              label="Recall Delay"
+              description="Days after case completion to schedule the recall"
+              error={form.formState.errors.case?.recall?.start_delay_days?.message}
+            >
+              <SettingsNumberInput
+                value={form.watch("case.recall.start_delay_days")}
+                onChange={(val) => form.setValue("case.recall.start_delay_days", val === "" ? 0 : val, { shouldDirty: true })}
+                suffix="days"
+                min={0}
+                max={730}
+              />
+            </SettingsField>
+          </SettingsGrid>
+        </div>
       </SettingsSection>
     </div>
   );
 }
 
-// ─── Preview Panel ───────────────────────────────────────────────────────────
-function PreviewPanel({ values, activeTab }: { values: SettingsFormType; activeTab: TabKey }) {
-  const formKey = TAB_TO_FORM_KEY[activeTab];
-  const sectionData = values[formKey] as any;
+// ═══════════════════════════════════════════════════════════════════════════════
+// Preview Panel — Shows how settings affect runtime behaviour
+// ═══════════════════════════════════════════════════════════════════════════════
 
+function PreviewPanel({ values, activeTab }: { values: SettingsFormType; activeTab: TabKey }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 mb-2">
@@ -507,65 +681,80 @@ function PreviewPanel({ values, activeTab }: { values: SettingsFormType; activeT
         <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">Live Preview</h3>
       </div>
 
-      <PreviewCard title={`${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Settings`} description="Current configuration" icon={<Info className="w-4 h-4" />}>
+      <PreviewCard
+        title={`${TABS.find((t) => t.key === activeTab)?.label} Settings`}
+        description="How your settings affect runtime behaviour"
+        icon={<Info className="w-4 h-4" />}
+      >
         {activeTab === "general" && (
           <>
-            <PreviewRow label="Welcome Message" value={values.general.welcome_message.slice(0, 40) + "..."} />
-            <PreviewRow label="Priority" value={values.general.default_priority} highlight />
-            <PreviewRow label="Slot Duration" value={`${values.general.opd_slot_duration} min`} />
-            <PreviewRow label="Recall Interval" value={`${values.general.recall_interval_days} days`} />
-            <PreviewRow label="Wellness Interval" value={`${values.general.wellness_interval_days} days`} />
-            <PreviewRow label="Notifications" value={values.general.notification_enabled ? "Enabled" : "Disabled"} />
+            <PreviewRow label="CRM" value={values.general.enabled ? "Enabled" : "Disabled"} highlight />
+            <PreviewRow label="Working Days" value={values.general.working_days || "None"} />
+            <PreviewRow label="Hours" value={`${values.general.business_start} - ${values.general.business_end}`} />
+            <PreviewRow label="Reminder Time" value={values.general.reminder_time} />
+            <PreviewRow label="Reminder Offset" value={`${values.general.reminder_offset_days} days before`} />
+            <PreviewRow label="Weekend Policy" value={values.general.weekend_policy} />
           </>
         )}
         {activeTab === "lead" && (
           <>
-            <PreviewRow label="1st Follow-Up" value={`${values.lead.lead_first_follow_up} days`} highlight />
-            <PreviewRow label="2nd Follow-Up" value={`${values.lead.lead_second_follow_up} days`} />
-            <PreviewRow label="1st Call" value={`${values.lead.lead_first_call} days`} />
-            <PreviewRow label="Missed Call" value={`${values.lead.lead_missed_call} days`} />
-            <PreviewRow label="Assignee" value={values.lead.assign_to || "Auto-assign"} />
+            <PreviewRow label="Status" value={values.lead.enabled ? "Enabled" : "Disabled"} highlight />
+            <PreviewRow label="Follow-up Delay" value={`${values.lead.start_delay_days} days after lead created`} />
+            <PreviewRow label="Auto-Close" value={values.lead.auto_close_on_completion ? "On conversion" : "Manual"} />
+            <PreviewRow label="Runtime" value="Lead Created -> Wait -> ONE Follow-up" />
           </>
         )}
         {activeTab === "opd" && (
           <>
-            <PreviewRow label="Visit Completed" value={`${values.opd.opd_visit_completed} days`} highlight />
-            <PreviewRow label="No Show" value={`${values.opd.opd_no_show} days`} />
-            <PreviewRow label="Converted" value={`${values.opd.opd_converted} days`} />
-            <PreviewRow label="Assignee" value={values.opd.assign_to || "Auto-assign"} />
+            <PreviewRow label="Status" value={values.opd.enabled ? "Enabled" : "Disabled"} highlight />
+            <PreviewRow label="Follow-up Delay" value={`${values.opd.start_delay_days} days after consultation`} />
+            <PreviewRow label="Auto-Close" value={values.opd.auto_close_on_completion ? "On treatment start" : "Manual"} />
+            <PreviewRow label="Runtime" value="Consultation -> Wait -> ONE Follow-up" />
           </>
         )}
         {activeTab === "treatment" && (
           <>
-            <PreviewRow label="Completed" value={`${values.treatment.treatment_completed} days`} highlight />
-            <PreviewRow label="Visit" value={`${values.treatment.treatment_visit_completed} days`} />
-            <PreviewRow label="Skip Wellness" value={values.treatment.skip_wellness_if_appointment ? "Yes" : "No"} />
-            <PreviewRow label="Assignee" value={values.treatment.assign_to || "Auto-assign"} />
+            <PreviewRow label="Status" value={values.treatment.enabled ? "Enabled" : "Disabled"} highlight />
+            <PreviewRow label="Wellness Delay" value={`${values.treatment.start_delay_days} days after treatment`} />
+            <PreviewRow label="Skip if Appt" value={values.treatment.skip_wellness_if_appointment ? "Yes" : "No"} />
+            <PreviewRow label="Runtime" value="Treatment Done -> Appt? -> Wellness" />
           </>
         )}
         {activeTab === "case" && (
           <>
-            <PreviewRow label="Follow-Up" value={`${values.case_follow_up.case_follow_up} days`} highlight />
-            <PreviewRow label="Completed" value={`${values.case_follow_up.case_completed} days`} />
-            <PreviewRow label="Created" value={`${values.case_follow_up.case_created} days`} />
-            <PreviewRow label="Assignee" value={values.case_follow_up.assign_to || "Auto-assign"} />
+            <PreviewRow label="Recovery" value={values.case.recovery.enabled ? "Enabled" : "Disabled"} highlight />
+            <PreviewRow label="Recovery Delay" value={`${values.case.recovery.start_delay_days} days`} />
+            <PreviewRow label="Recall" value={values.case.recall.enabled ? "Enabled" : "Disabled"} highlight />
+            <PreviewRow label="Recall Delay" value={`${values.case.recall.start_delay_days} days`} />
+            <PreviewRow label="Runtime" value="Case Done -> Wellness + Recall" />
           </>
         )}
       </PreviewCard>
 
-      <PreviewCard title="Quick Summary" description="Follow-up schedule overview" icon={<CheckCircle2 className="w-4 h-4" />}>
+      <PreviewCard
+        title="Enquiry Summary"
+        description="Enquiries generated by these settings"
+        icon={<CheckCircle2 className="w-4 h-4" />}
+      >
         <div className="space-y-1.5">
-          {Object.entries(sectionData || {}).map(([key, val]) => {
-            if (key === "assign_to" || typeof val !== "number") return null;
-            if (val === 0) return null;
-            return (
-              <PreviewRow
-                key={key}
-                label={key.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
-                value={`${val} days`}
-              />
-            );
-          })}
+          {activeTab === "general" && (
+            <PreviewRow label="CRM Status" value={values.general.enabled ? "Active" : "Inactive"} />
+          )}
+          {activeTab === "lead" && values.lead.enabled && (
+            <PreviewRow label="Lead Follow-up" value={`${values.lead.start_delay_days}d delay`} />
+          )}
+          {activeTab === "opd" && values.opd.enabled && (
+            <PreviewRow label="OPD Follow-up" value={`${values.opd.start_delay_days}d delay`} />
+          )}
+          {activeTab === "treatment" && values.treatment.enabled && (
+            <PreviewRow label="Treatment Wellness" value={`${values.treatment.start_delay_days}d delay`} />
+          )}
+          {activeTab === "case" && (
+            <>
+              {values.case.recovery.enabled && <PreviewRow label="Case Wellness" value={`${values.case.recovery.start_delay_days}d delay`} />}
+              {values.case.recall.enabled && <PreviewRow label="Recall" value={`${values.case.recall.start_delay_days}d delay`} />}
+            </>
+          )}
         </div>
       </PreviewCard>
     </div>

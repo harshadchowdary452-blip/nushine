@@ -1,111 +1,119 @@
 import { z } from "zod";
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// CRM Settings Schema — Aligned with Dental ERP Lifecycle
+//
+// Only 5 pages: General, Lead, OPD, Treatment, Case
+// Every field maps directly to a backend config key or CrmFollowUpConfig column.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export const GeneralSettingsSchema = z.object({
+  enabled: z.boolean(),
+  working_days: z.string().min(1, "At least one working day required"),
+  reminder_time: z.string().regex(/^\d{2}:\d{2}$/, "Format: HH:MM"),
+  business_start: z.string().regex(/^\d{2}:\d{2}$/, "Format: HH:MM"),
+  business_end: z.string().regex(/^\d{2}:\d{2}$/, "Format: HH:MM"),
+  timezone: z.string().min(1),
+  reminder_offset_days: z.number().min(0).max(30),
+  weekend_policy: z.enum(["SKIP", "INCLUDE"]),
+});
+
+export const FollowUpSettingsSchema = z.object({
+  enabled: z.boolean(),
+  start_delay_days: z.number().min(0, "Cannot be negative").max(365),
+  auto_close_on_completion: z.boolean(),
+});
+
+export const TreatmentSettingsSchema = z.object({
+  enabled: z.boolean(),
+  start_delay_days: z.number().min(0).max(365),
+  skip_wellness_if_appointment: z.boolean(),
+  auto_close_on_completion: z.boolean(),
+});
+
+export const CaseSettingsSchema = z.object({
+  recovery: z.object({
+    enabled: z.boolean(),
+    start_delay_days: z.number().min(0).max(365),
+  }),
+  recall: z.object({
+    enabled: z.boolean(),
+    start_delay_days: z.number().min(0).max(730),
+  }),
+});
+
 export const SettingsSchema = z.object({
-  general: z.object({
-    welcome_message: z.string().min(1, "Welcome message is required"),
-    reminder_days: z.number().min(0, "Cannot be negative").max(30, "Max 30 days"),
-    reminder_template_id: z.string().nullable(),
-    notification_enabled: z.boolean(),
-    default_priority: z.enum(["low", "medium", "high"]),
-    auto_assign_enabled: z.boolean(),
-    reminder_time: z.string(),
-    opd_slot_duration: z.number().min(5, "Min 5 minutes").max(120, "Max 120 minutes"),
-    recall_interval_days: z.number().min(0).max(365),
-    wellness_interval_days: z.number().min(0).max(365),
-  }),
-  lead: z.object({
-    lead_first_follow_up: z.number().min(0, "Cannot be negative").max(30),
-    lead_second_follow_up: z.number().min(0, "Cannot be negative").max(30),
-    lead_first_call: z.number().min(0, "Cannot be negative").max(30),
-    lead_second_call: z.number().min(0, "Cannot be negative").max(30),
-    lead_missed_call: z.number().min(0, "Cannot be negative").max(30),
-    lead_opd_conversion: z.number().min(0, "Cannot be negative").max(30),
-    lead_no_response: z.number().min(0, "Cannot be negative").max(30),
-    lead_converted: z.number().min(0, "Cannot be negative").max(30),
-    lead_lost: z.number().min(0, "Cannot be negative").max(30),
-    lead_manual: z.number().min(0, "Cannot be negative").max(30),
-    assign_to: z.string().nullable(),
-  }),
-  opd: z.object({
-    opd_visit_completed: z.number().min(0, "Cannot be negative").max(30),
-    opd_no_show: z.number().min(0, "Cannot be negative").max(30),
-    opd_converted: z.number().min(0, "Cannot be negative").max(30),
-    opd_no_response: z.number().min(0, "Cannot be negative").max(30),
-    assign_to: z.string().nullable(),
-  }),
-  treatment: z.object({
-    treatment_completed: z.number().min(0, "Cannot be negative").max(30),
-    treatment_visit_completed: z.number().min(0, "Cannot be negative").max(30),
-    treatment_no_show: z.number().min(0, "Cannot be negative").max(30),
-    treatment_converted: z.number().min(0, "Cannot be negative").max(30),
-    treatment_no_response: z.number().min(0, "Cannot be negative").max(30),
-    assign_to: z.string().nullable(),
-    skip_wellness_if_appointment: z.boolean(),
-  }),
-  case_follow_up: z.object({
-    case_follow_up: z.number().min(0, "Cannot be negative").max(30),
-    case_completed: z.number().min(0, "Cannot be negative").max(30),
-    case_created: z.number().min(0, "Cannot be negative").max(30),
-    case_approved: z.number().min(0, "Cannot be negative").max(30),
-    case_no_show: z.number().min(0, "Cannot be negative").max(30),
-    case_no_response: z.number().min(0, "Cannot be negative").max(30),
-    assign_to: z.string().nullable(),
-  }),
+  general: GeneralSettingsSchema,
+  lead: FollowUpSettingsSchema,
+  opd: FollowUpSettingsSchema,
+  treatment: TreatmentSettingsSchema,
+  case: CaseSettingsSchema,
 });
 
 export type SettingsFormType = z.infer<typeof SettingsSchema>;
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// Defaults — populate from API response or sensible dental-ERP defaults
+// ═══════════════════════════════════════════════════════════════════════════════
+
 export function getDefaults(data: any): SettingsFormType {
+  const general = data?.general || {};
+  const lead = data?.lead || {};
+  const opd = data?.opd || {};
+  const treatment = data?.treatment || {};
+  const caseData = data?.case || {};
+
   return {
     general: {
-      welcome_message: data?.welcome_message ?? "Thank you for visiting Nushine Dental! We're here to help you achieve your best smile.",
-      reminder_days: data?.reminder_days ?? 1,
-      reminder_template_id: data?.reminder_template_id ?? null,
-      notification_enabled: data?.notification_enabled ?? true,
-      default_priority: data?.default_priority ?? "medium",
-      auto_assign_enabled: data?.auto_assign_enabled ?? false,
-      reminder_time: data?.reminder_time ?? "10:00",
-      opd_slot_duration: data?.opd_slot_duration ?? 30,
-      recall_interval_days: data?.recall_interval_days ?? 90,
-      wellness_interval_days: data?.wellness_interval_days ?? 90,
+      enabled: parseBool(general.crm_enabled, true),
+      working_days: general.crm_working_days ?? "MON,TUE,WED,THU,FRI,SAT",
+      reminder_time: general.crm_reminder_time ?? "09:00",
+      business_start: general.crm_business_start ?? "09:00",
+      business_end: general.crm_business_end ?? "18:00",
+      timezone: general.crm_timezone ?? "Asia/Kolkata",
+      reminder_offset_days: parseIntSafe(general.crm_reminder_offset, 1),
+      weekend_policy: (general.crm_weekend_policy as "SKIP" | "INCLUDE") ?? "SKIP",
     },
     lead: {
-      lead_first_follow_up: data?.lead_first_follow_up ?? 1,
-      lead_second_follow_up: data?.lead_second_follow_up ?? 3,
-      lead_first_call: data?.lead_first_call ?? 0,
-      lead_second_call: data?.lead_second_call ?? 2,
-      lead_missed_call: data?.lead_missed_call ?? 0,
-      lead_opd_conversion: data?.lead_opd_conversion ?? 0,
-      lead_no_response: data?.lead_no_response ?? 7,
-      lead_converted: data?.lead_converted ?? 0,
-      lead_lost: data?.lead_lost ?? 30,
-      lead_manual: data?.lead_manual ?? 0,
-      assign_to: data?.assign_to ?? null,
+      enabled: lead.enabled ?? true,
+      start_delay_days: lead.start_delay_days ?? 1,
+      auto_close_on_completion: lead.auto_close_on_completion ?? false,
     },
     opd: {
-      opd_visit_completed: data?.opd_visit_completed ?? 0,
-      opd_no_show: data?.opd_no_show ?? 1,
-      opd_converted: data?.opd_converted ?? 0,
-      opd_no_response: data?.opd_no_response ?? 3,
-      assign_to: data?.assign_to ?? null,
+      enabled: opd.enabled ?? true,
+      start_delay_days: opd.start_delay_days ?? 3,
+      auto_close_on_completion: opd.auto_close_on_completion ?? false,
     },
     treatment: {
-      treatment_completed: data?.treatment_completed ?? 0,
-      treatment_visit_completed: data?.treatment_visit_completed ?? 0,
-      treatment_no_show: data?.treatment_no_show ?? 1,
-      treatment_converted: data?.treatment_converted ?? 0,
-      treatment_no_response: data?.treatment_no_response ?? 3,
-      assign_to: data?.assign_to ?? null,
-      skip_wellness_if_appointment: data?.skip_wellness_if_appointment ?? false,
+      enabled: treatment.enabled ?? false,
+      start_delay_days: treatment.start_delay_days ?? 3,
+      skip_wellness_if_appointment: treatment.skip_wellness_if_appointment ?? true,
+      auto_close_on_completion: treatment.auto_close_on_completion ?? false,
     },
-    case_follow_up: {
-      case_follow_up: data?.case_follow_up ?? 3,
-      case_completed: data?.case_completed ?? 0,
-      case_created: data?.case_created ?? 0,
-      case_approved: data?.case_approved ?? 0,
-      case_no_show: data?.case_no_show ?? 1,
-      case_no_response: data?.case_no_response ?? 3,
-      assign_to: data?.assign_to ?? null,
+    case: {
+      recovery: {
+        enabled: caseData.recovery?.enabled ?? true,
+        start_delay_days: caseData.recovery?.start_delay_days ?? 3,
+      },
+      recall: {
+        enabled: caseData.recall?.enabled ?? true,
+        start_delay_days: caseData.recall?.start_delay_days ?? 180,
+      },
     },
   };
+}
+
+function parseBool(val: any, fallback: boolean): boolean {
+  if (typeof val === "boolean") return val;
+  if (typeof val === "string") return val === "true" || val === "1";
+  return fallback;
+}
+
+function parseIntSafe(val: any, fallback: number): number {
+  if (typeof val === "number") return val;
+  if (typeof val === "string") {
+    const n = parseInt(val, 10);
+    return isNaN(n) ? fallback : n;
+  }
+  return fallback;
 }

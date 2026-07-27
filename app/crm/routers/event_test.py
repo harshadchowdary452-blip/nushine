@@ -1,7 +1,8 @@
 """
-Phase 3.3 Test APIs — verify rule evaluation for all event types.
+Test APIs — verify rule evaluation and enquiry creation for all event types.
 
-NO CRM records are created. Only returns decisions.
+GOES THROUGH FULL PIPELINE: Dispatcher → Rule Engine → Executor.
+Records ARE created. Use with caution in production.
 """
 import logging
 from fastapi import APIRouter, Depends
@@ -294,6 +295,6 @@ async def list_supported_events(
             "supported_events": sorted(SUPPORTED_EVENTS),
             "total": len(SUPPORTED_EVENTS),
             "phase": "3.3",
-            "note": "No CRM records are created by these events. Execution belongs to Phase 3.4.",
+            "note": "Events go through full pipeline (Dispatcher → Rule Engine → Executor). Records may be created.",
         },
     }
