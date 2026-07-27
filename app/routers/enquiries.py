@@ -158,132 +158,15 @@ async def get_enquiry_calendar(
     result = []
     today = date.today()
 
-    # --- 1. Follow-ups (date range only — overdue shown in summary, not in grid) ---
-    fu_q = select(FollowUp).where(
-        FollowUp.follow_up_date >= start,
-        FollowUp.follow_up_date <= end,
-    )
-    if hospital_id:
-        fu_q = fu_q.where(FollowUp.hospital_id == hospital_id)
-    if status_filter:
-        fu_q = fu_q.where(FollowUp.status == status_filter)
-    elif exclude_terminal:
-        fu_q = fu_q.where(FollowUp.status.notin_(terminal_statuses))
-    if type_filter:
-        fu_q = fu_q.where(FollowUp.follow_up_type == type_filter)
-    if doctor_id:
-        fu_q = fu_q.where(FollowUp.doctor_id == doctor_id)
-    if patient_id:
-        fu_q = fu_q.where(FollowUp.patient_id == patient_id)
-    fu_rows = (await db.execute(fu_q.order_by(FollowUp.follow_up_date))).scalars().all()
-
-    fu_patient_ids = list({fu.patient_id for fu in fu_rows})
-    fu_doctor_ids = list({fu.doctor_id for fu in fu_rows if fu.doctor_id})
-    fu_tt_ids = list({fu.treatment_type_id for fu in fu_rows if fu.treatment_type_id})
-    fu_patients = await _batch_load_names(db, fu_patient_ids, Patient, "full_name")
-    fu_patients_phone = {}
-    if fu_patient_ids:
-        ph_q = select(Patient.id, Patient.phone, Patient.op_no).where(Patient.id.in_(fu_patient_ids))
-        for row in (await db.execute(ph_q)).all():
-            fu_patients_phone[str(row[0])] = {"phone": row[1], "op_no": row[2]}
-    fu_doctors = await _batch_load_names(db, fu_doctor_ids, User, "full_name")
-    fu_tt = {}
-    if fu_tt_ids:
-        tt_q = select(TreatmentType).where(TreatmentType.id.in_(fu_tt_ids))
-        for tt in (await db.execute(tt_q)).scalars().all():
-            fu_tt[str(tt.id)] = tt.name
-
-    for fu in fu_rows:
-        pid = str(fu.patient_id)
-        pph = fu_patients_phone.get(pid, {})
-        patient_name = fu_patients.get(pid, "Unknown")
-        result.append({
-            "id": str(fu.id),
-            "source": "follow_up",
-            "enquiry_type": fu.follow_up_type or "ENQUIRY",
-            "patient_id": pid,
-            "patient_name": patient_name,
-            "op_number": pph.get("op_no"),
-            "doctor_name": fu_doctors.get(str(fu.doctor_id), None) if fu.doctor_id else None,
-            "doctor_id": str(fu.doctor_id) if fu.doctor_id else None,
-            "treatment_type": fu_tt.get(str(fu.treatment_type_id)) if fu.treatment_type_id else None,
-            "treatment_name": fu.treatment_name,
-            "follow_up_type": fu.follow_up_type,
-            "due_date": fu.follow_up_date.isoformat(),
-            "priority": fu.priority or "MEDIUM",
-            "status": fu.status,
-            "response": fu.response_summary,
-            "feedback": fu.patient_feedback,
-            "staff_notes": fu.staff_notes,
-            "action_required": fu.outcome,
-            "response_status": fu.response_status,
-            "next_action": fu.next_action,
-            "contact_channel": fu.contact_channel,
-            "last_contact_date": fu.last_contact_date.isoformat() if fu.last_contact_date else None,
-            "patient_phone": pph.get("phone"),
-        })
-
-    # --- 2. Enquiries (date range only) ---
-    enq_q = select(Enquiry).where(
-        Enquiry.next_follow_up_date >= start,
-        Enquiry.next_follow_up_date <= end,
-    )
-    if hospital_id:
-        enq_q = enq_q.where(Enquiry.hospital_id == hospital_id)
-    if status_filter:
-        enq_q = enq_q.where(Enquiry.status == status_filter)
-    elif exclude_terminal:
-        enq_q = enq_q.where(Enquiry.status.notin_(terminal_statuses))
-    if doctor_id:
-        enq_q = enq_q.where(Enquiry.assigned_staff_id == doctor_id)
-    if patient_id:
-        enq_q = enq_q.where(Enquiry.patient_id == patient_id)
-    enq_rows = (await db.execute(enq_q.order_by(Enquiry.next_follow_up_date))).scalars().all()
-
-    enq_patient_ids = list({e.patient_id for e in enq_rows})
-    enq_staff_ids = list({e.assigned_staff_id for e in enq_rows if e.assigned_staff_id})
-    enq_patients = await _batch_load_names(db, enq_patient_ids, Patient, "full_name")
-    enq_patients_phone = {}
-    if enq_patient_ids:
-        ph_q = select(Patient.id, Patient.phone, Patient.op_no).where(Patient.id.in_(enq_patient_ids))
-        for row in (await db.execute(ph_q)).all():
-            enq_patients_phone[str(row[0])] = {"phone": row[1], "op_no": row[2]}
-    enq_staff = await _batch_load_names(db, enq_staff_ids, User, "full_name")
-
-    for e in enq_rows:
-        pid = str(e.patient_id)
-        pph = enq_patients_phone.get(pid, {})
-        fu_type = "OPD_FOLLOW_UP" if e.treatment_interest == "OPD_FOLLOW_UP" else "ENQUIRY"
-        result.append({
-            "id": str(e.id),
-            "source": "enquiry",
-            "enquiry_type": fu_type,
-            "patient_id": pid,
-            "patient_name": enq_patients.get(pid, "Unknown"),
-            "op_number": pph.get("op_no"),
-            "doctor_name": enq_staff.get(str(e.assigned_staff_id)) if e.assigned_staff_id else None,
-            "doctor_id": str(e.assigned_staff_id) if e.assigned_staff_id else None,
-            "treatment_type": None,
-            "treatment_name": e.treatment_interest,
-            "follow_up_type": fu_type,
-            "due_date": e.next_follow_up_date.isoformat() if e.next_follow_up_date else e.created_at.date().isoformat(),
-            "priority": "MEDIUM",
-            "status": e.status,
-            "response": None,
-            "feedback": e.notes,
-            "staff_notes": None,
-            "action_required": None,
-            "response_status": None,
-            "next_action": None,
-            "contact_channel": None,
-            "last_contact_date": None,
-            "patient_phone": pph.get("phone"),
-        })
-
-    # --- 3. Generated enquiries (CRM automation, date range only) ---
+    # --- Generated enquiries (CRM automation, date range only) ---
+    VALID_ENQUIRY_TYPES = [
+        "LEAD_FOLLOW_UP", "OPD_FOLLOW_UP", "APPOINTMENT_REMINDER",
+        "TREATMENT_WELLNESS", "CASE_WELLNESS", "RECALL", "MISSED_APPOINTMENT",
+    ]
     ge_q = select(GeneratedEnquiry).where(
         GeneratedEnquiry.due_date >= start,
         GeneratedEnquiry.due_date <= end,
+        GeneratedEnquiry.enquiry_type.in_(VALID_ENQUIRY_TYPES),
     )
     if hospital_id:
         ge_q = ge_q.where(GeneratedEnquiry.hospital_id == hospital_id)
@@ -411,148 +294,84 @@ async def get_calendar_summary(
     }
     today = date.today()
     tomorrow = today + timedelta(days=1)
-    week_end = today + timedelta(days=7)
 
-    # --- Follow-ups (date range) ---
-    fu_filters = [
-        FollowUp.follow_up_date.between(start, end),
+    VALID_ENQUIRY_TYPES = [
+        "LEAD_FOLLOW_UP", "OPD_FOLLOW_UP", "APPOINTMENT_REMINDER",
+        "TREATMENT_WELLNESS", "CASE_WELLNESS", "RECALL", "MISSED_APPOINTMENT",
     ]
-    if hospital_id:
-        fu_filters.append(FollowUp.hospital_id == hospital_id)
-    if not include_terminal:
-        fu_filters.append(FollowUp.status.notin_(terminal_statuses))
-    fu_base = select(func.count()).select_from(FollowUp).where(and_(*fu_filters))
-    fu_total = (await db.execute(fu_base)).scalar() or 0
 
-    fu_status_q = select(FollowUp.status, func.count()).where(and_(*fu_filters))
-    fu_status_q = fu_status_q.group_by(FollowUp.status)
-    for st, cnt in (await db.execute(fu_status_q)).all():
-        counts["by_status"][st] = counts["by_status"].get(st, 0) + cnt
-        if st == "COMPLETED":
-            counts["completed"] += cnt
-        elif st in ("PENDING", "SCHEDULED", "OPEN"):
-            counts["pending"] += cnt
-
-    fu_type_q = select(FollowUp.follow_up_type, func.count()).where(and_(*fu_filters))
-    fu_type_q = fu_type_q.group_by(FollowUp.follow_up_type)
-    for tp, cnt in (await db.execute(fu_type_q)).all():
-        counts["by_type"][tp] = counts["by_type"].get(tp, 0) + cnt
-
-    # --- Enquiries (date range) ---
-    enq_filters = [
-        Enquiry.next_follow_up_date.between(start, end),
-    ]
-    if hospital_id:
-        enq_filters.append(Enquiry.hospital_id == hospital_id)
-    if not include_terminal:
-        enq_filters.append(Enquiry.status.notin_(terminal_statuses))
-    enq_q = select(func.count()).select_from(Enquiry).where(and_(*enq_filters))
-    enq_total = (await db.execute(enq_q)).scalar() or 0
-
-    enq_status_q = select(Enquiry.status, func.count()).where(and_(*enq_filters))
-    enq_status_q = enq_status_q.group_by(Enquiry.status)
-    for st, cnt in (await db.execute(enq_status_q)).all():
-        counts["by_status"][st] = counts["by_status"].get(st, 0) + cnt
-        if st in ("CONVERTED",):
-            counts["completed"] += cnt
-
-    # --- Generated enquiries (date range) ---
-    ge_filters = [
+    # --- Base filter for valid, non-terminal enquiries in date range ---
+    base_filters = [
         GeneratedEnquiry.due_date.between(start, end),
+        GeneratedEnquiry.enquiry_type.in_(VALID_ENQUIRY_TYPES),
     ]
     if hospital_id:
-        ge_filters.append(GeneratedEnquiry.hospital_id == hospital_id)
+        base_filters.append(GeneratedEnquiry.hospital_id == hospital_id)
     if not include_terminal:
-        ge_filters.append(GeneratedEnquiry.status.notin_(terminal_statuses))
-    ge_base = select(func.count()).select_from(GeneratedEnquiry).where(and_(*ge_filters))
-    ge_total = (await db.execute(ge_base)).scalar() or 0
+        base_filters.append(GeneratedEnquiry.status.notin_(terminal_statuses))
 
-    ge_type_q = select(GeneratedEnquiry.enquiry_type, func.count()).where(and_(*ge_filters))
-    ge_type_q = ge_type_q.group_by(GeneratedEnquiry.enquiry_type)
-    for tp, cnt in (await db.execute(ge_type_q)).all():
-        counts["by_type"][tp] = counts["by_type"].get(tp, 0) + cnt
+    # --- Total, by_type, by_status (within date range) ---
+    ge_total = (await db.execute(
+        select(func.count()).select_from(GeneratedEnquiry).where(and_(*base_filters))
+    )).scalar() or 0
+    counts["total"] = ge_total
 
-    ge_status_q = select(GeneratedEnquiry.status, func.count()).where(and_(*ge_filters))
-    ge_status_q = ge_status_q.group_by(GeneratedEnquiry.status)
-    for st, cnt in (await db.execute(ge_status_q)).all():
-        counts["by_status"][st] = counts["by_status"].get(st, 0) + cnt
+    for tp, cnt in (await db.execute(
+        select(GeneratedEnquiry.enquiry_type, func.count()).where(and_(*base_filters))
+        .group_by(GeneratedEnquiry.enquiry_type)
+    )).all():
+        counts["by_type"][tp] = cnt
+
+    for st, cnt in (await db.execute(
+        select(GeneratedEnquiry.status, func.count()).where(and_(*base_filters))
+        .group_by(GeneratedEnquiry.status)
+    )).all():
+        counts["by_status"][st] = cnt
         if st == "COMPLETED":
-            counts["completed"] += cnt
-        elif st == "PENDING":
+            counts["completed"] = cnt
+        elif st in ("PENDING", "SCHEDULED", "OPEN", "NEW"):
             counts["pending"] += cnt
 
-    counts["total"] = fu_total + enq_total + ge_total
-
-    # --- Overdue: PENDING + active statuses with due_date < today ---
+    # --- Overdue: active statuses with due_date < today (within date range) ---
     overdue_statuses = ["PENDING", "CONTACTED", "INTERESTED", "NEW", "NO_RESPONSE", "SCHEDULED", "OPEN"]
-    ov_fu = select(func.count()).select_from(FollowUp).where(
-        FollowUp.follow_up_date < today,
-        FollowUp.status.in_(overdue_statuses),
-    )
-    if hospital_id:
-        ov_fu = ov_fu.where(FollowUp.hospital_id == hospital_id)
-    counts["overdue"] = (await db.execute(ov_fu)).scalar() or 0
-
-    ov_ge = select(func.count()).select_from(GeneratedEnquiry).where(
+    ov_filters = [
         GeneratedEnquiry.due_date < today,
+        GeneratedEnquiry.due_date >= start,
+        GeneratedEnquiry.enquiry_type.in_(VALID_ENQUIRY_TYPES),
         GeneratedEnquiry.status.in_(overdue_statuses),
-    )
+    ]
     if hospital_id:
-        ov_ge = ov_ge.where(GeneratedEnquiry.hospital_id == hospital_id)
-    counts["overdue"] += (await db.execute(ov_ge)).scalar() or 0
+        ov_filters.append(GeneratedEnquiry.hospital_id == hospital_id)
+    counts["overdue"] = (await db.execute(
+        select(func.count()).select_from(GeneratedEnquiry).where(and_(*ov_filters))
+    )).scalar() or 0
 
     # --- Due Today ---
-    dt_fu = select(func.count()).select_from(FollowUp).where(
-        FollowUp.follow_up_date == today,
-        FollowUp.status.in_(overdue_statuses),
-    )
-    if hospital_id:
-        dt_fu = dt_fu.where(FollowUp.hospital_id == hospital_id)
-    counts["due_today"] = (await db.execute(dt_fu)).scalar() or 0
-
-    dt_ge = select(func.count()).select_from(GeneratedEnquiry).where(
+    dt_filters = [
         GeneratedEnquiry.due_date == today,
+        GeneratedEnquiry.enquiry_type.in_(VALID_ENQUIRY_TYPES),
         GeneratedEnquiry.status.in_(overdue_statuses),
-    )
+    ]
     if hospital_id:
-        dt_ge = dt_ge.where(GeneratedEnquiry.hospital_id == hospital_id)
-    counts["due_today"] += (await db.execute(dt_ge)).scalar() or 0
+        dt_filters.append(GeneratedEnquiry.hospital_id == hospital_id)
+    counts["due_today"] = (await db.execute(
+        select(func.count()).select_from(GeneratedEnquiry).where(and_(*dt_filters))
+    )).scalar() or 0
 
     # --- Due Tomorrow ---
-    dtm_fu = select(func.count()).select_from(FollowUp).where(
-        FollowUp.follow_up_date == tomorrow,
-        FollowUp.status.in_(overdue_statuses),
-    )
-    if hospital_id:
-        dtm_fu = dtm_fu.where(FollowUp.hospital_id == hospital_id)
-    counts["due_tomorrow"] = (await db.execute(dtm_fu)).scalar() or 0
-
-    dtm_ge = select(func.count()).select_from(GeneratedEnquiry).where(
+    dtm_filters = [
         GeneratedEnquiry.due_date == tomorrow,
+        GeneratedEnquiry.enquiry_type.in_(VALID_ENQUIRY_TYPES),
         GeneratedEnquiry.status.in_(overdue_statuses),
-    )
+    ]
     if hospital_id:
-        dtm_ge = dtm_ge.where(GeneratedEnquiry.hospital_id == hospital_id)
-    counts["due_tomorrow"] += (await db.execute(dtm_ge)).scalar() or 0
+        dtm_filters.append(GeneratedEnquiry.hospital_id == hospital_id)
+    counts["due_tomorrow"] = (await db.execute(
+        select(func.count()).select_from(GeneratedEnquiry).where(and_(*dtm_filters))
+    )).scalar() or 0
 
-    # --- Due This Week ---
-    dw_fu = select(func.count()).select_from(FollowUp).where(
-        FollowUp.follow_up_date >= today,
-        FollowUp.follow_up_date <= week_end,
-        FollowUp.status.in_(overdue_statuses),
-    )
-    if hospital_id:
-        dw_fu = dw_fu.where(FollowUp.hospital_id == hospital_id)
-    counts["due_this_week"] = (await db.execute(dw_fu)).scalar() or 0
-
-    dw_ge = select(func.count()).select_from(GeneratedEnquiry).where(
-        GeneratedEnquiry.due_date >= today,
-        GeneratedEnquiry.due_date <= week_end,
-        GeneratedEnquiry.status.in_(overdue_statuses),
-    )
-    if hospital_id:
-        dw_ge = dw_ge.where(GeneratedEnquiry.hospital_id == hospital_id)
-    counts["due_this_week"] += (await db.execute(dw_ge)).scalar() or 0
+    # --- Due This Week: items in date range with active status ---
+    counts["due_this_week"] = ge_total
 
     return counts
 
@@ -575,138 +394,33 @@ async def calendar_overdue_items(
     terminal_statuses = ["COMPLETED", "CANCELLED", "LOST", "CONVERTED"]
     overdue_statuses = ["PENDING", "CONTACTED", "INTERESTED", "APPOINTMENT_REQUIRED",
                         "APPOINTMENT_BOOKED", "NEW", "NO_RESPONSE", "SCHEDULED", "OPEN"]
-    exclude_terminal = (not include_terminal) and (not type_filter)
     result = []
 
-    # --- Follow-ups overdue ---
-    fu_q = select(FollowUp).where(
-        FollowUp.follow_up_date < today,
-        FollowUp.status.in_(overdue_statuses),
-    )
-    if hospital_id:
-        fu_q = fu_q.where(FollowUp.hospital_id == hospital_id)
-    if type_filter:
-        fu_q = fu_q.where(FollowUp.follow_up_type == type_filter)
-    elif exclude_terminal:
-        fu_q = fu_q.where(FollowUp.status.notin_(terminal_statuses))
-    if doctor_id:
-        fu_q = fu_q.where(FollowUp.doctor_id == doctor_id)
-    if patient_id:
-        fu_q = fu_q.where(FollowUp.patient_id == patient_id)
-    fu_rows = (await db.execute(fu_q.order_by(FollowUp.follow_up_date))).scalars().all()
-
-    fu_patient_ids = list({fu.patient_id for fu in fu_rows})
-    fu_doctor_ids = list({fu.doctor_id for fu in fu_rows if fu.doctor_id})
-    fu_tt_ids = list({fu.treatment_type_id for fu in fu_rows if fu.treatment_type_id})
-    fu_patients = await _batch_load_names(db, fu_patient_ids, Patient, "full_name")
-    fu_patients_phone = {}
-    if fu_patient_ids:
-        ph_q = select(Patient.id, Patient.phone, Patient.op_no).where(Patient.id.in_(fu_patient_ids))
-        for row in (await db.execute(ph_q)).all():
-            fu_patients_phone[str(row[0])] = {"phone": row[1], "op_no": row[2]}
-    fu_doctors = await _batch_load_names(db, fu_doctor_ids, User, "full_name")
-    fu_tt = {}
-    if fu_tt_ids:
-        tt_q = select(TreatmentType).where(TreatmentType.id.in_(fu_tt_ids))
-        for tt in (await db.execute(tt_q)).scalars().all():
-            fu_tt[str(tt.id)] = tt.name
-
-    for fu in fu_rows:
-        pid = str(fu.patient_id)
-        pph = fu_patients_phone.get(pid, {})
-        patient_name = fu_patients.get(pid, "Unknown")
-        doctor_name = fu_doctors.get(str(fu.doctor_id), None) if fu.doctor_id else None
-        result.append({
-            "id": str(fu.id),
-            "source": "follow_up",
-            "type": fu.follow_up_type or "GENERAL",
-            "status": fu.status,
-            "patient_name": patient_name,
-            "patient_id": pid,
-            "phone": pph.get("phone"),
-            "op_no": pph.get("op_no"),
-            "doctor_name": doctor_name,
-            "doctor_id": str(fu.doctor_id) if fu.doctor_id else None,
-            "treatment_type": fu_tt.get(str(fu.treatment_type_id)) if fu.treatment_type_id else None,
-            "treatment_type_id": str(fu.treatment_type_id) if fu.treatment_type_id else None,
-            "due_date": fu.follow_up_date.isoformat(),
-            "notes": fu.notes,
-            "days_overdue": (today - fu.follow_up_date).days,
-            "contact_channel": None,
-            "last_contact_date": None,
-            "patient_phone": pph.get("phone"),
-        })
-
-    # --- Enquiries overdue ---
-    enq_q = select(Enquiry).where(
-        Enquiry.next_follow_up_date < today,
-        Enquiry.status.in_(overdue_statuses),
-    )
-    if hospital_id:
-        enq_q = enq_q.where(Enquiry.hospital_id == hospital_id)
-    if type_filter:
-        enq_q = enq_q.where(Enquiry.treatment_interest == type_filter)
-    elif exclude_terminal:
-        enq_q = enq_q.where(Enquiry.status.notin_(terminal_statuses))
-    if doctor_id:
-        enq_q = enq_q.where(Enquiry.assigned_staff_id == doctor_id)
-    if patient_id:
-        enq_q = enq_q.where(Enquiry.patient_id == patient_id)
-    enq_rows = (await db.execute(enq_q.order_by(Enquiry.next_follow_up_date))).scalars().all()
-
-    enq_patient_ids = list({e.patient_id for e in enq_rows})
-    enq_doctor_ids = list({e.assigned_staff_id for e in enq_rows if e.assigned_staff_id})
-    enq_patients = await _batch_load_names(db, enq_patient_ids, Patient, "full_name")
-    enq_patients_phone = {}
-    if enq_patient_ids:
-        ph_q = select(Patient.id, Patient.phone, Patient.op_no).where(Patient.id.in_(enq_patient_ids))
-        for row in (await db.execute(ph_q)).all():
-            enq_patients_phone[str(row[0])] = {"phone": row[1], "op_no": row[2]}
-    enq_doctors = await _batch_load_names(db, enq_doctor_ids, User, "full_name")
-
-    for e in enq_rows:
-        pid = str(e.patient_id)
-        pph = enq_patients_phone.get(pid, {})
-        result.append({
-            "id": str(e.id),
-            "source": "enquiry",
-            "type": e.treatment_interest or "GENERAL",
-            "status": e.status,
-            "patient_name": enq_patients.get(pid, "Unknown"),
-            "patient_id": pid,
-            "phone": pph.get("phone"),
-            "op_no": pph.get("op_no"),
-            "doctor_name": enq_doctors.get(str(e.assigned_staff_id)) if e.assigned_staff_id else None,
-            "doctor_id": str(e.assigned_staff_id) if e.assigned_staff_id else None,
-            "treatment_type": None,
-            "treatment_type_id": None,
-            "due_date": e.next_follow_up_date.isoformat(),
-            "notes": e.notes,
-            "days_overdue": (today - e.next_follow_up_date).days,
-            "contact_channel": None,
-            "last_contact_date": None,
-            "patient_phone": pph.get("phone"),
-        })
+    VALID_ENQUIRY_TYPES = [
+        "LEAD_FOLLOW_UP", "OPD_FOLLOW_UP", "APPOINTMENT_REMINDER",
+        "TREATMENT_WELLNESS", "CASE_WELLNESS", "RECALL", "MISSED_APPOINTMENT",
+    ]
 
     # --- Generated enquiries overdue ---
     ge_q = select(GeneratedEnquiry).where(
         GeneratedEnquiry.due_date < today,
         GeneratedEnquiry.status.in_(overdue_statuses),
+        GeneratedEnquiry.enquiry_type.in_(VALID_ENQUIRY_TYPES),
     )
     if hospital_id:
         ge_q = ge_q.where(GeneratedEnquiry.hospital_id == hospital_id)
     if type_filter:
         ge_q = ge_q.where(GeneratedEnquiry.enquiry_type == type_filter)
-    elif exclude_terminal:
-        ge_q = ge_q.where(GeneratedEnquiry.status.notin_(terminal_statuses))
     if doctor_id:
         ge_q = ge_q.where(GeneratedEnquiry.doctor_id == doctor_id)
     if patient_id:
         ge_q = ge_q.where(GeneratedEnquiry.patient_id == patient_id)
     ge_rows = (await db.execute(ge_q.order_by(GeneratedEnquiry.due_date))).scalars().all()
 
-    ge_patient_ids = list({ge.patient_id for ge in ge_rows})
+    ge_patient_ids = list({ge.patient_id for ge in ge_rows if ge.patient_id})
+    ge_lead_ids = list({ge.lead_id for ge in ge_rows if ge.lead_id})
     ge_doctor_ids = list({ge.doctor_id for ge in ge_rows if ge.doctor_id})
+    ge_staff_ids = list({ge.assigned_staff_id for ge in ge_rows if ge.assigned_staff_id})
     ge_tt_ids = list({ge.treatment_type_id for ge in ge_rows if ge.treatment_type_id})
     ge_patients = await _batch_load_names(db, ge_patient_ids, Patient, "full_name")
     ge_patients_phone = {}
@@ -714,7 +428,14 @@ async def calendar_overdue_items(
         ph_q = select(Patient.id, Patient.phone, Patient.op_no).where(Patient.id.in_(ge_patient_ids))
         for row in (await db.execute(ph_q)).all():
             ge_patients_phone[str(row[0])] = {"phone": row[1], "op_no": row[2]}
-    ge_doctors = await _batch_load_names(db, ge_doctor_ids, User, "full_name")
+    ge_leads = {}
+    if ge_lead_ids:
+        from app.models.lead import Lead
+        lead_q = select(Lead.id, Lead.lead_name).where(Lead.id.in_(ge_lead_ids))
+        for row in (await db.execute(lead_q)).all():
+            ge_leads[str(row[0])] = row[1]
+    all_staff_ids = list(set(ge_doctor_ids + ge_staff_ids))
+    ge_staff = await _batch_load_names(db, all_staff_ids, User, "full_name")
     ge_tt = {}
     if ge_tt_ids:
         tt_q = select(TreatmentType).where(TreatmentType.id.in_(ge_tt_ids))
@@ -722,19 +443,25 @@ async def calendar_overdue_items(
             ge_tt[str(tt.id)] = tt.name
 
     for ge in ge_rows:
-        pid = str(ge.patient_id)
-        pph = ge_patients_phone.get(pid, {})
+        pid = str(ge.patient_id) if ge.patient_id else None
+        pph = ge_patients_phone.get(pid, {}) if pid else {}
+        doctor_name = ge_staff.get(str(ge.doctor_id)) if ge.doctor_id else None
+        assigned_name = ge_staff.get(str(ge.assigned_staff_id)) if ge.assigned_staff_id else None
+        lead_name = ge_leads.get(str(ge.lead_id)) if ge.lead_id else None
+        patient_display = ge_patients.get(pid, None) if pid else None
+        if not patient_display:
+            patient_display = lead_name or "Unknown"
         result.append({
             "id": str(ge.id),
-            "source": "generated",
-            "type": ge.enquiry_type or "GENERAL",
+            "source": "generated_enquiry",
+            "type": ge.enquiry_type or "UNKNOWN",
             "status": ge.status,
-            "patient_name": ge_patients.get(pid, "Unknown"),
+            "patient_name": patient_display,
             "patient_id": pid,
             "phone": pph.get("phone"),
             "op_no": pph.get("op_no"),
-            "doctor_name": ge_doctors.get(str(ge.doctor_id)) if ge.doctor_id else None,
-            "doctor_id": str(ge.doctor_id) if ge.doctor_id else None,
+            "doctor_name": doctor_name or assigned_name,
+            "doctor_id": str(ge.doctor_id) if ge.doctor_id else (str(ge.assigned_staff_id) if ge.assigned_staff_id else None),
             "treatment_type": ge_tt.get(str(ge.treatment_type_id)) if ge.treatment_type_id else None,
             "treatment_type_id": str(ge.treatment_type_id) if ge.treatment_type_id else None,
             "due_date": ge.due_date.isoformat(),

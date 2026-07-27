@@ -424,11 +424,22 @@ async def test_execute_rule(
         "visit_stage": "ANY",
     }
 
-    from app.crm.services.rule_engine import execute_rules
+    from app.crm.services.event_dispatcher import publish_event
     be_trigger = _LEAD_TRIGGER_FE2BE.get(data.trigger, data.trigger)
-    created = await execute_rules(db, hid, be_trigger, event_data, data.rule_type.upper())
+    result = await publish_event(
+        event_type=be_trigger,
+        source_module="CRM_RULES",
+        entity_type="PATIENT",
+        entity_id=data.patient_id,
+        hospital_id=hid,
+        patient_id=data.patient_id,
+        doctor_id=current_user.get("sub"),
+        triggered_by=str(current_user.get("sub")),
+        payload=event_data,
+        db=db,
+    )
     await db.commit()
-    return {"created": created, "count": len(created)}
+    return {"created": result.get("decisions", []), "count": len(result.get("decisions", []))}
 
 
 # ═══════════════════════════════════════════════════════════════════════════

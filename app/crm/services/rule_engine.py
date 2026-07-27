@@ -458,6 +458,11 @@ class RuleEngine:
                 logger.debug("MISSED_SKIP: appointment %s date %s is not in the past", appointment_id, appt_date)
                 return None
 
+        # Business Rule: Appointment must not already be COMPLETED (patient showed up)
+        if appt and getattr(appt, 'status', None) and str(appt.status) in ("COMPLETED", "CANCELLED"):
+            logger.debug("MISSED_SKIP: appointment %s already %s", appointment_id, appt.status)
+            return None
+
         # Business Rule: No duplicate missed appointment follow-up
         existing = await db.execute(
             select(GeneratedEnquiry).where(
@@ -670,12 +675,19 @@ class RuleEngine:
         """Rule: Case Wellness + Recall — create both after case completion."""
         from app.crm.services.event_dispatcher import Decision
         from app.models.generated_enquiry import GeneratedEnquiry
+        from app.models.case import Case
 
         patient_id = payload.get("patient_id")
         case_id = payload.get("case_id") or payload.get("entity_id")
         treatment_type_id = payload.get("treatment_type_id")
 
         if not patient_id or not case_id:
+            return []
+
+        # Business Rule: Verify case is actually COMPLETED in DB (don't trust event blindly)
+        case = await db.get(Case, case_id)
+        if case and case.status != "COMPLETED":
+            logger.debug("CASE_WELLNESS_SKIP: case=%s status=%s (not COMPLETED)", case_id, case.status)
             return []
 
         decisions = []

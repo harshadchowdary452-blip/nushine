@@ -281,12 +281,17 @@ async def convert_lead(lead_id: str, data: LeadConvertCreate, db: AsyncSession =
     try:
         patient_id = result.get("patient_id")
         if patient_id:
-            from app.crm.services.rule_engine import cancel_lead_followups_by_patient
-            await cancel_lead_followups_by_patient(
-                db,
-                hospital_id=getattr(result, 'hospital_id', None) or current_user.get("hospital_id"),
-                patient_id=patient_id,
-                cancelled_by_event="LEAD_CONVERTED",
+            from app.models.generated_enquiry import GeneratedEnquiry
+            from sqlalchemy import update
+            from app.database import get_db_session
+            await db.execute(
+                update(GeneratedEnquiry)
+                .where(
+                    GeneratedEnquiry.patient_id == patient_id,
+                    GeneratedEnquiry.enquiry_type == "LEAD_FOLLOW_UP",
+                    GeneratedEnquiry.status.in_(["PENDING", "NEW", "CONTACTED"]),
+                )
+                .values(status="CONVERTED")
             )
     except Exception:
         pass

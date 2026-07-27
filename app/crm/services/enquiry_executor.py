@@ -129,6 +129,19 @@ class EnquiryExecutor:
             result.duplicate_prevented += 1
             return result
 
+        # Validate enquiry type
+        VALID_TYPES = {
+            "LEAD_FOLLOW_UP", "OPD_FOLLOW_UP", "APPOINTMENT_REMINDER",
+            "TREATMENT_WELLNESS", "CASE_WELLNESS", "RECALL", "MISSED_APPOINTMENT",
+        }
+        if decision.enquiry_type not in VALID_TYPES:
+            logger.warning(
+                "INVALID_ENQUIRY_TYPE: %s — rejecting creation. Valid types: %s",
+                decision.enquiry_type, VALID_TYPES,
+            )
+            result.errors.append(f"Invalid enquiry_type: {decision.enquiry_type}")
+            return result
+
         # Create the enquiry
         try:
             ge = await self._create_enquiry(db, hospital_id, decision)
