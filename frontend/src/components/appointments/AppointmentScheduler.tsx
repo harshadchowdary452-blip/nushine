@@ -16,13 +16,13 @@ import type { DoctorSlotResponse, User, PaginatedResponse } from "@/types"
 import { extractDetail } from "@/types"
 
 const SLOT_COLORS: Record<string, string> = {
-  available: "bg-green-100 text-green-800 border-green-300 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700 cursor-pointer",
-  booked: "bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700 cursor-not-allowed opacity-60",
-  leave: "bg-gray-100 text-gray-400 border-gray-200 dark:bg-gray-800 dark:text-gray-500 dark:border-gray-700 cursor-not-allowed opacity-50",
-  blocked: "bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-700 cursor-not-allowed opacity-60",
-  past: "bg-gray-50 text-gray-300 border-gray-100 dark:bg-gray-900 dark:text-gray-600 dark:border-gray-800 cursor-not-allowed opacity-40",
-  selected: "bg-blue-500 text-white border-blue-600 dark:bg-blue-600 dark:border-blue-700 cursor-pointer",
-  "consecutive-selected": "bg-blue-400 text-white border-blue-500 dark:bg-blue-500 dark:border-blue-600 cursor-pointer",
+  available: "bg-green-100 text-green-800 border-green-300 hover:bg-green-200 cursor-pointer",
+  booked: "bg-red-100 text-red-800 border-red-300 cursor-not-allowed opacity-60",
+  leave: "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed opacity-50",
+  blocked: "bg-orange-100 text-orange-700 border-orange-300 cursor-not-allowed opacity-60",
+  past: "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed opacity-40",
+  selected: "bg-blue-500 text-white border-blue-600 cursor-pointer",
+  "consecutive-selected": "bg-blue-400 text-white border-blue-500 cursor-pointer",
 }
 
 export interface AppointmentSchedulerProps {
@@ -174,10 +174,10 @@ export default function AppointmentScheduler({
   const today = format(new Date(), "yyyy-MM-dd")
 
   return (
-    <div className={cn("rounded-xl border border-[#E2E8F0] dark:border-[#334155] bg-white dark:bg-[#1E293B] p-4 space-y-4", className)}>
+    <div className={cn("rounded-xl border border-[#E2E8F0] bg-white p-4 space-y-4", className)}>
       <div className="flex items-center gap-2">
-        <Calendar className="h-4 w-4 text-[#64748B] dark:text-[#94A3B8]" />
-        <h4 className="text-sm font-semibold text-[#0F172A] dark:text-[#F8FAFC]">Schedule Appointment</h4>
+        <Calendar className="h-4 w-4 text-[#64748B]" />
+        <h4 className="text-sm font-semibold text-[#0F172A]">Schedule Appointment</h4>
       </div>
 
       {showDoctorSelector && !doctorId && (
@@ -252,7 +252,7 @@ export default function AppointmentScheduler({
       </div>
 
       {procedureName && (
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-xs text-blue-700 dark:text-blue-400">
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-50 text-xs text-blue-700">
           <Stethoscope className="h-3 w-3" />
           <span className="font-medium">{procedureName}</span>
           <span className="text-blue-500">—</span>
@@ -264,7 +264,7 @@ export default function AppointmentScheduler({
       {doctorId && appointmentDate && (
         slotsLoading ? (
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm text-[#64748B] dark:text-[#94A3B8]">
+            <div className="flex items-center gap-2 text-sm text-[#64748B]">
               <div className="h-2 w-2 rounded-full bg-yellow-400 animate-pulse" />
               Loading available slots...
             </div>
@@ -275,50 +275,50 @@ export default function AppointmentScheduler({
             </div>
           </div>
         ) : slotsError ? (
-          <div className="rounded-xl border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800 p-4 space-y-2">
-            <p className="text-sm text-red-600 dark:text-red-400 font-medium flex items-center gap-2">
+          <div className="rounded-xl border border-red-200 bg-red-50 p-4 space-y-2">
+            <p className="text-sm text-red-600 font-medium flex items-center gap-2">
               <AlertCircle className="h-4 w-4" /> Failed to load slots
             </p>
-            <p className="text-xs text-red-500 dark:text-red-500">
+            <p className="text-xs text-red-500">
               {extractDetail(slotError) || slotError?.message || "Unknown error"}
             </p>
           </div>
         ) : slotData ? (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <h4 className="text-xs font-semibold text-[#0F172A] dark:text-[#F8FAFC]">
+              <h4 className="text-xs font-semibold text-[#0F172A]">
                 {slotData.doctor_name} — {format(new Date(slotData.date), "MMM dd, yyyy")}
               </h4>
               {slotData.is_on_leave && (
-                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-700">
                   On Leave{slotData.leave_reason ? `: ${slotData.leave_reason}` : ""}
                 </span>
               )}
             </div>
 
             {slotData.working_hours && (
-              <p className="text-xs text-[#64748B] dark:text-[#94A3B8]">
+              <p className="text-xs text-[#64748B]">
                 Working hours: {slotData.working_hours}
               </p>
             )}
 
             {durationMinutes > 30 && (
-              <p className="text-xs text-[#64748B] dark:text-[#94A3B8]">
+              <p className="text-xs text-[#64748B]">
                 Selecting a start time will reserve {Math.ceil(durationMinutes / 30)} consecutive slot{durationMinutes > 30 ? "s" : ""} ({durationMinutes} min)
               </p>
             )}
 
             <div className="flex items-center gap-3 mb-2 flex-wrap text-xs">
               <span className="flex items-center gap-1">
-                <span className="w-3 h-3 rounded border border-green-300 bg-green-100 dark:bg-green-900/30 dark:border-green-700" />
+                <span className="w-3 h-3 rounded border border-green-300 bg-green-100" />
                 Available
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-3 h-3 rounded border border-red-300 bg-red-100 dark:bg-red-900/30 dark:border-red-700" />
+                <span className="w-3 h-3 rounded border border-red-300 bg-red-100" />
                 Booked
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-3 h-3 rounded border border-gray-200 bg-gray-100 dark:bg-gray-800 dark:border-gray-700" />
+                <span className="w-3 h-3 rounded border border-gray-200 bg-gray-100" />
                 Unavailable
               </span>
               <span className="flex items-center gap-1">
@@ -328,7 +328,7 @@ export default function AppointmentScheduler({
             </div>
 
             {slotData.slots.length === 0 ? (
-              <p className="text-sm text-[#64748B] dark:text-[#94A3B8] py-4 text-center">
+              <p className="text-sm text-[#64748B] py-4 text-center">
                 No slots available for this date.
               </p>
             ) : (
@@ -382,14 +382,14 @@ export default function AppointmentScheduler({
       )}
 
       {!doctorId && showDoctorSelector && (
-        <div className="text-center py-6 text-xs text-[#64748B] dark:text-[#94A3B8]">
+        <div className="text-center py-6 text-xs text-[#64748B]">
           <UserIcon className="h-5 w-5 mx-auto mb-2 opacity-40" />
           Select a doctor to view available slots
         </div>
       )}
 
       {!doctorId && !showDoctorSelector && (
-        <div className="text-center py-6 text-xs text-[#64748B] dark:text-[#94A3B8]">
+        <div className="text-center py-6 text-xs text-[#64748B]">
           <Stethoscope className="h-5 w-5 mx-auto mb-2 opacity-40" />
           Doctor will be assigned during scheduling
         </div>

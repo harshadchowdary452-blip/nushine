@@ -510,22 +510,22 @@ export default function AppointmentList() {
               <div className="grid gap-2">
                 <Label>Patient</Label>
                 {selectedPatient ? (
-                  <div className="rounded-xl border border-border bg-white dark:bg-[#1E293B] p-4">
+                  <div className="rounded-xl border border-border bg-white  p-4">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
                           <UserIcon className="h-5 w-5 text-primary" />
                         </div>
                         <div>
-                          <p className="font-semibold text-[#0F172A] dark:text-[#F8FAFC]">{selectedPatient.full_name}</p>
-                          <p className="text-xs text-[#64748B] dark:text-[#CBD5E1]">ID: {selectedPatient.id.slice(0, 8)}</p>
+                          <p className="font-semibold text-[#0F172A] ">{selectedPatient.full_name}</p>
+                          <p className="text-xs text-[#64748B] ">ID: {selectedPatient.id.slice(0, 8)}</p>
                         </div>
                       </div>
                       <button type="button" onClick={clearPatientSelection} className="text-muted-foreground hover:text-foreground">
                         <X className="h-4 w-4" />
                       </button>
                     </div>
-                    <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-[#64748B] dark:text-[#CBD5E1]">
+                    <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-[#64748B] ">
                       {selectedPatient.age && <span>Age: {selectedPatient.age}</span>}
                       {selectedPatient.gender && <span>Gender: {selectedPatient.gender}</span>}
                       {selectedPatient.phone && <span>Phone: {selectedPatient.phone}</span>}
@@ -538,21 +538,21 @@ export default function AppointmentList() {
                       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
                       <Input ref={patientSearchRef} placeholder="Search by Name / Phone" value={patientSearch}
                         onChange={(e) => setPatientSearch(e.target.value)}
-                        className="pl-10 bg-white dark:bg-[#1E293B] border-[#E2E8F0] dark:border-[#334155] text-[#0F172A] dark:text-[#F8FAFC]" />
+                        className="pl-10 bg-white  border-[#E2E8F0]  text-[#0F172A] " />
                     </div>
                     {patientSearch && (
-                      <div className="max-h-[260px] overflow-y-auto rounded-xl border border-[#E2E8F0] dark:border-[#334155] bg-white dark:bg-[#1E293B]">
+                      <div className="max-h-[260px] overflow-y-auto rounded-xl border border-[#E2E8F0]  bg-white ">
                         {filteredPatients.length === 0 ? (
                           <div className="p-6 text-center text-sm text-[#64748B]">No patients found</div>
                         ) : filteredPatients.map((p) => (
                           <button key={p.id} type="button"
-                            className="w-full px-4 py-3 text-left border-b border-[#E2E8F0] dark:border-[#334155] last:border-0 hover:bg-gray-50 dark:hover:bg-[#334155] transition-colors"
+                            className="w-full px-4 py-3 text-left border-b border-[#E2E8F0]  last:border-0 hover:bg-gray-50 transition-colors"
                             onClick={() => handlePatientSelect(p.id)}>
                             <div className="flex items-center justify-between">
-                              <span className="font-medium text-sm text-[#0F172A] dark:text-[#F8FAFC]">{p.full_name}</span>
+                              <span className="font-medium text-sm text-[#0F172A] ">{p.full_name}</span>
                               <StatusBadge status={p.status} />
                             </div>
-                            <div className="flex items-center gap-3 text-xs text-[#64748B] dark:text-[#CBD5E1] mt-1">
+                            <div className="flex items-center gap-3 text-xs text-[#64748B]  mt-1">
                               {p.phone && <span>{p.phone}</span>}
                               <span>ID: {p.id.slice(0, 8)}</span>
                             </div>

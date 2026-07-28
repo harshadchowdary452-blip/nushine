@@ -354,6 +354,7 @@ async def update_patient(patient_id: str, data: PatientUpdate, db: AsyncSession 
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
     await verify_tenant_access(current_user, patient, "patient", db)
     old_data = {f: getattr(patient, f, None) for f in TRACKED_PATIENT_FIELDS}
+    old_status = patient.status.value if hasattr(patient.status, 'value') else str(patient.status)
     update_data = data.model_dump(exclude_none=True)
     patient = await service.update(patient_id, update_data, user_id=current_user.get("sub"))
     if patient:
@@ -361,18 +362,30 @@ async def update_patient(patient_id: str, data: PatientUpdate, db: AsyncSession 
         await record_timeline_event(db, patient_id=patient_id, action="Patient Updated",
             module="patient", description=f"Patient '{patient.full_name}' updated",
             current_user=current_user, changes=changes)
+    new_status = patient.status.value if hasattr(patient.status, 'value') else str(patient.status) if patient else None
     try:
         from app.crm.services.event_dispatcher import publish_event
         from app.crm.enums import EventType, EventSource
-        await publish_event(
-            event_type=EventType.PATIENT_UPDATED,
-            source_module=EventSource.PATIENT,
-            entity_type="PATIENT",
-            entity_id=patient.id,
-            hospital_id=patient.hospital_id,
-            patient_id=patient.id,
-            db=db,
-        )
+        if new_status == "OPD" and old_status != "OPD":
+            await publish_event(
+                event_type=EventType.OPD_CONSULTATION_COMPLETED,
+                source_module=EventSource.PATIENT,
+                entity_type="PATIENT",
+                entity_id=patient.id,
+                hospital_id=patient.hospital_id,
+                patient_id=patient.id,
+                db=db,
+            )
+        else:
+            await publish_event(
+                event_type=EventType.PATIENT_UPDATED,
+                source_module=EventSource.PATIENT,
+                entity_type="PATIENT",
+                entity_id=patient.id,
+                hospital_id=patient.hospital_id,
+                patient_id=patient.id,
+                db=db,
+            )
     except Exception:
         pass
     return patient

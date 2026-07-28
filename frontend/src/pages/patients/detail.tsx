@@ -561,7 +561,7 @@ export default function PatientDetail() {
             {patient.phone && (
               <>
                 <a href={`tel:${patient.phone}`}>
-                  <Button size="sm" variant="outline" className="border-gray-300 dark:border-[#475569]">
+                  <Button size="sm" variant="outline" className="border-gray-300 ">
                     <Phone className="h-4 w-4 mr-1.5" />
                     Call
                   </Button>
@@ -569,7 +569,7 @@ export default function PatientDetail() {
                 <a href={`https://wa.me/${patient.phone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(
                   `Hello ${patient.patient_name},\n\nThank you for visiting ${patient.hospital_name || "our clinic"}.\nPlease let us know if you need any assistance.\n\nRegards,\n${patient.hospital_name || "Our Clinic"}`
                 )}`} target="_blank" rel="noopener noreferrer">
-                  <Button size="sm" variant="outline" className="border-gray-300 dark:border-[#475569]">
+                  <Button size="sm" variant="outline" className="border-gray-300 ">
                     <MessageSquare className="h-4 w-4 mr-1.5" />
                     WhatsApp
                   </Button>
@@ -592,7 +592,7 @@ export default function PatientDetail() {
                 </DialogHeader>
                 <DialogBody>
                   {/* Personal Details */}
-                  <div className="rounded-xl border border-gray-100 dark:border-[#334155] p-4 mb-4">
+                  <div className="rounded-xl border border-gray-100  p-4 mb-4">
                     <h4 className="text-sm font-semibold text-primary flex items-center gap-2 mb-3">
                       <User className="h-4 w-4" />
                       Personal Details
@@ -651,7 +651,7 @@ export default function PatientDetail() {
                   </div>
 
                   {/* Contact Information */}
-                  <div className="rounded-xl border border-gray-100 dark:border-[#334155] p-4 mb-4">
+                  <div className="rounded-xl border border-gray-100  p-4 mb-4">
                     <h4 className="text-sm font-semibold text-primary flex items-center gap-2 mb-3">
                       <Phone className="h-4 w-4" />
                       Contact Information
@@ -718,7 +718,7 @@ export default function PatientDetail() {
                   </div>
 
                   {/* Medical Information */}
-                  <div className="rounded-xl border border-gray-100 dark:border-[#334155] p-4 mb-4">
+                  <div className="rounded-xl border border-gray-100  p-4 mb-4">
                     <h4 className="text-sm font-semibold text-primary flex items-center gap-2 mb-3">
                       <Activity className="h-4 w-4" />
                       Medical Information
@@ -736,7 +736,7 @@ export default function PatientDetail() {
                   </div>
 
                   {/* Vitals */}
-                  <div className="rounded-xl border border-gray-100 dark:border-[#334155] p-4 mb-4">
+                  <div className="rounded-xl border border-gray-100  p-4 mb-4">
                     <h4 className="text-sm font-semibold text-primary flex items-center gap-2 mb-3">
                       <Activity className="h-4 w-4" />
                       Vitals
@@ -766,7 +766,7 @@ export default function PatientDetail() {
                   </div>
 
                   {/* Status */}
-                  <div className="rounded-xl border border-gray-100 dark:border-[#334155] p-4">
+                  <div className="rounded-xl border border-gray-100  p-4">
                     <h4 className="text-sm font-semibold text-primary flex items-center gap-2 mb-3">
                       <Activity className="h-4 w-4" />
                       Status
@@ -1435,7 +1435,7 @@ function CaseImages({ caseId, caseName }: { caseId: string; caseName: string }) 
           </DialogHeader>
           {previewUrl && (
             <div
-              className="flex items-center justify-center overflow-auto max-h-[70vh] bg-gray-100 dark:bg-gray-900 rounded-lg cursor-grab active:cursor-grabbing select-none"
+              className="flex items-center justify-center overflow-auto max-h-[70vh] bg-gray-100 rounded-lg cursor-grab active:cursor-grabbing select-none"
               onWheel={(e) => {
                 e.preventDefault()
                 setZoom(z => {

@@ -23,6 +23,12 @@ class TreatmentSittingService:
         self.audit_log_repo = AuditLogRepository(db)
         self.db = db
 
+    async def _get_patient_id_from_plan(self, plan) -> Optional[str]:
+        if not plan or not plan.case_id:
+            return None
+        case = await self.db.get(Case, plan.case_id)
+        return str(case.patient_id) if case and case.patient_id else None
+
     async def _auto_create_appointment_from_sitting(self, sitting: TreatmentSitting) -> Optional[Appointment]:
         if not sitting.next_appointment_date:
             return None
@@ -129,20 +135,21 @@ class TreatmentSittingService:
             if sitting.status == TreatmentSittingStatus.COMPLETED.value:
                 from app.crm.services.event_dispatcher import publish_event
                 plan = await self.db.get(TreatmentPlan, treatment_plan_id)
+                patient_id = await self._get_patient_id_from_plan(plan)
                 if plan and plan.remaining_sittings <= 0:
                     await publish_event(
                         event_type="TREATMENT_COMPLETED",
                         source_module="TREATMENT_SITTING_SERVICE",
                         entity_type="TREATMENT",
                         entity_id=treatment_plan_id,
-                        patient_id=str(plan.patient_id) if plan.patient_id else None,
+                        patient_id=patient_id,
                         payload={
-                            "patient_id": str(plan.patient_id) if plan.patient_id else None,
+                            "patient_id": patient_id,
                             "treatment_plan_id": treatment_plan_id,
                             "case_id": str(plan.case_id) if plan.case_id else None,
                             "treatment_type_id": str(plan.treatment_type_id) if plan.treatment_type_id else None,
                             "treatment_name": plan.treatment_name,
-                            "doctor_id": str(plan.doctor_id) if plan.doctor_id else None,
+                            "doctor_id": str(plan.assigned_doctor_id) if plan.assigned_doctor_id else None,
                             "visit_date": sitting.sitting_date.isoformat() if sitting.sitting_date else date.today().isoformat(),
                         },
                         db=self.db,
@@ -153,14 +160,14 @@ class TreatmentSittingService:
                         source_module="TREATMENT_SITTING_SERVICE",
                         entity_type="TREATMENT",
                         entity_id=treatment_plan_id,
-                        patient_id=str(plan.patient_id) if plan.patient_id else None,
+                        patient_id=patient_id,
                         payload={
-                            "patient_id": str(plan.patient_id) if plan.patient_id else None,
+                            "patient_id": patient_id,
                             "treatment_plan_id": treatment_plan_id,
                             "case_id": str(plan.case_id) if plan.case_id else None,
                             "treatment_type_id": str(plan.treatment_type_id) if plan.treatment_type_id else None,
                             "treatment_name": plan.treatment_name,
-                            "doctor_id": str(plan.doctor_id) if plan.doctor_id else None,
+                            "doctor_id": str(plan.assigned_doctor_id) if plan.assigned_doctor_id else None,
                             "sitting_number": sitting.sitting_number,
                             "visit_date": sitting.sitting_date.isoformat() if sitting.sitting_date else date.today().isoformat(),
                         },
@@ -235,6 +242,7 @@ class TreatmentSittingService:
                 await self._recalculate_plan_sitting_counts(sitting.treatment_plan_id, user_id=user_id)
                 now_completed = sitting.status == TreatmentSittingStatus.COMPLETED.value
                 plan = await self.db.get(TreatmentPlan, sitting.treatment_plan_id)
+                patient_id = await self._get_patient_id_from_plan(plan)
                 if now_completed and not was_completed:
                     from app.crm.services.event_dispatcher import publish_event
                     if plan and plan.remaining_sittings <= 0:
@@ -243,14 +251,14 @@ class TreatmentSittingService:
                             source_module="TREATMENT_SITTING_SERVICE",
                             entity_type="TREATMENT",
                             entity_id=sitting.treatment_plan_id,
-                            patient_id=str(plan.patient_id) if plan.patient_id else None,
+                            patient_id=patient_id,
                             payload={
-                                "patient_id": str(plan.patient_id) if plan.patient_id else None,
+                                "patient_id": patient_id,
                                 "treatment_plan_id": sitting.treatment_plan_id,
                                 "case_id": str(plan.case_id) if plan.case_id else None,
                                 "treatment_type_id": str(plan.treatment_type_id) if plan.treatment_type_id else None,
                                 "treatment_name": plan.treatment_name,
-                                "doctor_id": str(plan.doctor_id) if plan.doctor_id else None,
+                                "doctor_id": str(plan.assigned_doctor_id) if plan.assigned_doctor_id else None,
                                 "visit_date": sitting.sitting_date.isoformat() if sitting.sitting_date else date.today().isoformat(),
                             },
                             db=self.db,
@@ -261,14 +269,14 @@ class TreatmentSittingService:
                             source_module="TREATMENT_SITTING_SERVICE",
                             entity_type="TREATMENT",
                             entity_id=sitting.treatment_plan_id,
-                            patient_id=str(plan.patient_id) if plan.patient_id else None,
+                            patient_id=patient_id,
                             payload={
-                                "patient_id": str(plan.patient_id) if plan.patient_id else None,
+                                "patient_id": patient_id,
                                 "treatment_plan_id": sitting.treatment_plan_id,
                                 "case_id": str(plan.case_id) if plan.case_id else None,
                                 "treatment_type_id": str(plan.treatment_type_id) if plan.treatment_type_id else None,
                                 "treatment_name": plan.treatment_name,
-                                "doctor_id": str(plan.doctor_id) if plan.doctor_id else None,
+                                "doctor_id": str(plan.assigned_doctor_id) if plan.assigned_doctor_id else None,
                                 "sitting_number": sitting.sitting_number,
                                 "visit_date": sitting.sitting_date.isoformat() if sitting.sitting_date else date.today().isoformat(),
                             },

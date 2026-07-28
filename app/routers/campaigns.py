@@ -147,7 +147,6 @@ async def launch_campaign(
     if not hospital_id:
         raise HTTPException(status_code=400, detail="Hospital ID required")
     result = await svc.launch(campaign_id, hospital_id)
-    await db.commit()
     try:
         from app.crm.services.event_dispatcher import publish_event
         from app.crm.enums import EventType, EventSource
@@ -161,6 +160,7 @@ async def launch_campaign(
         )
     except Exception:
         pass
+    await db.commit()
     return result
 
 

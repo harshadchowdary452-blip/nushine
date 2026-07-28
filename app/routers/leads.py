@@ -257,6 +257,7 @@ async def convert_lead(lead_id: str, data: LeadConvertCreate, db: AsyncSession =
     result = await service.convert(lead_id, data.model_dump(exclude_none=True), user_id=current_user.get("sub"))
     if "error" in result:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result["error"])
+    lead = await service.repo.get(lead_id)
     if result.get("patient_id"):
         await record_timeline_event(
             db, current_user=current_user, patient_id=result["patient_id"],
@@ -272,27 +273,28 @@ async def convert_lead(lead_id: str, data: LeadConvertCreate, db: AsyncSession =
             source_module=EventSource.LEAD,
             entity_type="LEAD",
             entity_id=lead_id,
-            hospital_id=getattr(result, 'hospital_id', None),
+            hospital_id=lead.hospital_id if lead else None,
             patient_id=result.get("patient_id"),
+            payload={
+                "lead_id": lead_id,
+                "patient_id": result.get("patient_id"),
+            },
             db=db,
         )
     except Exception:
         pass
     try:
-        patient_id = result.get("patient_id")
-        if patient_id:
-            from app.models.generated_enquiry import GeneratedEnquiry
-            from sqlalchemy import update
-            from app.database import get_db_session
-            await db.execute(
-                update(GeneratedEnquiry)
-                .where(
-                    GeneratedEnquiry.patient_id == patient_id,
-                    GeneratedEnquiry.enquiry_type == "LEAD_FOLLOW_UP",
-                    GeneratedEnquiry.status.in_(["PENDING", "NEW", "CONTACTED"]),
-                )
-                .values(status="CONVERTED")
+        from app.models.generated_enquiry import GeneratedEnquiry
+        from sqlalchemy import update
+        await db.execute(
+            update(GeneratedEnquiry)
+            .where(
+                GeneratedEnquiry.lead_id == lead_id,
+                GeneratedEnquiry.enquiry_type == "LEAD_FOLLOW_UP",
+                GeneratedEnquiry.status.in_(["PENDING", "NEW", "CONTACTED"]),
             )
+            .values(status="CONVERTED")
+        )
     except Exception:
         pass
     return result

@@ -119,6 +119,8 @@ class EnquiryExecutor:
             decision.patient_id, decision.case_id,
             decision.treatment_type_id, decision.appointment_id,
             decision.enquiry_type, decision.due_date,
+            lead_id=getattr(decision, 'lead_id', None),
+            chain_id=getattr(decision, 'chain_id', None),
         )
         if is_dup:
             logger.info(
@@ -167,19 +169,22 @@ class EnquiryExecutor:
 
         cancel_types = decision.cancel_enquiry_types or [decision.enquiry_type]
         patient_id = decision.patient_id
+        lead_id = getattr(decision, 'lead_id', None)
 
-        if not patient_id:
+        conditions = [
+            GeneratedEnquiry.hospital_id == hospital_id,
+            GeneratedEnquiry.enquiry_type.in_(cancel_types),
+            GeneratedEnquiry.status == "PENDING",
+        ]
+        if patient_id:
+            conditions.append(GeneratedEnquiry.patient_id == patient_id)
+        elif lead_id:
+            conditions.append(GeneratedEnquiry.lead_id == lead_id)
+        else:
             return 0
 
         result = await db.execute(
-            select(GeneratedEnquiry).where(
-                and_(
-                    GeneratedEnquiry.hospital_id == hospital_id,
-                    GeneratedEnquiry.patient_id == patient_id,
-                    GeneratedEnquiry.enquiry_type.in_(cancel_types),
-                    GeneratedEnquiry.status == "PENDING",
-                )
-            )
+            select(GeneratedEnquiry).where(and_(*conditions))
         )
 
         cancelled = 0
@@ -213,16 +218,36 @@ class EnquiryExecutor:
         appointment_id: Optional[str],
         enquiry_type: str,
         due_date: date,
+        lead_id: Optional[str] = None,
+        chain_id: Optional[str] = None,
     ) -> bool:
         """Check enterprise idempotency key before creating enquiry.
 
         Checks ALL active statuses (PENDING, CONTACTED, INTERESTED, etc.)
         NOT just PENDING — this prevents duplicate creation after CANCEL.
         Only COMPLETED and CANCELLED are excluded (terminal states).
+
+        For recurring recalls (chain_id provided), checks for any PENDING
+        recall in the same chain instead of the standard key.
         """
         from app.models.generated_enquiry import GeneratedEnquiry
 
         terminal_statuses = ["COMPLETED", "CANCELLED", "LOST", "CONVERTED"]
+
+        # For recurring recalls: check by chain_id + patient
+        if chain_id and enquiry_type == "RECALL":
+            result = await db.execute(
+                select(func.count(GeneratedEnquiry.id)).where(
+                    and_(
+                        GeneratedEnquiry.hospital_id == hospital_id,
+                        GeneratedEnquiry.patient_id == patient_id,
+                        GeneratedEnquiry.enquiry_type == "RECALL",
+                        GeneratedEnquiry.chain_id == chain_id,
+                        GeneratedEnquiry.status.notin_(terminal_statuses),
+                    )
+                )
+            )
+            return result.scalar() > 0
 
         conditions = [
             GeneratedEnquiry.hospital_id == hospital_id,
@@ -250,6 +275,11 @@ class EnquiryExecutor:
             conditions.append(GeneratedEnquiry.appointment_id == appointment_id)
         else:
             conditions.append(GeneratedEnquiry.appointment_id.is_(None))
+
+        if lead_id:
+            conditions.append(GeneratedEnquiry.lead_id == lead_id)
+        else:
+            conditions.append(GeneratedEnquiry.lead_id.is_(None))
 
         result = await db.execute(
             select(func.count(GeneratedEnquiry.id)).where(and_(*conditions))
@@ -285,7 +315,16 @@ class EnquiryExecutor:
             treatment_name=decision.treatment_name,
             created_by_event=decision.trigger_event,
             generation_reason=f"Rule Engine Decision | Event: {decision.trigger_event}",
+            is_recurring=getattr(decision, 'is_recurring', False),
+            occurrence_number=getattr(decision, 'occurrence_number', 1),
+            recurrence_interval_days=getattr(decision, 'recurrence_interval_days', None),
+            chain_id=None,
         )
+        if getattr(decision, 'is_recurring', False):
+            if getattr(decision, 'chain_id', None):
+                ge.chain_id = decision.chain_id
+            else:
+                ge.chain_id = ge.id
 
         ge.enquiry_number = await self._generate_enquiry_number(db)
 

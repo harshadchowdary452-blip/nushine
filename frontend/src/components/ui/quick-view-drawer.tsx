@@ -186,7 +186,7 @@ function ImagePreviewDialog({ url, onClose }: { url: string | null; onClose: () 
         </div>
       </div>
       <div
-        className="flex-1 flex items-center justify-center overflow-auto bg-gray-100 dark:bg-gray-900 cursor-grab active:cursor-grabbing select-none p-4"
+        className="flex-1 flex items-center justify-center overflow-auto bg-gray-100 cursor-grab active:cursor-grabbing select-none p-4"
         onWheel={(e) => { e.preventDefault(); setZoom(z => Math.max(0.25, Math.min(5, z + (e.deltaY > 0 ? -0.1 : 0.1)))) }}
         onDoubleClick={() => setZoom(z => z === 1 ? 2 : 1)}
       >

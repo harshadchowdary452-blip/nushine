@@ -51,6 +51,76 @@ interface CalendarItem {
   patient_id?: string
   appointment_date?: string
   hospital_phone?: string
+  enquiry_number?: string
+  description?: string
+  visit_number?: number
+  completed_treatments?: Array<{ id: string; treatment_name: string; completed_at?: string }>
+  // New enriched nested fields
+  patient?: {
+    id: string; name: string; photo_url?: string; phone?: string
+    op_number?: string; age?: number; gender?: string; status?: string
+  }
+  lead?: {
+    id: string; name: string; mobile: string; email?: string
+    source?: string; status?: string; interested_treatment?: string
+    priority?: string; next_follow_up_date?: string; notes?: string
+    alternate_mobile?: string; age?: number; gender?: string
+    city?: string; lead_score?: number; preferred_visit_date?: string
+    assigned_doctor?: string; assigned_staff?: string
+  }
+  doctor?: {
+    id?: string; name?: string; specialization?: string; photo_url?: string
+  }
+  hospital?: {
+    id: string; name: string; phone?: string; address?: string; logo_url?: string
+  }
+  case?: {
+    id: string; case_number?: string; chief_complaint?: string
+    status?: string; diagnosis?: string
+  }
+  treatment?: {
+    id: string; treatment_name?: string; treatment_type?: string; status?: string
+    start_date?: string; completion_date?: string
+    total_visits?: number; completed_visits?: number; remaining_visits?: number
+    current_visit?: number; current_stage?: string
+  }
+  appointment?: {
+    id: string; date?: string; time?: string; doctor_name?: string
+    appointment_type?: string; purpose?: string; status?: string
+  }
+  recurrence?: {
+    is_recurring: boolean; occurrence_number?: number
+    interval_days?: number; chain_id?: string
+  }
+  assigned_staff?: { id: string; name: string }
+  template_variables?: Record<string, string>
+}
+
+// Enriched detail response from /detail endpoint
+interface EnquiryDetail {
+  id: string; source: string; enquiry_type: string; enquiry_number?: string
+  status: string; priority: string; due_date: string
+  created_at?: string; updated_at?: string
+  description: string; notes?: string; trigger_event?: string
+  generation_reason?: string; visit_number?: number; total_visits?: number
+  patient?: CalendarItem["patient"]
+  lead?: CalendarItem["lead"]
+  doctor?: CalendarItem["doctor"]
+  hospital?: CalendarItem["hospital"]
+  case?: CalendarItem["case"]
+  treatment?: CalendarItem["treatment"]
+  appointment?: CalendarItem["appointment"]
+  recurrence?: CalendarItem["recurrence"]
+  assigned_staff?: { id: string; name: string; email?: string; phone?: string }
+  template_variables?: Record<string, string>
+  communication_history?: Array<{
+    id: string; channel: string; message_type: string
+    message: string; status: string; sent_at?: string; created_at?: string
+  }>
+  timeline?: Array<{
+    id: string; enquiry_type: string; status: string
+    due_date?: string; created_at?: string; description?: string
+  }>
 }
 
 interface DoctorItem {
@@ -69,12 +139,15 @@ interface TimelineEntry {
   notes?: string
   patient_feedback?: string
   response_summary?: string
+  event_type?: string
+  description?: string
 }
 
 interface WhatsAppTemplate {
   id?: string
   name?: string
   message?: string
+  enquiry_type?: string
   is_active?: boolean
 }
 
@@ -116,7 +189,7 @@ const STATUS_COLORS: Record<string, string> = {
   COMPLETED: "bg-gray-100 text-gray-600",
   NO_RESPONSE: "bg-gray-100 text-gray-500",
   LOST: "bg-red-100 text-red-800",
-  CANCELLED: "bg-dark-gray-100 text-gray-700",
+  CANCELLED: "bg-gray-100 text-gray-700",
   NEW: "bg-blue-100 text-blue-700",
   NOT_INTERESTED: "bg-gray-100 text-gray-500",
   CONVERTED: "bg-green-100 text-green-800",
@@ -139,7 +212,7 @@ const ENQUIRY_TYPE_LABELS: Record<string, string> = {
   CRM_RULE: "CRM Rule",
 }
 
-const responseStatusOptions = [
+const PATIENT_RESPONSE_OPTIONS = [
   { value: "INTERESTED", label: "Interested" },
   { value: "APPOINTMENT_REQUIRED", label: "Appointment Requested" },
   { value: "NOT_INTERESTED", label: "Not Interested" },
@@ -151,6 +224,23 @@ const responseStatusOptions = [
   { value: "TREATMENT_COMPLETED", label: "Treatment Successful" },
   { value: "NEEDS_REVIEW", label: "Needs Review" },
 ]
+
+const LEAD_RESPONSE_OPTIONS = [
+  { value: "INTERESTED", label: "Interested" },
+  { value: "NOT_INTERESTED", label: "Not Interested" },
+  { value: "FOLLOW_UP_REQUIRED", label: "Follow-up Required" },
+  { value: "CALL_BACK_LATER", label: "Call Back Later" },
+  { value: "WRONG_NUMBER", label: "Wrong Number" },
+  { value: "NO_RESPONSE", label: "No Response" },
+  { value: "ALREADY_UNDER_TREATMENT", label: "Already Under Treatment" },
+  { value: "BUDGET_ISSUE", label: "Budget Issue" },
+  { value: "LOST_TO_COMPETITOR", label: "Lost to Competitor" },
+  { value: "CONVERTED", label: "Converted" },
+]
+
+function getResponseOptions(enquiryType?: string) {
+  return enquiryType === "LEAD_FOLLOW_UP" ? LEAD_RESPONSE_OPTIONS : PATIENT_RESPONSE_OPTIONS
+}
 
 const nextActionOptions = [
   { value: "CALL_AGAIN", label: "Call Again" },
@@ -166,7 +256,54 @@ const timeSlots = [
   "19:00", "19:30", "20:00", "20:30", "21:00", "21:30",
 ]
 
-const DEFAULT_ENQUIRY_TEMPLATE = `Hello {{patient_name}},
+const DEFAULT_TEMPLATES: Record<string, string> = {
+  LEAD_FOLLOW_UP: `Hello {{lead_name}},
+
+Thank you for contacting {{hospital_name}}.
+
+We understand that you are interested in {{interested_treatment}}.
+
+Our team is available to answer your questions and help you schedule a consultation at your convenience.
+
+Please let us know a suitable time, and we will be happy to assist you.
+
+Thank you,
+{{hospital_name}}
+
+Contact:
+{{hospital_phone}}`,
+  APPOINTMENT_REMINDER: `Hello {{patient_name}},
+
+This is a friendly reminder about your appointment with Dr. {{doctor_name}}.
+
+Appointment
+
+Date:
+{{appointment_date}}
+
+Time:
+{{appointment_time}}
+
+OP Number:
+{{op_number}}
+
+If you are unable to attend, kindly let us know so we can assist with rescheduling.
+
+Thank you,
+{{hospital_name}}`,
+  OPD_FOLLOW_UP: `Hello {{patient_name}},
+
+We hope your consultation at {{hospital_name}} was helpful.
+
+Dr. {{doctor_name}} has recommended further care based on your consultation.
+
+If you have any questions or would like to begin your treatment, please contact us.
+
+We are happy to assist you.
+
+Thank you,
+{{hospital_name}}`,
+  TREATMENT_WELLNESS: `Hello {{patient_name}},
 
 We hope you are doing well after your recent {{treatment_name}} at {{hospital_name}}.
 
@@ -174,12 +311,52 @@ We would like to know how you are feeling now.
 
 • Are you recovering well?
 • Are you experiencing any discomfort?
-• Would you like to schedule a follow-up visit with Dr. {{doctor_name}} if required?
+• If required, would you like to schedule a follow-up visit with Dr. {{doctor_name}}?
 
-Please let us know. We are happy to assist you.
+Please let us know.
+
+We are always happy to assist you.
 
 Thank you,
-{{hospital_name}}`
+{{hospital_name}}`,
+  CASE_WELLNESS: `Hello {{patient_name}},
+
+We hope you are recovering well after completing your treatment for {{case_name}}.
+
+Completed Treatments
+
+{{completed_treatments}}
+
+If you have any concerns or need further guidance, please contact us.
+
+Our team and Dr. {{doctor_name}} are always available to help.
+
+Thank you,
+{{hospital_name}}`,
+  RECALL: `Hello {{patient_name}},
+
+This is your scheduled dental recall reminder from {{hospital_name}}.
+
+Based on your previous treatment
+
+{{completed_treatments}}
+
+your next preventive dental check-up is due on
+
+{{next_recall_date}}
+
+Regular reviews help maintain your oral health and allow early detection of any issues.
+
+Please contact us to schedule your appointment.
+
+Thank you,
+{{hospital_name}}`,
+}
+
+function getDefaultTemplate(enquiryType?: string): string {
+  if (enquiryType && DEFAULT_TEMPLATES[enquiryType]) return DEFAULT_TEMPLATES[enquiryType]
+  return DEFAULT_TEMPLATES.APPOINTMENT_REMINDER || ""
+}
 
 function replaceTemplateVars(template: string, vars: Record<string, string | undefined>): string {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] || "")
@@ -281,6 +458,16 @@ export default function EnquiryCalendar() {
   // --- Detail Drawer ---
   const [detailItem, setDetailItem] = useState<CalendarItem | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
+  const { data: detailData } = useQuery({
+    queryKey: ["enquiry-detail", detailItem?.id],
+    queryFn: async () => {
+      if (!detailItem?.id) return null
+      const resp = await enquiriesApi.getDetail(detailItem.id)
+      return (resp?.data || resp) as EnquiryDetail | null
+    },
+    enabled: !!detailItem?.id && detailOpen,
+    staleTime: 30_000,
+  })
 
   // --- Feedback Dialog ---
   const [feedbackOpen, setFeedbackOpen] = useState<string | null>(null)
@@ -454,37 +641,99 @@ export default function EnquiryCalendar() {
   const [waMessage, setWaMessage] = useState("")
   const [waLoading, setWaLoading] = useState(false)
   const [waTemplateError, setWaTemplateError] = useState("")
+  const [waPreviewOpen, setWaPreviewOpen] = useState(false)
+  const [waPreviewMsg, setWaPreviewMsg] = useState("")
+
+  const loadWaPreview = useCallback(async () => {
+    if (!detailItem?.id) return
+    try {
+      const r = await enquiriesApi.whatsappPreview(detailItem.id)
+      setWaPreviewMsg(r?.rendered_message || "No preview available")
+    } catch {
+      setWaPreviewMsg("Unable to load WhatsApp preview")
+    }
+  }, [detailItem?.id])
 
   function buildWhatsAppVars(item: CalendarItem): Record<string, string> {
-    return {
-      patient_name: item.patient_name || "Patient",
-      doctor_name: item.doctor_name || "Doctor",
-      hospital_name: currentUser?.hospital_name || "our clinic",
-      treatment_name: item.treatment_name || "treatment",
-      appointment_date: item.appointment_date || "soon",
-      hospital_phone: currentUser?.hospital_phone || item.hospital_phone || "",
+    if (item.template_variables && Object.keys(item.template_variables).length > 0) {
+      return item.template_variables
     }
+    const isLead = item.enquiry_type === "LEAD_FOLLOW_UP"
+    const vars: Record<string, string> = {
+      hospital_name: item.hospital?.name || currentUser?.hospital_name || "our clinic",
+      hospital_phone: item.hospital?.phone || item.hospital_phone || currentUser?.hospital_phone || "",
+      hospital_address: item.hospital?.address || "",
+      clinic_name: item.hospital?.name || "",
+      current_date: new Date().toISOString().slice(0, 10),
+      current_time: new Date().toTimeString().slice(0, 5),
+    }
+    if (isLead) {
+      vars.lead_name = item.lead?.name || ""
+      vars.lead_phone = item.lead?.mobile || ""
+      vars.lead_source = item.lead?.source || ""
+      vars.lead_status = item.lead?.status || ""
+      vars.interested_treatment = item.lead?.interested_treatment || ""
+      vars.assigned_staff = item.lead?.assigned_staff || item.assigned_staff?.name || ""
+      vars.assigned_staff_name = item.lead?.assigned_staff || item.assigned_staff?.name || ""
+      vars.preferred_branch = ""
+      vars.preferred_time = ""
+      vars.website = ""
+    } else {
+      vars.patient_name = item.patient?.name || item.patient_name || ""
+      vars.patient_phone = item.patient?.phone || item.patient_phone || ""
+      vars.doctor_name = item.doctor?.name || item.doctor_name || ""
+      vars.doctor_specialization = item.doctor?.specialization || ""
+      vars.op_number = item.patient?.op_number || item.op_number || ""
+      vars.treatment_name = item.treatment?.treatment_name || item.treatment_name || ""
+      vars.treatment_type = item.treatment?.treatment_type || item.treatment_type || ""
+      vars.treatment_status = item.treatment?.status || ""
+      vars.visit_number = String(item.treatment?.current_visit || item.visit_number || "")
+      vars.remaining_visits = String(item.treatment?.remaining_visits || "")
+      vars.total_visits = String(item.treatment?.total_visits || "")
+      vars.appointment_date = item.appointment?.date || item.appointment_date || ""
+      vars.appointment_time = item.appointment?.time || ""
+      vars.appointment_type = item.appointment?.appointment_type || ""
+      vars.case_name = item.case?.case_number || ""
+      vars.case_completion_date = item.case?.case_number ? item.case.case_number : ""
+      vars.completed_treatments = ""
+      vars.next_recall_date = item.recurrence ? item.due_date || "" : ""
+      vars.recall_interval = ""
+      vars.follow_up_date = item.due_date || ""
+      vars.followup_date = item.due_date || ""
+      vars.staff_name = item.assigned_staff?.name || item.doctor?.name || ""
+    }
+    return vars
   }
 
   async function openWhatsApp(item: CalendarItem) {
-    const phone = item.patient_phone
-    if (!phone) { addToast({ title: "Patient mobile number is not available.", variant: "destructive" }); return }
+    const phone = item.enquiry_type === "LEAD_FOLLOW_UP" ? item.lead?.mobile : (item.patient_phone || item.patient?.phone)
+    if (!phone) { addToast({ title: "Mobile number is not available.", variant: "destructive" }); return }
     setWaItem(item)
     setWaOpen(item.id)
     setWaTemplateError("")
     setWaLoading(true)
     try {
-      const templates = await whatsappTemplatesApi.list({ hospital_id: currentUser?.hospital_id })
-      const list: WhatsAppTemplate[] = Array.isArray(templates) ? templates : (templates as { items?: WhatsAppTemplate[]; data?: WhatsAppTemplate[] })?.items || []
-      const template = list.find((t) => t.is_active !== false && t.name && /enquiry|follow.?up/i.test(t.name) && t.message)
-      if (template?.message) {
-        setWaMessage(replaceTemplateVars(template.message, buildWhatsAppVars(item)))
+      const resp = await enquiriesApi.whatsappPreview(item.id)
+      if (resp?.rendered_message) {
+        setWaMessage(resp.rendered_message)
       } else {
-        const anyTemplate = list.find((t) => t.is_active !== false && t.message)
-        setWaMessage(replaceTemplateVars(anyTemplate?.message || DEFAULT_ENQUIRY_TEMPLATE, buildWhatsAppVars(item)))
+        throw new Error("no rendered_message")
       }
     } catch {
-      setWaMessage(replaceTemplateVars(DEFAULT_ENQUIRY_TEMPLATE, buildWhatsAppVars(item)))
+      try {
+        const templates = await whatsappTemplatesApi.list({ hospital_id: currentUser?.hospital_id })
+        const list: WhatsAppTemplate[] = Array.isArray(templates) ? templates : (templates as { items?: WhatsAppTemplate[]; data?: WhatsAppTemplate[] })?.items || []
+        const template = list.find((t) => t.is_active !== false && t.enquiry_type === item.enquiry_type && t.message)
+        if (template?.message) {
+          setWaMessage(replaceTemplateVars(template.message, buildWhatsAppVars(item)))
+        } else {
+          const defaultMsg = getDefaultTemplate(item.enquiry_type)
+          setWaMessage(replaceTemplateVars(defaultMsg, buildWhatsAppVars(item)))
+        }
+      } catch {
+        const defaultMsg = getDefaultTemplate(item.enquiry_type)
+        setWaMessage(replaceTemplateVars(defaultMsg, buildWhatsAppVars(item)))
+      }
     }
     setWaLoading(false)
   }
@@ -496,8 +745,8 @@ export default function EnquiryCalendar() {
       setWaTemplateError(`Unresolved variables: ${unresolved.join(", ")}. Please replace them before sending.`)
       return
     }
-    const phone = (waItem.patient_phone || "").replace(/[^0-9]/g, "")
-    if (!phone) { addToast({ title: "Patient mobile number is not available.", variant: "destructive" }); return }
+    const phone = (waItem.enquiry_type === "LEAD_FOLLOW_UP" ? (waItem.lead?.mobile || "") : (waItem.patient_phone || waItem.patient?.phone || "")).replace(/[^0-9]/g, "")
+    if (!phone) { addToast({ title: "Mobile number is not available.", variant: "destructive" }); return }
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(waMessage)}`, "_blank")
     try {
       if (waItem.source === "generated_enquiry") {
@@ -526,12 +775,15 @@ export default function EnquiryCalendar() {
   // --- Timeline ---
   const [timelineOpen, setTimelineOpen] = useState<string | null>(null)
   const [timelineItem, setTimelineItem] = useState<CalendarItem | null>(null)
+  const isLeadTimeline = timelineItem?.enquiry_type === "LEAD_FOLLOW_UP"
   const { data: timelineData } = useQuery({
     queryKey: ["patient-timeline", timelineItem?.patient_id],
     queryFn: () => crmApi.patientFollowUpHistory(timelineItem!.patient_id!),
-    enabled: !!timelineItem?.patient_id,
+    enabled: !!timelineItem?.patient_id && !isLeadTimeline,
   })
-  const timelineEntries: TimelineEntry[] = Array.isArray(timelineData) ? timelineData : []
+  // For LEAD enquiries, use enriched detail data timeline
+  const leadTimelineData = !isLeadTimeline ? [] : ((detailData as any)?.timeline || [])
+  const timelineEntries: any[] = isLeadTimeline ? leadTimelineData : (Array.isArray(timelineData) ? timelineData : [])
 
   // --- Navigation ---
   function navToday() { setSelectedDate(format(today, "yyyy-MM-dd")) }
@@ -761,12 +1013,11 @@ export default function EnquiryCalendar() {
                   <TableHeader className="sticky top-0 bg-white z-10">
                     <TableRow>
                       <TableHead className="w-2" />
-                      <TableHead className="whitespace-nowrap">Patient</TableHead>
+                      <TableHead className="whitespace-nowrap">Patient / Description</TableHead>
                       <TableHead className="whitespace-nowrap">OP No.</TableHead>
                       <TableHead className="whitespace-nowrap">Doctor</TableHead>
+                      <TableHead className="whitespace-nowrap">Hospital</TableHead>
                       <TableHead className="whitespace-nowrap">Type</TableHead>
-                      <TableHead className="whitespace-nowrap">Treatment</TableHead>
-                      <TableHead className="whitespace-nowrap">Priority</TableHead>
                       <TableHead className="whitespace-nowrap">Status</TableHead>
                       <TableHead className="whitespace-nowrap sticky right-0 bg-white z-10">Actions</TableHead>
                     </TableRow>
@@ -775,36 +1026,73 @@ export default function EnquiryCalendar() {
                     {filteredItems.map((item) => {
                       const tc = getTypeColor(item.enquiry_type || item.follow_up_type || "")
                       const od = isOverdue(item.due_date || "", item.status || "")
+                      const desc = item.description
+                      const patName = item.patient?.name || item.patient_name || "Unknown"
+                      const docName = item.doctor?.name || item.doctor_name
+                      const docSpec = item.doctor?.specialization
+                      const hospName = item.hospital?.name
+                      const treatmentLabel = item.treatment?.treatment_name || item.treatment_name
                       return (
                         <TableRow key={`${item.source}-${item.id}`}
                           className={`cursor-pointer hover:bg-muted/50 ${od ? "bg-red-50/40" : ""}`}
                           draggable
                           onDragStart={(e) => handleDragStart(e, item)}
                           onClick={() => { setDetailItem(item); setDetailOpen(true) }}>
-                          <TableCell className="w-2 p-0"><div className={`w-1.5 h-8 rounded-full ${tc.dot}`} /></TableCell>
-                          <TableCell className="font-medium whitespace-nowrap">{item.patient_name}</TableCell>
-                          <TableCell className="text-muted-foreground text-xs whitespace-nowrap">{item.op_number || "—"}</TableCell>
-                          <TableCell className="text-xs whitespace-nowrap">{item.doctor_name || "—"}</TableCell>
+                          <TableCell className="w-2 p-0"><div className={`w-1.5 h-10 rounded-full ${tc.dot}`} /></TableCell>
+                          <TableCell>
+                            <div className="font-medium text-sm whitespace-nowrap">{patName}</div>
+                            {item.enquiry_type === "APPOINTMENT_REMINDER" && item.appointment && (
+                              <div className="text-xs text-muted-foreground truncate max-w-[260px]">
+                                {treatmentLabel && <>{treatmentLabel} · </>}
+                                {item.treatment?.current_visit && <>Visit {item.treatment.current_visit + 1}/{item.treatment.total_visits} · </>}
+                                {item.appointment.time && <>{item.appointment.time}</>}
+                              </div>
+                            )}
+                            {item.enquiry_type === "TREATMENT_WELLNESS" && (
+                              <div className="text-xs text-muted-foreground truncate max-w-[260px]">
+                                {treatmentLabel && <>{treatmentLabel}</>}
+                                {item.treatment?.status && <> · {item.treatment.status}</>}
+                                {item.treatment?.completion_date && <> · {item.treatment.completion_date}</>}
+                              </div>
+                            )}
+                            {(item.enquiry_type === "CASE_WELLNESS" || item.enquiry_type === "RECALL") && item.case && (
+                              <div className="text-xs text-muted-foreground truncate max-w-[260px]">
+                                {item.case.case_number && <>{item.case.case_number}</>}
+                                {desc && <> · {desc}</>}
+                              </div>
+                            )}
+                            {!["APPOINTMENT_REMINDER", "TREATMENT_WELLNESS", "CASE_WELLNESS", "RECALL"].includes(item.enquiry_type || "") && desc && (
+                              <div className="text-xs text-muted-foreground truncate max-w-[220px]">{desc}</div>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-xs whitespace-nowrap">{item.patient?.op_number || item.op_number || "—"}</TableCell>
+                          <TableCell className="text-xs whitespace-nowrap">
+                            {docName ? (
+                              <span>
+                                Dr. {docName}
+                                {docSpec && <span className="text-muted-foreground ml-1">({docSpec})</span>}
+                              </span>
+                            ) : "—"}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{hospName || "—"}</TableCell>
                           <TableCell>
                             <Badge variant="outline" className={`text-[10px] ${tc.bg} ${tc.text} ${tc.border}`}>
                               {ENQUIRY_TYPE_LABELS[item.enquiry_type || ""] || item.enquiry_type || item.follow_up_type || "—"}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-xs max-w-[120px] truncate">{item.treatment_name || "—"}</TableCell>
                           <TableCell>
-                            {item.priority === "HIGH" ? (
-                              <Badge className="text-[10px] bg-red-100 text-red-700">HIGH</Badge>
-                            ) : item.priority === "LOW" ? (
-                              <Badge className="text-[10px] bg-gray-100 text-gray-600">LOW</Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-[10px]">MED</Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={`text-[10px] ${STATUS_COLORS[item.status || ""] || "bg-gray-100"}`}>
-                              {od && <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />}
-                              {item.status || "—"}
-                            </Badge>
+                            <div className="flex items-center gap-1">
+                              <Badge className={`text-[10px] ${STATUS_COLORS[item.status || ""] || "bg-gray-100"}`}>
+                                {od && <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />}
+                                {item.status || "—"}
+                              </Badge>
+                              {item.priority === "HIGH" && (
+                                <Badge className="text-[9px] bg-red-100 text-red-700">HIGH</Badge>
+                              )}
+                              {treatmentLabel && (
+                                <span className="text-[9px] text-muted-foreground truncate max-w-[80px] hidden lg:inline">{treatmentLabel}</span>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="sticky right-0 bg-white z-10">
                             <TooltipProvider>
@@ -1017,6 +1305,18 @@ export default function EnquiryCalendar() {
                                   {item.doctor_name && ` · Dr. ${item.doctor_name}`}
                                   {item.treatment_name && ` · ${item.treatment_name}`}
                                 </div>
+                                {item.enquiry_type === "APPOINTMENT_REMINDER" && item.appointment?.time && (
+                                  <div className="text-xs font-medium text-blue-600">{item.appointment.time}</div>
+                                )}
+                                {item.enquiry_type === "TREATMENT_WELLNESS" && item.treatment?.status && (
+                                  <div className="text-xs text-muted-foreground">{item.treatment.status.replace("_", " ")}</div>
+                                )}
+                                {(item.enquiry_type === "CASE_WELLNESS" || item.enquiry_type === "RECALL") && item.completed_treatments && item.completed_treatments.length > 0 && (
+                                  <div className="text-xs text-muted-foreground truncate">
+                                    {item.completed_treatments.slice(0, 3).map((ct: any) => ct.treatment_name).join(" · ")}
+                                    {item.completed_treatments.length > 3 && ` +${item.completed_treatments.length - 3}`}
+                                  </div>
+                                )}
                               </div>
                               <div className="flex items-center gap-0.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                                 <TooltipProvider>
@@ -1050,37 +1350,280 @@ export default function EnquiryCalendar() {
         </Card>
       )}
 
-      {/* Detail Drawer (Sheet) */}
+      {/* Detail Drawer (Sheet) — Enriched */}
       <Sheet open={detailOpen} onOpenChange={setDetailOpen}>
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
           {detailItem && (
             <>
               <SheetHeader>
                 <SheetTitle className="flex items-center gap-2">
                   <div className={`w-3 h-3 rounded-full ${getTypeColor(detailItem.enquiry_type || "").dot}`} />
-                  {detailItem.patient_name}
+                  {detailItem.enquiry_type === "LEAD_FOLLOW_UP"
+                    ? (detailItem.lead?.name || "Lead")
+                    : (detailItem.patient?.name || detailItem.patient_name || "Enquiry")}
+                  {detailItem.enquiry_number && (
+                    <span className="text-xs font-normal text-muted-foreground">#{detailItem.enquiry_number}</span>
+                  )}
                 </SheetTitle>
-                <SheetDescription>
-                  {ENQUIRY_TYPE_LABELS[detailItem.enquiry_type || ""] || detailItem.enquiry_type || "Enquiry"} · Due {detailItem.due_date}
+                <SheetDescription className="flex flex-col gap-1">
+                  <span>
+                    {ENQUIRY_TYPE_LABELS[detailItem.enquiry_type || ""] || detailItem.enquiry_type || "Enquiry"}
+                    {detailItem.description && <span className="block text-xs mt-0.5 italic">{detailItem.description}</span>}
+                  </span>
                 </SheetDescription>
               </SheetHeader>
-              <div className="mt-6 space-y-4">
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div><span className="text-muted-foreground">Status</span><div>
-                    <Badge className={`text-xs mt-1 ${STATUS_COLORS[detailItem.status || ""] || ""}`}>{detailItem.status}</Badge>
-                  </div></div>
-                  <div><span className="text-muted-foreground">Priority</span><div className="font-medium mt-1">{detailItem.priority || "MEDIUM"}</div></div>
-                  <div><span className="text-muted-foreground">OP Number</span><div className="font-medium mt-1">{detailItem.op_number || "—"}</div></div>
-                  <div><span className="text-muted-foreground">Phone</span><div className="font-medium mt-1">{detailItem.patient_phone || "—"}</div></div>
-                  <div><span className="text-muted-foreground">Doctor</span><div className="font-medium mt-1">{detailItem.doctor_name || "—"}</div></div>
-                  <div><span className="text-muted-foreground">Source</span><div className="font-medium mt-1 capitalize">{detailItem.source?.replace("_", " ") || "—"}</div></div>
+              <div className="mt-4 space-y-3">
+
+                {/* Status + Priority + Dates */}
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="bg-muted/30 rounded p-2">
+                    <div className="text-muted-foreground">Status</div>
+                    <Badge className={`text-xs mt-0.5 ${STATUS_COLORS[detailItem.status || ""] || ""}`}>{detailItem.status}</Badge>
+                  </div>
+                  <div className="bg-muted/30 rounded p-2">
+                    <div className="text-muted-foreground">Priority</div>
+                    <div className="font-semibold mt-0.5">{detailItem.priority || "MEDIUM"}</div>
+                  </div>
+                  <div className="bg-muted/30 rounded p-2">
+                    <div className="text-muted-foreground">Due</div>
+                    <div className="font-semibold mt-0.5">{detailItem.due_date ? format(parseISO(detailItem.due_date), "dd MMM") : "—"}</div>
+                  </div>
                 </div>
-                {detailItem.treatment_name && (
-                  <div><span className="text-xs text-muted-foreground">Treatment</span><p className="text-sm mt-0.5">{detailItem.treatment_name}</p></div>
+
+                {/* ── LEAD SUMMARY (for LEAD_FOLLOW_UP only) ── */}
+                {detailItem.enquiry_type === "LEAD_FOLLOW_UP" && detailItem.lead && (
+                  <>
+                    <div className="rounded-lg border border-amber-200 bg-amber-50/40 p-3 space-y-2">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 font-bold text-base">
+                          {(detailItem.lead.name || "?").charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-sm">{detailItem.lead.name}</div>
+                          {detailItem.lead.mobile && <div className="text-xs text-muted-foreground">{detailItem.lead.mobile}</div>}
+                        </div>
+                        <Badge className="text-[9px]">{detailItem.lead.status}</Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs pt-1 border-t border-amber-200/50">
+                        {detailItem.lead.source && <div><span className="text-muted-foreground">Source:</span> {detailItem.lead.source.replace("_", " ")}</div>}
+                        {detailItem.lead.interested_treatment && <div><span className="text-muted-foreground">Interest:</span> {detailItem.lead.interested_treatment}</div>}
+                        {detailItem.lead.email && <div className="col-span-2"><span className="text-muted-foreground">Email:</span> {detailItem.lead.email}</div>}
+                        {(detailData as any)?.lead?.alternate_mobile && (
+                          <div><span className="text-muted-foreground">Alt. Mobile:</span> {(detailData as any).lead.alternate_mobile}</div>
+                        )}
+                        {(detailData as any)?.lead?.city && <div><span className="text-muted-foreground">City:</span> {(detailData as any).lead.city}</div>}
+                        {(detailData as any)?.lead?.age != null && <div><span className="text-muted-foreground">Age:</span> {(detailData as any).lead.age} yrs</div>}
+                        {(detailData as any)?.lead?.gender && <div><span className="text-muted-foreground">Gender:</span> {(detailData as any).lead.gender}</div>}
+                        {(detailData as any)?.lead?.preferred_visit_date && <div><span className="text-muted-foreground">Preferred:</span> {(detailData as any).lead.preferred_visit_date}</div>}
+                        {(detailData as any)?.lead?.assigned_staff && <div><span className="text-muted-foreground">Assigned:</span> {(detailData as any).lead.assigned_staff}</div>}
+                      </div>
+                      {(detailData as any)?.lead?.notes && (
+                        <div className="text-xs pt-1 border-t border-amber-200/50">
+                          <span className="text-muted-foreground">Notes:</span> {(detailData as any).lead.notes}
+                        </div>
+                      )}
+                    </div>
+                  </>
                 )}
-                {detailItem.feedback && (
-                  <div><span className="text-xs text-muted-foreground">Notes</span><p className="text-sm mt-0.5">{detailItem.feedback}</p></div>
+
+                {/* ── PATIENT SUMMARY (for patient-type enquiries only) ── */}
+                {detailItem.enquiry_type !== "LEAD_FOLLOW_UP" && detailItem.patient && (
+                  <div className="rounded-lg border p-3 space-y-1.5">
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">PATIENT</div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+                        {(detailItem.patient.name || "?").charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-semibold text-sm">{detailItem.patient.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {detailItem.patient.op_number && <>OP: {detailItem.patient.op_number} · </>}
+                          {detailItem.patient.age && <>{detailItem.patient.age} yrs · </>}
+                          {detailItem.patient.gender && <>{detailItem.patient.gender}</>}
+                        </div>
+                      </div>
+                      <div className="text-xs text-right">
+                        {detailItem.patient.phone && <div className="font-medium">{detailItem.patient.phone}</div>}
+                        <div className="text-muted-foreground">{detailItem.patient.status || ""}</div>
+                      </div>
+                    </div>
+                  </div>
                 )}
+
+                {/* ── DOCTOR (patient types only) ── */}
+                {detailItem.enquiry_type !== "LEAD_FOLLOW_UP" && detailItem.doctor?.name && (
+                  <div className="rounded-lg border p-3 space-y-1.5">
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">DOCTOR</div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm">
+                        Dr{(detailItem.doctor.name || "").charAt(0)}
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-semibold text-sm">Dr. {detailItem.doctor.name}</div>
+                        {detailItem.doctor.specialization && (
+                          <div className="text-xs text-muted-foreground">{detailItem.doctor.specialization}</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Hospital (always relevant) */}
+                {detailItem.hospital?.name && (
+                  <div className="rounded-lg border p-3 space-y-1.5">
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">HOSPITAL</div>
+                    <div className="text-sm font-medium">{detailItem.hospital.name}</div>
+                    {detailItem.hospital.phone && <div className="text-xs text-muted-foreground">{detailItem.hospital.phone}</div>}
+                    {detailItem.hospital.address && <div className="text-xs text-muted-foreground">{detailItem.hospital.address}</div>}
+                  </div>
+                )}
+
+                {/* Case Information (patient types only) */}
+                {detailItem.enquiry_type !== "LEAD_FOLLOW_UP" && detailItem.case && (
+                  <div className="rounded-lg border p-3 space-y-1.5">
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">CASE</div>
+                    <div className="text-sm font-medium">{detailItem.case.case_number || detailItem.case.id}</div>
+                    {detailItem.case.chief_complaint && (
+                      <div className="text-xs text-muted-foreground line-clamp-2">{detailItem.case.chief_complaint}</div>
+                    )}
+                    {detailItem.case.diagnosis && (
+                      <div className="text-xs"><span className="text-muted-foreground">Dx: </span>{detailItem.case.diagnosis}</div>
+                    )}
+                    <div>
+                      <Badge variant="outline" className="text-[9px]">{detailItem.case.status}</Badge>
+                    </div>
+                  </div>
+                )}
+
+                {/* Treatment Information (patient types only) */}
+                {detailItem.enquiry_type !== "LEAD_FOLLOW_UP" && detailItem.treatment && (
+                  <div className="rounded-lg border p-3 space-y-1.5">
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">TREATMENT</div>
+                    <div className="text-sm font-medium">{detailItem.treatment.treatment_name}</div>
+                    {detailItem.treatment.treatment_type && (
+                      <div className="text-xs text-muted-foreground">{detailItem.treatment.treatment_type}</div>
+                    )}
+                    <div className="grid grid-cols-3 gap-2 text-xs mt-1">
+                      <div><span className="text-muted-foreground">Visits:</span> {detailItem.treatment.completed_visits || 0}/{detailItem.treatment.total_visits || "?"}</div>
+                      <div><span className="text-muted-foreground">Remaining:</span> {detailItem.treatment.remaining_visits || 0}</div>
+                      <div>
+                        <Badge variant="outline" className="text-[9px]">{detailItem.treatment.status}</Badge>
+                      </div>
+                    </div>
+                    {detailItem.treatment.current_stage && (
+                      <div className="text-xs font-medium text-primary">Current: {detailItem.treatment.current_stage}</div>
+                    )}
+                    {detailItem.treatment.start_date && (
+                      <div className="text-xs text-muted-foreground">Started: {format(parseISO(detailItem.treatment.start_date), "dd MMM yyyy")}</div>
+                    )}
+                  </div>
+                )}
+
+                {/* Appointment Information (patient types only) */}
+                {detailItem.enquiry_type !== "LEAD_FOLLOW_UP" && detailItem.appointment && (
+                  <div className="rounded-lg border p-3 space-y-1.5">
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">APPOINTMENT</div>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">
+                        {detailItem.appointment.date && format(parseISO(detailItem.appointment.date), "dd MMM yyyy")}
+                        {detailItem.appointment.time && <> at {detailItem.appointment.time}</>}
+                      </span>
+                    </div>
+                    {detailItem.appointment.doctor_name && (
+                      <div className="text-xs">Dr. {detailItem.appointment.doctor_name}</div>
+                    )}
+                    {detailItem.appointment.purpose && (
+                      <div className="text-xs text-muted-foreground">{detailItem.appointment.purpose}</div>
+                    )}
+                    <Badge variant="outline" className="text-[9px]">{detailItem.appointment.status}</Badge>
+                  </div>
+                )}
+
+                {/* Recurrence */}
+                {detailItem.recurrence?.is_recurring && (
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-3 space-y-1">
+                    <div className="text-xs font-semibold text-red-700 uppercase tracking-wide">RECURRING RECALL</div>
+                    <div className="text-xs text-red-600">
+                      Occurrence #{detailItem.recurrence.occurrence_number}
+                      {detailItem.recurrence.interval_days && <> · Every {detailItem.recurrence.interval_days} days</>}
+                    </div>
+                  </div>
+                )}
+
+                {/* Communication History */}
+                {detailData?.communication_history && detailData.communication_history.length > 0 && (
+                  <div className="rounded-lg border p-3 space-y-2">
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">COMMUNICATION HISTORY</div>
+                    <div className="space-y-1.5 max-h-[120px] overflow-y-auto">
+                      {detailData?.communication_history.slice(0, 5).map((c: any) => (
+                        <div key={c.id} className="text-xs flex items-start gap-2 py-1 border-b last:border-b-0">
+                          <span className={`px-1.5 py-0.5 rounded font-medium ${
+                            c.channel === "WHATSAPP" ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"
+                          }`}>{c.channel}</span>
+                          <span className="flex-1 truncate">{c.message?.substring(0, 80)}</span>
+                          <span className="text-muted-foreground shrink-0">{c.status}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Timeline */}
+                {detailData?.timeline && detailData.timeline.length > 0 && (
+                  <div className="rounded-lg border p-3 space-y-2">
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">TIMELINE</div>
+                    <div className="space-y-2 max-h-[150px] overflow-y-auto">
+                      {detailData?.timeline.map((entry: any, idx: number) => (
+                        <div key={entry.id || idx} className="flex gap-2 text-xs">
+                          <div className="w-2 h-2 rounded-full bg-primary mt-1 shrink-0" />
+                          <div className="flex-1">
+                            <div className="font-medium">{entry.description || entry.enquiry_type}</div>
+                            <div className="text-muted-foreground">
+                              {entry.created_at && format(new Date(entry.created_at), "dd MMM")}
+                              {entry.due_date && <> · due {format(parseISO(entry.due_date), "dd MMM")}</>}
+                              <Badge variant="outline" className="ml-1 text-[9px]">{entry.status}</Badge>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* WhatsApp Preview */}
+                {detailItem?.id && (
+                  <div className="rounded-lg border p-3 space-y-2">
+                    <button
+                      type="button"
+                      className="w-full flex items-center justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wide"
+                      onClick={() => setWaPreviewOpen(prev => !prev)}
+                    >
+                      <span>WHATSAPP PREVIEW</span>
+                      <ChevronRight className={`h-3.5 w-3.5 transition-transform ${waPreviewOpen ? "rotate-90" : ""}`} />
+                    </button>
+                    {waPreviewOpen && (
+                      <div className="space-y-2">
+                        {detailData?.template_variables && Object.keys(detailData.template_variables).length > 0 && (
+                          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs max-h-[120px] overflow-y-auto">
+                            {Object.entries(detailData.template_variables).slice(0, 12).map(([k, v]) => (
+                              <div key={k} className="truncate"><span className="text-muted-foreground">{k}:</span> {String(v || "—")}</div>
+                            ))}
+                          </div>
+                        )}
+                        {waPreviewMsg ? (
+                          <pre className="text-xs whitespace-pre-wrap bg-muted/30 rounded p-2 max-h-[120px] overflow-y-auto">{waPreviewMsg}</pre>
+                        ) : (
+                          <Button size="sm" variant="outline" className="w-full text-xs" onClick={loadWaPreview}>
+                            <MessageCircle className="h-3 w-3 mr-1" /> Load Preview
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Actions */}
                 <div className="flex gap-2 pt-2 border-t">
                   <Button size="sm" className="flex-1" onClick={() => { setDetailOpen(false); openFeedback(detailItem) }}>
                     <FileText className="h-3.5 w-3.5 mr-1" /> Feedback
@@ -1117,23 +1660,32 @@ export default function EnquiryCalendar() {
       {/* Feedback Dialog */}
       <Dialog open={!!feedbackOpen} onOpenChange={(o) => { if (!o) closeFeedback() }}>
         <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Record Feedback — {feedbackItem?.patient_name || ""}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>
+              Record Feedback —
+              {feedbackItem?.enquiry_type === "LEAD_FOLLOW_UP"
+                ? (feedbackItem?.lead?.name || "Lead")
+                : (feedbackItem?.patient_name || "")}
+            </DialogTitle>
+          </DialogHeader>
           <div className="space-y-4 px-1">
             <div className="space-y-2">
-              <Label>Patient Response <span className="text-red-500">*</span></Label>
+              <Label>Response <span className="text-red-500">*</span></Label>
               <Select value={fbResponseStatus} onValueChange={setFbResponseStatus}>
-                <SelectTrigger><SelectValue placeholder="Select patient response" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select response" /></SelectTrigger>
                 <SelectContent position="popper" className="max-h-[220px]">
-                  {responseStatusOptions.map((opt) => (
+                  {getResponseOptions(feedbackItem?.enquiry_type).map((opt) => (
                     <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Patient Condition / Feedback</Label>
-              <Textarea value={fbPatientFeedback} onChange={(e) => setFbPatientFeedback(e.target.value)} rows={2} placeholder="How is the patient feeling?" />
-            </div>
+            {feedbackItem?.enquiry_type !== "LEAD_FOLLOW_UP" && (
+              <div className="space-y-2">
+                <Label>Patient Condition / Feedback</Label>
+                <Textarea value={fbPatientFeedback} onChange={(e) => setFbPatientFeedback(e.target.value)} rows={2} placeholder="How is the patient feeling?" />
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Staff Notes</Label>
               <Textarea value={fbStaffNotes} onChange={(e) => setFbStaffNotes(e.target.value)} rows={2} placeholder="Internal notes..." />
@@ -1142,57 +1694,61 @@ export default function EnquiryCalendar() {
               <Label>Response Summary</Label>
               <Input value={fbSummary} onChange={(e) => setFbSummary(e.target.value)} placeholder="Brief outcome" />
             </div>
-            <div className="space-y-2">
-              <Label>Interested To Visit Again</Label>
-              <div className="flex gap-2">
-                {["Yes", "No", "Maybe"].map((opt) => (
-                  <Button key={opt} type="button" variant={fbInterested === opt ? "default" : "outline"} size="sm"
-                    className="flex-1" onClick={() => setFbInterested(opt)}>{opt}</Button>
-                ))}
-              </div>
-            </div>
-            {fbInterested === "Yes" && (
-              <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-3">
-                <Label className="font-semibold text-primary">Create Appointment</Label>
+            {feedbackItem?.enquiry_type !== "LEAD_FOLLOW_UP" && (
+              <>
                 <div className="space-y-2">
-                  <Label>Doctor <span className="text-red-500">*</span></Label>
-                  <Select value={fbApptDoctorId} onValueChange={setFbApptDoctorId}>
-                    <SelectTrigger><SelectValue placeholder="Select doctor" /></SelectTrigger>
-                    <SelectContent position="popper" className="max-h-[220px]">
-                      {doctorsList.map((doc) => (
-                        <SelectItem key={doc.id} value={doc.id}>{doc.full_name || doc.name || doc.username}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label>Interested To Visit Again</Label>
+                  <div className="flex gap-2">
+                    {["Yes", "No", "Maybe"].map((opt) => (
+                      <Button key={opt} type="button" variant={fbInterested === opt ? "default" : "outline"} size="sm"
+                        className="flex-1" onClick={() => setFbInterested(opt)}>{opt}</Button>
+                    ))}
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Date <span className="text-red-500">*</span></Label>
-                  <Input type="date" value={fbApptDate} onChange={(e) => setFbApptDate(e.target.value)} min={format(today, "yyyy-MM-dd")} />
-                </div>
-                {fbApptDoctorId && fbApptDate && (
-                  <div className="space-y-2">
-                    <Label>Available Time Slots</Label>
-                    {fbSlotsList.length > 0 ? (
-                      <div className="grid grid-cols-4 gap-1.5 max-h-[150px] overflow-y-auto p-1 border rounded-md">
-                        {fbSlotsList.map((slot: string) => (
-                          <Button key={slot} variant={fbApptTime === slot ? "default" : "outline"} size="sm"
-                            className={`text-xs h-8 ${fbApptTime === slot ? "ring-2 ring-primary" : ""}`}
-                            onClick={() => setFbApptTime(slot)}>
-                            {slot.replace(/^(\d{2})(\d{2})$/, "$1:$2")}
-                          </Button>
-                        ))}
+                {fbInterested === "Yes" && (
+                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-3">
+                    <Label className="font-semibold text-primary">Create Appointment</Label>
+                    <div className="space-y-2">
+                      <Label>Doctor <span className="text-red-500">*</span></Label>
+                      <Select value={fbApptDoctorId} onValueChange={setFbApptDoctorId}>
+                        <SelectTrigger><SelectValue placeholder="Select doctor" /></SelectTrigger>
+                        <SelectContent position="popper" className="max-h-[220px]">
+                          {doctorsList.map((doc) => (
+                            <SelectItem key={doc.id} value={doc.id}>{doc.full_name || doc.name || doc.username}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Date <span className="text-red-500">*</span></Label>
+                      <Input type="date" value={fbApptDate} onChange={(e) => setFbApptDate(e.target.value)} min={format(today, "yyyy-MM-dd")} />
+                    </div>
+                    {fbApptDoctorId && fbApptDate && (
+                      <div className="space-y-2">
+                        <Label>Available Time Slots</Label>
+                        {fbSlotsList.length > 0 ? (
+                          <div className="grid grid-cols-4 gap-1.5 max-h-[150px] overflow-y-auto p-1 border rounded-md">
+                            {fbSlotsList.map((slot: string) => (
+                              <Button key={slot} variant={fbApptTime === slot ? "default" : "outline"} size="sm"
+                                className={`text-xs h-8 ${fbApptTime === slot ? "ring-2 ring-primary" : ""}`}
+                                onClick={() => setFbApptTime(slot)}>
+                                {slot.replace(/^(\d{2})(\d{2})$/, "$1:$2")}
+                              </Button>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">No slots found.</p>
+                        )}
                       </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">No slots found.</p>
                     )}
+                    <Button className="w-full" onClick={handleFbBookAppointment}
+                      disabled={!fbApptDoctorId || !fbApptDate || !fbApptTime || fbApptSaving}>
+                      {fbApptSaving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                      <Calendar className="h-4 w-4 mr-2" /> Create Appointment
+                    </Button>
                   </div>
                 )}
-                <Button className="w-full" onClick={handleFbBookAppointment}
-                  disabled={!fbApptDoctorId || !fbApptDate || !fbApptTime || fbApptSaving}>
-                  {fbApptSaving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                  <Calendar className="h-4 w-4 mr-2" /> Create Appointment
-                </Button>
-              </div>
+              </>
             )}
             <div className="space-y-2">
               <Label>Next Action</Label>
@@ -1219,9 +1775,15 @@ export default function EnquiryCalendar() {
       {/* WhatsApp Dialog */}
       <Dialog open={!!waOpen} onOpenChange={(o) => { if (!o) { setWaOpen(null); setWaMessage(""); setWaTemplateError("") } }}>
         <DialogContent className="sm:max-w-lg">
-          <DialogHeader><DialogTitle>Send WhatsApp to {waItem?.patient_name || ""}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>
+              Send WhatsApp to {waItem?.enquiry_type === "LEAD_FOLLOW_UP"
+                ? (waItem?.lead?.name || "Lead")
+                : (waItem?.patient_name || "")}
+            </DialogTitle>
+          </DialogHeader>
           <div className="space-y-4">
-            <div className="text-sm text-muted-foreground">To: <strong>{waItem?.patient_phone || ""}</strong></div>
+            <div className="text-sm text-muted-foreground">To: <strong>{waItem?.patient_phone || waItem?.lead?.mobile || ""}</strong></div>
             <div className="space-y-2">
               <Label>Message Preview</Label>
               {waLoading ? (
@@ -1232,6 +1794,9 @@ export default function EnquiryCalendar() {
             </div>
             {waTemplateError && <div className="text-xs text-red-600 bg-red-50 rounded px-3 py-2">{waTemplateError}</div>}
             <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={async () => { if (!waItem) return; setWaLoading(true); try { const r = await enquiriesApi.whatsappPreview(waItem.id); if (r?.rendered_message) setWaMessage(r.rendered_message) } catch {} setWaLoading(false) }}>
+                <RotateCcw className="h-3 w-3 mr-1" /> Refresh
+              </Button>
               <Button variant="outline" className="flex-1" onClick={() => { setWaOpen(null); setWaMessage(""); setWaTemplateError("") }}>Cancel</Button>
               <Button className="flex-1" onClick={sendWhatsApp} disabled={!waMessage || waLoading}>
                 <MessageCircle className="h-4 w-4 mr-2" /> Open WhatsApp
@@ -1261,12 +1826,19 @@ export default function EnquiryCalendar() {
       {/* Timeline Dialog */}
       <Dialog open={!!timelineOpen} onOpenChange={(o) => { if (!o) { setTimelineOpen(null); setTimelineItem(null) } }}>
         <DialogContent className="sm:max-w-md max-h-[80vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Patient Timeline — {timelineItem?.patient_name || ""}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>
+              {timelineItem?.enquiry_type === "LEAD_FOLLOW_UP" ? "Lead Timeline" : "Patient Timeline"}
+              {timelineItem?.enquiry_type === "LEAD_FOLLOW_UP"
+                ? ` — ${timelineItem?.lead?.name || ""}`
+                : ` — ${timelineItem?.patient_name || ""}`}
+            </DialogTitle>
+          </DialogHeader>
           <div className="space-y-3 px-1">
             {timelineEntries.length === 0 ? (
               <div className="py-8 text-center text-muted-foreground text-sm">
                 <History className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                No timeline entries found for this patient.
+                No timeline entries found.
               </div>
             ) : (
               timelineEntries.map((entry: TimelineEntry, idx: number) => (
@@ -1279,9 +1851,9 @@ export default function EnquiryCalendar() {
                     <div className="text-xs text-muted-foreground">
                       {entry.created_at ? format(new Date(entry.created_at), "dd MMM yyyy HH:mm") : ""}
                     </div>
-                    <div className="text-sm font-medium">{entry.action || entry.status || entry.follow_up_type || "Event"}</div>
-                    {(entry.notes || entry.patient_feedback || entry.response_summary) && (
-                      <div className="text-xs text-muted-foreground mt-0.5">{entry.notes || entry.patient_feedback || entry.response_summary}</div>
+                    <div className="text-sm font-medium">{entry.action || entry.status || entry.follow_up_type || entry.event_type || "Event"}</div>
+                    {(entry.notes || entry.patient_feedback || entry.response_summary || entry.description) && (
+                      <div className="text-xs text-muted-foreground mt-0.5">{entry.notes || entry.patient_feedback || entry.response_summary || entry.description}</div>
                     )}
                   </div>
                 </div>

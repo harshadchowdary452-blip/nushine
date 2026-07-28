@@ -1,16 +1,17 @@
+import logging
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
-from datetime import date, datetime, timedelta
+from sqlalchemy import select, func, and_
+from datetime import date, timedelta
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.core.permissions import Permission, verify_permission
-from app.models.appointment import Appointment, AppointmentStatus
+from app.core.permissions import Permission, verify_permission, Role
+from app.models.appointment import Appointment
 from app.models.patient import Patient
 from app.models.user import User
-from app.core.permissions import Role
 
 router = APIRouter(prefix="/calendar", tags=["Calendar"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("/appointments")
@@ -27,30 +28,61 @@ async def get_calendar_appointments(
     role = current_user.get("role")
     user_id = current_user.get("sub")
     hospital_id = current_user.get("hospital_id")
-    query = select(Appointment).where(
-        Appointment.appointment_date >= s_date,
-        Appointment.appointment_date <= e_date,
-        Appointment.is_active == True,
+
+    stmt = (
+        select(
+            Appointment.id,
+            Appointment.patient_id,
+            Appointment.doctor_id,
+            Appointment.appointment_date,
+            Appointment.appointment_time,
+            Appointment.status,
+            Appointment.notes,
+            Patient.full_name.label("patient_name"),
+            User.full_name.label("doctor_name"),
+        )
+        .outerjoin(Patient, Appointment.patient_id == Patient.id)
+        .outerjoin(User, Appointment.doctor_id == User.id)
+        .where(
+            Appointment.appointment_date >= s_date,
+            Appointment.appointment_date <= e_date,
+            Appointment.is_active == True,
+        )
     )
+
     if role == Role.DOCTOR.value:
-        query = query.where(Appointment.doctor_id == user_id)
+        stmt = stmt.where(Appointment.doctor_id == user_id)
     elif doctor_id:
-        query = query.where(Appointment.doctor_id == doctor_id)
+        stmt = stmt.where(Appointment.doctor_id == doctor_id)
     elif hospital_id:
-        query = query.join(Appointment.patient).where(Patient.hospital_id == hospital_id)
-    query = query.order_by(Appointment.appointment_date, Appointment.appointment_time)
-    result = await db.execute(query)
-    items = result.scalars().all()
-    return [{
-        "id": str(a.id), "patient_id": str(a.patient_id) if a.patient_id else None,
-        "doctor_id": str(a.doctor_id) if a.doctor_id else None,
-        "patient_name": a.patient_name or "Unknown",
-        "doctor_name": a.doctor_name or "Unknown",
-        "appointment_date": a.appointment_date.isoformat(),
-        "appointment_time": a.appointment_time.strftime("%H:%M") if a.appointment_time else None,
-        "status": a.status.value if hasattr(a.status, 'value') else str(a.status),
-        "notes": a.notes,
-    } for a in items]
+        stmt = stmt.where(Patient.hospital_id == hospital_id)
+
+    stmt = stmt.order_by(Appointment.appointment_date, Appointment.appointment_time)
+    result = await db.execute(stmt)
+    rows = result.fetchall()
+
+    out = []
+    for row in rows:
+        status_val = row.status
+        if hasattr(status_val, 'value'):
+            status_val = status_val.value
+        else:
+            status_val = str(status_val)
+        appt_time = row.appointment_time
+        if appt_time:
+            appt_time = appt_time.strftime("%H:%M")
+        out.append({
+            "id": str(row.id),
+            "patient_id": str(row.patient_id) if row.patient_id else None,
+            "doctor_id": str(row.doctor_id) if row.doctor_id else None,
+            "patient_name": getattr(row, 'patient_name', None) or "Unknown",
+            "doctor_name": getattr(row, 'doctor_name', None) or "Unknown",
+            "appointment_date": row.appointment_date.isoformat(),
+            "appointment_time": appt_time,
+            "status": status_val,
+            "notes": row.notes,
+        })
+    return out
 
 
 @router.get("/doctors")
@@ -88,13 +120,18 @@ async def get_calendar_stats(
         month_start = today.replace(day=1)
         month_end = today.replace(day=28) + timedelta(days=4)
         month_end = month_end.replace(day=1) - timedelta(days=1)
-    query = select(func.count(Appointment.id)).where(
+
+    count_filters = [
         Appointment.appointment_date >= month_start,
         Appointment.appointment_date <= month_end,
-    )
-    if hospital_id: query = query.join(Appointment.patient).where(Patient.hospital_id == hospital_id)
-    total = (await db.execute(query)).scalar() or 0
-    today_q = select(func.count(Appointment.id)).where(Appointment.appointment_date == today)
-    if hospital_id: today_q = today_q.join(Appointment.patient).where(Patient.hospital_id == hospital_id)
-    today_count = (await db.execute(today_q)).scalar() or 0
+    ]
+    today_filters = [Appointment.appointment_date == today]
+
+    if hospital_id:
+        pid_subq = select(Patient.id).where(Patient.hospital_id == hospital_id).scalar_subquery()
+        count_filters.append(Appointment.patient_id.in_(pid_subq))
+        today_filters.append(Appointment.patient_id.in_(pid_subq))
+
+    total = (await db.execute(select(func.count(Appointment.id)).where(*count_filters))).scalar() or 0
+    today_count = (await db.execute(select(func.count(Appointment.id)).where(*today_filters))).scalar() or 0
     return {"total_month": total, "today": today_count}

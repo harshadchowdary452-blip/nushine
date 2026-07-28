@@ -524,6 +524,8 @@ export const enquiriesApi = {
   createFollowUp: (id: string, data: { action: string; notes?: string; next_follow_up_date?: string }) =>
     api.post(`/crm/enquiries/${id}/follow-ups`, data).then((r) => r.data),
   listFollowUps: (id: string) => api.get(`/crm/enquiries/${id}/follow-ups`).then((r) => r.data),
+  getDetail: (id: string) => api.get(`/crm/enquiries/${id}/detail`).then((r) => r.data),
+  whatsappPreview: (id: string, templateId?: string) => api.post(`/crm/enquiries/${id}/whatsapp-preview`, templateId ? { template_id: templateId } : {}).then((r) => r.data),
   calendar: (params: { start_date: string; end_date: string; status?: string; type?: string; search?: string; doctor_id?: string; patient_id?: string; priority?: string; include_terminal?: boolean; page?: number; page_size?: number }) =>
     api.get("/crm/enquiries/calendar", { params }).then((r) => r.data),
   calendarSummary: (params: { start_date: string; end_date: string; include_terminal?: boolean }) =>

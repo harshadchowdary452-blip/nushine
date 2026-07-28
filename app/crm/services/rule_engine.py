@@ -49,7 +49,7 @@ EVENT_TO_TRIGGER.update({
     "APPOINTMENT_RESCHEDULED": None,
     "TREATMENT_CREATED": None,
     "TREATMENT_STARTED": None,
-    "CASE_CREATED": None,
+    "CASE_CREATED": "CASE_CREATED",
     "CASE_UPDATED": None,
     "CASE_REOPENED": None,
     "CASE_APPROVED": None,
@@ -61,6 +61,7 @@ EVENT_TO_TRIGGER.update({
     "CAMPAIGN_COMPLETED": None,
     "ENQUIRY_CREATED": None,
     "ENQUIRY_CONVERTED": None,
+    "RECALL_COMPLETED": "RECALL_COMPLETED",
 })
 
 
@@ -198,6 +199,12 @@ class RuleEngine:
 
         elif event_type == "LEAD_CONVERTED":
             return await self._rule_lead_converted(db, hospital_id, payload)
+
+        elif event_type == "CASE_CREATED":
+            return await self._rule_case_created(db, hospital_id, payload, settings)
+
+        elif event_type == "RECALL_COMPLETED":
+            return await self._rule_recall_completed(db, hospital_id, payload, settings)
 
         return None
 
@@ -747,6 +754,9 @@ class RuleEngine:
             ).limit(1)
         )
         if not existing_recall.scalar_one_or_none():
+            # Cancel any existing pending recalls for this patient from OTHER cases
+            await self._cancel_patient_pending_recalls(db, hospital_id, patient_id, exclude_case_id=case_id, reason="CASE_COMPLETED_NEW_CHAIN")
+
             recall_enabled = settings.case_recall.enabled if settings.case_recall is not None else True
             if recall_enabled:
                 recall_delay = 180
@@ -765,6 +775,10 @@ class RuleEngine:
                     assigned_staff_id=payload.get("assigned_staff_id"),
                     trigger_event="CASE_COMPLETED",
                     description="Patient is due for routine dental recall",
+                    is_recurring=True,
+                    occurrence_number=1,
+                    recurrence_interval_days=recall_delay,
+                    chain_id=None,
                 ))
 
         # Auto-close stale enquiries from OTHER cases (after duplicate check)
@@ -808,6 +822,129 @@ class RuleEngine:
             patient_id=patient_id,
             trigger_event="PATIENT_INACTIVE",
         )
+
+    # ============================================================
+    # Recurring Recall Handlers
+    # ============================================================
+
+    async def _rule_case_created(
+        self, db: AsyncSession, hospital_id: str, payload: dict, settings
+    ) -> Optional["Decision"]:
+        """Rule: Cancel all pending recalls for patient when a new case is created."""
+        patient_id = payload.get("patient_id") or payload.get("entity_id")
+        case_id = payload.get("case_id") or payload.get("entity_id")
+        if not patient_id:
+            return None
+
+        await self._cancel_patient_pending_recalls(
+            db, hospital_id, patient_id,
+            exclude_case_id=case_id,
+            reason="CASE_CREATED",
+        )
+        return None
+
+    async def _rule_recall_completed(
+        self, db: AsyncSession, hospital_id: str, payload: dict, settings
+    ) -> Optional["Decision"]:
+        """Rule: When a recurring recall is completed, schedule the next one."""
+        from app.crm.services.event_dispatcher import Decision
+        from app.models.generated_enquiry import GeneratedEnquiry
+
+        enquiry_id = payload.get("entity_id") or payload.get("enquiry_id")
+        if not enquiry_id:
+            return None
+
+        completed_recall = await db.get(GeneratedEnquiry, enquiry_id)
+        if not completed_recall or completed_recall.enquiry_type != "RECALL":
+            return None
+        if not completed_recall.is_recurring:
+            return None
+
+        patient_id = completed_recall.patient_id
+
+        # Check: does patient already have a PENDING recall? (exclude the one we just completed)
+        existing = await db.execute(
+            select(GeneratedEnquiry).where(
+                and_(
+                    GeneratedEnquiry.hospital_id == hospital_id,
+                    GeneratedEnquiry.patient_id == patient_id,
+                    GeneratedEnquiry.enquiry_type == "RECALL",
+                    GeneratedEnquiry.status == "PENDING",
+                    GeneratedEnquiry.id != enquiry_id,
+                )
+            ).limit(1)
+        )
+        if existing.scalar_one_or_none():
+            return None
+
+        # Read CURRENT interval from CRM Settings — always fresh from DB, not cached
+        interval_days = 180
+        try:
+            from app.models.crm_follow_up_config import CrmFollowUpConfig
+            result = await db.execute(
+                select(CrmFollowUpConfig.start_delay_days).where(
+                    and_(
+                        CrmFollowUpConfig.hospital_id == hospital_id,
+                        CrmFollowUpConfig.context_type == "CASE_RECALL",
+                    )
+                ).limit(1)
+            )
+            fresh_interval = result.scalar_one_or_none()
+            if fresh_interval:
+                interval_days = fresh_interval
+        except Exception:
+            pass
+
+        completion_date = date.today()
+        new_due = completion_date + timedelta(days=interval_days)
+        new_occurrence = completed_recall.occurrence_number + 1
+
+        return Decision(
+            action="CREATE",
+            enquiry_type="RECALL",
+            due_date=new_due,
+            priority="LOW",
+            patient_id=patient_id,
+            case_id=completed_recall.case_id,
+            doctor_id=completed_recall.doctor_id,
+            trigger_event="RECALL_COMPLETED",
+            description=f"Recurring recall #{new_occurrence}",
+            is_recurring=True,
+            occurrence_number=new_occurrence,
+            recurrence_interval_days=interval_days,
+            chain_id=completed_recall.chain_id or completed_recall.id,
+        )
+
+    async def _cancel_patient_pending_recalls(
+        self, db: AsyncSession, hospital_id: str, patient_id: str,
+        exclude_case_id: Optional[str] = None, reason: str = "RECALL_CANCELLED",
+    ):
+        """Cancel all pending RECALL enquiries for a patient."""
+        from app.models.generated_enquiry import GeneratedEnquiry
+        from datetime import datetime, timezone
+
+        conditions = [
+            GeneratedEnquiry.hospital_id == hospital_id,
+            GeneratedEnquiry.patient_id == patient_id,
+            GeneratedEnquiry.enquiry_type == "RECALL",
+            GeneratedEnquiry.status == "PENDING",
+        ]
+        if exclude_case_id:
+            conditions.append(GeneratedEnquiry.case_id != exclude_case_id)
+
+        result = await db.execute(
+            select(GeneratedEnquiry).where(and_(*conditions))
+        )
+        now = datetime.now(timezone.utc)
+        cancelled = 0
+        for ge in result.scalars().all():
+            ge.status = "CANCELLED"
+            ge.cancelled_by_event = reason
+            ge.cancelled_at = now
+            cancelled += 1
+        if cancelled:
+            await db.flush()
+            logger.info("RECALLS_CANCELLED: patient=%s count=%d reason=%s", patient_id, cancelled, reason)
 
     # ============================================================
     # Helper Methods

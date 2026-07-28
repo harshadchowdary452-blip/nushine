@@ -72,5 +72,9 @@
     "tailwindcss": "^4.3.0",
     "zod": "^4.4.3",
     "zustand": "^5.0.14"
+  },
+  "allowScripts": {
+    "core-js@3.49.0": true,
+    "esbuild@0.21.5": true
   }
 }

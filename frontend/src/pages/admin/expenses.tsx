@@ -300,7 +300,7 @@ export default function AdminExpenses() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/20">
+            <div className="p-2 rounded-lg bg-blue-100">
               <Clock className="h-5 w-5 text-blue-600" />
             </div>
             <div>
@@ -311,7 +311,7 @@ export default function AdminExpenses() {
         </Card>
         <Card>
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/20">
+            <div className="p-2 rounded-lg bg-green-100">
               <TrendingUp className="h-5 w-5 text-green-600" />
             </div>
             <div>
@@ -322,7 +322,7 @@ export default function AdminExpenses() {
         </Card>
         <Card>
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-900/20">
+            <div className="p-2 rounded-lg bg-orange-100">
               <Wallet className="h-5 w-5 text-orange-600" />
             </div>
             <div>
@@ -333,7 +333,7 @@ export default function AdminExpenses() {
         </Card>
         <Card>
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/20">
+            <div className="p-2 rounded-lg bg-purple-100">
               <DollarSign className="h-5 w-5 text-purple-600" />
             </div>
             <div>

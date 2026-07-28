@@ -295,10 +295,32 @@ class StatusAutomationService:
         )
         plans = r.scalars().all()
         all_done = all(p.status == TreatmentPlanStatus.COMPLETED for p in plans)
-        if all_done and plans:
+        if all_done and plans and case.status != CaseStatus.COMPLETED:
             case.status = CaseStatus.COMPLETED
             await self.db.flush()
             await self.update_patient_status(case.patient_id)
+            try:
+                from app.crm.services.event_dispatcher import publish_event
+                from app.crm.enums import EventType, EventSource
+                from datetime import date as _date
+                await publish_event(
+                    event_type=EventType.CASE_COMPLETED,
+                    source_module=EventSource.CASE,
+                    entity_type="CASE",
+                    entity_id=case_id,
+                    hospital_id=None,
+                    patient_id=str(case.patient_id) if case.patient_id else None,
+                    doctor_id=str(case.doctor_id) if case.doctor_id else None,
+                    payload={
+                        "case_id": str(case_id),
+                        "patient_id": str(case.patient_id) if case.patient_id else None,
+                        "doctor_id": str(case.doctor_id) if case.doctor_id else None,
+                        "visit_date": _date.today().isoformat(),
+                    },
+                    db=self.db,
+                )
+            except Exception as e:
+                logger.warning("Failed to publish CASE_COMPLETED event: %s", e)
 
     # ──────────────────────────────────────────────
     # Case status update
@@ -546,6 +568,22 @@ class StatusAutomationService:
                 await self._check_case_completion(target_id)
             if entity_type == "follow_up" and obj.patient_id:
                 await self.update_patient_status(obj.patient_id)
+
+        if entity_type == "patient" and new_status == "OPD" and old_status != "OPD":
+            try:
+                from app.crm.services.event_dispatcher import publish_event
+                from app.crm.enums import EventType, EventSource
+                await publish_event(
+                    event_type=EventType.OPD_CONSULTATION_COMPLETED,
+                    source_module=EventSource.PATIENT,
+                    entity_type="PATIENT",
+                    entity_id=entity_id,
+                    hospital_id=obj.hospital_id,
+                    patient_id=entity_id,
+                    db=self.db,
+                )
+            except Exception as e:
+                logger.warning("Failed to publish OPD_CONSULTATION_COMPLETED event: %s", e)
 
         return {
             "previous_status": old_status,

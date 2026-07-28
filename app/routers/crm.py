@@ -278,7 +278,6 @@ async def send_whatsapp(
     log = await _log_communication(
         db, req.patient_id, hospital_id, current_user.get("sub"),
         CommunicationChannel.WHATSAPP.value, req.message_type, rendered, status_val)
-    await db.commit()
     try:
         from app.crm.services.event_dispatcher import publish_event
         from app.crm.enums import EventType, EventSource
@@ -294,6 +293,7 @@ async def send_whatsapp(
         )
     except Exception:
         pass
+    await db.commit()
     if not success:
         raise HTTPException(status_code=500, detail="Failed to send WhatsApp message")
     return {"success": True, "log_id": log.id, "rendered_message": rendered}
@@ -438,7 +438,6 @@ async def send_email(
         CommunicationChannel.EMAIL.value, req.message_type, rendered_body,
         CommunicationStatus.SENT.value, subject=rendered_subject,
         attachment_url=attachment_url)
-    await db.commit()
     try:
         from app.crm.services.event_dispatcher import publish_event
         from app.crm.enums import EventType, EventSource
@@ -453,6 +452,7 @@ async def send_email(
         )
     except Exception:
         pass
+    await db.commit()
     return {"success": True, "log_id": log.id}
 
 
@@ -926,7 +926,6 @@ async def mark_follow_up_completed(
     fu.completed_by = current_user.get("id")
     fu.last_contact_date = datetime.now(timezone.utc)
     patient_id = fu.patient_id
-    await db.commit()
     await record_timeline_event(
         db, current_user=current_user, patient_id=patient_id,
         action="Follow-Up Completed",
@@ -947,6 +946,7 @@ async def mark_follow_up_completed(
         )
     except Exception:
         pass
+    await db.commit()
     return {"success": True}
 
 

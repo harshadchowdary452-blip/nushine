@@ -136,9 +136,9 @@ export default function CrmSettingsPage() {
           });
         }
         case "lead":
-          return api.updateLead(values.lead);
+          return api.updateLead({ ...values.lead, skip_wellness_if_appointment: false });
         case "opd":
-          return api.updateOpd(values.opd);
+          return api.updateOpd({ ...values.opd, skip_wellness_if_appointment: false });
         case "treatment": {
           // Save global treatment defaults
           const t = values.treatment;

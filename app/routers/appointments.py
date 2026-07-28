@@ -169,6 +169,12 @@ async def create_appointment(data: AppointmentCreate, db: AsyncSession = Depends
             hospital_id=getattr(appointment, 'hospital_id', None),
             patient_id=appointment.patient_id,
             doctor_id=getattr(appointment, 'doctor_id', None),
+            payload={
+                "appointment_id": str(appointment.id),
+                "patient_id": str(appointment.patient_id),
+                "appointment_date": appointment.appointment_date.isoformat() if appointment.appointment_date else None,
+                "status": str(appointment.status.value) if hasattr(appointment.status, 'value') else str(appointment.status),
+            },
             db=db,
         )
     except Exception:
@@ -630,7 +636,6 @@ async def cancel_appointment(appointment_id: str, req: CancelRequest, db: AsyncS
         details=f"Appointment cancelled. Reason: {req.reason or 'Not specified'}",
     )
     db.add(audit)
-    await db.commit()
     await db.refresh(appointment)
 
     cancelled_by_name = await _resolve_user_name(db, current_user.get("sub"))
@@ -653,10 +658,15 @@ async def cancel_appointment(appointment_id: str, req: CancelRequest, db: AsyncS
             hospital_id=getattr(appointment, 'hospital_id', None),
             patient_id=appointment.patient_id,
             doctor_id=getattr(appointment, 'doctor_id', None),
+            payload={
+                "appointment_id": str(appointment.id),
+                "patient_id": str(appointment.patient_id),
+            },
             db=db,
         )
     except Exception:
         pass
+    await db.commit()
 
     return MessageResponse(message="Appointment cancelled successfully")
 
@@ -691,7 +701,6 @@ async def complete_appointment(appointment_id: str, req: CompleteRequest, db: As
 
     svc = StatusAutomationService(db)
     await svc.update_appointment_status(appointment_id, AppointmentStatus.COMPLETED)
-    await db.commit()
     await db.refresh(appointment)
 
     completed_by_name = await _resolve_user_name(db, current_user.get("sub"))
@@ -720,6 +729,7 @@ async def complete_appointment(appointment_id: str, req: CompleteRequest, db: As
         )
     except Exception:
         pass
+    await db.commit()
 
     return appointment
 
@@ -764,7 +774,6 @@ async def reschedule_appointment(appointment_id: str, req: RescheduleRequest, db
         details=f"Rescheduled from {old_date} {old_time} to {req.appointment_date} {req.appointment_time}. Reason: {req.reason or 'Not specified'}",
     )
     db.add(audit)
-    await db.commit()
     await db.refresh(appointment)
 
     rescheduled_by_name = await _resolve_user_name(db, current_user.get("sub"))
@@ -796,6 +805,7 @@ async def reschedule_appointment(appointment_id: str, req: RescheduleRequest, db
         )
     except Exception:
         pass
+    await db.commit()
 
     return appointment
 

@@ -159,17 +159,57 @@ async def get_recall_calendar(
     hospital_id = current_user.get("hospital_id")
     start = date.fromisoformat(start_date)
     end = date.fromisoformat(end_date)
+    result = []
+    seen_patients = set()
+
+    # 1. New CRM pipeline — GeneratedEnquiry RECALL (PENDING only, earliest per patient)
+    from app.models.generated_enquiry import GeneratedEnquiry
+    ge_q = select(GeneratedEnquiry).where(
+        GeneratedEnquiry.enquiry_type == "RECALL",
+        GeneratedEnquiry.status == "PENDING",
+        GeneratedEnquiry.due_date >= start,
+        GeneratedEnquiry.due_date <= end,
+    )
+    if hospital_id:
+        ge_q = ge_q.where(GeneratedEnquiry.hospital_id == hospital_id)
+    ge_q = ge_q.order_by(GeneratedEnquiry.due_date.asc())
+    ge_rows = (await db.execute(ge_q)).scalars().all()
+    for ge in ge_rows:
+        pid = ge.patient_id
+        if pid in seen_patients:
+            continue
+        seen_patients.add(pid)
+        patient = await db.get(Patient, pid)
+        doctor = await db.get(User, ge.doctor_id) if ge.doctor_id else None
+        result.append({
+            "id": str(ge.id), "patient_name": patient.full_name if patient else "Unknown",
+            "patient_phone": patient.phone if patient else None,
+            "doctor_name": doctor.full_name if doctor else None,
+            "treatment_name": ge.treatment_name,
+            "follow_up_date": ge.due_date.isoformat(),
+            "follow_up_type": "RECALL",
+            "status": ge.status,
+            "outcome": None,
+            "occurrence_number": ge.occurrence_number,
+            "is_recurring": ge.is_recurring,
+            "source": "crm_pipeline",
+        })
+
+    # 2. Legacy system — FollowUp recalls
     recall_types = [FollowUpType.SIX_MONTH_RECALL.value, FollowUpType.TWELVE_MONTH_RECALL.value, FollowUpType.CUSTOM_RECALL.value]
     q = select(FollowUp).where(
         FollowUp.follow_up_type.in_(recall_types),
         FollowUp.follow_up_date >= start, FollowUp.follow_up_date <= end,
+        FollowUp.status == FollowUpStatus.PENDING.value,
     )
     if hospital_id:
         q = q.where(FollowUp.hospital_id == hospital_id)
     q = q.order_by(FollowUp.follow_up_date)
     rows = (await db.execute(q)).scalars().all()
-    result = []
     for fu in rows:
+        if fu.patient_id in seen_patients:
+            continue
+        seen_patients.add(fu.patient_id)
         patient = await db.get(Patient, fu.patient_id)
         doctor = await db.get(User, fu.doctor_id) if fu.doctor_id else None
         result.append({
@@ -181,7 +221,12 @@ async def get_recall_calendar(
             "follow_up_type": fu.follow_up_type,
             "status": fu.status,
             "outcome": fu.outcome,
+            "occurrence_number": None,
+            "is_recurring": False,
+            "source": "legacy",
         })
+
+    result.sort(key=lambda x: x["follow_up_date"])
     return result
 
 

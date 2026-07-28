@@ -101,7 +101,6 @@ async def update_sitting(sitting_id: str, data: TreatmentSittingUpdate, db: Asyn
     sitting = await service.update(sitting_id, data.model_dump(exclude_none=True), user_id=current_user.get("sub"))
     if not sitting:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Treatment sitting not found")
-    await db.commit()
     new_data = {"sitting_number": sitting.sitting_number, "work_done": sitting.work_done, "status": sitting.status.value if hasattr(sitting.status, 'value') else sitting.status, "doctor_notes": sitting.doctor_notes}
     changes = build_changes(new_data, old_data)
     patient_id = await _get_patient_id_from_sitting(db, sitting_id)
@@ -132,6 +131,7 @@ async def update_sitting(sitting_id: str, data: TreatmentSittingUpdate, db: Asyn
 
     except Exception:
         pass
+    await db.commit()
     return sitting
 
 

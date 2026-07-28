@@ -37,6 +37,7 @@ SUPPORTED_EVENTS = {
     "COMMUNICATION_SENT", "COMMUNICATION_FAILED",
     "FOLLOWUP_COMPLETED", "CAMPAIGN_COMPLETED",
     "ENQUIRY_CREATED", "ENQUIRY_CONVERTED",
+    "RECALL_COMPLETED",
 }
 
 
@@ -93,6 +94,11 @@ class Decision:
     # For CANCEL action
     cancel_enquiry_types: Optional[list[str]] = None
     cancel_reason: Optional[str] = None
+    # Recurrence fields (RECALL only)
+    is_recurring: bool = False
+    occurrence_number: int = 1
+    recurrence_interval_days: Optional[int] = None
+    chain_id: Optional[str] = None
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -196,6 +202,15 @@ class CentralEventDispatcher:
 
         event.hospital_id = resolved_hospital_id
 
+        # Merge top-level params into payload so rule engine handlers can access them
+        merged_payload = dict(payload or {})
+        if patient_id and "patient_id" not in merged_payload:
+            merged_payload["patient_id"] = patient_id
+        if doctor_id and "doctor_id" not in merged_payload:
+            merged_payload["doctor_id"] = doctor_id
+        if entity_id and "entity_id" not in merged_payload:
+            merged_payload["entity_id"] = entity_id
+
         # Rule Engine — the SINGLE decision maker
         decisions = []
         if self._rule_engine:
@@ -203,7 +218,7 @@ class CentralEventDispatcher:
                 decisions = await self._rule_engine.evaluate(
                     db=db, hospital_id=resolved_hospital_id,
                     event_type=event_type, entity_type=entity_type,
-                    entity_id=entity_id, payload=payload or {},
+                    entity_id=entity_id, payload=merged_payload,
                 )
             except Exception as exc:
                 logger.error("RULE_ENGINE_FAILED: event=%s error=%s", event.event_id, str(exc), exc_info=True)
@@ -217,7 +232,7 @@ class CentralEventDispatcher:
                         db=db,
                         hospital_id=resolved_hospital_id,
                         decision=decision,
-                        event_data=payload or {},
+                        event_data=merged_payload,
                     )
                     execution_results.append(result)
                     logger.info(

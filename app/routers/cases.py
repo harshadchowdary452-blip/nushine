@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.core.permissions import verify_permission, verify_tenant_access, Permission, Role
@@ -65,7 +65,6 @@ async def create_case(data: CaseCreate, db: AsyncSession = Depends(get_db), curr
     case = await service.create(case_data, user_id=current_user.get("sub"), user_role=current_user.get("role"))
     svc = StatusAutomationService(db)
     await svc.update_patient_status(case.patient_id)
-    await db.commit()
     await record_timeline_event(
         db, current_user=current_user, patient_id=case.patient_id,
         action="Case Report Created",
@@ -87,6 +86,7 @@ async def create_case(data: CaseCreate, db: AsyncSession = Depends(get_db), curr
         )
     except Exception:
         pass
+    await db.commit()
     case = await _load_case_with_findings(db, case.id)
     return case
 
@@ -299,7 +299,6 @@ async def complete_case(case_id: str, db: AsyncSession = Depends(get_db), curren
     updated = await service.complete(case_id, user_id=current_user.get("sub"), user_role=current_user.get("role"))
     svc = StatusAutomationService(db)
     await svc.update_patient_status(patient_id)
-    await db.commit()
     await record_timeline_event(
         db, current_user=current_user, patient_id=patient_id,
         action="Case Report Completed",
@@ -317,10 +316,17 @@ async def complete_case(case_id: str, db: AsyncSession = Depends(get_db), curren
             hospital_id=getattr(case, 'hospital_id', None),
             patient_id=patient_id,
             doctor_id=getattr(case, 'doctor_id', None),
+            payload={
+                "case_id": str(case_id),
+                "patient_id": str(patient_id),
+                "doctor_id": str(case.doctor_id) if case.doctor_id else None,
+                "visit_date": date.today().isoformat(),
+            },
             db=db,
         )
     except Exception:
         pass
+    await db.commit()
     updated = await _load_case_with_findings(db, case.id)
     return updated
 
@@ -459,13 +465,11 @@ async def approve_treatment_plan(case_id: str, db: AsyncSession = Depends(get_db
     from app.services.treatment_generator import TreatmentGenerator
     generator = TreatmentGenerator(db)
     await generator.generate_from_items(items, user_id=current_user.get("sub"))
-    await db.commit()
     await service._add_timeline(
         case_id, "Treatment Plan Approved",
         new_value=f"{len(items)} item(s) generated as treatments",
         user_id=current_user.get("sub"), performer_role=current_user.get("role"),
     )
-    await db.commit()
     await record_timeline_event(
         db, current_user=current_user, patient_id=case.patient_id,
         action="Treatment Plan Approved",
@@ -487,6 +491,7 @@ async def approve_treatment_plan(case_id: str, db: AsyncSession = Depends(get_db
         )
     except Exception:
         pass
+    await db.commit()
     case = await _load_case_with_findings(db, case_id)
     return case
 

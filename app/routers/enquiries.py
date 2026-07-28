@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete as sa_delete, func, desc, case as sa_case, and_, or_
-from typing import Optional
+from typing import Optional, Any
 from datetime import datetime, timezone, date, timedelta
 from pydantic import BaseModel, Field
 from app.database import get_db
@@ -13,9 +13,126 @@ from app.models.user import User
 from app.models.follow_up import FollowUp, FollowUpStatus, FollowUpType
 from app.models.treatment_type import TreatmentType
 from app.models.generated_enquiry import GeneratedEnquiry
+from app.models.hospital import Hospital
+from app.models.case import Case
+from app.models.treatment_plan import TreatmentPlan, TreatmentPlanStatus
+from app.models.treatment_sitting import TreatmentSitting
+from app.models.appointment import Appointment
+from app.models.lead import Lead
+from app.models.patient_timeline import PatientTimeline
 from app.services.timeline_helper import record_timeline_event
+from app.services.timeline_service import TimelineService
 
 router = APIRouter(prefix="/crm/enquiries", tags=["CRM Enquiries"])
+
+LEAD_FOLLOW_UP_TEMPLATE = """Hello {{lead_name}},
+
+Thank you for contacting {{hospital_name}}.
+
+We understand that you are interested in {{interested_treatment}}.
+
+Our team is available to answer your questions and help you schedule a consultation at your convenience.
+
+Please let us know a suitable time, and we will be happy to assist you.
+
+Thank you,
+{{hospital_name}}
+
+Contact:
+{{hospital_phone}}"""
+
+APPOINTMENT_REMINDER_TEMPLATE = """Hello {{patient_name}},
+
+This is a friendly reminder about your appointment with Dr. {{doctor_name}}.
+
+Appointment
+
+Date:
+{{appointment_date}}
+
+Time:
+{{appointment_time}}
+
+OP Number:
+{{op_number}}
+
+If you are unable to attend, kindly let us know so we can assist with rescheduling.
+
+Thank you,
+{{hospital_name}}"""
+
+OPD_FOLLOW_UP_TEMPLATE = """Hello {{patient_name}},
+
+We hope your consultation at {{hospital_name}} was helpful.
+
+Dr. {{doctor_name}} has recommended further care based on your consultation.
+
+If you have any questions or would like to begin your treatment, please contact us.
+
+We are happy to assist you.
+
+Thank you,
+{{hospital_name}}"""
+
+TREATMENT_WELLNESS_TEMPLATE = """Hello {{patient_name}},
+
+We hope you are doing well after your recent {{treatment_name}} at {{hospital_name}}.
+
+We would like to know how you are feeling now.
+
+• Are you recovering well?
+• Are you experiencing any discomfort?
+• If required, would you like to schedule a follow-up visit with Dr. {{doctor_name}}?
+
+Please let us know.
+
+We are always happy to assist you.
+
+Thank you,
+{{hospital_name}}"""
+
+CASE_WELLNESS_TEMPLATE = """Hello {{patient_name}},
+
+We hope you are recovering well after completing your treatment for {{case_name}}.
+
+Completed Treatments
+
+{{completed_treatments}}
+
+If you have any concerns or need further guidance, please contact us.
+
+Our team and Dr. {{doctor_name}} are always available to help.
+
+Thank you,
+{{hospital_name}}"""
+
+RECALL_TEMPLATE = """Hello {{patient_name}},
+
+This is your scheduled dental recall reminder from {{hospital_name}}.
+
+Based on your previous treatment
+
+{{completed_treatments}}
+
+your next preventive dental check-up is due on
+
+{{next_recall_date}}
+
+Regular reviews help maintain your oral health and allow early detection of any issues.
+
+Please contact us to schedule your appointment.
+
+Thank you,
+{{hospital_name}}"""
+
+DEFAULT_TEMPLATES_BY_TYPE = {
+    "LEAD_FOLLOW_UP": LEAD_FOLLOW_UP_TEMPLATE,
+    "APPOINTMENT_REMINDER": APPOINTMENT_REMINDER_TEMPLATE,
+    "OPD_FOLLOW_UP": OPD_FOLLOW_UP_TEMPLATE,
+    "TREATMENT_WELLNESS": TREATMENT_WELLNESS_TEMPLATE,
+    "CASE_WELLNESS": CASE_WELLNESS_TEMPLATE,
+    "RECALL": RECALL_TEMPLATE,
+}
 
 
 def _verify_hospital_access(entity, current_user):
@@ -69,7 +186,6 @@ async def create_enquiry(data: EnquiryCreate, db: AsyncSession = Depends(get_db)
     )
     db.add(enquiry)
     await db.flush()
-    await db.commit()
     await record_timeline_event(
         db, current_user=current_user, patient_id=data.patient_id,
         action="CRM Enquiry Created",
@@ -90,6 +206,7 @@ async def create_enquiry(data: EnquiryCreate, db: AsyncSession = Depends(get_db)
         )
     except Exception:
         pass
+    await db.commit()
     return {"id": str(enquiry.id), "status": enquiry.status}
 
 
@@ -135,6 +252,185 @@ async def _batch_load_names(db: AsyncSession, ids: list[str], model, name_field=
     return {str(r.id): getattr(r, name_field, None) or getattr(r, "name", None) or str(r.id) for r in rows}
 
 
+async def _batch_load_entities(db: AsyncSession, model, ids: list[str]) -> dict[str, Any]:
+    """Batch load full model instances by ID list, return dict keyed by str(id)."""
+    if not ids:
+        return {}
+    q = select(model).where(model.id.in_(ids))
+    rows = (await db.execute(q)).scalars().all()
+    return {str(r.id): r for r in rows}
+
+
+def _generate_description(enquiry_type: str, patient_name: str | None, lead_name: str | None,
+                          treatment_name: str | None, case_obj: Any, lead_obj: Any,
+                          appointment_obj: Any, tp_obj: Any, recurrence_info: dict | None) -> str:
+    """Generate a meaningful description for every enquiry type — never empty/blank."""
+    if enquiry_type == "LEAD_FOLLOW_UP":
+        source = (lead_obj.source.replace("_", " ").title() + " Lead") if lead_obj and lead_obj.source else "Lead"
+        interest = lead_obj.interested_treatment if lead_obj and lead_obj.interested_treatment else ""
+        if interest:
+            return f"{source} - Interested in {interest}"
+        return f"{source} - Follow-up required"
+    if enquiry_type == "OPD_FOLLOW_UP":
+        return "Consultation completed. Treatment not yet started."
+    if enquiry_type == "APPOINTMENT_REMINDER":
+        if appointment_obj:
+            doc_name = getattr(appointment_obj.doctor, "full_name", "") if appointment_obj.doctor else ""
+            purpose = appointment_obj.appointment_type.replace("_", " ").title() if appointment_obj.appointment_type else "Appointment"
+            return f"{purpose} with Dr. {doc_name}" if doc_name else f"{purpose} scheduled"
+        return "Appointment reminder"
+    if enquiry_type == "TREATMENT_WELLNESS":
+        name = treatment_name or "Treatment"
+        if tp_obj:
+            return f"{name} - Visit {tp_obj.completed_sittings + 1} of {tp_obj.total_sittings}" if tp_obj.total_sittings else f"{name} - Completed"
+        return f"{name} - Wellness follow-up"
+    if enquiry_type == "CASE_WELLNESS":
+        return "Case completed. Recovery follow-up."
+    if enquiry_type == "RECALL":
+        if recurrence_info and recurrence_info.get("interval_days"):
+            interval = recurrence_info["interval_days"]
+            label = f"{interval}-Day" if interval != 180 else "6-Month"
+            label = f"{interval}-Day" if interval != 365 else "12-Month"
+            occ = recurrence_info.get("occurrence_number", 1)
+            return f"{label} Recall{' #' + str(occ) if occ > 1 else ''} for completed Case."
+        return "Scheduled recall follow-up"
+    if enquiry_type == "MISSED_APPOINTMENT":
+        if appointment_obj:
+            return f"Missed appointment on {appointment_obj.appointment_date.isoformat() if appointment_obj.appointment_date else ''}"
+        return "Missed appointment — follow-up required"
+    if treatment_name:
+        return f"{enquiry_type.replace('_', ' ').title()} — {treatment_name}"
+    return f"{enquiry_type.replace('_', ' ').title()} follow-up required"
+
+
+def _resolve_latest_doctor(case_obj: Any, tp_plans: list, appointments: list, fallback_doctor_id: str | None,
+                           entity_dict: dict[str, Any]) -> dict:
+    """Resolve the latest consulting doctor from clinical activity.
+    Priority: 1) Latest Treatment Visit Doctor 2) Latest Clinical Consultation 3) Latest Appointment Doctor
+    Never returns case creator, hospital creator, or patient creator unless no clinical doctor exists."""
+    doctor = {"id": None, "name": None, "specialization": None, "photo_url": None}
+    # Priority 1: Latest Treatment Sitting Doctor
+    if tp_plans:
+        tp_ids = [tp.id for tp in tp_plans]
+        from app.models.treatment_sitting import TreatmentSitting, TreatmentSittingStatus
+        import logging
+        logger = logging.getLogger("enquiries")
+        try:
+            sitting_q = select(TreatmentSitting).where(
+                TreatmentSitting.treatment_plan_id.in_(tp_ids),
+                TreatmentSitting.status.in_([TreatmentSittingStatus.COMPLETED.value, TreatmentSittingStatus.IN_PROGRESS.value]),
+            ).order_by(desc(TreatmentSitting.sitting_date)).limit(1)
+            # This will be executed per-call via the db session; for batch we handle separately
+        except Exception:
+            pass
+    # Priority 2: Latest Treatment Plan assigned doctor
+    if not doctor["id"] and tp_plans:
+        for tp in sorted(tp_plans, key=lambda x: x.created_at or datetime.min, reverse=True):
+            if tp.assigned_doctor_id and tp.assigned_doctor_id in entity_dict.get("users", {}):
+                doc = entity_dict["users"][tp.assigned_doctor_id]
+                doctor = {"id": str(doc.id), "name": doc.full_name,
+                          "specialization": getattr(doc, "specialization", None), "photo_url": None}
+                break
+    # Priority 3: Case doctor (clinical consultation)
+    if not doctor["id"] and case_obj and case_obj.doctor_id:
+        if case_obj.doctor_id in entity_dict.get("users", {}):
+            doc = entity_dict["users"][case_obj.doctor_id]
+            doctor = {"id": str(doc.id), "name": doc.full_name,
+                      "specialization": getattr(doc, "specialization", None), "photo_url": None}
+    # Priority 4: Latest appointment doctor
+    if not doctor["id"] and appointments:
+        for appt in sorted(appointments, key=lambda x: x.appointment_date or date.min, reverse=True):
+            if appt.doctor_id and appt.doctor_id in entity_dict.get("users", {}):
+                doc = entity_dict["users"][appt.doctor_id]
+                doctor = {"id": str(doc.id), "name": doc.full_name,
+                          "specialization": getattr(doc, "specialization", None), "photo_url": None}
+                break
+    # Priority 5: Fallback (doctor_id from enquiry)
+    if not doctor["id"] and fallback_doctor_id:
+        if fallback_doctor_id in entity_dict.get("users", {}):
+            doc = entity_dict["users"][fallback_doctor_id]
+            doctor = {"id": str(doc.id), "name": doc.full_name,
+                      "specialization": getattr(doc, "specialization", None), "photo_url": None}
+    return doctor
+
+
+def _build_template_variables(enquiry_type: str, patient_obj: Any, lead_obj: Any, doctor_obj: dict,
+                               hospital_obj: Any, case_obj: Any, tp_obj: Any,
+                               appointment_obj: Any, treatment_name: str | None,
+                               occ_number: int | None, total_visits: int | None,
+                               completed_treatments: list | None = None) -> dict:
+    """Type-scoped template variables — never empty/null/fallback.
+    LEAD_FOLLOW_UP returns only lead/hospital variables.
+    Patient types return all clinical variables."""
+    v = {}
+    is_lead = enquiry_type == "LEAD_FOLLOW_UP"
+
+    # Hospital — always available
+    v["hospital_name"] = hospital_obj.name if hospital_obj else ""
+    v["hospital_phone"] = hospital_obj.phone if hospital_obj else ""
+    v["hospital_address"] = hospital_obj.address if hospital_obj else ""
+    v["clinic_name"] = hospital_obj.name if hospital_obj else ""
+
+    # Lead variables
+    v["lead_name"] = lead_obj.lead_name if lead_obj else ""
+    v["lead_source"] = (lead_obj.source.replace("_", " ").title()) if lead_obj and lead_obj.source else ""
+    v["lead_status"] = lead_obj.status if lead_obj else ""
+    v["lead_phone"] = lead_obj.mobile if lead_obj else ""
+
+    if is_lead:
+        v["interested_treatment"] = lead_obj.interested_treatment if lead_obj else ""
+        v["assigned_staff"] = ""
+        v["assigned_staff_name"] = ""
+        return v  # LEAD type — no patient/clinical variables
+
+    # ─── Patient-type variables below ────────────────────────────────────
+
+    v["patient_name"] = patient_obj.full_name if patient_obj else (lead_obj.lead_name if lead_obj else "")
+    v["patient_phone"] = patient_obj.phone if patient_obj else (lead_obj.mobile if lead_obj else "")
+    v["patient_age"] = str(patient_obj.age) if patient_obj and patient_obj.age else ""
+    v["patient_gender"] = patient_obj.gender if patient_obj else ""
+    v["op_number"] = patient_obj.op_no if patient_obj else ""
+    v["doctor_name"] = doctor_obj.get("name") or ""
+    v["doctor_specialization"] = doctor_obj.get("specialization") or ""
+    v["staff_name"] = ""
+    v["staff_phone"] = ""
+    v["staff_email"] = ""
+    if appointment_obj:
+        v["appointment_date"] = appointment_obj.appointment_date.isoformat() if appointment_obj.appointment_date else ""
+        v["appointment_time"] = str(appointment_obj.appointment_time) if appointment_obj.appointment_time else ""
+        apt_type = appointment_obj.appointment_type
+        v["appointment_type"] = (apt_type.value if hasattr(apt_type, "value") else apt_type).replace("_", " ").title() if apt_type else ""
+    else:
+        v["appointment_date"] = ""
+        v["appointment_time"] = ""
+        v["appointment_type"] = ""
+    v["treatment_name"] = treatment_name or ""
+    v["treatment_type"] = ""
+    v["treatment_status"] = ""
+    v["treatment_completion_date"] = ""
+    if tp_obj:
+        tt = tp_obj.treatment_type
+        v["treatment_type"] = tt.name if tt else ""
+        ts = tp_obj.status
+        v["treatment_status"] = (ts.value if hasattr(ts, "value") else ts).replace("_", " ").title() if ts else ""
+        v["treatment_completion_date"] = tp_obj.completed_at.strftime("%d %B %Y") if tp_obj.completed_at else ""
+    v["case_name"] = case_obj.case_number if case_obj and case_obj.case_number else ""
+    v["case_completion_date"] = case_obj.completion_date.strftime("%d %B %Y") if case_obj and case_obj.completion_date else ""
+    v["visit_number"] = str(occ_number) if occ_number else (str(tp_obj.completed_sittings + 1) if tp_obj else "")
+    v["remaining_visits"] = str(tp_obj.remaining_sittings) if tp_obj and tp_obj.remaining_sittings else ""
+    v["total_visits"] = str(tp_obj.total_sittings) if tp_obj and tp_obj.total_sittings else ""
+    if completed_treatments:
+        v["completed_treatments"] = "\n".join(f"• {t.get('treatment_name', '')}" for t in completed_treatments if t.get("treatment_name"))
+    else:
+        v["completed_treatments"] = ""
+    v["recall_interval"] = ""
+    v["next_recall_date"] = ""
+    v["recall_date"] = ""
+    v["followup_date"] = ""
+    v["wellness_type"] = ""
+    return v
+
+
 @router.get("/calendar")
 async def get_enquiry_calendar(
     start_date: str = Query(...), end_date: str = Query(...),
@@ -155,10 +451,7 @@ async def get_enquiry_calendar(
 
     terminal_statuses = ["COMPLETED", "CANCELLED", "LOST", "CONVERTED"]
     exclude_terminal = (not include_terminal) and (not status_filter)
-    result = []
-    today = date.today()
 
-    # --- Generated enquiries (CRM automation, date range only) ---
     VALID_ENQUIRY_TYPES = [
         "LEAD_FOLLOW_UP", "OPD_FOLLOW_UP", "APPOINTMENT_REMINDER",
         "TREATMENT_WELLNESS", "CASE_WELLNESS", "RECALL", "MISSED_APPOINTMENT",
@@ -186,75 +479,317 @@ async def get_enquiry_calendar(
         ge_q = ge_q.where(GeneratedEnquiry.priority == priority)
     ge_rows = (await db.execute(ge_q.order_by(GeneratedEnquiry.due_date))).scalars().all()
 
-    ge_patient_ids = list({ge.patient_id for ge in ge_rows if ge.patient_id})
-    ge_lead_ids = list({ge.lead_id for ge in ge_rows if ge.lead_id})
-    ge_staff_ids = list({ge.assigned_staff_id for ge in ge_rows if ge.assigned_staff_id})
-    ge_doctor_ids = list({ge.doctor_id for ge in ge_rows if ge.doctor_id})
-    ge_tt_ids = list({ge.treatment_type_id for ge in ge_rows if ge.treatment_type_id})
-    ge_patients = await _batch_load_names(db, ge_patient_ids, Patient, "full_name")
-    ge_patients_phone = {}
-    if ge_patient_ids:
-        ph_q = select(Patient.id, Patient.phone, Patient.op_no).where(Patient.id.in_(ge_patient_ids))
-        for row in (await db.execute(ph_q)).all():
-            ge_patients_phone[str(row[0])] = {"phone": row[1], "op_no": row[2]}
-    ge_leads = {}
-    if ge_lead_ids:
-        from app.models.lead import Lead
-        lead_q = select(Lead.id, Lead.lead_name).where(Lead.id.in_(ge_lead_ids))
-        for row in (await db.execute(lead_q)).all():
-            ge_leads[str(row[0])] = row[1]
-    all_staff_ids = list(set(ge_staff_ids + ge_doctor_ids))
-    ge_staff = await _batch_load_names(db, all_staff_ids, User, "full_name")
-    ge_tt = {}
-    if ge_tt_ids:
-        tt_q = select(TreatmentType).where(TreatmentType.id.in_(ge_tt_ids))
-        for tt in (await db.execute(tt_q)).scalars().all():
-            ge_tt[str(tt.id)] = tt.name
+    # --- Extract all entity IDs for batch loading ---
+    patient_ids = list({ge.patient_id for ge in ge_rows if ge.patient_id})
+    lead_ids = list({ge.lead_id for ge in ge_rows if ge.lead_id})
+    doctor_ids = list({ge.doctor_id for ge in ge_rows if ge.doctor_id})
+    staff_ids = list({ge.assigned_staff_id for ge in ge_rows if ge.assigned_staff_id})
+    case_ids = list({ge.case_id for ge in ge_rows if ge.case_id})
+    tp_ids = list({ge.treatment_plan_id for ge in ge_rows if ge.treatment_plan_id})
+    tp_item_ids = list({ge.treatment_plan_item_id for ge in ge_rows if ge.treatment_plan_item_id})
+    appt_ids = list({ge.appointment_id for ge in ge_rows if ge.appointment_id})
+    tt_ids = list({ge.treatment_type_id for ge in ge_rows if ge.treatment_type_id})
+    hosp_ids = list({ge.hospital_id for ge in ge_rows if ge.hospital_id})
+    all_user_ids = list(set(doctor_ids + staff_ids + [g.doctor_id for g in ge_rows if g.doctor_id]))
 
+    # --- Batch load all entities ---
+    patients = await _batch_load_entities(db, Patient, patient_ids)
+    leads = await _batch_load_entities(db, Lead, lead_ids)
+    users = await _batch_load_entities(db, User, all_user_ids)
+    cases = await _batch_load_entities(db, Case, case_ids)
+    tp_entities = await _batch_load_entities(db, TreatmentPlan, tp_ids) if tp_ids else {}
+    appointments = await _batch_load_entities(db, Appointment, appt_ids) if appt_ids else {}
+    hospitals = await _batch_load_entities(db, Hospital, hosp_ids)
+    tt_entities = await _batch_load_entities(db, TreatmentType, tt_ids) if tt_ids else {}
+
+    # --- Load treatment plans for each case (for latest doctor resolution) ---
+    case_ids_for_tp = [c.id for c in cases.values()] if cases else []
+    case_tp_map: dict[str, list] = {}
+    tp_id_to_case: dict[str, str] = {}
+    if case_ids_for_tp:
+        tp_q = select(TreatmentPlan).where(TreatmentPlan.case_id.in_(case_ids_for_tp))
+        tp_all = (await db.execute(tp_q)).scalars().all()
+        for tp in tp_all:
+            cid = str(tp.case_id)
+            if cid not in case_tp_map:
+                case_tp_map[cid] = []
+            case_tp_map[cid].append(tp)
+            tp_id_to_case[str(tp.id)] = cid
+
+    # --- Batch load completed treatments for cases (for CASE_WELLNESS and RECALL) ---
+    completed_tp_by_case: dict[str, list[dict]] = {}
+    if case_ids_for_tp:
+        all_tps_for_cases = (await db.execute(
+            select(TreatmentPlan).where(
+                TreatmentPlan.case_id.in_(case_ids_for_tp),
+                TreatmentPlan.status == TreatmentPlanStatus.COMPLETED.value,
+            )
+        )).scalars().all()
+        for tp in all_tps_for_cases:
+            cid = str(tp.case_id)
+            if cid not in completed_tp_by_case:
+                completed_tp_by_case[cid] = []
+            completed_tp_by_case[cid].append({
+                "id": str(tp.id),
+                "treatment_name": tp.treatment_name,
+                "completed_at": tp.completed_at.isoformat() if tp.completed_at else None,
+            })
+
+    # --- Load appointments for each patient (for latest doctor resolution) ---
+    appts_for_patient: dict[str, list] = {}
+    if patient_ids:
+        appt_q = select(Appointment).where(Appointment.patient_id.in_(patient_ids),
+                                            Appointment.is_active == True)
+        all_patient_appts = (await db.execute(appt_q)).scalars().all()
+        for a in all_patient_appts:
+            pid = str(a.patient_id)
+            if pid not in appts_for_patient:
+                appts_for_patient[pid] = []
+            appts_for_patient[pid].append(a)
+
+    # --- Load latest treatment sitting for each treatment plan (for doctor resolution) ---
+    sitting_doctor_map: dict[str, str] = {}
+    if tp_ids:
+        all_tp_ids = list(tp_id_to_case.keys()) or tp_ids
+        sitting_q = select(TreatmentSitting).where(
+            TreatmentSitting.treatment_plan_id.in_(all_tp_ids),
+            TreatmentSitting.status.in_(["COMPLETED", "IN_PROGRESS"]),
+            TreatmentSitting.doctor_id.isnot(None),
+        ).order_by(desc(TreatmentSitting.sitting_date))
+        all_sittings = (await db.execute(sitting_q)).scalars().all()
+        for s in all_sittings:
+            stpid = str(s.treatment_plan_id)
+            if stpid not in sitting_doctor_map:
+                sitting_doctor_map[stpid] = str(s.doctor_id)
+
+    entity_dict = {"users": users, "patients": patients, "leads": leads,
+                   "cases": cases, "tp": tp_entities, "appointments": appointments,
+                   "hospitals": hospitals, "tt": tt_entities, "sitting_doctor_map": sitting_doctor_map}
+
+    result = []
     for ge in ge_rows:
         pid = str(ge.patient_id) if ge.patient_id else None
-        pph = ge_patients_phone.get(pid, {}) if pid else {}
-        doctor_name = ge_staff.get(str(ge.doctor_id)) if ge.doctor_id else None
-        assigned_name = ge_staff.get(str(ge.assigned_staff_id)) if ge.assigned_staff_id else None
-        lead_name = ge_leads.get(str(ge.lead_id)) if ge.lead_id else None
-        patient_display = ge_patients.get(pid, None) if pid else None
-        if not patient_display:
-            patient_display = lead_name or "Unknown"
-        result.append({
+        lid = str(ge.lead_id) if ge.lead_id else None
+        cid = str(ge.case_id) if ge.case_id else None
+        tpid = str(ge.treatment_plan_id) if ge.treatment_plan_id else None
+        apptid = str(ge.appointment_id) if ge.appointment_id else None
+        ttid = str(ge.treatment_type_id) if ge.treatment_type_id else None
+        hid = str(ge.hospital_id) if ge.hospital_id else None
+
+        patient_obj = patients.get(pid) if pid else None
+        lead_obj = leads.get(lid) if lid else None
+        case_obj = cases.get(cid) if cid else None
+        tp_obj = tp_entities.get(tpid) if tpid else None
+        appt_obj = appointments.get(apptid) if apptid else None
+        tt_obj = tt_entities.get(ttid) if ttid else None
+        hospital_obj = hospitals.get(hid) if hid else None
+
+        # --- Patient info (null for LEAD enquiries) ---
+        patient_info = None
+        if patient_obj and not is_lead:
+            patient_info = {
+                "id": str(patient_obj.id),
+                "name": patient_obj.full_name,
+                "photo_url": patient_obj.photo_url,
+                "phone": patient_obj.phone,
+                "op_number": patient_obj.op_no,
+                "age": patient_obj.age,
+                "gender": patient_obj.gender,
+                "status": patient_obj.status.value if hasattr(patient_obj.status, "value") else patient_obj.status,
+            }
+
+        # --- Lead info ---
+        lead_info = None
+        if lead_obj:
+            lead_info = {
+                "id": str(lead_obj.id),
+                "name": lead_obj.lead_name,
+                "mobile": lead_obj.mobile,
+                "email": lead_obj.email,
+                "source": lead_obj.source,
+                "status": lead_obj.status,
+                "interested_treatment": lead_obj.interested_treatment,
+                "priority": lead_obj.priority,
+                "next_follow_up_date": lead_obj.next_follow_up_date.isoformat() if lead_obj.next_follow_up_date else None,
+                "notes": lead_obj.notes,
+            }
+
+        # --- Appointment info (null for LEAD enquiries) ---
+        appointment_info = None
+        if appt_obj and not is_lead:
+            appt_doctor_name = None
+            if appt_obj.doctor_id and appt_obj.doctor_id in users:
+                appt_doctor_name = users[appt_obj.doctor_id].full_name
+            appointment_info = {
+                "id": str(appt_obj.id),
+                "date": appt_obj.appointment_date.isoformat() if appt_obj.appointment_date else None,
+                "time": str(appt_obj.appointment_time) if appt_obj.appointment_time else None,
+                "doctor_name": appt_doctor_name,
+                "appointment_type": appt_obj.appointment_type.value if hasattr(appt_obj.appointment_type, "value") else appt_obj.appointment_type,
+                "purpose": getattr(appt_obj, "notes", None),
+                "status": appt_obj.status.value if hasattr(appt_obj.status, "value") else appt_obj.status,
+            }
+
+        # --- Treatment info (null for LEAD enquiries) ---
+        treatment_info = None
+        treatment_display_name = None
+        if tp_obj and not is_lead:
+            treatment_display_name = tp_obj.treatment_name
+        if not treatment_display_name and ge.treatment_name and not is_lead:
+            treatment_display_name = ge.treatment_name
+        if not treatment_display_name and tt_obj and not is_lead:
+            treatment_display_name = tt_obj.name
+        if tp_obj and not is_lead:
+            treatment_type_name = tt_obj.name if tt_obj else None
+            treatment_info = {
+                "id": str(tp_obj.id),
+                "treatment_name": tp_obj.treatment_name,
+                "treatment_type": treatment_type_name,
+                "status": tp_obj.status.value if hasattr(tp_obj.status, "value") else tp_obj.status,
+                "start_date": tp_obj.start_date.isoformat() if tp_obj.start_date else None,
+                "completion_date": tp_obj.completed_at.isoformat() if tp_obj.completed_at else None,
+                "total_visits": tp_obj.total_sittings,
+                "completed_visits": tp_obj.completed_sittings,
+                "remaining_visits": tp_obj.remaining_sittings,
+                "current_visit": ge.visit_number,
+            }
+
+        # --- Case info (null for LEAD enquiries) ---
+        case_info = None
+        if case_obj and not is_lead:
+            case_info = {
+                "id": str(case_obj.id),
+                "case_number": case_obj.case_number,
+                "chief_complaint": case_obj.chief_complaint,
+                "status": case_obj.status.value if hasattr(case_obj.status, "value") else case_obj.status,
+                "diagnosis": case_obj.final_diagnosis or case_obj.diagnosis,
+            }
+
+        # --- Hospital info ---
+        hospital_info = None
+        if hospital_obj:
+            hospital_info = {
+                "id": str(hospital_obj.id),
+                "name": hospital_obj.name,
+                "phone": hospital_obj.phone,
+                "address": hospital_obj.address,
+                "logo_url": hospital_obj.logo_url,
+            }
+
+        # --- Doctor resolution (skip for LEAD enquiries) ---
+        is_lead = ge.enquiry_type == "LEAD_FOLLOW_UP"
+        doctor_info = {"id": None, "name": None, "specialization": None, "photo_url": None}
+        if not is_lead:
+            case_tps = case_tp_map.get(cid, []) if cid else []
+            patient_appts = appts_for_patient.get(pid, []) if pid else []
+            sitting_doctor_id = None
+            if tpid and tpid in sitting_doctor_map:
+                sitting_doctor_id = sitting_doctor_map[tpid]
+            elif cid:
+                for tp in case_tps:
+                    stpid = str(tp.id)
+                    if stpid in sitting_doctor_map:
+                        sitting_doctor_id = sitting_doctor_map[stpid]
+                        break
+            doctor_info = _resolve_latest_doctor(case_obj, case_tps, patient_appts,
+                                                  sitting_doctor_id or ge.doctor_id or ge.assigned_staff_id, entity_dict)
+
+        # --- Recurrence info ---
+        recurrence_info = None
+        if ge.enquiry_type == "RECALL" and ge.is_recurring:
+            recurrence_info = {
+                "is_recurring": True,
+                "occurrence_number": ge.occurrence_number,
+                "interval_days": ge.recurrence_interval_days,
+                "chain_id": ge.chain_id,
+            }
+
+        # --- Completed Treatments (for CASE_WELLNESS and RECALL only) ---
+        completed_treatments = []
+        if not is_lead and cid:
+            completed_treatments = completed_tp_by_case.get(cid, [])
+
+        # --- Description ---
+        description = _generate_description(
+            ge.enquiry_type, patient_obj.full_name if patient_obj else None,
+            lead_obj.lead_name if lead_obj else None,
+            treatment_display_name, case_obj, lead_obj, appt_obj, tp_obj, recurrence_info
+        )
+
+        # --- Template variables ---
+        template_vars = _build_template_variables(
+            ge.enquiry_type, patient_obj, lead_obj, doctor_info, hospital_obj,
+            case_obj, tp_obj, appt_obj, treatment_display_name,
+            ge.occurrence_number, tp_obj.total_sittings if tp_obj else None,
+            completed_treatments=completed_treatments,
+        )
+
+        # --- Assigned staff ---
+        assigned_staff_info = None
+        if ge.assigned_staff_id and ge.assigned_staff_id in users:
+            s = users[ge.assigned_staff_id]
+            assigned_staff_info = {"id": str(s.id), "name": s.full_name}
+
+        # Backward-compat fields — null for LEAD enquiries
+        backward_patient_name = None
+        backward_patient_phone = None
+        backward_op_number = None
+        backward_doctor_name = None
+        backward_treatment_type = None
+        if not is_lead:
+            backward_patient_name = (patient_info or {}).get("name") or (lead_info or {}).get("name") or "Unknown"
+            backward_patient_phone = (patient_info or {}).get("phone") or (lead_info or {}).get("mobile")
+            backward_op_number = (patient_info or {}).get("op_number")
+            backward_doctor_name = doctor_info.get("name")
+            backward_treatment_type = (treatment_info or {}).get("treatment_type") or (tt_obj.name if tt_obj else None)
+
+        item = {
             "id": str(ge.id),
             "source": "generated_enquiry",
             "enquiry_type": ge.enquiry_type or "ENQUIRY",
-            "patient_id": pid,
-            "patient_name": patient_display,
-            "op_number": pph.get("op_no"),
-            "doctor_name": doctor_name or assigned_name,
-            "doctor_id": str(ge.doctor_id) if ge.doctor_id else (str(ge.assigned_staff_id) if ge.assigned_staff_id else None),
-            "treatment_type": ge_tt.get(str(ge.treatment_type_id)) if ge.treatment_type_id else None,
-            "treatment_name": ge.treatment_name or ge.enquiry_type,
-            "follow_up_type": ge.enquiry_type or ge.trigger_event or "CRM_RULE",
-            "due_date": ge.due_date.isoformat(),
-            "priority": ge.priority or "MEDIUM",
+            "enquiry_number": ge.enquiry_number,
             "status": ge.status,
-            "response": None,
-            "feedback": ge.notes,
-            "staff_notes": None,
-            "action_required": ge.enquiry_type,
-            "response_status": None,
-            "next_action": None,
-            "contact_channel": None,
-            "last_contact_date": None,
-            "patient_phone": pph.get("phone"),
-        })
+            "priority": ge.priority or "MEDIUM",
+            "due_date": ge.due_date.isoformat(),
+            "created_at": ge.created_at.isoformat() if ge.created_at else None,
+            "description": description,
+            "patient": patient_info,
+            "lead": lead_info,
+            "doctor": doctor_info,
+            "hospital": hospital_info,
+            "case": case_info,
+            "treatment": treatment_info,
+            "appointment": appointment_info,
+            "recurrence": recurrence_info,
+            "assigned_staff": assigned_staff_info,
+            "treatment_name": treatment_display_name,
+            "completed_treatments": completed_treatments,
+            "template_variables": template_vars,
+            "patient_name": backward_patient_name,
+            "patient_id": pid if not is_lead else None,
+            "patient_phone": backward_patient_phone,
+            "op_number": backward_op_number,
+            "doctor_name": backward_doctor_name,
+            "doctor_id": doctor_info.get("id"),
+            "treatment_type": backward_treatment_type,
+        }
+        result.append(item)
 
-    # --- Search filter (client-side for name/phone/op_number) ---
+    # --- Search (type-aware: don't search patient fields for LEAD) ---
     if search:
         sl = search.lower()
         result = [
             r for r in result
-            if sl in (r.get("patient_name") or "").lower()
-            or sl in (r.get("op_number") or "").lower()
-            or sl in (r.get("patient_phone") or "").lower()
-            or sl in (r.get("treatment_name") or "").lower()
+            if sl in (r.get("description") or "").lower()
+            or sl in ((r.get("lead") or {}).get("name") or "").lower()
+            or sl in ((r.get("lead") or {}).get("mobile") or "").lower()
+            or sl in ((r.get("hospital") or {}).get("name") or "").lower()
+            or (r.get("patient_name") and sl in (r.get("patient_name") or "").lower())
+            or (r.get("op_number") and sl in (r.get("op_number") or "").lower())
+            or (r.get("patient_phone") and sl in (r.get("patient_phone") or "").lower())
+            or (r.get("treatment_name") and sl in (r.get("treatment_name") or "").lower())
+            or (r.get("doctor_name") and sl in (r.get("doctor_name") or "").lower())
+            or ((r.get("case") or {}).get("case_number") and sl in ((r.get("case") or {}).get("case_number") or "").lower())
         ]
 
     # Sort by due_date
@@ -443,13 +978,16 @@ async def calendar_overdue_items(
             ge_tt[str(tt.id)] = tt.name
 
     for ge in ge_rows:
+        is_lead = ge.enquiry_type == "LEAD_FOLLOW_UP"
         pid = str(ge.patient_id) if ge.patient_id else None
         pph = ge_patients_phone.get(pid, {}) if pid else {}
         doctor_name = ge_staff.get(str(ge.doctor_id)) if ge.doctor_id else None
         assigned_name = ge_staff.get(str(ge.assigned_staff_id)) if ge.assigned_staff_id else None
         lead_name = ge_leads.get(str(ge.lead_id)) if ge.lead_id else None
         patient_display = ge_patients.get(pid, None) if pid else None
-        if not patient_display:
+        if is_lead:
+            patient_display = lead_name or "Lead"
+        elif not patient_display:
             patient_display = lead_name or "Unknown"
         result.append({
             "id": str(ge.id),
@@ -457,20 +995,20 @@ async def calendar_overdue_items(
             "type": ge.enquiry_type or "UNKNOWN",
             "status": ge.status,
             "patient_name": patient_display,
-            "patient_id": pid,
-            "phone": pph.get("phone"),
-            "op_no": pph.get("op_no"),
-            "doctor_name": doctor_name or assigned_name,
-            "doctor_id": str(ge.doctor_id) if ge.doctor_id else (str(ge.assigned_staff_id) if ge.assigned_staff_id else None),
-            "treatment_type": ge_tt.get(str(ge.treatment_type_id)) if ge.treatment_type_id else None,
-            "treatment_type_id": str(ge.treatment_type_id) if ge.treatment_type_id else None,
+            "patient_id": pid if not is_lead else None,
+            "phone": pph.get("phone") if not is_lead else None,
+            "op_no": pph.get("op_no") if not is_lead else None,
+            "doctor_name": None if is_lead else (doctor_name or assigned_name),
+            "doctor_id": None if is_lead else (str(ge.doctor_id) if ge.doctor_id else (str(ge.assigned_staff_id) if ge.assigned_staff_id else None)),
+            "treatment_type": None if is_lead else (ge_tt.get(str(ge.treatment_type_id)) if ge.treatment_type_id else None),
+            "treatment_type_id": None if is_lead else (str(ge.treatment_type_id) if ge.treatment_type_id else None),
             "due_date": ge.due_date.isoformat(),
             "notes": ge.notes,
             "days_overdue": (today - ge.due_date).days,
             "priority": ge.priority,
             "contact_channel": None,
             "last_contact_date": None,
-            "patient_phone": pph.get("phone"),
+            "patient_phone": None if is_lead else pph.get("phone"),
         })
 
     # Sort by days_overdue desc (most overdue first), paginate
@@ -553,12 +1091,42 @@ async def update_enquiry_status(
     ge = await db.get(GeneratedEnquiry, enquiry_id)
     if ge:
         _verify_hospital_access(ge, current_user)
+        old_status = ge.status
         ge.status = data.status
         if data.status == "COMPLETED":
             ge.updated_at = datetime.now(timezone.utc)
+            if ge.enquiry_type == "RECALL" and getattr(ge, 'is_recurring', False):
+                try:
+                    from app.crm.services.event_dispatcher import publish_event
+                    from app.crm.enums import EventType, EventSource
+                    await publish_event(
+                        event_type=EventType.RECALL_COMPLETED,
+                        source_module=EventSource.RECALL,
+                        entity_type="RECALL",
+                        entity_id=ge.id,
+                        hospital_id=ge.hospital_id,
+                        patient_id=ge.patient_id,
+                        payload={
+                            "enquiry_id": ge.id,
+                            "patient_id": ge.patient_id,
+                            "case_id": ge.case_id,
+                            "occurrence_number": ge.occurrence_number,
+                            "chain_id": ge.chain_id,
+                        },
+                        db=db,
+                    )
+                except Exception:
+                    pass
         elif data.status == "CANCELLED":
             ge.cancelled_by_event = "MANUAL"
             ge.cancelled_at = datetime.now(timezone.utc)
+        await record_timeline_event(
+            db, current_user=current_user, patient_id=ge.patient_id,
+            action="CRM Enquiry Status Updated",
+            description=f"Status changed from {old_status} to {data.status}",
+            module="CRM",
+            changes=[{"field": "status", "old_value": old_status, "new_value": data.status}],
+        )
         await db.commit()
         return {"success": True, "source": "generated_enquiry"}
 
@@ -714,7 +1282,6 @@ async def create_enquiry_follow_up(enquiry_id: str, data: EnquiryFollowUpAction,
             e.status = EnquiryStatus.CONTACTED.value
     if data.next_follow_up_date:
         e.next_follow_up_date = date.fromisoformat(data.next_follow_up_date)
-    await db.commit()
     await record_timeline_event(
         db, current_user=current_user, patient_id=e.patient_id,
         action="CRM Follow-Up Action",
@@ -736,6 +1303,7 @@ async def create_enquiry_follow_up(enquiry_id: str, data: EnquiryFollowUpAction,
             )
     except Exception:
         pass
+    await db.commit()
     return {"success": True, "enquiry_status": e.status}
 
 
@@ -757,4 +1325,435 @@ async def list_enquiry_follow_ups(enquiry_id: str, db: AsyncSession = Depends(ge
     return result
 
 
+# =============================================================================
+# ENRICHED ENQUIRY DETAIL — full context for the detail drawer
+# =============================================================================
+@router.get("/{enquiry_id}/detail")
+async def get_enriched_enquiry_detail(
+    enquiry_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)):
+    """Returns fully enriched detail for a single GeneratedEnquiry."""
+    verify_permission(current_user, Permission.VIEW_CRM_DASHBOARD)
 
+    ge = await db.get(GeneratedEnquiry, enquiry_id)
+    if not ge:
+        raise HTTPException(status_code=404, detail="Enquiry not found")
+    hospital_id = current_user.get("hospital_id")
+    if hospital_id and str(ge.hospital_id) != hospital_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # --- Batch load all related entities ---
+    user_ids = list({ge.doctor_id, ge.assigned_staff_id})
+    patients = await _batch_load_entities(db, Patient, [ge.patient_id]) if ge.patient_id else {}
+    leads = await _batch_load_entities(db, Lead, [ge.lead_id]) if ge.lead_id else {}
+    users = await _batch_load_entities(db, User, [u for u in user_ids if u])
+    cases = await _batch_load_entities(db, Case, [ge.case_id]) if ge.case_id else {}
+    tp_entities = await _batch_load_entities(db, TreatmentPlan, [ge.treatment_plan_id]) if ge.treatment_plan_id else {}
+    appointments = await _batch_load_entities(db, Appointment, [ge.appointment_id]) if ge.appointment_id else {}
+    hospitals = await _batch_load_entities(db, Hospital, [ge.hospital_id])
+    tt_entities = await _batch_load_entities(db, TreatmentType, [ge.treatment_type_id]) if ge.treatment_type_id else {}
+
+    pid = str(ge.patient_id) if ge.patient_id else None
+    lid = str(ge.lead_id) if ge.lead_id else None
+    cid = str(ge.case_id) if ge.case_id else None
+    hid = str(ge.hospital_id) if ge.hospital_id else None
+
+    patient_obj = patients.get(pid) if pid else None
+    lead_obj = leads.get(lid) if lid else None
+    case_obj = cases.get(str(ge.case_id)) if ge.case_id else None
+    tp_obj = tp_entities.get(str(ge.treatment_plan_id)) if ge.treatment_plan_id else None
+    appt_obj = appointments.get(str(ge.appointment_id)) if ge.appointment_id else None
+    hospital_obj = hospitals.get(hid) if hid else None
+    tt_obj = tt_entities.get(str(ge.treatment_type_id)) if ge.treatment_type_id else None
+
+    is_lead = ge.enquiry_type == "LEAD_FOLLOW_UP"
+
+    # Doctor resolution (LEAD enquiries get no doctor)
+    doctor_info = {"id": None, "name": None, "specialization": None, "photo_url": None}
+    treatment_display_name = None
+    completed_treatments = []
+
+    if not is_lead:
+        case_tps = []
+        if case_obj:
+            tp_all = (await db.execute(
+                select(TreatmentPlan).where(TreatmentPlan.case_id == case_obj.id)
+            )).scalars().all()
+            case_tps = list(tp_all)
+        patient_appts = []
+        if patient_obj:
+            appt_all = (await db.execute(
+                select(Appointment).where(Appointment.patient_id == patient_obj.id,
+                                            Appointment.is_active == True)
+            )).scalars().all()
+            patient_appts = list(appt_all)
+
+        sitting_doctor_id = None
+        if tp_obj:
+            sitting_q = await db.execute(
+                select(TreatmentSitting).where(
+                    TreatmentSitting.treatment_plan_id == tp_obj.id,
+                    TreatmentSitting.status.in_(["COMPLETED", "IN_PROGRESS"]),
+                    TreatmentSitting.doctor_id.isnot(None),
+                ).order_by(desc(TreatmentSitting.sitting_date)).limit(1)
+            )
+            latest_sitting = sitting_q.scalar_one_or_none()
+            if latest_sitting:
+                sitting_doctor_id = str(latest_sitting.doctor_id)
+
+        entity_dict = {"users": users, "patients": patients, "leads": leads,
+                       "cases": cases, "tp": tp_entities, "appointments": appointments,
+                       "hospitals": hospitals, "tt": tt_entities}
+
+        doctor_info = _resolve_latest_doctor(case_obj, case_tps, patient_appts,
+                                              sitting_doctor_id or ge.doctor_id or ge.assigned_staff_id, entity_dict)
+
+        treatment_display_name = tp_obj.treatment_name if tp_obj else (ge.treatment_name or (tt_obj.name if tt_obj else None))
+
+        # --- Completed Treatments for the case ---
+        if ge.case_id:
+            ct_q = select(TreatmentPlan).where(
+                TreatmentPlan.case_id == ge.case_id,
+                TreatmentPlan.status == TreatmentPlanStatus.COMPLETED.value,
+            )
+            for ct in (await db.execute(ct_q)).scalars().all():
+                completed_treatments.append({
+                    "id": str(ct.id),
+                    "treatment_name": ct.treatment_name,
+                    "completed_at": ct.completed_at.isoformat() if ct.completed_at else None,
+                })
+
+    # --- Patient Summary (null for LEAD enquiries) ---
+    patient_info = None
+    if patient_obj and not is_lead:
+        patient_info = {
+            "id": str(patient_obj.id),
+            "name": patient_obj.full_name,
+            "photo_url": patient_obj.photo_url,
+            "phone": patient_obj.phone,
+            "email": patient_obj.email,
+            "op_number": patient_obj.op_no,
+            "age": patient_obj.age,
+            "gender": patient_obj.gender,
+            "dob": patient_obj.date_of_birth.isoformat() if patient_obj.date_of_birth else None,
+            "address": patient_obj.address,
+            "status": patient_obj.status.value if hasattr(patient_obj.status, "value") else patient_obj.status,
+        }
+
+    # --- Lead Summary ---
+    lead_info = None
+    if lead_obj:
+        lead_info = {
+            "id": str(lead_obj.id),
+            "name": lead_obj.lead_name,
+            "mobile": lead_obj.mobile,
+            "alternate_mobile": lead_obj.alternate_mobile,
+            "email": lead_obj.email,
+            "source": lead_obj.source,
+            "status": lead_obj.status,
+            "interested_treatment": lead_obj.interested_treatment,
+            "priority": lead_obj.priority,
+            "preferred_visit_date": lead_obj.preferred_visit_date.isoformat() if lead_obj.preferred_visit_date else None,
+            "next_follow_up_date": lead_obj.next_follow_up_date.isoformat() if lead_obj.next_follow_up_date else None,
+            "notes": lead_obj.notes,
+            "age": lead_obj.age,
+            "gender": lead_obj.gender,
+            "city": lead_obj.city,
+            "lead_score": lead_obj.lead_score,
+            "converted_patient_id": lead_obj.converted_patient_id,
+            "assigned_doctor": users.get(lead_obj.assigned_doctor_id).full_name if lead_obj.assigned_doctor_id and lead_obj.assigned_doctor_id in users else None,
+            "assigned_staff": users.get(lead_obj.assigned_staff_id).full_name if lead_obj.assigned_staff_id and lead_obj.assigned_staff_id in users else None,
+        }
+
+    # --- Appointment Information (null for LEAD enquiries) ---
+    appointment_info = None
+    if appt_obj and not is_lead:
+        appt_doctor_name = users[appt_obj.doctor_id].full_name if appt_obj.doctor_id and appt_obj.doctor_id in users else None
+        appointment_info = {
+            "id": str(appt_obj.id),
+            "date": appt_obj.appointment_date.isoformat() if appt_obj.appointment_date else None,
+            "time": str(appt_obj.appointment_time) if appt_obj.appointment_time else None,
+            "end_time": str(appt_obj.end_time) if appt_obj.end_time else None,
+            "doctor_name": appt_doctor_name,
+            "department": None,
+            "purpose": appt_obj.notes,
+            "type": appt_obj.appointment_type.value if hasattr(appt_obj.appointment_type, "value") else appt_obj.appointment_type,
+            "status": appt_obj.status.value if hasattr(appt_obj.status, "value") else appt_obj.status,
+        }
+
+    # --- Treatment Information (null for LEAD enquiries) ---
+    treatment_info = None
+    if tp_obj and not is_lead:
+        treatment_type_name = tt_obj.name if tt_obj else None
+        treatment_info = {
+            "id": str(tp_obj.id),
+            "treatment_name": tp_obj.treatment_name,
+            "treatment_type": treatment_type_name,
+            "treatment_number": tp_obj.treatment_number,
+            "description": tp_obj.description,
+            "status": tp_obj.status.value if hasattr(tp_obj.status, "value") else tp_obj.status,
+            "start_date": tp_obj.start_date.isoformat() if tp_obj.start_date else None,
+            "expected_completion_date": tp_obj.expected_completion_date.isoformat() if tp_obj.expected_completion_date else None,
+            "completion_date": tp_obj.completed_at.isoformat() if tp_obj.completed_at else None,
+            "total_visits": tp_obj.total_sittings,
+            "completed_visits": tp_obj.completed_sittings,
+            "remaining_visits": tp_obj.remaining_sittings,
+            "current_stage": f"Visit {tp_obj.completed_sittings + 1} of {tp_obj.total_sittings}" if tp_obj.total_sittings else "Not started",
+            "cost": tp_obj.cost,
+            "paid_amount": tp_obj.paid_amount,
+            "assigned_doctor": users.get(tp_obj.assigned_doctor_id).full_name if tp_obj.assigned_doctor_id and tp_obj.assigned_doctor_id in users else None,
+        }
+
+    # --- Case Information (null for LEAD enquiries) ---
+    case_info = None
+    if case_obj and not is_lead:
+        case_info = {
+            "id": str(case_obj.id),
+            "case_number": case_obj.case_number,
+            "chief_complaint": case_obj.chief_complaint,
+            "diagnosis": case_obj.final_diagnosis or case_obj.diagnosis,
+            "status": case_obj.status.value if hasattr(case_obj.status, "value") else case_obj.status,
+            "hpi": case_obj.hpi,
+            "dental_history": case_obj.dental_history,
+            "medical_history": case_obj.medical_history,
+            "completion_date": case_obj.completion_date.isoformat() if case_obj.completion_date else None,
+        }
+
+    # --- Hospital ---
+    hospital_info = None
+    if hospital_obj:
+        hospital_info = {
+            "id": str(hospital_obj.id),
+            "name": hospital_obj.name,
+            "phone": hospital_obj.phone,
+            "email": hospital_obj.email,
+            "address": hospital_obj.address,
+            "logo_url": hospital_obj.logo_url,
+        }
+
+    # --- Recurrence ---
+    recurrence_info = None
+    if ge.enquiry_type == "RECALL" and ge.is_recurring:
+        recurrence_info = {
+            "is_recurring": True,
+            "occurrence_number": ge.occurrence_number,
+            "interval_days": ge.recurrence_interval_days,
+            "chain_id": ge.chain_id,
+        }
+
+    description = _generate_description(
+        ge.enquiry_type, patient_obj.full_name if patient_obj else None,
+        lead_obj.lead_name if lead_obj else None,
+        treatment_display_name, case_obj, lead_obj, appt_obj, tp_obj, recurrence_info
+    )
+
+    template_vars = _build_template_variables(
+        ge.enquiry_type, patient_obj, lead_obj, doctor_info, hospital_obj,
+        case_obj, tp_obj, appt_obj, treatment_display_name,
+        ge.occurrence_number, tp_obj.total_sittings if tp_obj else None,
+        completed_treatments=completed_treatments,
+    )
+
+    # --- Communication History ---
+    communication_history = []
+    from app.models.communication_log import CommunicationLog
+    comm_q = select(CommunicationLog).where(
+        CommunicationLog.patient_id == ge.patient_id,
+        CommunicationLog.hospital_id == ge.hospital_id,
+    ).order_by(desc(CommunicationLog.created_at)).limit(20)
+    for comm in (await db.execute(comm_q)).scalars().all():
+        communication_history.append({
+            "id": str(comm.id),
+            "channel": comm.channel,
+            "message_type": comm.message_type,
+            "message": comm.message[:500] if comm.message else "",
+            "status": comm.status,
+            "sent_at": comm.sent_at.isoformat() if comm.sent_at else None,
+            "created_at": comm.created_at.isoformat() if comm.created_at else None,
+        })
+
+    # --- Timeline (type-aware) ---
+    timeline = []
+    if is_lead and ge.lead_id:
+        # Lead timeline: lead-created, status changes, follow-ups
+        from app.models.lead import Lead
+        from app.models.follow_up import FollowUp
+        from app.models.communication_log import CommunicationLog
+        lead = await db.get(Lead, ge.lead_id)
+        if lead:
+            timeline.append({
+                "id": str(lead.id), "event_type": "LEAD_CREATED",
+                "description": f"Lead created — {lead.source.replace('_', ' ').title() if lead.source else 'Unknown source'}",
+                "created_at": lead.created_at.isoformat() if lead.created_at else None,
+                "status": lead.status,
+            })
+        # Lead follow-up events
+        fu_q = select(FollowUp).where(
+            FollowUp.lead_id == ge.lead_id
+        ).order_by(desc(FollowUp.created_at)).limit(20)
+        for fu in (await db.execute(fu_q)).scalars().all():
+            timeline.append({
+                "id": str(fu.id), "event_type": "LEAD_FOLLOW_UP",
+                "description": fu.notes or f"Follow-up ({fu.follow_up_type or 'General'})",
+                "created_at": fu.created_at.isoformat() if fu.created_at else None,
+                "status": fu.status,
+            })
+        # Lead communication events
+        comm_q = select(CommunicationLog).where(
+            CommunicationLog.lead_id == ge.lead_id
+        ).order_by(desc(CommunicationLog.created_at)).limit(20)
+        for comm in (await db.execute(comm_q)).scalars().all():
+            timeline.append({
+                "id": str(comm.id), "event_type": "LEAD_COMMUNICATION",
+                "description": f"{comm.channel} — {comm.message[:100] if comm.message else 'No message'}",
+                "created_at": comm.created_at.isoformat() if comm.created_at else None,
+                "status": comm.status,
+            })
+        timeline.sort(key=lambda x: x.get("created_at") or "", reverse=True)
+    elif ge.patient_id and not is_lead:
+        from app.services.timeline_service import TimelineService
+        ts = TimelineService(db)
+        timeline_raw, _ = await ts.get_timeline(ge.patient_id, limit=50)
+        timeline = timeline_raw
+
+    # --- Assigned Staff ---
+    assigned_staff_info = None
+    if ge.assigned_staff_id and ge.assigned_staff_id in users:
+        s = users[ge.assigned_staff_id]
+        assigned_staff_info = {"id": str(s.id), "name": s.full_name, "email": s.email, "phone": s.phone}
+
+    return {
+        "id": str(ge.id),
+        "source": "generated_enquiry",
+        "enquiry_type": ge.enquiry_type,
+        "enquiry_number": ge.enquiry_number,
+        "status": ge.status,
+        "priority": ge.priority or "MEDIUM",
+        "due_date": ge.due_date.isoformat(),
+        "created_at": ge.created_at.isoformat() if ge.created_at else None,
+        "updated_at": ge.updated_at.isoformat() if ge.updated_at else None,
+        "description": description,
+        "notes": ge.notes,
+        "trigger_event": ge.trigger_event,
+        "generation_reason": ge.generation_reason,
+        "visit_number": ge.visit_number,
+        "total_visits": ge.total_visits,
+        "patient": patient_info,
+        "lead": lead_info,
+        "doctor": doctor_info,
+        "hospital": hospital_info,
+        "case": case_info,
+        "treatment": treatment_info,
+        "appointment": appointment_info,
+        "recurrence": recurrence_info,
+        "assigned_staff": assigned_staff_info,
+        "completed_treatments": completed_treatments,
+        "template_variables": template_vars,
+        "communication_history": communication_history,
+        "timeline": timeline,
+    }
+
+
+# =============================================================================
+# WHATSAPP PREVIEW FOR ENQUIRY
+# =============================================================================
+class WhatsAppPreviewRequest(BaseModel):
+    template_message: Optional[str] = Field(None, description="Custom template message (uses default if not provided)")
+
+
+class WhatsAppPreviewResponse(BaseModel):
+    enquiry_id: str
+    template_message: str
+    rendered_message: str
+    resolved_variables: dict
+    unresolved_variables: list
+    is_valid: bool
+
+
+@router.post("/{enquiry_id}/whatsapp-preview")
+async def get_whatsapp_preview(
+    enquiry_id: str,
+    request: WhatsAppPreviewRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Get WhatsApp message preview for an enquiry. Resolves all template variables in real-time."""
+    verify_permission(current_user, Permission.VIEW_CRM_DASHBOARD)
+
+    ge = await db.get(GeneratedEnquiry, enquiry_id)
+    if not ge:
+        raise HTTPException(status_code=404, detail="Enquiry not found")
+    hospital_id = current_user.get("hospital_id")
+    if hospital_id and str(ge.hospital_id) != hospital_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # Find template
+    from app.models.whatsapp_template import WhatsAppTemplate
+    eq_type = ge.enquiry_type
+
+    template_obj = None
+    q = select(WhatsAppTemplate).where(
+        WhatsAppTemplate.hospital_id == ge.hospital_id,
+        WhatsAppTemplate.enquiry_type == eq_type,
+        WhatsAppTemplate.is_active == True,
+    )
+    t = (await db.execute(q)).scalar_one_or_none()
+    if t:
+        template_obj = t
+    else:
+        q = select(WhatsAppTemplate).where(
+            WhatsAppTemplate.hospital_id.is_(None),
+            WhatsAppTemplate.enquiry_type == eq_type,
+            WhatsAppTemplate.is_active == True,
+        )
+        t = (await db.execute(q)).scalar_one_or_none()
+        if t:
+            template_obj = t
+
+    template_message = request.template_message
+    if not template_message:
+        if template_obj:
+            template_message = template_obj.message
+        else:
+            template_message = DEFAULT_TEMPLATES_BY_TYPE.get(eq_type or "", "")
+
+    # Resolve variables with type-scoped validation
+    from app.crm.services.template_resolver import get_template_resolver
+    resolver = get_template_resolver()
+    rendered, invalid = await resolver.resolve_with_validation(
+        db, template_message, enquiry_type=eq_type or "",
+        patient_id=ge.patient_id,
+        lead_id=ge.lead_id,
+        hospital_id=ge.hospital_id,
+        doctor_id=ge.doctor_id,
+        appointment_id=ge.appointment_id,
+        treatment_type_id=ge.treatment_type_id,
+        case_id=ge.case_id,
+        treatment_plan_id=ge.treatment_plan_id,
+        staff_id=ge.assigned_staff_id,
+        visit_number=ge.visit_number,
+        total_visits=ge.total_visits,
+        remaining_visits=ge.total_visits - ge.visit_number if ge.total_visits and ge.visit_number else None,
+    )
+
+    # Also build the resolved_variables dict for frontend display
+    variables = await resolver._build_variable_map(
+        db, enquiry_type=eq_type or "",
+        patient_id=ge.patient_id, lead_id=ge.lead_id, hospital_id=ge.hospital_id, doctor_id=ge.doctor_id,
+        appointment_id=ge.appointment_id, treatment_type_id=ge.treatment_type_id, case_id=ge.case_id,
+        treatment_plan_id=ge.treatment_plan_id, staff_id=ge.assigned_staff_id, visit_number=ge.visit_number,
+        remaining_visits=ge.total_visits - ge.visit_number if ge.total_visits and ge.visit_number else None,
+        total_visits=ge.total_visits,
+    )
+
+    is_valid = len(unresolved) == 0 and len(invalid) == 0
+
+    return WhatsAppPreviewResponse(
+        enquiry_id=ge.id,
+        template_message=template_message,
+        rendered_message=rendered,
+        resolved_variables=variables,
+        unresolved_variables=unresolved + invalid,
+        is_valid=is_valid,
+    )

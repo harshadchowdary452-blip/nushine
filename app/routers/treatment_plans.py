@@ -274,7 +274,6 @@ async def start_treatment(plan_id: str, db: AsyncSession = Depends(get_db), curr
     verify_permission(current_user, Permission.CREATE_TREATMENT_PLAN)
     service = TreatmentPlanService(db)
     result = await service.update_status(plan_id, "IN_PROGRESS", user_id=current_user.get("sub"))
-    await db.commit()
     patient_id = await _get_patient_id_from_plan(db, plan_id)
     await record_timeline_event(
         db, current_user=current_user, patient_id=patient_id,
@@ -297,6 +296,7 @@ async def start_treatment(plan_id: str, db: AsyncSession = Depends(get_db), curr
         )
     except Exception:
         pass
+    await db.commit()
     return result
 
 
@@ -311,7 +311,6 @@ async def complete_treatment(plan_id: str, body: CompleteTreatmentBody = Body(de
         elif body.notes:
             update_data["notes"] = body.notes
     result = await service.update(plan_id, update_data, user_id=current_user.get("sub"))
-    await db.commit()
     patient_id = await _get_patient_id_from_plan(db, plan_id)
     await record_timeline_event(
         db, current_user=current_user, patient_id=patient_id,
@@ -330,6 +329,13 @@ async def complete_treatment(plan_id: str, body: CompleteTreatmentBody = Body(de
             hospital_id=getattr(result, 'hospital_id', None),
             patient_id=patient_id,
             doctor_id=getattr(result, 'assigned_doctor_id', None),
+            payload={
+                "treatment_plan_id": plan_id,
+                "patient_id": patient_id,
+                "case_id": str(result.case_id) if result.case_id else None,
+                "treatment_type_id": str(result.treatment_type_id) if result.treatment_type_id else None,
+                "doctor_id": str(result.assigned_doctor_id) if result.assigned_doctor_id else None,
+            },
             db=db,
         )
     except Exception:
