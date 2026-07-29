@@ -882,7 +882,7 @@ export default function LeadDetail() {
                 <SelectContent>
                   {doctors.length > 0 ? doctors.map((doc: DoctorListItem) => (
                     <SelectItem key={doc.id} value={doc.id}>{doc.full_name}</SelectItem>
-                  )) : <SelectItem value="" disabled>No doctors available</SelectItem>}
+                  )) : <SelectItem value="__none__" disabled>No doctors available</SelectItem>}
                 </SelectContent>
               </Select>
             </div>

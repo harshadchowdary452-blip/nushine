@@ -508,7 +508,7 @@ export default function CampaignResponses() {
                         <TableRow key={resp.id}>
                           <TableCell>
                             <div className="flex flex-col">
-                              <span className="font-medium text-sm text-gray-900">{resp.patient_name || "Unknown"}</span>
+                              <span className="font-medium text-sm text-gray-900">{resp.patient_name || "-"}</span>
                               {resp.phone && <span className="text-xs text-gray-400">{resp.phone}</span>}
                             </div>
                           </TableCell>

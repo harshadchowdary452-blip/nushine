@@ -51,6 +51,7 @@ from app.models.enquiry_type_master import EnquiryTypeMaster
 from app.models.communication_template_master import CommunicationTemplateMaster
 from app.models.crm_config import CrmConfig
 from app.models.crm_rule import CrmRule
+from app.models.feedback import LeadFeedback, PatientFeedback, FeedbackNote
 
 __all__ = [
     "AdminGroup", "Hospital", "User", "Patient", "Consultant",
@@ -86,4 +87,5 @@ __all__ = [
     "CommunicationTemplateMaster",
     "CrmConfig",
     "CrmRule",
+    "LeadFeedback", "PatientFeedback", "FeedbackNote",
 ]

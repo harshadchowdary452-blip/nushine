@@ -75,6 +75,13 @@ class Lead(Base):
     next_follow_up_date: Mapped[date] = mapped_column(Date, nullable=True)
     priority: Mapped[str] = mapped_column(String(20), default="MEDIUM", nullable=False)
 
+    # --- Synced feedback summary (updated by FeedbackService) ---
+    latest_response_status: Mapped[str] = mapped_column(String(30), nullable=True)
+    latest_feedback_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    latest_feedback_notes: Mapped[str] = mapped_column(Text, nullable=True)
+    latest_call_outcome: Mapped[str] = mapped_column(String(30), nullable=True)
+    latest_follow_up_requirement: Mapped[str] = mapped_column(String(20), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 

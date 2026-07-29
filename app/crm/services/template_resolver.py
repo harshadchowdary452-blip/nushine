@@ -12,7 +12,8 @@ logger = logging.getLogger("crm.template_resolver")
 
 LEAD_VARIABLES = {
     "lead_name", "lead_phone", "lead_source", "lead_status",
-    "interested_treatment", "preferred_branch", "preferred_time",
+    "interested_treatment", "treatment_name",
+    "preferred_branch", "preferred_time",
     "assigned_staff", "assigned_staff_name",
     "hospital_name", "hospital_phone", "hospital_address",
     "clinic_name", "website",
@@ -76,12 +77,14 @@ class TemplateVariableResolver:
         visit_number: Optional[int] = None,
         remaining_visits: Optional[int] = None,
         total_visits: Optional[int] = None,
+        treatment_name: Optional[str] = None,
     ) -> str:
         """Replace all {{variable}} placeholders with actual values, respecting type scope."""
         variables = await self._build_variable_map(
             db, enquiry_type, patient_id, lead_id, hospital_id, doctor_id,
             appointment_id, treatment_type_id, case_id,
             treatment_plan_id, staff_id, visit_number, remaining_visits, total_visits,
+            treatment_name=treatment_name,
         )
         result = template_message
         for key, value in variables.items():
@@ -105,6 +108,7 @@ class TemplateVariableResolver:
         visit_number: Optional[int] = None,
         remaining_visits: Optional[int] = None,
         total_visits: Optional[int] = None,
+        treatment_name: Optional[str] = None,
     ) -> tuple[str, list[str]]:
         """Resolve template and validate no forbidden variables are used.
         Returns (resolved_message, invalid_variables).
@@ -120,6 +124,7 @@ class TemplateVariableResolver:
             patient_id, lead_id, hospital_id, doctor_id,
             appointment_id, treatment_type_id, case_id,
             treatment_plan_id, staff_id, visit_number, remaining_visits, total_visits,
+            treatment_name=treatment_name,
         )
         return result, invalid
 
@@ -166,6 +171,7 @@ class TemplateVariableResolver:
         visit_number: Optional[int] = None,
         remaining_visits: Optional[int] = None,
         total_visits: Optional[int] = None,
+        treatment_name: Optional[str] = None,
     ) -> dict[str, str]:
         variables: dict[str, str] = {}
         is_lead = enquiry_type in LEAD_ENQUIRY_TYPES
@@ -210,6 +216,7 @@ class TemplateVariableResolver:
                     variables["lead_source"] = lead.source.replace("_", " ").title() if lead.source else ""
                     variables["lead_status"] = lead.status or ""
                     variables["interested_treatment"] = lead.interested_treatment or ""
+                    variables["treatment_name"] = lead.interested_treatment or ""
                     if lead.notes:
                         variables["lead_notes"] = lead.notes
                     # Preferred branch / time
@@ -288,6 +295,12 @@ class TemplateVariableResolver:
                 if appt.appointment_type:
                     apt_type = appt.appointment_type
                     variables["appointment_type"] = (apt_type.value if hasattr(apt_type, "value") else apt_type).replace("_", " ").title() if apt_type else ""
+                # Resolve doctor_name from the linked appointment's doctor if not already resolved
+                if "doctor_name" not in variables and appt.doctor_id:
+                    from app.models.user import User
+                    appt_doc = await db.get(User, appt.doctor_id)
+                    if appt_doc:
+                        variables["doctor_name"] = appt_doc.full_name or ""
 
         # --- Treatment Type ---
         treatment_type_name = None
@@ -389,6 +402,14 @@ class TemplateVariableResolver:
             if next_fu and next_fu.follow_up_date:
                 variables["follow_up_date"] = next_fu.follow_up_date.isoformat()
                 variables["followup_date"] = next_fu.follow_up_date.isoformat()
+
+        # Fallback: use treatment_name parameter if still unresolved (e.g. from GeneratedEnquiry.treatment_name)
+        if "treatment_name" not in variables and treatment_name:
+            variables["treatment_name"] = treatment_name
+
+        # Fallback: if appointment_id is present and doctor_name is still empty, use "Our Doctor"
+        if appointment_id and "doctor_name" not in variables:
+            variables["doctor_name"] = "Our Doctor"
 
         return variables
 

@@ -54,6 +54,7 @@ import {
   Stethoscope,
   CreditCard,
   ScrollText,
+  ThumbsUp,
 } from "lucide-react";
 
 function getInitials(name: string): string {
@@ -1140,6 +1141,48 @@ export default function PatientDetail() {
 
       {activeTab === "responses" && (
         <div className="overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 320px)" }}>
+          {patient?.latest_feedback_date && (
+            <Card className="p-4 border-border shadow-card mb-4">
+              <h4 className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
+                <ThumbsUp className="h-4 w-4 text-primary" />
+                Latest Patient Feedback
+              </h4>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                {patient.latest_satisfaction_rating != null && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Overall Rating</span>
+                    <span className="font-medium">{patient.latest_satisfaction_rating}/5</span>
+                  </div>
+                )}
+                {patient.latest_recommendation_status != null && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Would Recommend</span>
+                    <span className={`font-medium ${patient.latest_recommendation_status ? "text-green-600" : "text-red-600"}`}>
+                      {patient.latest_recommendation_status ? "Yes" : "No"}
+                    </span>
+                  </div>
+                )}
+                {patient.latest_recovery_status && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Recovery</span>
+                    <span className="font-medium">{patient.latest_recovery_status.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())}</span>
+                  </div>
+                )}
+                {patient.latest_feedback_date && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Feedback Date</span>
+                    <span className="font-medium">{new Date(patient.latest_feedback_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</span>
+                  </div>
+                )}
+              </div>
+              {patient.latest_feedback_comments && (
+                <div className="mt-2 pt-2 border-t text-xs">
+                  <span className="text-muted-foreground">Comments: </span>
+                  <span className="italic">{patient.latest_feedback_comments}</span>
+                </div>
+              )}
+            </Card>
+          )}
           <Card className="p-6 border-border shadow-card">
             <h3 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
               <MessageSquare className="h-5 w-5 text-primary" />

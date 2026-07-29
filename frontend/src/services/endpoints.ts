@@ -462,6 +462,33 @@ export const crmApi = {
     submit: (data: { patient_id: string; rating: number; review?: string; doctor_id?: string; case_id?: string }) =>
       api.post("/crm/feedback", data).then((r) => r.data),
   },
+  // Context-aware feedback (Lead vs Patient)
+  leadFeedback: {
+    submit: (enquiryId: string, data: Record<string, unknown>) =>
+      api.post(`/crm/feedback/lead/${enquiryId}`, data).then((r) => r.data),
+    list: (enquiryId: string) =>
+      api.get(`/crm/feedback/lead/${enquiryId}`).then((r) => r.data),
+    latest: (enquiryId: string) =>
+      api.get(`/crm/feedback/lead/${enquiryId}/latest`).then((r) => r.data),
+  },
+  patientFeedback: {
+    submit: (enquiryId: string, data: Record<string, unknown>) =>
+      api.post(`/crm/feedback/patient/${enquiryId}`, data).then((r) => r.data),
+    list: (enquiryId: string) =>
+      api.get(`/crm/feedback/patient/${enquiryId}`).then((r) => r.data),
+    latest: (enquiryId: string) =>
+      api.get(`/crm/feedback/patient/${enquiryId}/latest`).then((r) => r.data),
+  },
+  feedbackNotes: {
+    add: (feedbackId: string, content: string) =>
+      api.post(`/crm/feedback/${feedbackId}/notes`, { content }).then((r) => r.data),
+    list: (feedbackId: string) =>
+      api.get(`/crm/feedback/${feedbackId}/notes`).then((r) => r.data),
+    update: (noteId: string, content: string) =>
+      api.patch(`/crm/feedback/notes/${noteId}`, { content }).then((r) => r.data),
+  },
+  feedbackSummary: (enquiryId: string) =>
+    api.get(`/crm/feedback/${enquiryId}/summary`).then((r) => r.data),
   segments: () => api.get("/crm/segments").then((r) => r.data),
   analytics: () => api.get("/crm/analytics").then((r) => r.data),
   preview: (data: {

@@ -4,8 +4,6 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import text
-from alembic import command
-from alembic.config import Config
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,7 +18,7 @@ from app.core.permissions import Role
 from app.core.logging import setup_logging, correlation_id, generate_correlation_id
 from app.core.middleware import RequestIDMiddleware
 from app.utils.scheduler import check_appointment_reminders, check_same_day_appointments, check_missed_appointments, check_overdue_treatments
-from app.routers import auth, admin_groups, hospitals, doctors, consultants, patients, cases, consultant_notes, treatment_plans, treatment_sittings, treatment_plan_items, appointments, billings, pre_ops, post_ops, dashboards, whatsapp_messaging, whatsapp_config, notifications, hospital_monthly_expenses, reports, crm, crm_v2, calendar, status_audit, campaigns, campaign_templates, leads, doctor_working_hours, doctor_availability, doctor_leaves, doctor_blocked_slots, consent_forms, enquiries, treatment_follow_ups, recalls, exports, treatment_types, doctor_queue, clinical_progress_notes, master_data, crm_rules, crm_config_settings
+from app.routers import auth, admin_groups, hospitals, doctors, consultants, patients, cases, consultant_notes, treatment_plans, treatment_sittings, treatment_plan_items, appointments, billings, pre_ops, post_ops, dashboards, whatsapp_messaging, whatsapp_config, notifications, hospital_monthly_expenses, reports, crm, crm_v2, calendar, status_audit, campaigns, campaign_templates, leads, doctor_working_hours, doctor_availability, doctor_leaves, doctor_blocked_slots, consent_forms, enquiries, treatment_follow_ups, recalls, exports, treatment_types, doctor_queue, clinical_progress_notes, master_data, crm_rules, crm_config_settings, crm_feedback
 from app.crm.routers import events as crm_events
 from app.crm.routers import event_test as crm_event_test
 
@@ -31,21 +29,99 @@ logger = logging.getLogger("app")
 limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"], storage_uri=settings.REDIS_URL if settings.REDIS_URL else "memory://")
 
 
-def run_migrations():
-    base_dir = Path(__file__).resolve().parents[1]
-    config = Config(str(base_dir / "alembic" / "alembic.ini"))
-    config.set_main_option("sqlalchemy.url", settings.SYNC_DATABASE_URL)
-    command.upgrade(config, "head")
+MIGRATION_SQL = """
+-- Feedback tables (idempotent)
+CREATE TABLE IF NOT EXISTS lead_feedback (
+    id VARCHAR(36) PRIMARY KEY,
+    enquiry_id VARCHAR(36) NOT NULL REFERENCES generated_enquiries(id),
+    hospital_id VARCHAR(36) REFERENCES hospitals(id),
+    lead_id VARCHAR(36) NOT NULL REFERENCES leads(id),
+    response_status VARCHAR(30) NOT NULL DEFAULT 'CONTACTED',
+    interested BOOLEAN DEFAULT FALSE,
+    follow_up_required BOOLEAN DEFAULT TRUE,
+    budget_mentioned FLOAT,
+    preferred_consultation_date DATE,
+    preferred_consultation_time TIME,
+    preferred_doctor_id VARCHAR(36) REFERENCES users(id),
+    reason_not_interested TEXT,
+    competitor_chosen VARCHAR(255),
+    call_outcome VARCHAR(30),
+    whatsapp_replied BOOLEAN DEFAULT FALSE,
+    callback_requested BOOLEAN DEFAULT FALSE,
+    notes TEXT,
+    feedback_date TIMESTAMPTZ,
+    feedback_by VARCHAR(36) REFERENCES users(id),
+    created_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_lead_feedback_enquiry ON lead_feedback(enquiry_id);
+CREATE INDEX IF NOT EXISTS idx_lead_feedback_lead ON lead_feedback(lead_id);
+
+CREATE TABLE IF NOT EXISTS patient_feedback_context (
+    id VARCHAR(36) PRIMARY KEY,
+    enquiry_id VARCHAR(36) NOT NULL REFERENCES generated_enquiries(id),
+    hospital_id VARCHAR(36) REFERENCES hospitals(id),
+    patient_id VARCHAR(36) NOT NULL REFERENCES patients(id),
+    consultation_experience INTEGER,
+    treatment_satisfaction INTEGER,
+    doctor_rating INTEGER,
+    staff_behaviour INTEGER,
+    waiting_time INTEGER,
+    billing_experience INTEGER,
+    facility_cleanliness INTEGER,
+    would_recommend BOOLEAN,
+    overall_rating INTEGER,
+    next_follow_up_required BOOLEAN DEFAULT FALSE,
+    recovery_status VARCHAR(50),
+    additional_comments TEXT,
+    feedback_date TIMESTAMPTZ,
+    feedback_by VARCHAR(36) REFERENCES users(id),
+    created_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_patient_feedback_enquiry ON patient_feedback_context(enquiry_id);
+CREATE INDEX IF NOT EXISTS idx_patient_feedback_patient ON patient_feedback_context(patient_id);
+
+CREATE TABLE IF NOT EXISTS feedback_notes (
+    id VARCHAR(36) PRIMARY KEY,
+    feedback_id VARCHAR(36) NOT NULL,
+    feedback_type VARCHAR(10) NOT NULL,
+    content TEXT NOT NULL,
+    created_by VARCHAR(36) REFERENCES users(id),
+    edit_history TEXT,
+    created_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_feedback_notes_feedback ON feedback_notes(feedback_id);
+
+-- Patient sync columns (idempotent)
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS latest_satisfaction_rating INTEGER;
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS latest_feedback_date TIMESTAMPTZ;
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS latest_feedback_comments TEXT;
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS latest_recovery_status VARCHAR(50);
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS latest_recommendation_status BOOLEAN;
+
+-- Lead sync columns (idempotent)
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS latest_response_status VARCHAR(30);
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS latest_feedback_date TIMESTAMPTZ;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS latest_feedback_notes TEXT;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS latest_call_outcome VARCHAR(30);
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS latest_follow_up_requirement VARCHAR(20);
+"""
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Running Alembic migrations...")
+    logger.info("Creating feedback tables...")
     try:
-        await asyncio.to_thread(run_migrations)
-        logger.info("Migrations completed")
+        async with engine.begin() as conn:
+            for stmt in MIGRATION_SQL.split(";"):
+                s = stmt.strip()
+                if s:
+                    await conn.execute(text(s))
+        logger.info("Feedback tables ready")
     except Exception as e:
-        logger.warning(f"Migration warning (non-fatal): {e}")
+        logger.warning(f"Table creation warning (non-fatal): {e}")
 
     logger.info("Seeding super admin...")
     await seed_super_admin()
@@ -194,6 +270,7 @@ app.include_router(clinical_progress_notes.router, prefix="/api/v1")
 app.include_router(master_data.router, prefix="/api/v1")
 app.include_router(crm_rules.router, prefix="/api/v1")
 app.include_router(crm_config_settings.router, prefix="/api/v1")
+app.include_router(crm_feedback.router, prefix="/api/v1")
 
 
 @app.get("/")

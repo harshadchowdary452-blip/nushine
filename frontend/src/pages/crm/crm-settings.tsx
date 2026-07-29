@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { useForm, type UseFormReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -13,7 +13,6 @@ import {
   Info,
   CheckCircle2,
   Clock,
-  Globe,
   Calendar,
   Zap,
 } from "lucide-react";
@@ -87,7 +86,7 @@ export default function CrmSettingsPage() {
 
   const form = useForm<SettingsFormType>({
     resolver: zodResolver(SettingsSchema),
-    defaultValues: getDefaults(data),
+    defaultValues: getDefaults(data as Record<string, unknown>),
     mode: "onChange",
   });
 
@@ -101,7 +100,7 @@ export default function CrmSettingsPage() {
 
   useEffect(() => {
     if (data) {
-      reset(getDefaults(data));
+    reset(getDefaults(data as Record<string, unknown>));
     }
   }, [data, reset]);
 
@@ -173,7 +172,7 @@ export default function CrmSettingsPage() {
       queryClient.invalidateQueries({ queryKey: ["crmSettings"] });
       reset(getValues());
     },
-    onError: (err: any) => {
+    onError: (err: Error) => {
       addToast({ variant: "destructive", title: err?.message || "Save failed" });
     },
   });
@@ -295,11 +294,13 @@ export default function CrmSettingsPage() {
   );
 }
 
+type TabProps = { form: UseFormReturn<SettingsFormType> };
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // General Tab — Global CRM behaviour
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function GeneralTab({ form }: { form: any }) {
+function GeneralTab({ form }: TabProps) {
   const workingDays = form.watch("general.working_days") || "";
   const selectedDays = workingDays.split(",").map((d: string) => d.trim()).filter(Boolean);
 
@@ -428,7 +429,7 @@ function GeneralTab({ form }: { form: any }) {
 // Lead Tab — Patients who have not yet visited
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function LeadTab({ form }: { form: any }) {
+function LeadTab({ form }: TabProps) {
   return (
     <div className="space-y-5">
       <SettingsSection
@@ -483,7 +484,7 @@ function LeadTab({ form }: { form: any }) {
 // OPD Tab — Patient visited, consultation completed, treatment not started
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function OpdTab({ form }: { form: any }) {
+function OpdTab({ form }: TabProps) {
   return (
     <div className="space-y-5">
       <SettingsSection
@@ -538,7 +539,7 @@ function OpdTab({ form }: { form: any }) {
 // Treatment Tab — Follow-up AFTER treatment completion
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function TreatmentTab({ form }: { form: any }) {
+function TreatmentTab({ form }: TabProps) {
   return (
     <div className="space-y-5">
       <SettingsSection
@@ -593,7 +594,7 @@ function TreatmentTab({ form }: { form: any }) {
 // Case Tab — Recovery + Recall after complete case
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function CaseTab({ form }: { form: any }) {
+function CaseTab({ form }: TabProps) {
   return (
     <div className="space-y-5">
       <SettingsSection

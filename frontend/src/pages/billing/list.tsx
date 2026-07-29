@@ -193,7 +193,6 @@ export default function BillingList() {
     setDialogOpen(open)
   }
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const columns = useMemo<ColumnDef<Billing>[]>(
     () => [
       {
@@ -455,7 +454,7 @@ export default function BillingList() {
                   <SelectContent>
                     {cases.map((c) => (
                       <SelectItem key={c.id} value={c.id}>
-                        {c.chief_complaint} — {c.patient_name || c.patient?.full_name || "Unknown"}
+                        {c.chief_complaint} — {c.patient_name || c.patient?.full_name || "-"}
                       </SelectItem>
                     ))}
                   </SelectContent>

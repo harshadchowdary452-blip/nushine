@@ -1,12 +1,11 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
 import type { User } from "@/types";
 
 interface AuthState {
   user: User | null;
   accessToken: string | null;
   refreshToken: string | null;
-  _hasHydrated: boolean;
   setAuth: (user: User, accessToken: string, refreshToken: string) => void;
   setTokens: (accessToken: string, refreshToken: string) => void;
   setUser: (user: User) => void;
@@ -19,7 +18,6 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       accessToken: null,
       refreshToken: null,
-      _hasHydrated: true,
       setAuth: (user, accessToken, refreshToken) =>
         set({ user, accessToken, refreshToken }),
       setTokens: (accessToken, refreshToken) =>
@@ -30,6 +28,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: "auth-storage",
+      storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         user: state.user,
         accessToken: state.accessToken,
@@ -38,6 +37,15 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 );
+
+export function getTokenExpiry(token: string): number | null {
+  try {
+    const body = JSON.parse(atob(token.split(".")[1]));
+    return body.exp ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export function useIsAuthenticated() {
   const { user, accessToken, refreshToken } = useAuthStore();

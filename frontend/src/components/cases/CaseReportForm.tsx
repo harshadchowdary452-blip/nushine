@@ -315,7 +315,7 @@ export default function CaseReportForm({
                     className={`px-3 py-1.5 text-xs cursor-pointer hover:bg-muted flex justify-between ${selectedPatient?.id === p.id ? "bg-muted font-medium" : ""}`}
                     onClick={() => { setSelectedPatient(p); setPatientSearch(p.full_name || "") }}
                   >
-                    <span>{p.full_name || "Unknown"}</span>
+                    <span>{p.full_name || "-"}</span>
                     <span className="text-muted-foreground">{p.op_no || "—"}</span>
                   </div>
                 ))}

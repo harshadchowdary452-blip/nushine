@@ -1,4 +1,4 @@
-import { type FieldErrors, type UseFormReturn } from "react-hook-form";
+import { type UseFormReturn } from "react-hook-form";
 import type { z } from "zod";
 import type { SettingsSchema } from "./schemas";
 

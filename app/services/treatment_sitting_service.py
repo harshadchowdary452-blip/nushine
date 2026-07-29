@@ -103,6 +103,7 @@ class TreatmentSittingService:
                 payload={
                     "appointment_id": str(appt.id),
                     "patient_id": str(case.patient_id),
+                    "treatment_plan_id": str(sitting.treatment_plan_id) if sitting.treatment_plan_id else None,
                     "doctor_id": str(doctor_id) if doctor_id else None,
                     "appointment_date": appt.appointment_date.isoformat(),
                     "status": "SCHEDULED",

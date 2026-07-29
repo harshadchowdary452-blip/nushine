@@ -222,10 +222,10 @@ export default function CrmDashboardPage() {
         <div className={cn(GLASS, "rounded-2xl p-4 flex flex-wrap gap-3 items-end")}>
           <div className="space-y-1">
             <label className="text-[10px] font-semibold text-gray-500 uppercase">Doctor</label>
-            <Select value={doctorFilter} onValueChange={setDoctorFilter}>
+            <Select value={doctorFilter} onValueChange={(v) => setDoctorFilter(v === "__all__" ? "" : v)}>
               <SelectTrigger className="h-8 w-40 text-xs rounded-xl"><SelectValue placeholder="All Doctors" /></SelectTrigger>
               <SelectContent className="max-h-[200px]">
-                <SelectItem value="" className="text-xs">All Doctors</SelectItem>
+                <SelectItem value="__all__" className="text-xs">All Doctors</SelectItem>
                 {doctorOptions.map((d: { id: string; full_name?: string; name?: string }) => (
                   <SelectItem key={d.id} value={d.id} className="text-xs">{d.full_name || d.name}</SelectItem>
                 ))}
@@ -234,10 +234,10 @@ export default function CrmDashboardPage() {
           </div>
           <div className="space-y-1">
             <label className="text-[10px] font-semibold text-gray-500 uppercase">Follow-Up Type</label>
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v === "__all__" ? "" : v)}>
               <SelectTrigger className="h-8 w-36 text-xs rounded-xl"><SelectValue placeholder="All Types" /></SelectTrigger>
               <SelectContent className="max-h-[200px]">
-                <SelectItem value="" className="text-xs">All Types</SelectItem>
+                <SelectItem value="__all__" className="text-xs">All Types</SelectItem>
                 {Object.entries(fuTypeLabels).map(([k, v]) => (
                   <SelectItem key={k} value={k} className="text-xs">{v}</SelectItem>
                 ))}
@@ -246,10 +246,10 @@ export default function CrmDashboardPage() {
           </div>
           <div className="space-y-1">
             <label className="text-[10px] font-semibold text-gray-500 uppercase">Status</label>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
               <SelectTrigger className="h-8 w-36 text-xs rounded-xl"><SelectValue placeholder="All Status" /></SelectTrigger>
               <SelectContent className="max-h-[200px]">
-                <SelectItem value="" className="text-xs">All Status</SelectItem>
+                <SelectItem value="__all__" className="text-xs">All Status</SelectItem>
                 {Object.entries(statusColors).map(([k]) => (
                   <SelectItem key={k} value={k} className="text-xs">{k}</SelectItem>
                 ))}
@@ -499,7 +499,7 @@ export default function CrmDashboardPage() {
                     <MessageSquare className="h-3.5 w-3.5" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-gray-800 truncate">{msg.patient_name || msg.recipient || "Unknown"}</p>
+                    <p className="text-xs font-medium text-gray-800 truncate">{msg.patient_name || msg.recipient || "-"}</p>
                     <p className="text-[10px] text-gray-500 truncate">{msg.message_type || "Message"}</p>
                   </div>
                   <div className="text-right shrink-0">

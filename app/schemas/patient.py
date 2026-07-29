@@ -81,6 +81,11 @@ class PatientResponse(BaseModel):
     photo_url: Optional[str]
     status: str
     is_active: bool
+    latest_satisfaction_rating: Optional[int] = None
+    latest_feedback_date: Optional[datetime] = None
+    latest_feedback_comments: Optional[str] = None
+    latest_recovery_status: Optional[str] = None
+    latest_recommendation_status: Optional[bool] = None
     created_at: datetime
     updated_at: datetime
 

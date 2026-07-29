@@ -56,60 +56,66 @@ export type SettingsFormType = z.infer<typeof SettingsSchema>;
 // Defaults — populate from API response or sensible dental-ERP defaults
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export function getDefaults(data: any): SettingsFormType {
-  const general = data?.general || {};
-  const lead = data?.lead || {};
-  const opd = data?.opd || {};
-  const treatment = data?.treatment || {};
-  const caseData = data?.case || {};
+export function getDefaults(data: Record<string, unknown> | undefined): SettingsFormType {
+  const general: Record<string, unknown> = (data?.general as Record<string, unknown>) || {};
+  const lead: Record<string, unknown> = (data?.lead as Record<string, unknown>) || {};
+  const opd: Record<string, unknown> = (data?.opd as Record<string, unknown>) || {};
+  const treatment: Record<string, unknown> = (data?.treatment as Record<string, unknown>) || {};
+  const caseData: Record<string, unknown> = (data?.case as Record<string, unknown>) || {};
 
   return {
     general: {
       enabled: parseBool(general.crm_enabled, true),
-      working_days: general.crm_working_days ?? "MON,TUE,WED,THU,FRI,SAT",
-      reminder_time: general.crm_reminder_time ?? "09:00",
-      business_start: general.crm_business_start ?? "09:00",
-      business_end: general.crm_business_end ?? "18:00",
-      timezone: general.crm_timezone ?? "Asia/Kolkata",
+      working_days: (general.crm_working_days as string) ?? "MON,TUE,WED,THU,FRI,SAT",
+      reminder_time: (general.crm_reminder_time as string) ?? "09:00",
+      business_start: (general.crm_business_start as string) ?? "09:00",
+      business_end: (general.crm_business_end as string) ?? "18:00",
+      timezone: (general.crm_timezone as string) ?? "Asia/Kolkata",
       reminder_offset_days: parseIntSafe(general.crm_reminder_offset, 1),
       weekend_policy: (general.crm_weekend_policy as "SKIP" | "INCLUDE") ?? "SKIP",
     },
     lead: {
-      enabled: lead.enabled ?? true,
-      start_delay_days: lead.start_delay_days ?? 1,
-      auto_close_on_completion: lead.auto_close_on_completion ?? false,
+      enabled: (lead.enabled as boolean) ?? true,
+      start_delay_days: (lead.start_delay_days as number) ?? 1,
+      auto_close_on_completion: (lead.auto_close_on_completion as boolean) ?? false,
     },
     opd: {
-      enabled: opd.enabled ?? true,
-      start_delay_days: opd.start_delay_days ?? 3,
-      auto_close_on_completion: opd.auto_close_on_completion ?? false,
+      enabled: (opd.enabled as boolean) ?? true,
+      start_delay_days: (opd.start_delay_days as number) ?? 3,
+      auto_close_on_completion: (opd.auto_close_on_completion as boolean) ?? false,
     },
     treatment: {
-      enabled: treatment.enabled ?? false,
-      start_delay_days: treatment.start_delay_days ?? 3,
-      skip_wellness_if_appointment: treatment.skip_wellness_if_appointment ?? true,
-      auto_close_on_completion: treatment.auto_close_on_completion ?? false,
+      enabled: (treatment.enabled as boolean) ?? false,
+      start_delay_days: (treatment.start_delay_days as number) ?? 3,
+      skip_wellness_if_appointment: (treatment.skip_wellness_if_appointment as boolean) ?? true,
+      auto_close_on_completion: (treatment.auto_close_on_completion as boolean) ?? false,
     },
-    case: {
-      recovery: {
-        enabled: caseData.recovery?.enabled ?? true,
-        start_delay_days: caseData.recovery?.start_delay_days ?? 3,
-      },
-      recall: {
-        enabled: caseData.recall?.enabled ?? true,
-        start_delay_days: caseData.recall?.start_delay_days ?? 180,
-      },
+    case: buildCase(caseData),
+  };
+}
+
+function buildCase(caseData: Record<string, unknown>): SettingsFormType["case"] {
+  const rec = (caseData.recovery as Record<string, unknown>) || {};
+  const rcl = (caseData.recall as Record<string, unknown>) || {};
+  return {
+    recovery: {
+      enabled: (rec.enabled as boolean) ?? true,
+      start_delay_days: (rec.start_delay_days as number) ?? 3,
+    },
+    recall: {
+      enabled: (rcl.enabled as boolean) ?? true,
+      start_delay_days: (rcl.start_delay_days as number) ?? 180,
     },
   };
 }
 
-function parseBool(val: any, fallback: boolean): boolean {
+function parseBool(val: unknown, fallback: boolean): boolean {
   if (typeof val === "boolean") return val;
   if (typeof val === "string") return val === "true" || val === "1";
   return fallback;
 }
 
-function parseIntSafe(val: any, fallback: number): number {
+function parseIntSafe(val: unknown, fallback: number): number {
   if (typeof val === "number") return val;
   if (typeof val === "string") {
     const n = parseInt(val, 10);

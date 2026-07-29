@@ -307,6 +307,39 @@ class RuleEngine:
             logger.debug("OPD_SKIP: treatment_started for patient=%s", patient_id)
             return None
 
+        # Business Rule: Check actual DB for treatment plans (payload may be stale)
+        # TreatmentPlan links to Patient via Case (TreatmentPlan.case_id → Case.id → Case.patient_id)
+        from app.models.treatment_plan import TreatmentPlan, TreatmentPlanStatus
+        from app.models.case import Case
+        existing_tp = await db.execute(
+            select(TreatmentPlan).join(Case, TreatmentPlan.case_id == Case.id).where(
+                Case.patient_id == patient_id,
+                TreatmentPlan.status.in_([
+                    TreatmentPlanStatus.IN_PROGRESS.value,
+                    TreatmentPlanStatus.ASSIGNED.value,
+                    TreatmentPlanStatus.GENERATED.value,
+                    TreatmentPlanStatus.COMPLETED.value,
+                ]),
+            ).limit(1)
+        )
+        if existing_tp.scalar_one_or_none():
+            logger.debug("OPD_SKIP: patient=%s has treatment plans in DB", patient_id)
+            return None
+
+        # Also check for existing appointments (past or future — patient in treatment flow)
+        from app.models.appointment import Appointment
+        has_appt = await db.execute(
+            select(Appointment).where(
+                Appointment.patient_id == patient_id,
+                Appointment.is_active == True,
+            ).limit(1)
+        )
+        if has_appt.scalar_one_or_none():
+            logger.debug("OPD_SKIP: patient=%s has appointments", patient_id)
+            return None
+
+
+
         # Business Rule: No duplicate OPD follow-up for this patient
         existing = await db.execute(
             select(GeneratedEnquiry).where(
@@ -347,7 +380,7 @@ class RuleEngine:
 
     async def _rule_appointment_created(
         self, db: AsyncSession, hospital_id: str, payload: dict, settings
-    ) -> Optional["Decision"]:
+    ) -> Optional[list["Decision"] | "Decision"]:
         """Rule: Appointment Reminder — ONLY for SCHEDULED future appointments, no duplicate."""
         from app.crm.services.event_dispatcher import Decision
         from app.models.generated_enquiry import GeneratedEnquiry
@@ -408,19 +441,11 @@ class RuleEngine:
         if due_date < date.today():
             due_date = date.today()
 
-        return Decision(
-            action="CREATE",
-            enquiry_type="APPOINTMENT_REMINDER",
-            due_date=due_date,
-            priority="MEDIUM",
-            patient_id=patient_id,
-            appointment_id=appointment_id,
-            doctor_id=payload.get("doctor_id"),
-            assigned_staff_id=payload.get("assigned_staff_id"),
-            treatment_type_id=payload.get("treatment_type_id"),
-            trigger_event="APPOINTMENT_CREATED",
-            description=f"Appointment reminder",
-        )
+        decisions = [
+            Decision(action="CANCEL", cancel_enquiry_types=["OPD_FOLLOW_UP"], cancel_reason="APPOINTMENT_CREATED", patient_id=patient_id, trigger_event="APPOINTMENT_CREATED"),
+            Decision(action="CREATE", enquiry_type="APPOINTMENT_REMINDER", due_date=due_date, priority="MEDIUM", patient_id=patient_id, appointment_id=appointment_id, treatment_plan_id=payload.get("treatment_plan_id"), doctor_id=payload.get("doctor_id"), assigned_staff_id=payload.get("assigned_staff_id"), treatment_type_id=payload.get("treatment_type_id"), trigger_event="APPOINTMENT_CREATED", description="Appointment reminder"),
+        ]
+        return decisions
 
     async def _rule_appointment_cancelled(
         self, db: AsyncSession, hospital_id: str, payload: dict
@@ -509,7 +534,7 @@ class RuleEngine:
 
     async def _rule_treatment_visit_completed(
         self, db: AsyncSession, hospital_id: str, payload: dict, settings
-    ) -> Optional["Decision"]:
+    ) -> Optional[list["Decision"] | "Decision"]:
         """Rule: Multi-visit treatment — only Appointment Reminder if future appointment exists.
 
         Per spec:
@@ -532,7 +557,6 @@ class RuleEngine:
 
         if has_future:
             # Future appointment exists → create Appointment Reminder ONLY
-            # Get the next appointment details
             next_appt = await self._get_next_appointment(db, patient_id)
             if not next_appt:
                 return None
@@ -540,34 +564,21 @@ class RuleEngine:
             appointment_id = next_appt.id
             appt_date = next_appt.appointment_date
 
-            # No duplicate check for reminders (they're per-appointment)
             reminder_days = settings.default_reminder_offset_days if settings else 1
             due_date = appt_date - timedelta(days=reminder_days) if appt_date else date.today()
             if due_date < date.today():
                 due_date = date.today()
 
-            return Decision(
-                action="CREATE",
-                enquiry_type="APPOINTMENT_REMINDER",
-                due_date=due_date,
-                priority="MEDIUM",
-                patient_id=patient_id,
-                appointment_id=appointment_id,
-                case_id=case_id,
-                treatment_plan_id=treatment_plan_id,
-                treatment_type_id=payload.get("treatment_type_id"),
-                doctor_id=payload.get("doctor_id"),
-                assigned_staff_id=payload.get("assigned_staff_id"),
-                trigger_event="TREATMENT_VISIT_COMPLETED",
-                description="Appointment reminder after treatment visit",
-            )
+            return [
+                Decision(action="CANCEL", cancel_enquiry_types=["OPD_FOLLOW_UP"], cancel_reason="TREATMENT_VISIT_COMPLETED", patient_id=patient_id, trigger_event="TREATMENT_VISIT_COMPLETED"),
+                Decision(action="CREATE", enquiry_type="APPOINTMENT_REMINDER", due_date=due_date, priority="MEDIUM", patient_id=patient_id, appointment_id=appointment_id, case_id=case_id, treatment_plan_id=treatment_plan_id, treatment_type_id=payload.get("treatment_type_id"), doctor_id=payload.get("doctor_id"), assigned_staff_id=payload.get("assigned_staff_id"), trigger_event="TREATMENT_VISIT_COMPLETED", description="Appointment reminder after treatment visit"),
+            ]
 
-        # No future appointment → do nothing (treatment is not yet completed)
         return None
 
     async def _rule_treatment_completed(
         self, db: AsyncSession, hospital_id: str, payload: dict, settings
-    ) -> Optional["Decision"]:
+    ) -> Optional[list["Decision"] | "Decision"]:
         """Rule: Treatment Wellness — ONLY when treatment completed AND no future appointment."""
         from app.crm.services.event_dispatcher import Decision
         from app.models.generated_enquiry import GeneratedEnquiry
@@ -596,21 +607,10 @@ class RuleEngine:
             if due_date < date.today():
                 due_date = date.today()
 
-            return Decision(
-                action="CREATE",
-                enquiry_type="APPOINTMENT_REMINDER",
-                due_date=due_date,
-                priority="MEDIUM",
-                patient_id=patient_id,
-                appointment_id=appointment_id,
-                case_id=case_id,
-                treatment_plan_id=treatment_plan_id,
-                treatment_type_id=treatment_type_id,
-                doctor_id=payload.get("doctor_id"),
-                assigned_staff_id=payload.get("assigned_staff_id"),
-                trigger_event="TREATMENT_COMPLETED",
-                description="Appointment reminder after treatment completion",
-            )
+            return [
+                Decision(action="CANCEL", cancel_enquiry_types=["OPD_FOLLOW_UP"], cancel_reason="TREATMENT_COMPLETED", patient_id=patient_id, trigger_event="TREATMENT_COMPLETED"),
+                Decision(action="CREATE", enquiry_type="APPOINTMENT_REMINDER", due_date=due_date, priority="MEDIUM", patient_id=patient_id, appointment_id=appointment_id, case_id=case_id, treatment_plan_id=treatment_plan_id, treatment_type_id=treatment_type_id, doctor_id=payload.get("doctor_id"), assigned_staff_id=payload.get("assigned_staff_id"), trigger_event="TREATMENT_COMPLETED", description="Appointment reminder after treatment completion"),
+            ]
 
         # No future appointment → create Treatment Wellness
         # Load treatment-specific config
@@ -642,7 +642,7 @@ class RuleEngine:
             return None
 
         # Auto-close completed enquiries
-        await self._auto_close_enquiries(db, hospital_id, patient_id, ["TREATMENT_WELLNESS", "APPOINTMENT_REMINDER"])
+        await self._auto_close_enquiries(db, hospital_id, patient_id, ["OPD_FOLLOW_UP", "TREATMENT_WELLNESS", "APPOINTMENT_REMINDER"])
 
         delay_days = follow_up_config.start_delay_days if follow_up_config else 3
 

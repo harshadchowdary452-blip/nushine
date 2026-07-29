@@ -1,5 +1,3 @@
-import { cn } from "@/lib/utils";
-
 export function SettingsSkeleton() {
   return (
     <div className="space-y-6 animate-fade-in">

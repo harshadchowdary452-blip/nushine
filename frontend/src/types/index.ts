@@ -115,6 +115,11 @@ export interface Patient {
   blood_group?: string | null;
   status: PatientStatus;
   is_active: boolean;
+  latest_satisfaction_rating?: number | null;
+  latest_feedback_date?: string | null;
+  latest_feedback_comments?: string | null;
+  latest_recovery_status?: string | null;
+  latest_recommendation_status?: boolean | null;
   created_at: string;
   updated_at: string;
 }

@@ -1,5 +1,5 @@
 import axios from "axios";
-import { useAuthStore } from "@/store/authStore";
+import { useAuthStore, getTokenExpiry } from "@/store/authStore";
 import { queryClient } from "@/lib/queryClient";
 
 const api = axios.create({
@@ -8,14 +8,43 @@ const api = axios.create({
   timeout: 30000,
 });
 
-// Request ID correlation
-let requestCounter = 0;
-api.interceptors.request.use((config) => {
-  const state = useAuthStore.getState();
-  if (state._hasHydrated && state.accessToken) {
-    config.headers.Authorization = "Bearer " + state.accessToken;
+let refreshPromise: Promise<string> | null = null;
+
+function isTokenExpired(token: string, bufferSec = 15): boolean {
+  const exp = getTokenExpiry(token);
+  if (exp === null) return true;
+  return Date.now() / 1000 >= exp - bufferSec;
+}
+
+async function ensureValidToken(): Promise<string | null> {
+  const { accessToken, refreshToken } = useAuthStore.getState();
+  if (!accessToken) return null;
+  if (!isTokenExpired(accessToken)) return accessToken;
+
+  if (!refreshToken) return null;
+
+  if (!refreshPromise) {
+    refreshPromise = axios
+      .post("/api/v1/auth/refresh", { refresh_token: refreshToken })
+      .then((res) => {
+        const { access_token, refresh_token } = res.data;
+        useAuthStore.getState().setTokens(access_token, refresh_token);
+        return access_token as string;
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
   }
-  // Attach request ID for server-side correlation
+  return refreshPromise;
+}
+
+// Attach Authorization header with proactive token refresh
+let requestCounter = 0;
+api.interceptors.request.use(async (config) => {
+  const token = await ensureValidToken();
+  if (token) {
+    config.headers.Authorization = "Bearer " + token;
+  }
   config.headers["X-Request-ID"] = `req-${++requestCounter}-${Date.now().toString(36)}`;
   return config;
 });
@@ -33,8 +62,6 @@ api.interceptors.response.use((response) => {
   }
   return response;
 });
-
-let refreshPromise: Promise<string> | null = null;
 
 const forceLogout = () => {
   queryClient.clear();
@@ -60,34 +87,15 @@ api.interceptors.response.use(
 
     originalRequest._retry = true;
 
-    try {
-      if (!refreshPromise) {
-        const refreshToken = useAuthStore.getState().refreshToken;
-        if (!refreshToken) {
-          forceLogout();
-          return Promise.reject(error);
-        }
-
-        refreshPromise = axios
-          .post("/api/v1/auth/refresh", { refresh_token: refreshToken })
-          .then((res) => {
-            const { access_token, refresh_token } = res.data;
-            useAuthStore.getState().setTokens(access_token, refresh_token);
-            return access_token as string;
-          })
-          .finally(() => {
-            refreshPromise = null;
-          });
-      }
-
-      const accessToken = await refreshPromise;
-      originalRequest.headers = originalRequest.headers ?? {};
-      originalRequest.headers.Authorization = "Bearer " + accessToken;
-      return api(originalRequest);
-    } catch {
+    const token = await ensureValidToken();
+    if (!token) {
       forceLogout();
       return Promise.reject(error);
     }
+
+    originalRequest.headers = originalRequest.headers ?? {};
+    originalRequest.headers.Authorization = "Bearer " + token;
+    return api(originalRequest);
   }
 );
 

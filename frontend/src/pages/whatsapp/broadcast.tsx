@@ -86,13 +86,19 @@ export default function WhatsAppBroadcast() {
   }
 
   function fillTemplate(msg: string, recipient: { patient_name?: string | null; lead_name?: string; full_name?: string }): string {
-    const name = recipient.patient_name || recipient.lead_name || recipient.full_name || "Patient"
+    const name = recipient.patient_name || recipient.lead_name || recipient.full_name || "-"
     return msg
       .replace(/\{PatientName\}/g, name)
       .replace(/\{HospitalName\}/g, user?.hospital_name || "Our Clinic")
       .replace(/\{Date\}/g, new Date().toLocaleDateString())
       .replace(/\{Time\}/g, new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }))
       .replace(/\{DoctorName\}/g, "")
+  }
+
+  function getName(r: Patient | Lead): string {
+    const patient = r as Patient
+    if (patient.patient_name || patient.full_name) return patient.patient_name || patient.full_name || "-"
+    return (r as Lead).lead_name || "-"
   }
 
   function generateDeepLink(phone: string, message: string): string {
@@ -106,7 +112,7 @@ export default function WhatsAppBroadcast() {
     const message = getMessage()
     const items = audience.map((r) => {
       const phone = ('phone' in r ? r.phone : null) || ('mobile' in r ? r.mobile : null) || ""
-      const name = ('patient_name' in r ? r.patient_name : null) || ('lead_name' in r ? r.lead_name : null) || "Patient"
+      const name = getName(r)
       const filled = fillTemplate(message, r)
       return { name, phone, message: filled, link: generateDeepLink(phone, filled) }
     })
@@ -121,7 +127,7 @@ export default function WhatsAppBroadcast() {
     if (!message.trim()) { addToast({ title: "No message", description: "Select a template or write a custom message", variant: "destructive" }); return }
     const links = audience.map((r) => {
       const phone = ('phone' in r ? r.phone : null) || ('mobile' in r ? r.mobile : null) || ""
-      const name = ('patient_name' in r ? r.patient_name : null) || ('lead_name' in r ? r.lead_name : null) || "Patient"
+      const name = getName(r)
       const filled = fillTemplate(message, r)
       return { name, phone, message: filled, link: generateDeepLink(phone, filled) }
     })
@@ -171,7 +177,7 @@ export default function WhatsAppBroadcast() {
                     {filteredPatients.slice(0, 20).map((p) => (
                       <label key={p.id} className="flex items-center gap-2 text-sm p-1.5 rounded hover:bg-gray-50 cursor-pointer">
                         <input type="checkbox" className="rounded" />
-                        <span className="flex-1">{p.patient_name || "Unknown"}</span>
+                        <span className="flex-1">{p.patient_name || "-"}</span>
                         <span className="text-xs text-gray-400">{p.phone || "—"}</span>
                       </label>
                     ))}

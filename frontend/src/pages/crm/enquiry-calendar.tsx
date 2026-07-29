@@ -1,16 +1,16 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   Phone, MessageCircle, CheckCircle, Loader2,
   Search, ChevronLeft, ChevronRight, ChevronsLeft, Calendar,
-  FileText, History, RotateCcw, X, Clock, AlertTriangle, Users, Filter,
-  ArrowUpDown, Keyboard,
+  FileText, History, RotateCcw, X, AlertTriangle, Filter,
+  Keyboard,
 } from "lucide-react"
 import {
   format, addDays, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
   addWeeks, subWeeks, addMonths, subMonths, isToday, isBefore, parseISO, startOfDay,
 } from "date-fns"
-import { enquiriesApi, crmApi, appointmentsApi, doctorsApi, whatsappTemplatesApi } from "@/services/endpoints"
+import { enquiriesApi, crmApi, doctorsApi, whatsappTemplatesApi } from "@/services/endpoints"
 import { extractDetail } from "@/types"
 import PageHeader from "@/components/layout/page-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -23,6 +23,8 @@ import { useToast } from "@/components/ui/toast"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
+import { EnquiryDetailSheet } from "./enquiry-detail-sheet"
+import { FeedbackDrawer } from "@/components/crm/FeedbackDrawer"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
@@ -31,6 +33,9 @@ interface CalendarItem {
   id: string
   source?: string
   enquiry_type?: string
+  display_name?: string
+  display_phone?: string
+  display_email?: string
   patient_name?: string
   patient_phone?: string
   op_number?: string
@@ -121,6 +126,9 @@ interface EnquiryDetail {
     id: string; enquiry_type: string; status: string
     due_date?: string; created_at?: string; description?: string
   }>
+  display_name?: string
+  display_phone?: string
+  display_email?: string
 }
 
 interface DoctorItem {
@@ -211,50 +219,6 @@ const ENQUIRY_TYPE_LABELS: Record<string, string> = {
   CUSTOM_FOLLOW_UP: "Custom Follow-Up",
   CRM_RULE: "CRM Rule",
 }
-
-const PATIENT_RESPONSE_OPTIONS = [
-  { value: "INTERESTED", label: "Interested" },
-  { value: "APPOINTMENT_REQUIRED", label: "Appointment Requested" },
-  { value: "NOT_INTERESTED", label: "Not Interested" },
-  { value: "NEEDS_MORE_TIME", label: "Needs Callback" },
-  { value: "REQUESTED_CALLBACK", label: "Requested Callback" },
-  { value: "BUSY", label: "Busy" },
-  { value: "NO_RESPONSE", label: "No Response" },
-  { value: "WRONG_NUMBER", label: "Wrong Number" },
-  { value: "TREATMENT_COMPLETED", label: "Treatment Successful" },
-  { value: "NEEDS_REVIEW", label: "Needs Review" },
-]
-
-const LEAD_RESPONSE_OPTIONS = [
-  { value: "INTERESTED", label: "Interested" },
-  { value: "NOT_INTERESTED", label: "Not Interested" },
-  { value: "FOLLOW_UP_REQUIRED", label: "Follow-up Required" },
-  { value: "CALL_BACK_LATER", label: "Call Back Later" },
-  { value: "WRONG_NUMBER", label: "Wrong Number" },
-  { value: "NO_RESPONSE", label: "No Response" },
-  { value: "ALREADY_UNDER_TREATMENT", label: "Already Under Treatment" },
-  { value: "BUDGET_ISSUE", label: "Budget Issue" },
-  { value: "LOST_TO_COMPETITOR", label: "Lost to Competitor" },
-  { value: "CONVERTED", label: "Converted" },
-]
-
-function getResponseOptions(enquiryType?: string) {
-  return enquiryType === "LEAD_FOLLOW_UP" ? LEAD_RESPONSE_OPTIONS : PATIENT_RESPONSE_OPTIONS
-}
-
-const nextActionOptions = [
-  { value: "CALL_AGAIN", label: "Call Again" },
-  { value: "CREATE_FOLLOW_UP", label: "Create Follow-Up" },
-  { value: "BOOK_APPOINTMENT", label: "Book Appointment" },
-  { value: "CLOSE_ENQUIRY", label: "Close Enquiry" },
-]
-
-const timeSlots = [
-  "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
-  "12:00", "12:30", "14:00", "14:30", "15:00", "15:30",
-  "16:00", "16:30", "17:00", "17:30", "18:00", "18:30",
-  "19:00", "19:30", "20:00", "20:30", "21:00", "21:30",
-]
 
 const DEFAULT_TEMPLATES: Record<string, string> = {
   LEAD_FOLLOW_UP: `Hello {{lead_name}},
@@ -385,8 +349,6 @@ export default function EnquiryCalendar() {
   const [priorityFilter, setPriorityFilter] = useState("")
   const [showFilters, setShowFilters] = useState(false)
   const [includeTerminal, setIncludeTerminal] = useState(false)
-  const calendarRef = useRef<HTMLDivElement>(null)
-
   const selDate = new Date(selectedDate + "T00:00:00")
 
   function getRange() {
@@ -413,17 +375,20 @@ export default function EnquiryCalendar() {
     }),
   })
 
-  const apiItems: CalendarItem[] = (calData?.items as CalendarItem[]) || (Array.isArray(calData) ? calData as CalendarItem[] : [])
+  const apiItems: CalendarItem[] = useMemo(() =>
+    (calData?.items as CalendarItem[]) || (Array.isArray(calData) ? calData as CalendarItem[] : []),
+    [calData]
+  )
   const totalCount: number = calData?.total || apiItems.length
 
   const searchedItems = useMemo(() => {
     if (!searchQuery) return apiItems
     const sl = searchQuery.toLowerCase()
     return apiItems.filter((i) =>
-      (i.patient_name || "").toLowerCase().includes(sl) ||
+      (i.display_name || i.patient_name || "").toLowerCase().includes(sl) ||
       (i.op_number || "").toLowerCase().includes(sl) ||
       (i.treatment_name || "").toLowerCase().includes(sl) ||
-      (i.patient_phone || "").toLowerCase().includes(sl))
+      (i.display_phone || i.patient_phone || "").toLowerCase().includes(sl))
   }, [apiItems, searchQuery])
 
   const filteredItems = useMemo(() => {
@@ -469,48 +434,13 @@ export default function EnquiryCalendar() {
     staleTime: 30_000,
   })
 
-  // --- Feedback Dialog ---
-  const [feedbackOpen, setFeedbackOpen] = useState<string | null>(null)
-  const [feedbackItem, setFeedbackItem] = useState<CalendarItem | null>(null)
-  const [fbResponseStatus, setFbResponseStatus] = useState("")
-  const [fbPatientFeedback, setFbPatientFeedback] = useState("")
-  const [fbStaffNotes, setFbStaffNotes] = useState("")
-  const [fbSummary, setFbSummary] = useState("")
-  const [fbNextAction, setFbNextAction] = useState("")
-  const [fbSaving, setFbSaving] = useState(false)
-  const [fbInterested, setFbInterested] = useState("")
-  const [fbApptOpen, setFbApptOpen] = useState(false)
-  const [fbApptDoctorId, setFbApptDoctorId] = useState("")
-  const [fbApptDate, setFbApptDate] = useState("")
-  const [fbApptTime, setFbApptTime] = useState("")
-  const [fbApptSaving, setFbApptSaving] = useState(false)
-
-  const { data: fbSlots } = useQuery({
-    queryKey: ["fb-appointment-slots", fbApptDoctorId, fbApptDate],
-    queryFn: () => appointmentsApi.slots({ doctor_id: fbApptDoctorId, date: fbApptDate }),
-    enabled: !!fbApptDoctorId && !!fbApptDate && fbApptOpen,
-  })
-  const fbSlotsList: string[] = Array.isArray(fbSlots) ? fbSlots : fbSlots?.slots ? fbSlots.slots : []
+  // --- Feedback Drawer ---
+  const [feedbackDrawerOpen, setFeedbackDrawerOpen] = useState(false)
+  const [feedbackDrawerItem, setFeedbackDrawerItem] = useState<CalendarItem | null>(null)
 
   function openFeedback(item: CalendarItem, _channel?: string) {
-    setFeedbackItem(item)
-    setFeedbackOpen(item.id)
-    setFbResponseStatus(item.response_status || "")
-    setFbPatientFeedback(item.feedback || "")
-    setFbStaffNotes(item.staff_notes || "")
-    setFbSummary(item.response || "")
-    setFbNextAction(item.next_action || "")
-    setFbInterested("")
-    setFbApptOpen(false)
-    setFbApptDoctorId(item.doctor_id || "")
-    setFbApptDate("")
-    setFbApptTime("")
-  }
-
-  function closeFeedback() {
-    setFeedbackOpen(null); setFeedbackItem(null); setFbSaving(false); setFbApptOpen(false)
-    setFbResponseStatus(""); setFbPatientFeedback(""); setFbStaffNotes(""); setFbSummary(""); setFbNextAction("")
-    setFbInterested(""); setFbApptDoctorId(""); setFbApptDate(""); setFbApptTime(""); setFbApptSaving(false)
+    setFeedbackDrawerItem(item)
+    setFeedbackDrawerOpen(true)
   }
 
   const invalidateCalendar = useCallback(() => {
@@ -520,65 +450,7 @@ export default function EnquiryCalendar() {
     queryClient.invalidateQueries({ queryKey: ["crm-enhanced-dashboard"] })
   }, [queryClient])
 
-  async function handleRecordFeedback() {
-    if (!feedbackOpen || !fbResponseStatus) return
-    setFbSaving(true)
-    try {
-      let status = "PENDING"
-      if (["NO_RESPONSE", "BUSY", "WRONG_NUMBER"].includes(fbResponseStatus)) status = "NO_RESPONSE"
-      else if (fbResponseStatus === "NOT_INTERESTED") status = "LOST"
-      else if (["INTERESTED", "APPOINTMENT_REQUIRED", "NEEDS_MORE_TIME", "REQUESTED_CALLBACK", "NEEDS_REVIEW"].includes(fbResponseStatus)) status = "CONTACTED"
-      else if (fbResponseStatus === "TREATMENT_COMPLETED") status = "COMPLETED"
 
-      if (feedbackItem?.source === "generated_enquiry") {
-        await enquiriesApi.updateStatus(feedbackOpen, { status })
-      } else {
-        await crmApi.followUps.update(feedbackOpen, {
-          status, response_status: fbResponseStatus,
-          patient_feedback: fbPatientFeedback || undefined,
-          staff_notes: fbStaffNotes || undefined,
-          response_summary: fbSummary || undefined,
-          next_action: fbNextAction || undefined,
-          interested_to_visit_again: fbInterested || undefined,
-        })
-      }
-      invalidateCalendar()
-      addToast({ title: "Feedback saved", variant: "success" })
-      closeFeedback()
-    } catch (err: unknown) {
-      addToast({ title: "Error", description: extractDetail(err) || "Failed to save feedback", variant: "destructive" })
-    }
-    setFbSaving(false)
-  }
-
-  async function handleFbBookAppointment() {
-    if (!feedbackItem || !feedbackOpen || !fbApptDoctorId || !fbApptDate || !fbApptTime) return
-    setFbApptSaving(true)
-    try {
-      const resp = await appointmentsApi.create({
-        patient_id: feedbackItem.patient_id,
-        doctor_id: fbApptDoctorId,
-        appointment_date: fbApptDate,
-        appointment_time: fbApptTime,
-        appointment_type: "FOLLOW_UP",
-        notes: "Created from enquiry calendar feedback",
-      })
-      if (feedbackItem.source === "generated_enquiry") {
-        await enquiriesApi.updateStatus(feedbackOpen, { status: "COMPLETED" })
-      } else {
-        await crmApi.followUps.update(feedbackOpen, {
-          status: "APPOINTMENT_BOOKED",
-          appointment_id: resp.id || resp.appointment_id,
-        })
-      }
-      invalidateCalendar()
-      addToast({ title: "Appointment created & feedback saved", variant: "success" })
-      closeFeedback()
-    } catch (err: unknown) {
-      addToast({ title: "Error", description: extractDetail(err) || "Booking failed", variant: "destructive" })
-    }
-    setFbApptSaving(false)
-  }
 
   async function handleMarkCompleted(id: string, source?: string) {
     try {
@@ -673,6 +545,7 @@ export default function EnquiryCalendar() {
       vars.lead_source = item.lead?.source || ""
       vars.lead_status = item.lead?.status || ""
       vars.interested_treatment = item.lead?.interested_treatment || ""
+      vars.treatment_name = item.lead?.interested_treatment || ""
       vars.assigned_staff = item.lead?.assigned_staff || item.assigned_staff?.name || ""
       vars.assigned_staff_name = item.lead?.assigned_staff || item.assigned_staff?.name || ""
       vars.preferred_branch = ""
@@ -681,7 +554,7 @@ export default function EnquiryCalendar() {
     } else {
       vars.patient_name = item.patient?.name || item.patient_name || ""
       vars.patient_phone = item.patient?.phone || item.patient_phone || ""
-      vars.doctor_name = item.doctor?.name || item.doctor_name || ""
+      vars.doctor_name = item.doctor?.name || item.doctor_name || item.appointment?.doctor_name || ""
       vars.doctor_specialization = item.doctor?.specialization || ""
       vars.op_number = item.patient?.op_number || item.op_number || ""
       vars.treatment_name = item.treatment?.treatment_name || item.treatment_name || ""
@@ -757,42 +630,41 @@ export default function EnquiryCalendar() {
       invalidateCalendar()
     } catch { /* ignore */ }
     setWaOpen(null); setWaMessage(""); setWaTemplateError("")
-    setTimeout(() => openFeedback(waItem!, "WHATSAPP"), 800)
   }
 
   function handleCall(item: CalendarItem) {
-    const phone = item.patient_phone
-    if (!phone) { addToast({ title: "No phone number for this patient", variant: "destructive" }); return }
-    navigator.clipboard.writeText(phone).catch(() => {})
+    const phone = item.patient_phone || item.lead?.mobile || item.patient?.phone || (item as any).display_phone
+    if (!phone) { addToast({ title: "No phone number available", variant: "destructive" }); return }
     window.location.href = `tel:${phone}`
-    addToast({ title: `Dialing ${phone}`, description: "Number copied to clipboard", variant: "default" })
     if (item.source !== "generated_enquiry") {
       crmApi.followUps.update(item.id, { status: "CONTACTED", contact_channel: "CALL" }).then(() => invalidateCalendar()).catch(() => {})
     }
-    setTimeout(() => openFeedback(item, "CALL"), 600)
   }
 
   // --- Timeline ---
   const [timelineOpen, setTimelineOpen] = useState<string | null>(null)
   const [timelineItem, setTimelineItem] = useState<CalendarItem | null>(null)
   const isLeadTimeline = timelineItem?.enquiry_type === "LEAD_FOLLOW_UP"
+  // Use rich PatientTimeline from detail endpoint for both lead and patient enquiries
+  // Falls back to FollowUp-only history if detail not loaded yet
   const { data: timelineData } = useQuery({
     queryKey: ["patient-timeline", timelineItem?.patient_id],
     queryFn: () => crmApi.patientFollowUpHistory(timelineItem!.patient_id!),
-    enabled: !!timelineItem?.patient_id && !isLeadTimeline,
+    enabled: !!timelineItem?.patient_id && !isLeadTimeline && !detailData?.timeline,
   })
-  // For LEAD enquiries, use enriched detail data timeline
-  const leadTimelineData = !isLeadTimeline ? [] : ((detailData as any)?.timeline || [])
-  const timelineEntries: any[] = isLeadTimeline ? leadTimelineData : (Array.isArray(timelineData) ? timelineData : [])
 
+  const timelineEntries: { id?: string; enquiry_type?: string; status?: string; due_date?: string; created_at?: string; description?: string; action?: string; notes?: string }[] =
+    (detailData?.timeline as any[]) || (Array.isArray(timelineData) ? timelineData : [])
   // --- Navigation ---
-  function navToday() { setSelectedDate(format(today, "yyyy-MM-dd")) }
-  function handleNav(d: -1 | 1) {
-    if (viewMode === "day") setSelectedDate(format(d > 0 ? addDays(selDate, 1) : subDays(selDate, 1), "yyyy-MM-dd"))
-    else if (viewMode === "week" || viewMode === "agenda") setSelectedDate(format(d > 0 ? addWeeks(selDate, 1) : subWeeks(selDate, 1), "yyyy-MM-dd"))
-    else setSelectedDate(format(d > 0 ? addMonths(selDate, 1) : subMonths(selDate, 1), "yyyy-MM-dd"))
-  }
-
+  const navToday = useCallback(() => setSelectedDate(format(new Date(), "yyyy-MM-dd")), [])
+  const handleNav = useCallback((d: -1 | 1) => {
+    setSelectedDate((prev) => {
+      const p = parseISO(prev)
+      if (viewMode === "day") return format(d > 0 ? addDays(p, 1) : subDays(p, 1), "yyyy-MM-dd")
+      if (viewMode === "week" || viewMode === "agenda") return format(d > 0 ? addWeeks(p, 1) : subWeeks(p, 1), "yyyy-MM-dd")
+      return format(d > 0 ? addMonths(p, 1) : subMonths(p, 1), "yyyy-MM-dd")
+    })
+  }, [viewMode])
   function handleDayClick(dateStr: string) { setSelectedDate(dateStr); setViewMode("day") }
 
   // --- Keyboard shortcuts ---
@@ -810,27 +682,18 @@ export default function EnquiryCalendar() {
     }
     window.addEventListener("keydown", handleKey)
     return () => window.removeEventListener("keydown", handleKey)
-  }, [viewMode, selectedDate])
+  }, [viewMode, handleNav, navToday])
 
   // --- Calendar grid ---
   const calStart = startOfMonth(selDate)
   const calEnd = endOfMonth(selDate)
 
-  // --- Summary counts (use API summary if available, else compute) ---
   const dayItems = useMemo(() => searchedItems.filter((i) => i.due_date === selectedDate), [searchedItems, selectedDate])
-  const typeCounts = useMemo(() => {
-    const counts: Record<string, number> = {}
-    for (const item of dayItems) {
-      const t = item.enquiry_type || item.follow_up_type || "OTHER"
-      counts[t] = (counts[t] || 0) + 1
-    }
-    return counts
-  }, [dayItems])
 
-  const overdueCount = useMemo(() => {
-    const cutoff = format(subDays(new Date(), 0), "yyyy-MM-dd")
-    return searchedItems.filter((i) => isOverdue(i.due_date || "", i.status || "")).length
-  }, [searchedItems])
+  const overdueCount = useMemo(() =>
+    searchedItems.filter((i) => isOverdue(i.due_date || "", i.status || "")).length,
+    [searchedItems]
+  )
 
   return (
     <div className="space-y-4">
@@ -1027,7 +890,7 @@ export default function EnquiryCalendar() {
                       const tc = getTypeColor(item.enquiry_type || item.follow_up_type || "")
                       const od = isOverdue(item.due_date || "", item.status || "")
                       const desc = item.description
-                      const patName = item.patient?.name || item.patient_name || "Unknown"
+                      const patName = item.display_name || item.patient?.name || item.patient_name || "-"
                       const docName = item.doctor?.name || item.doctor_name
                       const docSpec = item.doctor?.specialization
                       const hospName = item.hospital?.name
@@ -1161,7 +1024,6 @@ export default function EnquiryCalendar() {
                 for (let i = 0; i < 7; i++) {
                   const day = addDays(weekStart, i)
                   const dateStr = format(day, "yyyy-MM-dd")
-                  const todayStr = format(today, "yyyy-MM-dd")
                   const dayItemsAll = searchedItems.filter((item) => item.due_date === dateStr)
                   const todayCheck = isToday(day)
                   cells.push(
@@ -1179,7 +1041,7 @@ export default function EnquiryCalendar() {
                           const tc = getTypeColor(item.enquiry_type || "")
                           return (
                             <div key={item.id} className={`text-[10px] px-1.5 py-0.5 rounded ${tc.bg} ${tc.text} truncate border ${tc.border}`}>
-                              {item.patient_name}
+                              {item.display_name || item.patient_name || "-"}
                             </div>
                           )
                         })}
@@ -1210,7 +1072,6 @@ export default function EnquiryCalendar() {
                 for (let i = 0; i < startDay; i++) cells.push(<div key={`e-${i}`} className="bg-gray-50 p-2" />)
                 for (let d = 1; d <= daysInMonth; d++) {
                   const dateStr = `${format(selDate, "yyyy-MM")}-${String(d).padStart(2, "0")}`
-                  const todayStr = format(today, "yyyy-MM-dd")
                   const dayItemsAll = searchedItems.filter((item) => item.due_date === dateStr)
                   const todayCheck = dateStr === format(today, "yyyy-MM-dd")
                   const isSelected = dateStr === selectedDate
@@ -1226,7 +1087,7 @@ export default function EnquiryCalendar() {
                       <div className="text-[9px] mt-0.5 leading-tight">
                         {dayItemsAll.slice(0, 3).map((item) => {
                           const tc = getTypeColor(item.enquiry_type || "")
-                          return <div key={item.id} className={`truncate ${tc.text}`}>{item.patient_name}</div>
+                          return <div key={item.id} className={`truncate ${tc.text}`}>{item.display_name || item.patient_name || "-"}</div>
                         })}
                         {dayItemsAll.length > 3 && <div className="text-gray-400">+{dayItemsAll.length - 3}</div>}
                       </div>
@@ -1291,7 +1152,7 @@ export default function EnquiryCalendar() {
                               <div className={`w-2 h-2 rounded-full flex-shrink-0 ${tc.dot}`} />
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
-                                  <span className="text-sm font-medium truncate">{item.patient_name}</span>
+                                  <span className="text-sm font-medium truncate">{item.display_name || item.patient_name || "-"}</span>
                                   <Badge variant="outline" className={`text-[9px] ${tc.bg} ${tc.text} ${tc.border}`}>
                                     {ENQUIRY_TYPE_LABELS[item.enquiry_type || ""] || item.enquiry_type || "—"}
                                   </Badge>
@@ -1313,7 +1174,7 @@ export default function EnquiryCalendar() {
                                 )}
                                 {(item.enquiry_type === "CASE_WELLNESS" || item.enquiry_type === "RECALL") && item.completed_treatments && item.completed_treatments.length > 0 && (
                                   <div className="text-xs text-muted-foreground truncate">
-                                    {item.completed_treatments.slice(0, 3).map((ct: any) => ct.treatment_name).join(" · ")}
+                                    {item.completed_treatments.slice(0, 3).map((ct: { treatment_name?: string }) => ct.treatment_name).join(" · ")}
                                     {item.completed_treatments.length > 3 && ` +${item.completed_treatments.length - 3}`}
                                   </div>
                                 )}
@@ -1350,427 +1211,29 @@ export default function EnquiryCalendar() {
         </Card>
       )}
 
-      {/* Detail Drawer (Sheet) — Enriched */}
-      <Sheet open={detailOpen} onOpenChange={setDetailOpen}>
-        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-          {detailItem && (
-            <>
-              <SheetHeader>
-                <SheetTitle className="flex items-center gap-2">
-                  <div className={`w-3 h-3 rounded-full ${getTypeColor(detailItem.enquiry_type || "").dot}`} />
-                  {detailItem.enquiry_type === "LEAD_FOLLOW_UP"
-                    ? (detailItem.lead?.name || "Lead")
-                    : (detailItem.patient?.name || detailItem.patient_name || "Enquiry")}
-                  {detailItem.enquiry_number && (
-                    <span className="text-xs font-normal text-muted-foreground">#{detailItem.enquiry_number}</span>
-                  )}
-                </SheetTitle>
-                <SheetDescription className="flex flex-col gap-1">
-                  <span>
-                    {ENQUIRY_TYPE_LABELS[detailItem.enquiry_type || ""] || detailItem.enquiry_type || "Enquiry"}
-                    {detailItem.description && <span className="block text-xs mt-0.5 italic">{detailItem.description}</span>}
-                  </span>
-                </SheetDescription>
-              </SheetHeader>
-              <div className="mt-4 space-y-3">
+      {/* Detail Drawer (Sheet) — Premium EnquiryDetailSheet */}
+      <EnquiryDetailSheet
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        enquiryId={detailItem?.id || null}
+        onCall={(item) => { setDetailOpen(false); handleCall(item) }}
+        onWhatsApp={(item) => { setDetailOpen(false); openWhatsApp(item) }}
+        onFeedback={(item) => { setDetailOpen(false); openFeedback(item) }}
+        onReschedule={(id, date) => { setReschedOpen(id); setReschedDate(date); setDetailOpen(false) }}
+        onComplete={(id, source) => { handleMarkCompleted(id, source); setDetailOpen(false) }}
+        onTimeline={(item) => { setTimelineItem(item); setTimelineOpen(item.id); setDetailOpen(false) }}
+        calendarItem={detailItem}
+      />
 
-                {/* Status + Priority + Dates */}
-                <div className="grid grid-cols-3 gap-2 text-xs">
-                  <div className="bg-muted/30 rounded p-2">
-                    <div className="text-muted-foreground">Status</div>
-                    <Badge className={`text-xs mt-0.5 ${STATUS_COLORS[detailItem.status || ""] || ""}`}>{detailItem.status}</Badge>
-                  </div>
-                  <div className="bg-muted/30 rounded p-2">
-                    <div className="text-muted-foreground">Priority</div>
-                    <div className="font-semibold mt-0.5">{detailItem.priority || "MEDIUM"}</div>
-                  </div>
-                  <div className="bg-muted/30 rounded p-2">
-                    <div className="text-muted-foreground">Due</div>
-                    <div className="font-semibold mt-0.5">{detailItem.due_date ? format(parseISO(detailItem.due_date), "dd MMM") : "—"}</div>
-                  </div>
-                </div>
-
-                {/* ── LEAD SUMMARY (for LEAD_FOLLOW_UP only) ── */}
-                {detailItem.enquiry_type === "LEAD_FOLLOW_UP" && detailItem.lead && (
-                  <>
-                    <div className="rounded-lg border border-amber-200 bg-amber-50/40 p-3 space-y-2">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 font-bold text-base">
-                          {(detailItem.lead.name || "?").charAt(0).toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-sm">{detailItem.lead.name}</div>
-                          {detailItem.lead.mobile && <div className="text-xs text-muted-foreground">{detailItem.lead.mobile}</div>}
-                        </div>
-                        <Badge className="text-[9px]">{detailItem.lead.status}</Badge>
-                      </div>
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs pt-1 border-t border-amber-200/50">
-                        {detailItem.lead.source && <div><span className="text-muted-foreground">Source:</span> {detailItem.lead.source.replace("_", " ")}</div>}
-                        {detailItem.lead.interested_treatment && <div><span className="text-muted-foreground">Interest:</span> {detailItem.lead.interested_treatment}</div>}
-                        {detailItem.lead.email && <div className="col-span-2"><span className="text-muted-foreground">Email:</span> {detailItem.lead.email}</div>}
-                        {(detailData as any)?.lead?.alternate_mobile && (
-                          <div><span className="text-muted-foreground">Alt. Mobile:</span> {(detailData as any).lead.alternate_mobile}</div>
-                        )}
-                        {(detailData as any)?.lead?.city && <div><span className="text-muted-foreground">City:</span> {(detailData as any).lead.city}</div>}
-                        {(detailData as any)?.lead?.age != null && <div><span className="text-muted-foreground">Age:</span> {(detailData as any).lead.age} yrs</div>}
-                        {(detailData as any)?.lead?.gender && <div><span className="text-muted-foreground">Gender:</span> {(detailData as any).lead.gender}</div>}
-                        {(detailData as any)?.lead?.preferred_visit_date && <div><span className="text-muted-foreground">Preferred:</span> {(detailData as any).lead.preferred_visit_date}</div>}
-                        {(detailData as any)?.lead?.assigned_staff && <div><span className="text-muted-foreground">Assigned:</span> {(detailData as any).lead.assigned_staff}</div>}
-                      </div>
-                      {(detailData as any)?.lead?.notes && (
-                        <div className="text-xs pt-1 border-t border-amber-200/50">
-                          <span className="text-muted-foreground">Notes:</span> {(detailData as any).lead.notes}
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-
-                {/* ── PATIENT SUMMARY (for patient-type enquiries only) ── */}
-                {detailItem.enquiry_type !== "LEAD_FOLLOW_UP" && detailItem.patient && (
-                  <div className="rounded-lg border p-3 space-y-1.5">
-                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">PATIENT</div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
-                        {(detailItem.patient.name || "?").charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-semibold text-sm">{detailItem.patient.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {detailItem.patient.op_number && <>OP: {detailItem.patient.op_number} · </>}
-                          {detailItem.patient.age && <>{detailItem.patient.age} yrs · </>}
-                          {detailItem.patient.gender && <>{detailItem.patient.gender}</>}
-                        </div>
-                      </div>
-                      <div className="text-xs text-right">
-                        {detailItem.patient.phone && <div className="font-medium">{detailItem.patient.phone}</div>}
-                        <div className="text-muted-foreground">{detailItem.patient.status || ""}</div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* ── DOCTOR (patient types only) ── */}
-                {detailItem.enquiry_type !== "LEAD_FOLLOW_UP" && detailItem.doctor?.name && (
-                  <div className="rounded-lg border p-3 space-y-1.5">
-                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">DOCTOR</div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm">
-                        Dr{(detailItem.doctor.name || "").charAt(0)}
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-semibold text-sm">Dr. {detailItem.doctor.name}</div>
-                        {detailItem.doctor.specialization && (
-                          <div className="text-xs text-muted-foreground">{detailItem.doctor.specialization}</div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Hospital (always relevant) */}
-                {detailItem.hospital?.name && (
-                  <div className="rounded-lg border p-3 space-y-1.5">
-                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">HOSPITAL</div>
-                    <div className="text-sm font-medium">{detailItem.hospital.name}</div>
-                    {detailItem.hospital.phone && <div className="text-xs text-muted-foreground">{detailItem.hospital.phone}</div>}
-                    {detailItem.hospital.address && <div className="text-xs text-muted-foreground">{detailItem.hospital.address}</div>}
-                  </div>
-                )}
-
-                {/* Case Information (patient types only) */}
-                {detailItem.enquiry_type !== "LEAD_FOLLOW_UP" && detailItem.case && (
-                  <div className="rounded-lg border p-3 space-y-1.5">
-                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">CASE</div>
-                    <div className="text-sm font-medium">{detailItem.case.case_number || detailItem.case.id}</div>
-                    {detailItem.case.chief_complaint && (
-                      <div className="text-xs text-muted-foreground line-clamp-2">{detailItem.case.chief_complaint}</div>
-                    )}
-                    {detailItem.case.diagnosis && (
-                      <div className="text-xs"><span className="text-muted-foreground">Dx: </span>{detailItem.case.diagnosis}</div>
-                    )}
-                    <div>
-                      <Badge variant="outline" className="text-[9px]">{detailItem.case.status}</Badge>
-                    </div>
-                  </div>
-                )}
-
-                {/* Treatment Information (patient types only) */}
-                {detailItem.enquiry_type !== "LEAD_FOLLOW_UP" && detailItem.treatment && (
-                  <div className="rounded-lg border p-3 space-y-1.5">
-                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">TREATMENT</div>
-                    <div className="text-sm font-medium">{detailItem.treatment.treatment_name}</div>
-                    {detailItem.treatment.treatment_type && (
-                      <div className="text-xs text-muted-foreground">{detailItem.treatment.treatment_type}</div>
-                    )}
-                    <div className="grid grid-cols-3 gap-2 text-xs mt-1">
-                      <div><span className="text-muted-foreground">Visits:</span> {detailItem.treatment.completed_visits || 0}/{detailItem.treatment.total_visits || "?"}</div>
-                      <div><span className="text-muted-foreground">Remaining:</span> {detailItem.treatment.remaining_visits || 0}</div>
-                      <div>
-                        <Badge variant="outline" className="text-[9px]">{detailItem.treatment.status}</Badge>
-                      </div>
-                    </div>
-                    {detailItem.treatment.current_stage && (
-                      <div className="text-xs font-medium text-primary">Current: {detailItem.treatment.current_stage}</div>
-                    )}
-                    {detailItem.treatment.start_date && (
-                      <div className="text-xs text-muted-foreground">Started: {format(parseISO(detailItem.treatment.start_date), "dd MMM yyyy")}</div>
-                    )}
-                  </div>
-                )}
-
-                {/* Appointment Information (patient types only) */}
-                {detailItem.enquiry_type !== "LEAD_FOLLOW_UP" && detailItem.appointment && (
-                  <div className="rounded-lg border p-3 space-y-1.5">
-                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">APPOINTMENT</div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm font-medium">
-                        {detailItem.appointment.date && format(parseISO(detailItem.appointment.date), "dd MMM yyyy")}
-                        {detailItem.appointment.time && <> at {detailItem.appointment.time}</>}
-                      </span>
-                    </div>
-                    {detailItem.appointment.doctor_name && (
-                      <div className="text-xs">Dr. {detailItem.appointment.doctor_name}</div>
-                    )}
-                    {detailItem.appointment.purpose && (
-                      <div className="text-xs text-muted-foreground">{detailItem.appointment.purpose}</div>
-                    )}
-                    <Badge variant="outline" className="text-[9px]">{detailItem.appointment.status}</Badge>
-                  </div>
-                )}
-
-                {/* Recurrence */}
-                {detailItem.recurrence?.is_recurring && (
-                  <div className="rounded-lg border border-red-200 bg-red-50 p-3 space-y-1">
-                    <div className="text-xs font-semibold text-red-700 uppercase tracking-wide">RECURRING RECALL</div>
-                    <div className="text-xs text-red-600">
-                      Occurrence #{detailItem.recurrence.occurrence_number}
-                      {detailItem.recurrence.interval_days && <> · Every {detailItem.recurrence.interval_days} days</>}
-                    </div>
-                  </div>
-                )}
-
-                {/* Communication History */}
-                {detailData?.communication_history && detailData.communication_history.length > 0 && (
-                  <div className="rounded-lg border p-3 space-y-2">
-                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">COMMUNICATION HISTORY</div>
-                    <div className="space-y-1.5 max-h-[120px] overflow-y-auto">
-                      {detailData?.communication_history.slice(0, 5).map((c: any) => (
-                        <div key={c.id} className="text-xs flex items-start gap-2 py-1 border-b last:border-b-0">
-                          <span className={`px-1.5 py-0.5 rounded font-medium ${
-                            c.channel === "WHATSAPP" ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"
-                          }`}>{c.channel}</span>
-                          <span className="flex-1 truncate">{c.message?.substring(0, 80)}</span>
-                          <span className="text-muted-foreground shrink-0">{c.status}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Timeline */}
-                {detailData?.timeline && detailData.timeline.length > 0 && (
-                  <div className="rounded-lg border p-3 space-y-2">
-                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">TIMELINE</div>
-                    <div className="space-y-2 max-h-[150px] overflow-y-auto">
-                      {detailData?.timeline.map((entry: any, idx: number) => (
-                        <div key={entry.id || idx} className="flex gap-2 text-xs">
-                          <div className="w-2 h-2 rounded-full bg-primary mt-1 shrink-0" />
-                          <div className="flex-1">
-                            <div className="font-medium">{entry.description || entry.enquiry_type}</div>
-                            <div className="text-muted-foreground">
-                              {entry.created_at && format(new Date(entry.created_at), "dd MMM")}
-                              {entry.due_date && <> · due {format(parseISO(entry.due_date), "dd MMM")}</>}
-                              <Badge variant="outline" className="ml-1 text-[9px]">{entry.status}</Badge>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* WhatsApp Preview */}
-                {detailItem?.id && (
-                  <div className="rounded-lg border p-3 space-y-2">
-                    <button
-                      type="button"
-                      className="w-full flex items-center justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wide"
-                      onClick={() => setWaPreviewOpen(prev => !prev)}
-                    >
-                      <span>WHATSAPP PREVIEW</span>
-                      <ChevronRight className={`h-3.5 w-3.5 transition-transform ${waPreviewOpen ? "rotate-90" : ""}`} />
-                    </button>
-                    {waPreviewOpen && (
-                      <div className="space-y-2">
-                        {detailData?.template_variables && Object.keys(detailData.template_variables).length > 0 && (
-                          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs max-h-[120px] overflow-y-auto">
-                            {Object.entries(detailData.template_variables).slice(0, 12).map(([k, v]) => (
-                              <div key={k} className="truncate"><span className="text-muted-foreground">{k}:</span> {String(v || "—")}</div>
-                            ))}
-                          </div>
-                        )}
-                        {waPreviewMsg ? (
-                          <pre className="text-xs whitespace-pre-wrap bg-muted/30 rounded p-2 max-h-[120px] overflow-y-auto">{waPreviewMsg}</pre>
-                        ) : (
-                          <Button size="sm" variant="outline" className="w-full text-xs" onClick={loadWaPreview}>
-                            <MessageCircle className="h-3 w-3 mr-1" /> Load Preview
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Actions */}
-                <div className="flex gap-2 pt-2 border-t">
-                  <Button size="sm" className="flex-1" onClick={() => { setDetailOpen(false); openFeedback(detailItem) }}>
-                    <FileText className="h-3.5 w-3.5 mr-1" /> Feedback
-                  </Button>
-                  <Button size="sm" variant="outline" className="flex-1" onClick={() => { setDetailOpen(false); handleCall(detailItem) }}>
-                    <Phone className="h-3.5 w-3.5 mr-1" /> Call
-                  </Button>
-                  <Button size="sm" variant="outline" className="flex-1" onClick={() => { setDetailOpen(false); openWhatsApp(detailItem) }}>
-                    <MessageCircle className="h-3.5 w-3.5 mr-1" /> WhatsApp
-                  </Button>
-                </div>
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline" className="flex-1"
-                    onClick={() => { setReschedOpen(detailItem.id); setReschedDate(detailItem.due_date || selectedDate); setDetailOpen(false) }}>
-                    <RotateCcw className="h-3.5 w-3.5 mr-1" /> Reschedule
-                  </Button>
-                  {detailItem.status !== "COMPLETED" && detailItem.status !== "LOST" && detailItem.status !== "CANCELLED" && (
-                    <Button size="sm" variant="outline" className="flex-1"
-                      onClick={() => { handleMarkCompleted(detailItem.id, detailItem.source); setDetailOpen(false) }}>
-                      <CheckCircle className="h-3.5 w-3.5 mr-1" /> Complete
-                    </Button>
-                  )}
-                  <Button size="sm" variant="ghost"
-                    onClick={() => { setTimelineItem(detailItem); setTimelineOpen(detailItem.id); setDetailOpen(false) }}>
-                    <History className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
-
-      {/* Feedback Dialog */}
-      <Dialog open={!!feedbackOpen} onOpenChange={(o) => { if (!o) closeFeedback() }}>
-        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              Record Feedback —
-              {feedbackItem?.enquiry_type === "LEAD_FOLLOW_UP"
-                ? (feedbackItem?.lead?.name || "Lead")
-                : (feedbackItem?.patient_name || "")}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 px-1">
-            <div className="space-y-2">
-              <Label>Response <span className="text-red-500">*</span></Label>
-              <Select value={fbResponseStatus} onValueChange={setFbResponseStatus}>
-                <SelectTrigger><SelectValue placeholder="Select response" /></SelectTrigger>
-                <SelectContent position="popper" className="max-h-[220px]">
-                  {getResponseOptions(feedbackItem?.enquiry_type).map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {feedbackItem?.enquiry_type !== "LEAD_FOLLOW_UP" && (
-              <div className="space-y-2">
-                <Label>Patient Condition / Feedback</Label>
-                <Textarea value={fbPatientFeedback} onChange={(e) => setFbPatientFeedback(e.target.value)} rows={2} placeholder="How is the patient feeling?" />
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label>Staff Notes</Label>
-              <Textarea value={fbStaffNotes} onChange={(e) => setFbStaffNotes(e.target.value)} rows={2} placeholder="Internal notes..." />
-            </div>
-            <div className="space-y-2">
-              <Label>Response Summary</Label>
-              <Input value={fbSummary} onChange={(e) => setFbSummary(e.target.value)} placeholder="Brief outcome" />
-            </div>
-            {feedbackItem?.enquiry_type !== "LEAD_FOLLOW_UP" && (
-              <>
-                <div className="space-y-2">
-                  <Label>Interested To Visit Again</Label>
-                  <div className="flex gap-2">
-                    {["Yes", "No", "Maybe"].map((opt) => (
-                      <Button key={opt} type="button" variant={fbInterested === opt ? "default" : "outline"} size="sm"
-                        className="flex-1" onClick={() => setFbInterested(opt)}>{opt}</Button>
-                    ))}
-                  </div>
-                </div>
-                {fbInterested === "Yes" && (
-                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-3">
-                    <Label className="font-semibold text-primary">Create Appointment</Label>
-                    <div className="space-y-2">
-                      <Label>Doctor <span className="text-red-500">*</span></Label>
-                      <Select value={fbApptDoctorId} onValueChange={setFbApptDoctorId}>
-                        <SelectTrigger><SelectValue placeholder="Select doctor" /></SelectTrigger>
-                        <SelectContent position="popper" className="max-h-[220px]">
-                          {doctorsList.map((doc) => (
-                            <SelectItem key={doc.id} value={doc.id}>{doc.full_name || doc.name || doc.username}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Date <span className="text-red-500">*</span></Label>
-                      <Input type="date" value={fbApptDate} onChange={(e) => setFbApptDate(e.target.value)} min={format(today, "yyyy-MM-dd")} />
-                    </div>
-                    {fbApptDoctorId && fbApptDate && (
-                      <div className="space-y-2">
-                        <Label>Available Time Slots</Label>
-                        {fbSlotsList.length > 0 ? (
-                          <div className="grid grid-cols-4 gap-1.5 max-h-[150px] overflow-y-auto p-1 border rounded-md">
-                            {fbSlotsList.map((slot: string) => (
-                              <Button key={slot} variant={fbApptTime === slot ? "default" : "outline"} size="sm"
-                                className={`text-xs h-8 ${fbApptTime === slot ? "ring-2 ring-primary" : ""}`}
-                                onClick={() => setFbApptTime(slot)}>
-                                {slot.replace(/^(\d{2})(\d{2})$/, "$1:$2")}
-                              </Button>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-xs text-muted-foreground">No slots found.</p>
-                        )}
-                      </div>
-                    )}
-                    <Button className="w-full" onClick={handleFbBookAppointment}
-                      disabled={!fbApptDoctorId || !fbApptDate || !fbApptTime || fbApptSaving}>
-                      {fbApptSaving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                      <Calendar className="h-4 w-4 mr-2" /> Create Appointment
-                    </Button>
-                  </div>
-                )}
-              </>
-            )}
-            <div className="space-y-2">
-              <Label>Next Action</Label>
-              <Select value={fbNextAction} onValueChange={setFbNextAction}>
-                <SelectTrigger><SelectValue placeholder="Select next action" /></SelectTrigger>
-                <SelectContent>
-                  {nextActionOptions.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex gap-2 pt-2">
-              <Button variant="outline" className="flex-1" onClick={closeFeedback}>Cancel</Button>
-              <Button className="flex-1" onClick={handleRecordFeedback} disabled={!fbResponseStatus || fbSaving}>
-                {fbSaving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                Save Feedback
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Feedback Drawer (context-aware Lead/Patient) */}
+      <FeedbackDrawer
+        open={feedbackDrawerOpen}
+        onOpenChange={setFeedbackDrawerOpen}
+        enquiry={feedbackDrawerItem}
+        onSaved={() => {
+          invalidateCalendar()
+        }}
+      />
 
       {/* WhatsApp Dialog */}
       <Dialog open={!!waOpen} onOpenChange={(o) => { if (!o) { setWaOpen(null); setWaMessage(""); setWaTemplateError("") } }}>
@@ -1794,7 +1257,7 @@ export default function EnquiryCalendar() {
             </div>
             {waTemplateError && <div className="text-xs text-red-600 bg-red-50 rounded px-3 py-2">{waTemplateError}</div>}
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={async () => { if (!waItem) return; setWaLoading(true); try { const r = await enquiriesApi.whatsappPreview(waItem.id); if (r?.rendered_message) setWaMessage(r.rendered_message) } catch {} setWaLoading(false) }}>
+              <Button variant="outline" size="sm" onClick={async () => { if (!waItem) return; setWaLoading(true); try { const r = await enquiriesApi.whatsappPreview(waItem.id); if (r?.rendered_message) setWaMessage(r.rendered_message) } catch (e) { console.error('Preview failed', e) } setWaLoading(false) }}>
                 <RotateCcw className="h-3 w-3 mr-1" /> Refresh
               </Button>
               <Button variant="outline" className="flex-1" onClick={() => { setWaOpen(null); setWaMessage(""); setWaTemplateError("") }}>Cancel</Button>
