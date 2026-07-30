@@ -2,15 +2,13 @@ import { useState, useMemo, useCallback, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { useQuery, keepPreviousData } from "@tanstack/react-query"
 import { Search, Filter, Stethoscope, Clock, FileText, ChevronDown, ChevronRight, IndianRupee, Hash, ChevronLeft, RotateCcw, Loader2 } from "lucide-react"
-import PageHeader from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
+import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { treatmentApi } from "@/services/endpoints"
 import { formatIndianRupees } from "@/lib/currency"
+import { PageHeader, EmptyState, LoadingSkeleton, StatusBadge } from "@/design-system"
 import { cn } from "@/lib/utils"
 import type { TreatmentPlan } from "@/types"
 
@@ -154,11 +152,13 @@ export default function TreatmentList() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Treatments" description={`${caseGroups.length} case(s) · ${total} treatment(s) · ${activeTreatments} active`}>
-        <Button variant="outline" size="sm" onClick={() => navigate("/treatments/workflow")}>
-          Workflow Board
-        </Button>
-      </PageHeader>
+      <PageHeader title="Treatments" description={`${caseGroups.length} case(s) · ${total} treatment(s) · ${activeTreatments} active`}
+        actions={
+          <Button variant="outline" size="sm" onClick={() => navigate("/treatments/workflow")}>
+            Workflow Board
+          </Button>
+        }
+      />
 
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
@@ -196,18 +196,9 @@ export default function TreatmentList() {
       </div>
 
       {showInitialSkeleton ? (
-        <div className="space-y-3">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-24 w-full" />
-          ))}
-        </div>
+        <LoadingSkeleton rows={5} />
       ) : caseGroups.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center py-16">
-            <Stethoscope className="h-10 w-10 text-muted-foreground mb-3" />
-            <p className="text-muted-foreground text-sm">No treatments found</p>
-          </CardContent>
-        </Card>
+        <EmptyState icon={Stethoscope} title="No treatments found" />
       ) : (
         <div className="space-y-3">
           {caseGroups.map((group) => {
@@ -237,9 +228,7 @@ export default function TreatmentList() {
                       {group.patient_op_no && (
                         <span className="text-xs text-muted-foreground">OP: {group.patient_op_no}</span>
                       )}
-                      <Badge className={cn("text-[10px] px-1.5 py-0", STATUS_COLORS[group.aggregate_status] || "bg-gray-100")}>
-                        {group.aggregate_status?.replace(/_/g, " ")}
-                      </Badge>
+                      <StatusBadge status={group.aggregate_status} />
                     </div>
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1"><FileText className="h-3 w-3" /> {group.case_number}</span>
@@ -304,9 +293,7 @@ export default function TreatmentList() {
                           {formatIndianRupees(treatment.cost || 0)}
                         </div>
 
-                        <Badge className={cn("text-[10px] px-1.5 py-0 shrink-0", STATUS_COLORS[treatment.status] || "bg-gray-100")}>
-                          {treatment.status?.replace(/_/g, " ")}
-                        </Badge>
+                        <StatusBadge status={treatment.status} />
 
                         <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />
                       </div>

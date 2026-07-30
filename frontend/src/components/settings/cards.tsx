@@ -19,16 +19,19 @@ export function SettingsSection({
   contentClassName,
 }: SettingsSectionProps) {
   return (
-    <div className={cn("bg-white rounded-xl border border-[var(--color-border)] shadow-[var(--shadow-card)] overflow-hidden", className)}>
-      <div className="px-5 py-4 border-b border-[var(--color-border)] bg-gradient-to-r from-white to-[var(--color-bg)]">
+    <div className={cn(
+      "rounded-[var(--ds-card-radius)] border border-[var(--ds-border)] bg-[var(--ds-surface)] shadow-[var(--ds-shadow-card)] overflow-hidden",
+      className
+    )}>
+      <div className="px-5 py-4 border-b border-[var(--ds-border)]">
         <div className="flex items-center gap-2.5">
           {icon && (
-            <span className="text-[var(--color-primary)]">{icon}</span>
+            <span className="text-[var(--ds-primary)]">{icon}</span>
           )}
           <div>
-            <h3 className="text-card-title text-[var(--color-text-primary)]">{title}</h3>
+            <h3 className="font-[var(--ds-text-h3)] text-[var(--ds-text)]">{title}</h3>
             {description && (
-              <p className="text-xs text-[var(--color-text-muted)] mt-0.5">{description}</p>
+              <p className="text-xs text-[var(--ds-text-tertiary)] mt-0.5">{description}</p>
             )}
           </div>
         </div>
@@ -54,7 +57,7 @@ export function SettingsGrid({ children, columns = 2, className }: SettingsGridP
   }[columns];
 
   return (
-    <div className={cn("grid gap-4", colClass, className)}>
+    <div className={cn("grid gap-5", colClass, className)}>
       {children}
     </div>
   );

@@ -33,101 +33,121 @@ router = APIRouter(prefix="/crm/enquiries", tags=["CRM Enquiries"])
 
 LEAD_FOLLOW_UP_TEMPLATE = """Hello {{lead_name}},
 
-Thank you for your interest in {{treatment_name}}.
+Thank you for contacting {{hospital_name}}.
 
-Our team is happy to answer any questions you may have, explain the procedure in detail, and help you schedule a consultation at your convenience.
+We appreciate your interest in our dental services. Our team has received your enquiry regarding **{{treatment_name}}**.
 
-Let us know your preferred date and time.
+One of our patient care executives will contact you shortly to understand your requirements and assist you in planning your visit.
 
-Thank you,
+If you have any immediate questions, feel free to reply to this message or call us at {{hospital_phone}}.
+
+We look forward to welcoming you to {{hospital_name}} and providing you with the highest standard of dental care.
+
+Warm Regards,
+
 {{hospital_name}}
-
-Contact:
-{{hospital_phone}}"""
+Patient Care Team"""
 
 APPOINTMENT_REMINDER_TEMPLATE = """Hello {{patient_name}},
 
-This is a friendly reminder about your appointment with Dr. {{doctor_name}}.
+This is a friendly reminder from {{hospital_name}} regarding your upcoming appointment.
 
-Appointment
+━━━━━━━━━━━━━━━━━━
+Appointment Summary
+━━━━━━━━━━━━━━━━━━
 
-Date:
-{{appointment_date}}
+Doctor: Dr. {{doctor_name}}
+Date: {{appointment_date}}
+Time: {{appointment_time}}
+OP Number: {{op_number}}
+━━━━━━━━━━━━━━━━━━
 
-Time:
-{{appointment_time}}
+Please arrive 10 minutes before your scheduled time. Kindly carry any relevant medical records or reports with you.
 
-OP Number:
-{{op_number}}
+If you need to reschedule or cancel, please inform us at least 24 hours in advance so we can accommodate other patients.
 
-If you are unable to attend, kindly let us know so we can assist with rescheduling.
+For any assistance, contact us at {{hospital_phone}}.
 
-Thank you,
-{{hospital_name}}"""
+Warm Regards,
+
+{{hospital_name}}
+Patient Care Team"""
 
 OPD_FOLLOW_UP_TEMPLATE = """Hello {{patient_name}},
 
-We hope your consultation at {{hospital_name}} was helpful.
+We hope your consultation at {{hospital_name}} with Dr. {{doctor_name}} was a helpful step toward better dental health.
 
-Dr. {{doctor_name}} has recommended further care based on your consultation.
+Based on your consultation, Dr. {{doctor_name}} has recommended a personalised treatment plan designed to address your specific needs.
 
-If you have any questions or would like to begin your treatment, please contact us.
+If you have any questions about the recommended treatment or would like to schedule your next appointment, please don't hesitate to reach out. Our team is here to guide you through every step.
 
-We are happy to assist you.
+You can contact us at {{hospital_phone}}.
 
-Thank you,
-{{hospital_name}}"""
+Warm Regards,
+
+{{hospital_name}}
+Patient Care Team"""
 
 TREATMENT_WELLNESS_TEMPLATE = """Hello {{patient_name}},
 
-We hope you are doing well after your recent {{treatment_name}} at {{hospital_name}}.
+We hope you are recovering well after your recent {{treatment_name}} at {{hospital_name}}.
 
-We would like to know how you are feeling now.
+At {{hospital_name}}, your well-being is our highest priority. We would like to check in and see how you are feeling.
 
-• Are you recovering well?
-• Are you experiencing any discomfort?
-• If required, would you like to schedule a follow-up visit with Dr. {{doctor_name}}?
+• Are you recovering as expected?
+• Are you experiencing any discomfort or unusual symptoms?
+• Would you like to schedule a follow-up visit with Dr. {{doctor_name}}?
 
-Please let us know.
+Your feedback helps us ensure you receive the best possible care. Please take a moment to reply to this message or call us at {{hospital_phone}}.
 
-We are always happy to assist you.
+Warm Regards,
 
-Thank you,
-{{hospital_name}}"""
+{{hospital_name}}
+Patient Care Team"""
 
 CASE_WELLNESS_TEMPLATE = """Hello {{patient_name}},
 
-We hope you are recovering well after completing your treatment for {{case_name}}.
+We hope you are recovering well after completing your dental treatment at {{hospital_name}}.
 
-Completed Treatments
+━━━━━━━━━━━━━━━━━━
+Treatment Summary
+━━━━━━━━━━━━━━━━━━
 
 {{completed_treatments}}
+━━━━━━━━━━━━━━━━━━
 
-If you have any concerns or need further guidance, please contact us.
+If you have any concerns about your recovery or need further guidance, please contact us. Dr. {{doctor_name}} and our entire team are always available to assist you.
 
-Our team and Dr. {{doctor_name}} are always available to help.
+Regular follow-ups help ensure the long-term success of your treatment.
 
-Thank you,
-{{hospital_name}}"""
+Warm Regards,
+
+{{hospital_name}}
+Patient Care Team"""
 
 RECALL_TEMPLATE = """Hello {{patient_name}},
 
 This is your scheduled dental recall reminder from {{hospital_name}}.
 
-Based on your previous treatment
+━━━━━━━━━━━━━━━━━━
+Previous Treatment
+━━━━━━━━━━━━━━━━━━
 
 {{completed_treatments}}
+━━━━━━━━━━━━━━━━━━
 
-your next preventive dental check-up is due on
+Your next preventive dental check-up is due on:
 
-{{next_recall_date}}
+📅 {{next_recall_date}}
 
-Regular reviews help maintain your oral health and allow early detection of any issues.
+Regular dental reviews are essential for maintaining optimal oral health and detecting any potential issues early. A routine examination takes just 30 minutes and can prevent more complex problems in the future.
 
-Please contact us to schedule your appointment.
+Please contact us at {{hospital_phone}} to schedule your appointment at a convenient time.
 
-Thank you,
-{{hospital_name}}"""
+Warm Regards,
+
+{{hospital_name}}
+Patient Care Team"""
 
 DEFAULT_TEMPLATES_BY_TYPE = {
     "LEAD_FOLLOW_UP": LEAD_FOLLOW_UP_TEMPLATE,
@@ -390,6 +410,8 @@ def _build_template_variables(enquiry_type: str, patient_obj: Any, lead_obj: Any
     v["hospital_phone"] = hospital_obj.phone if hospital_obj else ""
     v["hospital_address"] = hospital_obj.address if hospital_obj else ""
     v["clinic_name"] = hospital_obj.name if hospital_obj else ""
+    v["current_date"] = date.today().isoformat()
+    v["current_time"] = datetime.now().strftime("%H:%M")
 
     # Lead variables
     v["lead_name"] = lead_obj.lead_name if lead_obj else ""
@@ -1101,10 +1123,11 @@ async def update_enquiry_status(
         ge.status = data.status
         if data.status == "COMPLETED":
             ge.updated_at = datetime.now(timezone.utc)
-            if ge.enquiry_type == "RECALL" and getattr(ge, 'is_recurring', False):
-                try:
-                    from app.crm.services.event_dispatcher import publish_event
-                    from app.crm.enums import EventType, EventSource
+            try:
+                from app.crm.services.event_dispatcher import publish_event
+                from app.crm.enums import EventType, EventSource
+
+                if ge.enquiry_type == "RECALL" and getattr(ge, 'is_recurring', False):
                     await publish_event(
                         event_type=EventType.RECALL_COMPLETED,
                         source_module=EventSource.RECALL,
@@ -1121,8 +1144,28 @@ async def update_enquiry_status(
                         },
                         db=db,
                     )
-                except Exception:
-                    pass
+
+                if ge.enquiry_type == "LEAD_FOLLOW_UP":
+                    await publish_event(
+                        event_type=EventType.LEAD_FOLLOW_UP_COMPLETED,
+                        source_module=EventSource.LEAD,
+                        entity_type="LEAD_FOLLOW_UP",
+                        entity_id=ge.id,
+                        hospital_id=ge.hospital_id,
+                        patient_id=ge.patient_id,
+                        lead_id=ge.lead_id,
+                        payload={
+                            "enquiry_id": ge.id,
+                            "patient_id": ge.patient_id,
+                            "lead_id": ge.lead_id,
+                            "occurrence_number": ge.occurrence_number,
+                            "total_attempts": ge.total_attempts,
+                            "chain_id": ge.chain_id,
+                        },
+                        db=db,
+                    )
+            except Exception:
+                pass
         elif data.status == "CANCELLED":
             ge.cancelled_by_event = "MANUAL"
             ge.cancelled_at = datetime.now(timezone.utc)

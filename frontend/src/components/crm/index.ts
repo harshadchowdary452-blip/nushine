@@ -30,8 +30,8 @@ export const FOLLOW_UP_STATUSES = [
 ] as const;
 
 export const LEAD_STATUSES = [
-  "NEW", "CONTACTED", "INTERESTED", "QUALIFIED", "PROPOSAL_SENT",
-  "NEGOTIATION", "CONVERTED", "LOST", "UNRESPONSIVE", "FOLLOW_UP_REQUIRED",
+  "NEW", "CONTACTED", "INTERESTED", "FOLLOW_UP_REQUIRED", "APPOINTMENT_BOOKED",
+  "VISITED", "CONVERTED", "LOST", "NOT_INTERESTED", "NO_RESPONSE",
 ] as const;
 
 export const CAMPAIGN_STATUSES = [
@@ -85,15 +85,15 @@ export const followUpStatusColors: Record<string, string> = {
 
 export const leadStatusColors: Record<string, string> = {
   NEW: "bg-blue-50 text-blue-700",
-  CONTACTED: "bg-indigo-50 text-indigo-700",
-  INTERESTED: "bg-green-50 text-green-700",
-  QUALIFIED: "bg-emerald-50 text-emerald-700",
-  PROPOSAL_SENT: "bg-purple-50 text-purple-700",
-  NEGOTIATION: "bg-amber-50 text-amber-700",
+  CONTACTED: "bg-purple-50 text-purple-700",
+  INTERESTED: "bg-emerald-50 text-emerald-700",
+  FOLLOW_UP_REQUIRED: "bg-amber-50 text-amber-700",
+  APPOINTMENT_BOOKED: "bg-indigo-50 text-indigo-700",
+  VISITED: "bg-teal-50 text-teal-700",
   CONVERTED: "bg-green-100 text-green-800",
   LOST: "bg-red-50 text-red-700",
-  UNRESPONSIVE: "bg-gray-50 text-gray-600",
-  FOLLOW_UP_REQUIRED: "bg-yellow-50 text-yellow-700",
+  NOT_INTERESTED: "bg-gray-50 text-gray-600",
+  NO_RESPONSE: "bg-orange-50 text-orange-700",
 };
 
 export const campaignStatusColors: Record<string, string> = {

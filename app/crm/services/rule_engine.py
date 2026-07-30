@@ -62,6 +62,9 @@ EVENT_TO_TRIGGER.update({
     "ENQUIRY_CREATED": None,
     "ENQUIRY_CONVERTED": None,
     "RECALL_COMPLETED": "RECALL_COMPLETED",
+    "LEAD_FOLLOW_UP_COMPLETED": "LEAD_FOLLOW_UP_COMPLETED",
+    "LEAD_NOT_INTERESTED": "LEAD_NOT_INTERESTED",
+    "LEAD_LOST": "LEAD_NOT_INTERESTED",
 })
 
 
@@ -206,6 +209,12 @@ class RuleEngine:
         elif event_type == "RECALL_COMPLETED":
             return await self._rule_recall_completed(db, hospital_id, payload, settings)
 
+        elif event_type == "LEAD_FOLLOW_UP_COMPLETED":
+            return await self._rule_lead_follow_up_completed(db, hospital_id, payload, settings)
+
+        elif event_type == "LEAD_NOT_INTERESTED":
+            return await self._rule_lead_not_interested(db, hospital_id, payload)
+
         return None
 
     # ============================================================
@@ -266,6 +275,18 @@ class RuleEngine:
 
         due_date = today + timedelta(days=delay_days)
 
+        # Multi-attempt config
+        max_attempts = follow_up_config.max_attempts if follow_up_config else 3
+        days_between = follow_up_config.days_between_attempts if follow_up_config else 3
+
+        # Update lead automation fields
+        from app.models.lead import Lead
+        lead = await db.get(Lead, lead_id)
+        if lead:
+            lead.automation_status = "ACTIVE"
+            lead.current_attempt = 0
+            lead.total_attempts = max_attempts
+
         return Decision(
             action="CREATE",
             enquiry_type="LEAD_FOLLOW_UP",
@@ -276,7 +297,11 @@ class RuleEngine:
             doctor_id=payload.get("doctor_id"),
             assigned_staff_id=payload.get("assigned_staff_id"),
             trigger_event="LEAD_CREATED",
-            description=f"Lead follow-up for new lead",
+            description=f"Lead follow-up #1 for new lead",
+            is_recurring=True,
+            occurrence_number=1,
+            total_attempts=max_attempts,
+            recurrence_interval_days=days_between,
         )
 
     async def _rule_opd_consultation_completed(
@@ -797,12 +822,111 @@ class RuleEngine:
         if not lead_id:
             return None
 
+        # Stop lead automation
+        await self._stop_lead_automation(db, lead_id, "CONVERTED")
+
         return Decision(
             action="CANCEL",
             cancel_enquiry_types=["LEAD_FOLLOW_UP"],
             cancel_reason="LEAD_CONVERTED",
             lead_id=lead_id,
             trigger_event="LEAD_CONVERTED",
+        )
+
+    async def _rule_lead_follow_up_completed(
+        self, db: AsyncSession, hospital_id: str, payload: dict, settings
+    ) -> Optional["Decision"]:
+        """Rule: When a lead follow-up is completed, schedule the next attempt if within limit."""
+        from app.crm.services.event_dispatcher import Decision
+        from app.models.generated_enquiry import GeneratedEnquiry
+        from app.models.lead import Lead
+
+        enquiry_id = payload.get("entity_id") or payload.get("enquiry_id")
+        if not enquiry_id:
+            return None
+
+        completed_ge = await db.get(GeneratedEnquiry, enquiry_id)
+        if not completed_ge or completed_ge.enquiry_type != "LEAD_FOLLOW_UP":
+            return None
+
+        lead_id = completed_ge.lead_id
+        if not lead_id:
+            return None
+
+        # Check lead automation status
+        lead = await db.get(Lead, lead_id)
+        if not lead:
+            return None
+        if lead.automation_status != "ACTIVE":
+            return None
+        if lead.status not in ("NEW", "CONTACTED", "INTERESTED", "FOLLOW_UP_REQUIRED"):
+            return None
+
+        # Load config for max_attempts and days_between
+        follow_up_config = settings.lead_follow_up
+        max_attempts = follow_up_config.max_attempts if follow_up_config else 3
+        days_between = follow_up_config.days_between_attempts if follow_up_config else 3
+
+        current_occ = completed_ge.occurrence_number or 1
+
+        # Do we have another attempt?
+        if current_occ >= max_attempts:
+            # Final attempt reached — auto-close if configured
+            if follow_up_config and follow_up_config.auto_close_after_final:
+                lead.automation_status = "CLOSED"
+                lead.automation_closed_at = datetime.now(timezone.utc)
+                lead.automation_closure_reason = "MAX_ATTEMPTS_REACHED"
+            return None
+
+        next_occ = current_occ + 1
+        new_due = date.today() + timedelta(days=days_between)
+
+        # Update lead current_attempt
+        lead.current_attempt = current_occ
+
+        return Decision(
+            action="CREATE",
+            enquiry_type="LEAD_FOLLOW_UP",
+            due_date=new_due,
+            priority="MEDIUM",
+            patient_id=completed_ge.patient_id,
+            lead_id=lead_id,
+            doctor_id=completed_ge.doctor_id,
+            trigger_event="LEAD_FOLLOW_UP_COMPLETED",
+            description=f"Lead follow-up #{next_occ} for lead",
+            is_recurring=True,
+            occurrence_number=next_occ,
+            total_attempts=max_attempts,
+            recurrence_interval_days=days_between,
+        )
+
+    async def _rule_lead_not_interested(
+        self, db: AsyncSession, hospital_id: str, payload: dict
+    ) -> Optional["Decision"]:
+        """Rule: Cancel all pending LEAD_FOLLOW_UP when lead is closed (NOT_INTERESTED, LOST, NO_RESPONSE)."""
+        from app.crm.services.event_dispatcher import Decision
+
+        lead_id = payload.get("lead_id") or payload.get("entity_id")
+        if not lead_id:
+            return None
+
+        status = payload.get("status", "NOT_INTERESTED")
+        # Determine closure reason from lead status
+        if status in ("LOST", "NO_RESPONSE"):
+            reason = status
+            trigger = "LEAD_LOST"
+        else:
+            reason = "NOT_INTERESTED"
+            trigger = "LEAD_NOT_INTERESTED"
+
+        await self._stop_lead_automation(db, lead_id, reason)
+
+        return Decision(
+            action="CANCEL",
+            cancel_enquiry_types=["LEAD_FOLLOW_UP"],
+            cancel_reason=reason,
+            lead_id=lead_id,
+            trigger_event=trigger,
         )
 
     async def _rule_patient_inactive(
@@ -949,6 +1073,41 @@ class RuleEngine:
     # ============================================================
     # Helper Methods
     # ============================================================
+
+    async def _stop_lead_automation(
+        self, db: AsyncSession, lead_id: str, reason: str
+    ):
+        """Stop all automation for a lead: set status to STOPPED and cancel pending enquiries."""
+        from app.models.lead import Lead
+        from app.models.generated_enquiry import GeneratedEnquiry
+        from datetime import datetime, timezone
+
+        lead = await db.get(Lead, lead_id)
+        if lead:
+            lead.automation_status = "STOPPED"
+            lead.automation_closed_at = datetime.now(timezone.utc)
+            lead.automation_closure_reason = reason
+
+        # Cancel all pending LEAD_FOLLOW_UP enquiries for this lead
+        result = await db.execute(
+            select(GeneratedEnquiry).where(
+                and_(
+                    GeneratedEnquiry.lead_id == lead_id,
+                    GeneratedEnquiry.enquiry_type == "LEAD_FOLLOW_UP",
+                    GeneratedEnquiry.status == "PENDING",
+                )
+            )
+        )
+        now = datetime.now(timezone.utc)
+        count = 0
+        for ge in result.scalars().all():
+            ge.status = "CANCELLED"
+            ge.cancelled_by_event = reason
+            ge.cancelled_at = now
+            count += 1
+        if count:
+            await db.flush()
+            logger.info("LEAD_AUTOMATION_STOPPED: lead=%s reason=%s cancelled=%d", lead_id, reason, count)
 
     async def _has_future_appointment(self, db: AsyncSession, patient_id: str) -> bool:
         """Check if patient has a future SCHEDULED appointment."""

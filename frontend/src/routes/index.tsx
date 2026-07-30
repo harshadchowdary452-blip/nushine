@@ -5,7 +5,7 @@ import { lazy, Suspense } from "react";
 import type { ReactElement } from "react";
 import { useAuthStore } from "@/store/authStore";
 import type { Role } from "@/types";
-import AppLayout from "@/components/layout/app-layout";
+import { EnterpriseAppLayout } from "@/design-system";
 
 const Login = lazy(() => import("@/pages/auth/login"));
 const SuperAdminDashboard = lazy(() => import("@/pages/dashboard/super-admin"));
@@ -87,13 +87,13 @@ function ProtectedLayout() {
   const isAuthenticated = !!user && !!accessToken && !!refreshToken;
   if (!isAuthenticated) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   return (
-    <AppLayout>
+    <EnterpriseAppLayout>
       <Suspense fallback={<PageLoader />}>
         <AnimatePresence mode="wait">
           <Outlet key={location.pathname} />
         </AnimatePresence>
       </Suspense>
-    </AppLayout>
+    </EnterpriseAppLayout>
   );
 }
 

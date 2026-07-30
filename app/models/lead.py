@@ -75,6 +75,14 @@ class Lead(Base):
     next_follow_up_date: Mapped[date] = mapped_column(Date, nullable=True)
     priority: Mapped[str] = mapped_column(String(20), default="MEDIUM", nullable=False)
 
+    # --- Automation tracking ---
+    automation_status: Mapped[str] = mapped_column(String(20), default="ACTIVE", nullable=False)
+    current_attempt: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    total_attempts: Mapped[int] = mapped_column(Integer, nullable=True)
+    automation_closed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    automation_closed_by: Mapped[str] = mapped_column(String(36), nullable=True)
+    automation_closure_reason: Mapped[str] = mapped_column(String(50), nullable=True)
+
     # --- Synced feedback summary (updated by FeedbackService) ---
     latest_response_status: Mapped[str] = mapped_column(String(30), nullable=True)
     latest_feedback_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -85,7 +93,7 @@ class Lead(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
-    hospital = relationship("Hospital", backref="leads")
+    hospital = relationship("Hospital", backref="leads", lazy="selectin")
     assigned_staff = relationship("User", foreign_keys=[assigned_staff_id])
     assigned_doctor = relationship("User", foreign_keys=[assigned_doctor_id])
     converted_patient = relationship("Patient", backref="lead_source_link")
@@ -97,15 +105,22 @@ class LeadCommunication(Base):
     lead_id: Mapped[str] = mapped_column(String(36), ForeignKey("leads.id"), nullable=False)
     hospital_id: Mapped[str] = mapped_column(String(36), ForeignKey("hospitals.id"), nullable=True)
     sent_by: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
+    sent_by_name: Mapped[str] = mapped_column(String(255), nullable=True)
     channel: Mapped[str] = mapped_column(String(20), nullable=False, default="WHATSAPP")
     message_type: Mapped[str] = mapped_column(String(40), nullable=False, default="GENERAL")
+    template_name: Mapped[str] = mapped_column(String(255), nullable=True)
     message: Mapped[str] = mapped_column(Text, nullable=False)
+    message_preview: Mapped[str] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="PENDING")
+    delivery_status: Mapped[str] = mapped_column(String(20), nullable=True)
+    provider_message_id: Mapped[str] = mapped_column(String(255), nullable=True)
     provider_response: Mapped[str] = mapped_column(Text, nullable=True)
+    direction: Mapped[str] = mapped_column(String(20), nullable=False, default="OUTGOING")
     sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     lead = relationship("Lead", backref="communications")
+    sender = relationship("User", foreign_keys=[sent_by], lazy="select")
 
 
 class LeadCall(Base):

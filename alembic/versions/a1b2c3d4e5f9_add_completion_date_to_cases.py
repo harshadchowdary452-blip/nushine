@@ -1,6 +1,6 @@
 """add_completion_date_to_cases
 
-Revision ID: a1b2c3d4e5f6
+Revision ID: a1b2c3d4e5f9
 Revises: f5e8c2d1a4b9
 Create Date: 2026-06-11 13:45:00.000000
 
@@ -10,7 +10,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = 'a1b2c3d4e5f6'
+revision: str = 'a1b2c3d4e5f9'
 down_revision: Union[str, None] = 'f5e8c2d1a4b9'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

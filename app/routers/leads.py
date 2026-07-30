@@ -172,15 +172,29 @@ async def update_lead_status(lead_id: str, data: LeadStatusUpdate, db: AsyncSess
     try:
         from app.crm.services.event_dispatcher import publish_event
         from app.crm.enums import EventType, EventSource
-        if result and result.status in ("LOST", "NOT_INTERESTED", "NO_RESPONSE"):
-            await publish_event(
-                event_type=EventType.LEAD_LOST,
-                source_module=EventSource.LEAD,
-                entity_type="LEAD",
-                entity_id=lead_id,
-                hospital_id=getattr(result, 'hospital_id', None),
-                db=db,
-            )
+        if result:
+            if result.status == "NOT_INTERESTED":
+                await publish_event(
+                    event_type=EventType.LEAD_NOT_INTERESTED,
+                    source_module=EventSource.LEAD,
+                    entity_type="LEAD",
+                    entity_id=lead_id,
+                    hospital_id=getattr(result, 'hospital_id', None),
+                    lead_id=lead_id,
+                    payload={"status": result.status, "lead_id": lead_id},
+                    db=db,
+                )
+            elif result.status in ("LOST", "NO_RESPONSE"):
+                await publish_event(
+                    event_type=EventType.LEAD_LOST,
+                    source_module=EventSource.LEAD,
+                    entity_type="LEAD",
+                    entity_id=lead_id,
+                    hospital_id=getattr(result, 'hospital_id', None),
+                    lead_id=lead_id,
+                    payload={"status": result.status, "lead_id": lead_id},
+                    db=db,
+                )
     except Exception:
         pass
     return result
@@ -214,7 +228,12 @@ async def add_lead_communication(lead_id: str, data: LeadCommunicationCreate, db
     verify_permission(current_user, Permission.MANAGE_LEADS)
     service = LeadService(db)
     lead = await _verify_lead_access(service, lead_id, current_user)
-    result = await service.add_communication(lead_id, data.model_dump(), user_id=current_user.get("sub"))
+    result = await service.add_communication(
+        lead_id, data.model_dump(exclude_none=True),
+        user_id=current_user.get("sub"),
+        user_name=current_user.get("full_name") or current_user.get("username"),
+    )
+    await db.refresh(lead)
     if lead.converted_patient_id:
         await record_timeline_event(
             db, current_user=current_user, patient_id=lead.converted_patient_id,
@@ -297,6 +316,36 @@ async def convert_lead(lead_id: str, data: LeadConvertCreate, db: AsyncSession =
         )
     except Exception:
         pass
+    # Send welcome message on conversion
+    if lead:
+        try:
+            hospital_name = lead.hospital.name if lead.hospital else "Our Hospital"
+            patient_name = result.get("patient_name") or lead.lead_name
+            welcome_msg = (
+                f"Hello {patient_name},\n\n"
+                f"Welcome to {hospital_name}.\n\n"
+                f"Your registration has been successfully completed and your enquiry "
+                f"has now been converted into a patient profile.\n\n"
+                f"Our team will guide you through every step of your treatment journey. "
+                f"You can contact us anytime if you require assistance.\n\n"
+                f"Thank you for choosing {hospital_name}.\n\n"
+                f"We look forward to providing you with exceptional dental care.\n\n"
+                f"Warm Regards,\n"
+                f"{hospital_name}\n"
+                f"Patient Care Team"
+            )
+            await service.add_communication(
+                lead_id=lead_id,
+                data={
+                    "channel": "WHATSAPP",
+                    "message": welcome_msg,
+                    "template_name": "LEAD_CONVERSION",
+                },
+                user_id=current_user.get("sub"),
+                user_name=current_user.get("full_name") or current_user.get("username"),
+            )
+        except Exception:
+            pass
     return result
 
 

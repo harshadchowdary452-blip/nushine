@@ -38,6 +38,8 @@ SUPPORTED_EVENTS = {
     "FOLLOWUP_COMPLETED", "CAMPAIGN_COMPLETED",
     "ENQUIRY_CREATED", "ENQUIRY_CONVERTED",
     "RECALL_COMPLETED",
+    "LEAD_FOLLOW_UP_COMPLETED",
+    "LEAD_NOT_INTERESTED",
 }
 
 
@@ -94,9 +96,10 @@ class Decision:
     # For CANCEL action
     cancel_enquiry_types: Optional[list[str]] = None
     cancel_reason: Optional[str] = None
-    # Recurrence fields (RECALL only)
+    # Recurrence fields (RECALL + LEAD_FOLLOW_UP)
     is_recurring: bool = False
     occurrence_number: int = 1
+    total_attempts: Optional[int] = None
     recurrence_interval_days: Optional[int] = None
     chain_id: Optional[str] = None
 

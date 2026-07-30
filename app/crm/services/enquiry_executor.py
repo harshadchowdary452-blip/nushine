@@ -317,6 +317,7 @@ class EnquiryExecutor:
             generation_reason=f"Rule Engine Decision | Event: {decision.trigger_event}",
             is_recurring=getattr(decision, 'is_recurring', False),
             occurrence_number=getattr(decision, 'occurrence_number', 1),
+            total_attempts=getattr(decision, 'total_attempts', None),
             recurrence_interval_days=getattr(decision, 'recurrence_interval_days', None),
             chain_id=None,
         )

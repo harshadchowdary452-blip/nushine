@@ -1,41 +1,51 @@
-import { useState, useMemo } from "react"
-import { useNavigate } from "react-router-dom"
+import { useState, useMemo, useCallback } from "react"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
-import { Plus, Search, Eye, Phone, MessageSquare, Users, UserPlus, Calendar, MoreHorizontal, Star, ArrowUpDown, Target, UserCog } from "lucide-react"
 import { format } from "date-fns"
+import {
+  Plus, Search, Eye, Phone, MessageSquare, Calendar, MoreHorizontal,
+  Star, ArrowUpDown, UserCog, Columns, Trash2,
+  Target, RefreshCw, Clock,
+  ChevronLeft, ChevronRight, Users, SlidersHorizontal, X,
+} from "lucide-react"
 import PageHeader from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { NumericInput } from "@/components/ui/numeric-input"
-
+import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent } from "@/components/ui/card"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { leadsApi, usersApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
+import { leadsApi, usersApi } from "@/services/endpoints"
 import DentalEmptyState from "@/components/ui/dental-empty-state"
 import QuickExport from "@/components/ui/quick-export"
+
 import type { Lead, LeadSource, LeadStatus } from "@/types"
 
 const priorityColors: Record<string, string> = {
-  HIGH: "text-red-600 bg-red-50",
-  MEDIUM: "text-amber-600 bg-amber-50",
-  LOW: "text-green-600 bg-green-50",
+  HIGH: "text-red-600 bg-red-50 border-red-200",
+  MEDIUM: "text-amber-600 bg-amber-50 border-amber-200",
+  LOW: "text-green-600 bg-green-50 border-green-200",
 }
 
 const statusColors: Record<string, string> = {
   NEW: "bg-blue-50 text-blue-700 ring-blue-600/20",
   CONTACTED: "bg-purple-50 text-purple-700 ring-purple-600/20",
-  INTERESTED: "bg-cyan-50 text-cyan-700 ring-cyan-600/20",
+  INTERESTED: "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
   FOLLOW_UP_REQUIRED: "bg-amber-50 text-amber-700 ring-amber-600/20",
   APPOINTMENT_BOOKED: "bg-indigo-50 text-indigo-700 ring-indigo-600/20",
   VISITED: "bg-teal-50 text-teal-700 ring-teal-600/20",
@@ -56,17 +66,49 @@ const statusOptions: LeadStatus[] = [
   "VISITED", "CONVERTED", "LOST", "NOT_INTERESTED", "NO_RESPONSE",
 ]
 
+const columnOptions = [
+  { key: "lead_name", label: "Lead Name", default: true },
+  { key: "contact", label: "Contact", default: true },
+  { key: "source", label: "Source", default: true },
+  { key: "treatment", label: "Treatment", default: true },
+  { key: "priority", label: "Priority", default: true },
+  { key: "status", label: "Status", default: true },
+  { key: "assigned", label: "Assigned To", default: true },
+  { key: "next_follow_up", label: "Next Follow-up", default: true },
+  { key: "score", label: "Score", default: false },
+  { key: "budget", label: "Budget", default: false },
+  { key: "city", label: "City", default: false },
+  { key: "created", label: "Created Date", default: false },
+  { key: "last_contacted", label: "Last Contacted", default: false },
+]
+
 export default function LeadList() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
   const { addToast } = useToast()
 
+  const statusFromUrl = searchParams.get("status") || ""
+  const sourceFromUrl = searchParams.get("source") || ""
+
   const [search, setSearch] = useState("")
-  const [statusFilter, setStatusFilter] = useState("")
-  const [sourceFilter, setSourceFilter] = useState("")
+  const [statusFilter, setStatusFilter] = useState(statusFromUrl)
+  const [sourceFilter, setSourceFilter] = useState(sourceFromUrl)
   const [sortField, setSortField] = useState<string>("created_at")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+  const [visibleColumns, setVisibleColumns] = useState(columnOptions.filter((c) => c.default).map((c) => c.key))
+  const [showColumnChooser, setShowColumnChooser] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+  const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set())
+  const [selectAll, setSelectAll] = useState(false)
+
   const [createOpen, setCreateOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [leadToDelete, setLeadToDelete] = useState<string | null>(null)
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+
   const [leadName, setLeadName] = useState("")
   const [mobile, setMobile] = useState("")
   const [alternateMobile, setAlternateMobile] = useState("")
@@ -81,8 +123,14 @@ export default function LeadList() {
   const [notes, setNotes] = useState("")
 
   const { data: leads, isLoading } = useQuery({
-    queryKey: ["leads", statusFilter, sourceFilter],
-    queryFn: () => leadsApi.list({ status: statusFilter || undefined, source: sourceFilter || undefined }),
+    queryKey: ["leads", statusFilter, sourceFilter, page, pageSize],
+    queryFn: () => leadsApi.list({ status: statusFilter || undefined, source: sourceFilter || undefined, page, page_size: pageSize }),
+  })
+
+  const { data: analytics } = useQuery({
+    queryKey: ["lead-analytics-summary"],
+    queryFn: () => leadsApi.analytics(),
+    staleTime: 30000,
   })
 
   const { data: usersData } = useQuery({
@@ -100,26 +148,27 @@ export default function LeadList() {
     return map
   }, [usersData])
 
-  const createMutation = useMutation({
-    mutationFn: (data: Record<string, unknown>) => leadsApi.create(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leads"] })
-      addToast({ title: "Lead Created", variant: "success" })
-      setCreateOpen(false); resetForm()
-    },
-    onError: () => addToast({ title: "Error", description: "Failed to create lead", variant: "destructive" }),
-  })
+  const leadsList: Lead[] = useMemo(() => {
+    const items: Lead[] = Array.isArray(leads) ? leads : leads?.items || []
+    return items
+  }, [leads])
+
+  const totalLeads = useMemo(() => {
+    if (Array.isArray(leads)) return leads.length
+    return (leads as Record<string, unknown>)?.total as number || 0
+  }, [leads])
 
   const filtered = useMemo(() => {
-    const items: Lead[] = Array.isArray(leads) ? leads : []
-    let result = items
+    let result = leadsList
     if (search) {
       const q = search.toLowerCase()
       result = result.filter((l) =>
         l.lead_name.toLowerCase().includes(q) ||
         l.mobile.includes(q) ||
         (l.email && l.email.toLowerCase().includes(q)) ||
-        (l.city && l.city.toLowerCase().includes(q))
+        (l.city && l.city.toLowerCase().includes(q)) ||
+        (l.interested_treatment && l.interested_treatment.toLowerCase().includes(q)) ||
+        (l.source && l.source.toLowerCase().includes(q))
       )
     }
     result.sort((a, b) => {
@@ -128,11 +177,51 @@ export default function LeadList() {
       else if (sortField === "created_at") cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       else if (sortField === "lead_score") cmp = (a.lead_score ?? 0) - (b.lead_score ?? 0)
       else if (sortField === "next_follow_up_date") cmp = (a.next_follow_up_date || "").localeCompare(b.next_follow_up_date || "")
+      else if (sortField === "budget") cmp = (a.budget ?? 0) - (b.budget ?? 0)
       else cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       return sortDir === "desc" ? -cmp : cmp
     })
     return result
-  }, [leads, search, sortField, sortDir])
+  }, [leadsList, search, sortField, sortDir])
+
+  const createMutation = useMutation({
+    mutationFn: (data: Record<string, unknown>) => leadsApi.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["leads"] })
+      queryClient.invalidateQueries({ queryKey: ["lead-analytics"] })
+      addToast({ title: "Lead Created", variant: "success" })
+      setCreateOpen(false)
+      resetForm()
+    },
+    onError: () => addToast({ title: "Error", description: "Failed to create lead", variant: "destructive" }),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => leadsApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["leads"] })
+      queryClient.invalidateQueries({ queryKey: ["lead-analytics"] })
+      addToast({ title: "Lead deleted", variant: "success" })
+      setDeleteOpen(false)
+      setLeadToDelete(null)
+    },
+    onError: () => addToast({ title: "Error", description: "Failed to delete lead", variant: "destructive" }),
+  })
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await Promise.all(ids.map((id) => leadsApi.delete(id)))
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["leads"] })
+      queryClient.invalidateQueries({ queryKey: ["lead-analytics"] })
+      addToast({ title: `${selectedLeads.size} leads deleted`, variant: "success" })
+      setBulkDeleteOpen(false)
+      setSelectedLeads(new Set())
+      setSelectAll(false)
+    },
+    onError: () => addToast({ title: "Error", description: "Failed to delete some leads", variant: "destructive" }),
+  })
 
   function resetForm() {
     setLeadName(""); setMobile(""); setAlternateMobile(""); setEmail("")
@@ -161,225 +250,632 @@ export default function LeadList() {
     else { setSortField(field); setSortDir("desc") }
   }
 
+  function toggleSelectAll() {
+    if (selectAll) {
+      setSelectedLeads(new Set())
+      setSelectAll(false)
+    } else {
+      setSelectedLeads(new Set(filtered.map((l) => l.id)))
+      setSelectAll(true)
+    }
+  }
+
+  function toggleSelect(id: string) {
+    const next = new Set(selectedLeads)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    setSelectedLeads(next)
+    setSelectAll(next.size === filtered.length && filtered.length > 0)
+  }
+
+  const handleCall = useCallback((lead: Lead) => {
+    if (lead.mobile) {
+      window.location.href = `tel:${lead.mobile}`
+    }
+  }, [])
+
+  const handleWhatsApp = useCallback((lead: Lead) => {
+    if (lead.mobile) {
+      const phone = lead.mobile.replace(/[^0-9]/g, "")
+      const hospitalName = lead.hospital_name || "our dental clinic"
+      const msg =
+        `Hello ${lead.lead_name},\n\n` +
+        `Thank you for contacting ${hospitalName}.\n\n` +
+        `We appreciate your interest in our dental services. Our team has received your enquiry regarding **${lead.interested_treatment || "dental treatment"}**.\n\n` +
+        `One of our patient care executives will contact you shortly to understand your requirements and assist you in planning your visit.\n\n` +
+        `We look forward to welcoming you to ${hospitalName} and providing you with the highest standard of dental care.\n\n` +
+        `Warm Regards,\n${hospitalName}\nPatient Care Team`
+      const encodedMsg = encodeURIComponent(msg)
+      leadsApi.addCommunication(lead.id, {
+        channel: "WHATSAPP",
+        message: msg,
+        template_name: "GREETING",
+      }).catch(() => {}).finally(() => {
+        window.open(`https://wa.me/${phone}?text=${encodedMsg}`, "_blank")
+      })
+    }
+  }, [])
+
+  const SortHeader = ({ field, children }: { field: string; children: React.ReactNode }) => (
+    <th
+      className="text-left px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 transition-colors"
+      onClick={() => toggleSort(field)}
+    >
+      <div className="flex items-center gap-1">
+        {children}
+        <ArrowUpDown className={`h-3 w-3 ${sortField === field ? "text-[#0EA5E9]" : "text-gray-300"}`} />
+      </div>
+    </th>
+  )
+
+  const stats = (analytics as Record<string, unknown>) || {}
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
-      <PageHeader title="Leads" description="Manage incoming patient inquiries and leads">
+      <PageHeader
+        title="Lead Management"
+        description={`${filtered.length} leads${search ? " found" : ""}`}
+      >
+        <QuickExport module="leads" label="Export" />
         <Button onClick={() => setCreateOpen(true)}>
           <Plus className="h-4 w-4 mr-1.5" /> Add Lead
         </Button>
-        <QuickExport module="leads" label="leads" />
       </PageHeader>
 
+      <div className="grid grid-cols-4 sm:grid-cols-5 lg:grid-cols-8 xl:grid-cols-10 gap-2">
+        {[
+          { label: "Total", key: "total", color: "text-blue-600", bg: "bg-blue-50" },
+          { label: "New", key: "NEW", color: "text-blue-600", bg: "bg-blue-50" },
+          { label: "Interested", key: "INTERESTED", color: "text-emerald-600", bg: "bg-emerald-50" },
+          { label: "Follow-ups", key: "FOLLOW_UP_REQUIRED", color: "text-amber-600", bg: "bg-amber-50" },
+          { label: "Converted", key: "CONVERTED", color: "text-green-600", bg: "bg-green-50" },
+          { label: "Lost", key: "LOST", color: "text-red-600", bg: "bg-red-50" },
+        ].map((s) => {
+          const val = s.key === "total" ? (stats.total as number) ?? 0 : ((stats.by_status as Record<string, number>) || {})[s.key] ?? 0
+          return (
+            <button
+              key={s.key}
+              onClick={() => {
+                if (s.key !== "total") {
+                  setStatusFilter(s.key)
+                  setSearchParams(s.key === statusFromUrl ? {} : { status: s.key })
+                }
+              }}
+              className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all ${
+                statusFilter === s.key ? "border-blue-300 bg-blue-50 ring-1 ring-blue-200" : "border-gray-100 hover:border-gray-200 hover:bg-gray-50"
+              }`}
+            >
+              <span className={`text-lg font-bold ${s.color}`}>{val}</span>
+              <span className="text-[10px] text-gray-500 mt-0.5">{s.label}</span>
+            </button>
+          )
+        })}
+      </div>
+
       <Card>
-        <CardContent className="p-4 space-y-3">
-          <div className="flex flex-wrap gap-2">
-            <div className="relative flex-1 min-w-[200px]">
+        <CardContent className="p-3 space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[220px]">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
-              <Input placeholder="Search by name, phone, email, city..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8" />
+              <Input
+                placeholder="Search name, phone, email, treatment..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-8 h-9 text-sm"
+              />
+              {search && (
+                <button onClick={() => setSearch("")} className="absolute right-2 top-2.5 text-gray-400 hover:text-gray-600">
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
-            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v === "all" ? "" : v)}>
-              <SelectTrigger className="w-[160px]"><SelectValue placeholder="All Statuses" /></SelectTrigger>
+            <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v === "all" ? "" : v); setPage(1) }}>
+              <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Status" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
                 {statusOptions.map((s) => <SelectItem key={s} value={s}>{s.replace(/_/g, " ")}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Select value={sourceFilter} onValueChange={(v) => setSourceFilter(v === "all" ? "" : v)}>
-              <SelectTrigger className="w-[160px]"><SelectValue placeholder="All Sources" /></SelectTrigger>
+            <Select value={sourceFilter} onValueChange={(v) => { setSourceFilter(v === "all" ? "" : v); setPage(1) }}>
+              <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Source" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Sources</SelectItem>
                 {sourceOptions.map((s) => <SelectItem key={s} value={s}>{s.replace(/_/g, " ")}</SelectItem>)}
               </SelectContent>
             </Select>
+            <Button variant="outline" size="sm" className="h-9" onClick={() => setShowFilters(!showFilters)}>
+              <SlidersHorizontal className="h-3.5 w-3.5 mr-1" /> More
+            </Button>
+            <div className="relative">
+              <Button variant="outline" size="sm" className="h-9" onClick={() => setShowColumnChooser(!showColumnChooser)}>
+                <Columns className="h-3.5 w-3.5 mr-1" /> Columns
+              </Button>
+              {showColumnChooser && (
+                <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-2">
+                  <p className="text-xs font-medium text-gray-500 px-2 py-1">Toggle Columns</p>
+                  {columnOptions.map((col) => (
+                    <label key={col.key} className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer text-sm">
+                      <input
+                        type="checkbox"
+                        checked={visibleColumns.includes(col.key)}
+                        onChange={() => {
+                          setVisibleColumns((prev) =>
+                            prev.includes(col.key) ? prev.filter((k) => k !== col.key) : [...prev, col.key]
+                          )
+                        }}
+                        className="rounded border-gray-300"
+                      />
+                      {col.label}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+            {selectedLeads.size > 0 && (
+              <div className="flex items-center gap-2 ml-2 pl-2 border-l border-gray-200">
+                <span className="text-xs text-gray-500">{selectedLeads.size} selected</span>
+                <Button variant="outline" size="sm" className="h-8 text-red-600" onClick={() => { setBulkDeleteOpen(true) }}>
+                  <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
+                </Button>
+              </div>
+            )}
           </div>
+
+          {showFilters && (
+            <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500">Treatment:</span>
+                <Input placeholder="Filter by treatment" className="h-8 w-48 text-sm" />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500">Priority:</span>
+                <Select>
+                  <SelectTrigger className="h-8 w-32"><SelectValue placeholder="All" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="HIGH">High</SelectItem>
+                    <SelectItem value="MEDIUM">Medium</SelectItem>
+                    <SelectItem value="LOW">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500">Date Range:</span>
+                <Input type="date" className="h-8 w-36 text-sm" />
+                <span className="text-xs text-gray-400">to</span>
+                <Input type="date" className="h-8 w-36 text-sm" />
+              </div>
+              <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setShowFilters(false) }}>
+                <X className="h-3 w-3 mr-1" /> Close
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
       {isLoading ? (
         <div className="space-y-2">
-          {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-lg" />)}
+          <div className="flex items-center gap-4 p-3">
+            {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-4 flex-1" />)}
+          </div>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="h-14 w-full rounded-lg" />
+          ))}
         </div>
       ) : filtered.length === 0 ? (
         <DentalEmptyState
-          icon={UserPlus}
-          title="No leads yet"
-          description="Add your first lead to start tracking inquiries"
-          action={<Button onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4 mr-1.5" /> Add Lead</Button>}
+          icon={Users}
+          title={search || statusFilter || sourceFilter ? "No leads match your filters" : "No leads yet"}
+          description={search ? "Try a different search term" : "Add your first lead to start tracking inquiries"}
+          action={
+            !search && !statusFilter && !sourceFilter ? (
+              <Button onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4 mr-1.5" /> Add Lead</Button>
+            ) : undefined
+          }
         />
       ) : (
-        <div className="rounded-lg border border-gray-200 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider cursor-pointer select-none" onClick={() => toggleSort("lead_name")}>
-                  <div className="flex items-center gap-1">Lead Name <ArrowUpDown className="h-3 w-3" /></div>
-                </th>
-                <th className="text-left px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">Contact</th>
-                <th className="text-left px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">Source</th>
-                <th className="text-left px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">Treatment</th>
-                <th className="text-left px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">Priority</th>
-                <th className="text-left px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider cursor-pointer select-none" onClick={() => toggleSort("next_follow_up_date")}>
-                  <div className="flex items-center gap-1">Next Follow-up <ArrowUpDown className="h-3 w-3" /></div>
-                </th>
-                <th className="text-left px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider cursor-pointer select-none" onClick={() => toggleSort("lead_score")}>
-                  <div className="flex items-center gap-1">Score <ArrowUpDown className="h-3 w-3" /></div>
-                </th>
-                <th className="text-left px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">Status</th>
-                <th className="text-left px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">Assigned To</th>
-                <th className="text-right px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filtered.map((lead) => (
-                <tr key={lead.id} className="hover:bg-gray-50/50 transition-colors cursor-pointer" onClick={() => navigate(`/leads/${lead.id}`)}>
-                  <td className="px-3 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="h-8 w-8 rounded-full bg-[#E0F2FE] flex items-center justify-center shrink-0">
-                        <Users className="h-4 w-4 text-[#0EA5E9]" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900 truncate max-w-[160px]">{lead.lead_name}</p>
-                        <p className="text-xs text-gray-400">#{lead.id.slice(-6).toUpperCase()}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-3 py-3">
-                    <p className="text-gray-700">{lead.mobile}</p>
-                    {lead.email && <p className="text-xs text-gray-400 truncate max-w-[140px]">{lead.email}</p>}
-                  </td>
-                  <td className="px-3 py-3">
-                    <span className="text-xs text-gray-600 bg-gray-100 rounded px-1.5 py-0.5">{lead.source?.replace(/_/g, " ")}</span>
-                  </td>
-                  <td className="px-3 py-3">
-                    <span className="text-xs text-gray-600">{lead.interested_treatment || "—"}</span>
-                  </td>
-                  <td className="px-3 py-3">
-                    {lead.priority && (
-                      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium ${priorityColors[lead.priority] || priorityColors.MEDIUM}`}>
-                        <Star className="h-3 w-3" fill={lead.priority === "HIGH" ? "currentColor" : "none"} />
-                        {lead.priority}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-3">
-                    {lead.next_follow_up_date ? (
-                      <div className="flex items-center gap-1 text-xs">
-                        <Calendar className="h-3 w-3 text-gray-400" />
-                        <span className={new Date(lead.next_follow_up_date) < new Date() ? "text-red-600 font-medium" : "text-gray-600"}>
-                          {format(new Date(lead.next_follow_up_date), "dd MMM")}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-gray-400">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-3">
-                    <div className="flex items-center gap-1.5">
-                      <div className="h-1.5 w-12 bg-gray-200 rounded-full overflow-hidden">
-                        <div className="h-full bg-[#0EA5E9] rounded-full" style={{ width: `${Math.min((lead.lead_score ?? 0) / 100 * 100, 100)}%` }} />
-                      </div>
-                      <span className="text-xs font-medium text-gray-600">{lead.lead_score ?? 0}</span>
-                    </div>
-                  </td>
-                  <td className="px-3 py-3">
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${statusColors[lead.status] || statusColors.NEW}`}>
-                      {lead.status.replace(/_/g, " ")}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3">
-                    {lead.assigned_staff_id || lead.assigned_doctor_id ? (
-                      <div className="flex items-center gap-1.5 text-xs text-gray-600">
-                        <UserCog className="h-3 w-3 text-gray-400" />
-                        <span className="truncate max-w-[100px]">
-                          {lead.assigned_doctor_id ? (userMap[lead.assigned_doctor_id] || lead.assigned_doctor_id.slice(0, 8)) : (userMap[lead.assigned_staff_id!] || lead.assigned_staff_id?.slice(0, 8))}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-gray-400">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-3 text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                        <Button variant="ghost" size="icon-sm"><MoreHorizontal className="h-4 w-4" /></Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-44">
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/leads/${lead.id}`) }}>
-                          <Eye className="h-4 w-4 mr-2" /> View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/leads/${lead.id}`) }}>
-                          <Phone className="h-4 w-4 mr-2" /> Log Call
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/leads/${lead.id}`) }}>
-                          <MessageSquare className="h-4 w-4 mr-2" /> Send Message
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/leads/${lead.id}`) }}>
-                          <Calendar className="h-4 w-4 mr-2" /> Schedule Follow-up
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/leads/${lead.id}`) }}>
-                          <Calendar className="h-4 w-4 mr-2" /> Book Appointment
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        {lead.status !== "CONVERTED" && lead.status !== "LOST" && lead.status !== "NOT_INTERESTED" && lead.status !== "NO_RESPONSE" && (
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/leads/${lead.id}`) }}>
-                            <Target className="h-4 w-4 mr-2" /> Convert
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </td>
+        <div className="rounded-xl border border-gray-200 overflow-hidden bg-white">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="px-3 py-3 w-10">
+                    <input
+                      type="checkbox"
+                      checked={selectAll}
+                      onChange={toggleSelectAll}
+                      className="rounded border-gray-300"
+                    />
+                  </th>
+                  {visibleColumns.includes("lead_name") && (
+                    <SortHeader field="lead_name">Lead Name</SortHeader>
+                  )}
+                  {visibleColumns.includes("contact") && (
+                    <th className="text-left px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">Contact</th>
+                  )}
+                  {visibleColumns.includes("source") && (
+                    <th className="text-left px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">Source</th>
+                  )}
+                  {visibleColumns.includes("treatment") && (
+                    <th className="text-left px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">Treatment</th>
+                  )}
+                  {visibleColumns.includes("priority") && (
+                    <th className="text-left px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">Priority</th>
+                  )}
+                  {visibleColumns.includes("next_follow_up") && (
+                    <SortHeader field="next_follow_up_date">Follow-up</SortHeader>
+                  )}
+                  {visibleColumns.includes("score") && (
+                    <SortHeader field="lead_score">Score</SortHeader>
+                  )}
+                  {visibleColumns.includes("budget") && (
+                    <SortHeader field="budget">Budget</SortHeader>
+                  )}
+                  {visibleColumns.includes("city") && (
+                    <th className="text-left px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">City</th>
+                  )}
+                  {visibleColumns.includes("status") && (
+                    <th className="text-left px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">Status</th>
+                  )}
+                  {visibleColumns.includes("assigned") && (
+                    <th className="text-left px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">Assigned</th>
+                  )}
+                  {visibleColumns.includes("created") && (
+                    <SortHeader field="created_at">Created</SortHeader>
+                  )}
+                  {visibleColumns.includes("last_contacted") && (
+                    <th className="text-left px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">Last Contact</th>
+                  )}
+                  <th className="text-right px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider w-20">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filtered.map((lead) => (
+                  <tr
+                    key={lead.id}
+                    className={`hover:bg-gray-50/70 transition-colors cursor-pointer ${
+                      selectedLeads.has(lead.id) ? "bg-blue-50/40" : ""
+                    }`}
+                    onClick={() => navigate(`/leads/${lead.id}`)}
+                  >
+                    <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedLeads.has(lead.id)}
+                        onChange={() => toggleSelect(lead.id)}
+                        className="rounded border-gray-300"
+                      />
+                    </td>
+                    {visibleColumns.includes("lead_name") && (
+                      <td className="px-3 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center shrink-0">
+                            <Users className="h-4 w-4 text-blue-500" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-900 truncate max-w-[180px]">{lead.lead_name}</p>
+                            <p className="text-[11px] text-gray-400 font-mono">#{lead.id.slice(-6).toUpperCase()}</p>
+                          </div>
+                        </div>
+                      </td>
+                    )}
+                    {visibleColumns.includes("contact") && (
+                      <td className="px-3 py-3">
+                        <p className="text-gray-700 text-[13px]">{lead.mobile}</p>
+                        {lead.email && <p className="text-[11px] text-gray-400 truncate max-w-[150px]">{lead.email}</p>}
+                      </td>
+                    )}
+                    {visibleColumns.includes("source") && (
+                      <td className="px-3 py-3">
+                        <Badge variant="outline" className="text-[11px]">
+                          {lead.source?.replace(/_/g, " ")}
+                        </Badge>
+                      </td>
+                    )}
+                    {visibleColumns.includes("treatment") && (
+                      <td className="px-3 py-3">
+                        <span className="text-[13px] text-gray-600">{lead.interested_treatment || "—"}</span>
+                      </td>
+                    )}
+                    {visibleColumns.includes("priority") && (
+                      <td className="px-3 py-3">
+                        {lead.priority && (
+                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium border ${priorityColors[lead.priority] || priorityColors.MEDIUM}`}>
+                            <Star className="h-2.5 w-2.5" fill={lead.priority === "HIGH" ? "currentColor" : "none"} />
+                            {lead.priority}
+                          </span>
+                        )}
+                      </td>
+                    )}
+                    {visibleColumns.includes("next_follow_up") && (
+                      <td className="px-3 py-3">
+                        {lead.next_follow_up_date ? (
+                          <div className="flex items-center gap-1 text-[12px]">
+                            <Clock className="h-3 w-3 text-gray-400" />
+                            <span className={new Date(lead.next_follow_up_date) < new Date() ? "text-red-600 font-medium" : "text-gray-600"}>
+                              {format(new Date(lead.next_follow_up_date), "dd MMM")}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-[12px] text-gray-400">—</span>
+                        )}
+                      </td>
+                    )}
+                    {visibleColumns.includes("score") && (
+                      <td className="px-3 py-3">
+                        <div className="flex items-center gap-1.5">
+                          <div className="h-1.5 w-12 bg-gray-200 rounded-full overflow-hidden">
+                            <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min((lead.lead_score ?? 0), 100)}%` }} />
+                          </div>
+                          <span className="text-[11px] font-medium text-gray-600">{lead.lead_score ?? 0}</span>
+                        </div>
+                      </td>
+                    )}
+                    {visibleColumns.includes("budget") && (
+                      <td className="px-3 py-3 text-[13px] text-gray-700">
+                        {lead.budget ? `₹${lead.budget.toLocaleString()}` : "—"}
+                      </td>
+                    )}
+                    {visibleColumns.includes("city") && (
+                      <td className="px-3 py-3 text-[13px] text-gray-600">{lead.city || "—"}</td>
+                    )}
+                    {visibleColumns.includes("status") && (
+                      <td className="px-3 py-3">
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${statusColors[lead.status] || statusColors.NEW}`}>
+                          {lead.status.replace(/_/g, " ")}
+                        </span>
+                      </td>
+                    )}
+                    {visibleColumns.includes("assigned") && (
+                      <td className="px-3 py-3">
+                        {lead.assigned_staff_id || lead.assigned_doctor_id ? (
+                          <div className="flex items-center gap-1 text-[12px] text-gray-600">
+                            <UserCog className="h-3 w-3 text-gray-400" />
+                            <span className="truncate max-w-[100px]">
+                              {lead.assigned_doctor_id
+                                ? (userMap[lead.assigned_doctor_id] || lead.assigned_doctor_id.slice(0, 8))
+                                : (lead.assigned_staff_id ? (userMap[lead.assigned_staff_id] || lead.assigned_staff_id.slice(0, 8)) : "—")}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-[12px] text-gray-400">—</span>
+                        )}
+                      </td>
+                    )}
+                    {visibleColumns.includes("created") && (
+                      <td className="px-3 py-3 text-[12px] text-gray-500">
+                        {format(new Date(lead.created_at), "dd MMM yy")}
+                      </td>
+                    )}
+                    {visibleColumns.includes("last_contacted") && (
+                      <td className="px-3 py-3 text-[12px] text-gray-500">
+                        {lead.last_contacted_at ? format(new Date(lead.last_contacted_at), "dd MMM") : "—"}
+                      </td>
+                    )}
+                    <td className="px-3 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon-sm"><MoreHorizontal className="h-4 w-4" /></Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-52 bg-white shadow-lg border-gray-200">
+                          <DropdownMenuItem onClick={() => navigate(`/leads/${lead.id}`)} className="cursor-pointer">
+                            <Eye className="h-4 w-4 mr-2.5 text-gray-500" /> View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator className="bg-gray-100" />
+                          <DropdownMenuItem onClick={() => handleCall(lead)} className="cursor-pointer">
+                            <Phone className="h-4 w-4 mr-2.5 text-gray-500" /> Call
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleWhatsApp(lead)} className="cursor-pointer">
+                            <MessageSquare className="h-4 w-4 mr-2.5 text-gray-500" /> WhatsApp
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator className="bg-gray-100" />
+                          <DropdownMenuItem onClick={() => navigate(`/leads/${lead.id}`)} className="cursor-pointer">
+                            <Calendar className="h-4 w-4 mr-2.5 text-gray-500" /> Schedule Follow-up
+                          </DropdownMenuItem>
+                          {lead.status !== "CONVERTED" && lead.status !== "LOST" && lead.status !== "NOT_INTERESTED" && lead.status !== "NO_RESPONSE" && (
+                            <DropdownMenuItem onClick={() => navigate(`/leads/${lead.id}`)} className="cursor-pointer">
+                              <Target className="h-4 w-4 mr-2.5 text-gray-500" /> Convert to Patient
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuSeparator className="bg-gray-100" />
+                          <DropdownMenuItem
+                            className="text-red-600 cursor-pointer focus:text-red-700 focus:bg-red-50"
+                            onClick={() => { setLeadToDelete(lead.id); setDeleteOpen(true) }}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2.5" /> Delete Lead
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50/50">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">
+                Showing {filtered.length} of {totalLeads} leads
+              </span>
+              <Select value={pageSize.toString()} onValueChange={(v) => { setPageSize(parseInt(v)); setPage(1) }}>
+                <SelectTrigger className="h-7 w-16 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="25">25</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="icon-sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-xs text-gray-600 px-2">Page {page}</span>
+              <Button variant="outline" size="icon-sm" disabled={page * pageSize >= totalLeads} onClick={() => setPage(page + 1)}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>New Lead</DialogTitle>
-            <DialogDescription>Enter the lead details below</DialogDescription>
+        <DialogContent className="sm:max-w-xl max-h-[90vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-6 py-5 border-b border-gray-100 shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center">
+                <Users className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <DialogTitle>Create New Lead</DialogTitle>
+                <DialogDescription>Enter lead details to start tracking a new patient inquiry</DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-3 py-2">
-            <div className="col-span-2"><Label>Lead Name *</Label><Input value={leadName} onChange={(e) => setLeadName(e.target.value)} placeholder="Full name" /></div>
-            <div><Label>Mobile *</Label><Input value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="Phone number" /></div>
-            <div><Label>Alternate Mobile</Label><Input value={alternateMobile} onChange={(e) => setAlternateMobile(e.target.value)} placeholder="Alt phone" /></div>
-            <div className="col-span-2"><Label>Email</Label><Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email address" /></div>
-            <div><Label>Age</Label><NumericInput mode="integer" min={0} max={150} value={age} onChange={(v) => setAge(v)} placeholder="Age" /></div>
-            <div><Label>Gender</Label>
-              <Select value={gender} onValueChange={setGender}>
-                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="MALE">Male</SelectItem>
-                  <SelectItem value="FEMALE">Female</SelectItem>
-                  <SelectItem value="OTHER">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div><Label>City</Label><Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" /></div>
-            <div><Label>Source</Label>
-              <Select value={source} onValueChange={setSource}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {sourceOptions.map((s) => <SelectItem key={s} value={s}>{s.replace(/_/g, " ")}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div><Label>Interested Treatment</Label><Input value={interestedTreatment} onChange={(e) => setInterestedTreatment(e.target.value)} placeholder="e.g. Root Canal" /></div>
-            <div><Label>Budget (if known)</Label><NumericInput mode="currency" prefix="₹" value={budget} onChange={(v) => setBudget(v)} placeholder="Amount" /></div>
-            <div className="col-span-2"><Label>Preferred Visit Date</Label><Input type="date" value={preferredVisitDate} onChange={(e) => setPreferredVisitDate(e.target.value)} /></div>
-            <div className="col-span-2"><Label>Notes</Label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Additional notes..." rows={3} /></div>
+          <div className="overflow-y-auto px-6 py-4 space-y-6 flex-1">
+            <section>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-0.5 w-5 bg-blue-500 rounded-full" />
+                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Basic Information</h4>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <Label className="text-xs font-medium text-gray-600">Lead Name <span className="text-red-500">*</span></Label>
+                  <Input value={leadName} onChange={(e) => setLeadName(e.target.value)} placeholder="Full name" className="mt-1" />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-gray-600">Age</Label>
+                  <NumericInput mode="integer" min={0} max={150} value={age} onChange={(v) => setAge(v)} placeholder="Age" className="mt-1" />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-gray-600">Gender</Label>
+                  <Select value={gender} onValueChange={setGender}>
+                    <SelectTrigger className="mt-1"><SelectValue placeholder="Select" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="MALE">Male</SelectItem>
+                      <SelectItem value="FEMALE">Female</SelectItem>
+                      <SelectItem value="OTHER">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-gray-600">City</Label>
+                  <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" className="mt-1" />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-gray-600">Source <span className="text-red-500">*</span></Label>
+                  <Select value={source} onValueChange={setSource}>
+                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {sourceOptions.map((s) => <SelectItem key={s} value={s}>{s.replace(/_/g, " ")}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </section>
+            <section>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-0.5 w-5 bg-purple-500 rounded-full" />
+                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Contact Information</h4>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs font-medium text-gray-600">Mobile <span className="text-red-500">*</span></Label>
+                  <Input value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="Phone number" className="mt-1" />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-gray-600">Alternate Mobile</Label>
+                  <Input value={alternateMobile} onChange={(e) => setAlternateMobile(e.target.value)} placeholder="Alt phone" className="mt-1" />
+                </div>
+                <div className="col-span-2">
+                  <Label className="text-xs font-medium text-gray-600">Email</Label>
+                  <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email address" className="mt-1" />
+                </div>
+              </div>
+            </section>
+            <section>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-0.5 w-5 bg-emerald-500 rounded-full" />
+                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Lead Details</h4>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <Label className="text-xs font-medium text-gray-600">Interested Treatment</Label>
+                  <Input value={interestedTreatment} onChange={(e) => setInterestedTreatment(e.target.value)} placeholder="e.g. Root Canal Treatment" className="mt-1" />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-gray-600">Budget</Label>
+                  <NumericInput mode="currency" prefix="₹" value={budget} onChange={(v) => setBudget(v)} placeholder="Amount" className="mt-1" />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-gray-600">Preferred Visit Date</Label>
+                  <Input type="date" value={preferredVisitDate} onChange={(e) => setPreferredVisitDate(e.target.value)} className="mt-1" />
+                </div>
+                <div className="col-span-2">
+                  <Label className="text-xs font-medium text-gray-600">Notes</Label>
+                  <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Additional notes..." rows={3} className="mt-1" />
+                </div>
+              </div>
+            </section>
           </div>
-          <DialogFooter>
+          <DialogFooter className="px-6 py-4 border-t border-gray-100 shrink-0 bg-white">
             <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
             <Button onClick={handleCreate} disabled={createMutation.isPending}>
-              {createMutation.isPending ? "Creating..." : "Create Lead"}
+              {createMutation.isPending ? (
+                <><RefreshCw className="h-4 w-4 mr-1.5 animate-spin" /> Creating...</>
+              ) : (
+                <><Plus className="h-4 w-4 mr-1.5" /> Create Lead</>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Lead</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this lead? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => leadToDelete && deleteMutation.mutate(leadToDelete)}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedLeads.size} Leads</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {selectedLeads.size} selected leads? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => bulkDeleteMutation.mutate(Array.from(selectedLeads))}
+              disabled={bulkDeleteMutation.isPending}
+            >
+              {bulkDeleteMutation.isPending ? "Deleting..." : `Delete ${selectedLeads.size} Leads`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </motion.div>
   )
 }

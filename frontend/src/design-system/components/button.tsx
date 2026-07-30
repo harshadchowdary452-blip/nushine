@@ -1,0 +1,53 @@
+import * as React from "react"
+import { Slot } from "@radix-ui/react-slot"
+import { cva, type VariantProps } from "class-variance-authority"
+import { cn } from "@/lib/utils"
+
+const buttonVariants = cva(
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap transition-all duration-[var(--ds-transition-base)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-primary)]/30 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 select-none font-[var(--ds-text-button)]",
+  {
+    variants: {
+      variant: {
+        primary:
+          "bg-[var(--ds-primary)] text-white shadow-sm hover:bg-[var(--ds-primary-hover)] active:bg-[var(--ds-primary-active)] active:scale-[0.98]",
+        secondary:
+          "bg-[var(--ds-surface-secondary)] text-[var(--ds-text)] hover:bg-[var(--ds-border)] active:bg-[var(--ds-border-hover)] active:scale-[0.98]",
+        accent:
+          "bg-[var(--ds-accent)] text-white shadow-sm hover:bg-[var(--ds-accent-hover)] active:bg-[var(--ds-accent-active)] active:scale-[0.98]",
+        destructive:
+          "bg-[var(--ds-danger)] text-white shadow-sm hover:bg-[var(--ds-danger-hover)] active:scale-[0.98]",
+        outline:
+          "border border-[var(--ds-border)] bg-[var(--ds-surface)] text-[var(--ds-text)] shadow-sm hover:bg-[var(--ds-surface-hover)] hover:border-[var(--ds-border-hover)] active:scale-[0.98]",
+        ghost:
+          "text-[var(--ds-text-secondary)] hover:bg-[var(--ds-surface-hover)] hover:text-[var(--ds-text)]",
+        link:
+          "text-[var(--ds-primary)] underline-offset-4 hover:underline p-0 h-auto",
+      },
+      size: {
+        default: "h-9 px-4 py-2 rounded-[var(--ds-radius-lg)]",
+        sm: "h-8 rounded-[var(--ds-radius-lg)] px-3 text-[var(--ds-text-body-sm)]",
+        lg: "h-10 rounded-[var(--ds-radius-xl)] px-6 font-[var(--ds-text-button-lg)]",
+        xl: "h-12 rounded-[var(--ds-radius-xl)] px-8 text-[var(--ds-text-body)]",
+        icon: "h-9 w-9 rounded-[var(--ds-radius-lg)]",
+        "icon-sm": "h-8 w-8 rounded-[var(--ds-radius-lg)]",
+        "icon-lg": "h-10 w-10 rounded-[var(--ds-radius-xl)]",
+      },
+    },
+    defaultVariants: { variant: "primary", size: "default" },
+  }
+)
+
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
+  asChild?: boolean
+}
+
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant, size, asChild = false, ...props }, ref) => {
+    const Comp = asChild ? Slot : "button"
+    return <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props} />
+  }
+)
+Button.displayName = "Button"
+
+// eslint-disable-next-line react-refresh/only-export-components
+export { Button, buttonVariants }

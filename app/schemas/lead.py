@@ -49,6 +49,7 @@ class LeadUpdate(BaseModel):
 class LeadResponse(BaseModel):
     id: str
     hospital_id: str
+    hospital_name: Optional[str] = None
     assigned_staff_id: Optional[str]
     assigned_doctor_id: Optional[str]
     converted_patient_id: Optional[str]
@@ -69,6 +70,12 @@ class LeadResponse(BaseModel):
     last_contacted_at: Optional[datetime]
     next_follow_up_date: Optional[date]
     priority: Optional[str]
+    automation_status: Optional[str] = None
+    current_attempt: Optional[int] = None
+    total_attempts: Optional[int] = None
+    automation_closed_at: Optional[datetime] = None
+    automation_closed_by: Optional[str] = None
+    automation_closure_reason: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -125,14 +132,24 @@ class LeadAppointmentCreate(BaseModel):
 class LeadCommunicationCreate(BaseModel):
     channel: str = "WHATSAPP"
     message: str
+    template_name: Optional[str] = None
 
 
 class LeadCommunicationResponse(BaseModel):
     id: str
     lead_id: str
+    hospital_id: Optional[str]
+    sent_by: Optional[str]
+    sent_by_name: Optional[str]
     channel: str
+    message_type: str
+    template_name: Optional[str]
     message: str
+    message_preview: Optional[str]
     status: str
+    delivery_status: Optional[str]
+    provider_message_id: Optional[str]
+    direction: str
     sent_at: Optional[datetime]
     created_at: datetime
 

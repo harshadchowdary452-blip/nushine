@@ -1,9 +1,11 @@
 import logging
 from typing import Optional
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 from app.repositories.lead_repository import LeadRepository, LeadCommunicationRepository, LeadCallRepository
 from app.repositories.audit_log_repository import AuditLogRepository
+from app.utils.whatsapp import whatsapp_provider
 
 logger = logging.getLogger(__name__)
 
@@ -64,14 +66,47 @@ class LeadService:
             logger.exception("DELETE_LEAD - Error: %s", str(e))
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to delete lead: {str(e)}")
 
-    async def add_communication(self, lead_id: str, data: dict, user_id: str = None) -> object:
+    async def add_communication(self, lead_id: str, data: dict, user_id: str = None, user_name: str = None) -> object:
         lead = await self.repo.get(lead_id)
         if not lead:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lead not found")
-        comm = await self.comm_repo.create(lead_id=lead_id, **data)
+        channel = data.get("channel", "WHATSAPP")
+        message = data.get("message", "")
+        template_name = data.get("template_name")
+        provider_message_id = None
+        delivery_status = "PENDING"
+
+        if channel == "WHATSAPP" and message and lead.mobile:
+            try:
+                sent = await whatsapp_provider.send_message(lead.mobile, message)
+                delivery_status = "SENT" if sent else "FAILED"
+            except Exception:
+                delivery_status = "FAILED"
+        elif channel in ("NOTE", "FEEDBACK"):
+            delivery_status = "STORED"
+        else:
+            delivery_status = "PENDING"
+
+        comm = await self.comm_repo.create(
+            lead_id=lead_id,
+            hospital_id=lead.hospital_id,
+            sent_by=user_id,
+            sent_by_name=user_name,
+            channel=channel,
+            message_type=template_name or "GENERAL",
+            template_name=template_name,
+            message=message,
+            message_preview=message[:200] if message else None,
+            status=delivery_status,
+            delivery_status=delivery_status,
+            provider_message_id=provider_message_id,
+            sent_at=datetime.now(timezone.utc) if delivery_status in ("SENT", "STORED") else None,
+        )
+        lead.last_contacted_at = datetime.now(timezone.utc)
+        await self.db.flush()
         await self.audit_log_repo.create(
             user_id=user_id, action="LEAD_COMMUNICATION", entity_type="LEAD",
-            entity_id=lead_id, details=f"Communication sent via {data.get('channel', 'UNKNOWN')}"
+            entity_id=lead_id, details=f"Communication sent via {channel}"
         )
         return comm
 

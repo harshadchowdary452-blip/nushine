@@ -4,56 +4,56 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
 import { format, differenceInDays } from "date-fns"
 import {
-  ArrowLeft, Phone, Mail, MapPin, Calendar, IndianRupee, Activity,
-  MessageSquare, PhoneCall, Edit3, Trash2, Star, Target, Clock,
+  ArrowLeft, ArrowRight, Phone, Mail, MapPin, Calendar, IndianRupee, Activity,
+  MessageSquare, PhoneCall, Edit3, Trash2, Star, Target,
   CheckCircle2, XCircle, AlertTriangle, Plus, ChevronRight, Users,
+  MessageCircle, FileText, User,
+  RefreshCw, MoreHorizontal, ExternalLink,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { NumericInput } from "@/components/ui/numeric-input"
+import SearchableSelect from "@/components/ui/searchable-select"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog"
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { leadsApi, doctorsApi } from "@/services/endpoints"
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { leadsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
-import { useAuthStore } from "@/store/authStore"
-import type { Lead, LeadCall, LeadCommunication, LeadCallOutcome, DoctorListItem, ApiError } from "@/types"
+import LeadTimeline from "./components/lead-timeline"
+import type { Lead, LeadCall, LeadCommunication, LeadCallOutcome, ApiError } from "@/types"
 
-interface LeadFollowUp {
-  id: string
-  status: string | null
-  follow_up_date: string | null
-  follow_up_time: string | null
-  notes: string | null
+const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
+  NEW: { bg: "bg-blue-500", text: "text-white", label: "New" },
+  CONTACTED: { bg: "bg-purple-500", text: "text-white", label: "Contacted" },
+  INTERESTED: { bg: "bg-emerald-500", text: "text-white", label: "Interested" },
+  FOLLOW_UP_REQUIRED: { bg: "bg-amber-500", text: "text-white", label: "Follow-up Required" },
+  APPOINTMENT_BOOKED: { bg: "bg-indigo-500", text: "text-white", label: "Appointment Booked" },
+  VISITED: { bg: "bg-teal-500", text: "text-white", label: "Visited" },
+  CONVERTED: { bg: "bg-green-600", text: "text-white", label: "Converted" },
+  LOST: { bg: "bg-red-500", text: "text-white", label: "Lost" },
+  NOT_INTERESTED: { bg: "bg-gray-500", text: "text-white", label: "Not Interested" },
+  NO_RESPONSE: { bg: "bg-orange-500", text: "text-white", label: "No Response" },
 }
 
-const statusStyles: Record<string, string> = {
-  NEW: "bg-blue-600 text-white",
-  CONTACTED: "bg-orange-500 text-white",
-  INTERESTED: "bg-green-600 text-white",
-  FOLLOW_UP_REQUIRED: "bg-amber-500 text-white",
-  APPOINTMENT_BOOKED: "bg-purple-600 text-white",
-  VISITED: "bg-teal-600 text-white",
-  CONVERTED: "bg-emerald-600 text-white",
-  LOST: "bg-red-600 text-white",
-  NOT_INTERESTED: "bg-gray-500 text-white",
-  NO_RESPONSE: "bg-slate-500 text-white",
-}
-
-const priorityStyles: Record<string, string> = {
-  HIGH: "bg-red-50 text-red-700 border-red-200",
-  MEDIUM: "bg-amber-50 text-amber-700 border-amber-200",
-  LOW: "bg-green-50 text-green-700 border-green-200",
+const priorityConfig: Record<string, { bg: string; text: string; label: string }> = {
+  HIGH: { bg: "bg-red-50", text: "text-red-700 border-red-200", label: "High" },
+  MEDIUM: { bg: "bg-amber-50", text: "text-amber-700 border-amber-200", label: "Medium" },
+  LOW: { bg: "bg-green-50", text: "text-green-700 border-green-200", label: "Low" },
 }
 
 const statusOptions = [
@@ -65,6 +65,15 @@ const callOutcomes: LeadCallOutcome[] = [
   "INTERESTED", "NOT_INTERESTED", "NO_ANSWER", "BUSY", "CALL_BACK_LATER", "APPOINTMENT_REQUESTED", "CONVERTED",
 ]
 
+const quickActions = [
+  { key: "call", icon: Phone, label: "Call", color: "bg-blue-500 hover:bg-blue-600" },
+  { key: "whatsapp", icon: MessageCircle, label: "WhatsApp", color: "bg-green-500 hover:bg-green-600" },
+  { key: "email", icon: Mail, label: "Email", color: "bg-purple-500 hover:bg-purple-600" },
+  { key: "convert", icon: Target, label: "Convert", color: "bg-emerald-500 hover:bg-emerald-600" },
+  { key: "note", icon: FileText, label: "Note", color: "bg-gray-500 hover:bg-gray-600" },
+  { key: "feedback", icon: Star, label: "Feedback", color: "bg-amber-500 hover:bg-amber-600" },
+]
+
 export default function LeadDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -73,13 +82,14 @@ export default function LeadDetail() {
   const { addToast } = useToast()
 
   const [activeTab, setActiveTab] = useState("overview")
+  const [statusChangeOpen, setStatusChangeOpen] = useState(false)
+  const [selectedStatus, setSelectedStatus] = useState("")
 
   const [editOpen, setEditOpen] = useState(false)
   const [callOutcomeOpen, setCallOutcomeOpen] = useState(false)
   const [commOpen, setCommOpen] = useState(false)
-  const [followUpOpen, setFollowUpOpen] = useState(false)
-  const [apptOpen, setApptOpen] = useState(false)
   const [convertOpen, setConvertOpen] = useState(false)
+  const [noteOpen, setNoteOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
 
   const [leadName, setLeadName] = useState("")
@@ -104,23 +114,18 @@ export default function LeadDetail() {
   const [commChannel, setCommChannel] = useState("WHATSAPP")
   const [commMessage, setCommMessage] = useState("")
 
-  const [fuDate, setFuDate] = useState("")
-  const [fuTime, setFuTime] = useState("")
-  const [fuReason, setFuReason] = useState("")
-  const [fuNotes, setFuNotes] = useState("")
+  const [noteText, setNoteText] = useState("")
 
-  const [apptDate, setApptDate] = useState("")
-  const [apptTime, setApptTime] = useState("")
-  const [apptDoctor, setApptDoctor] = useState("")
-  const [apptNotes, setApptNotes] = useState("")
+  const [feedbackRating, setFeedbackRating] = useState<number>(0)
+  const [feedbackComment, setFeedbackComment] = useState("")
 
-  const [convertPatientName, setConvertPatientName] = useState("")
-  const [convertAge, setConvertAge] = useState("")
-  const [convertGender, setConvertGender] = useState("")
-  const [convertPhone, setConvertPhone] = useState("")
-  const [convertEmail, setConvertEmail] = useState("")
-  const [convertCity, setConvertCity] = useState("")
-  const [convertNotes, setConvertNotes] = useState("")
+  const [convertStep, setConvertStep] = useState(1)
+  const [convertForm, setConvertForm] = useState({
+    full_name: "", email: "", phone: "", gender: "", age: "",
+    patient_source: "", source_campaign_name: "", source_campaign_id: "",
+    source_campaign_date: "", address: "", medical_history: "", abha_id: "",
+    height: "", weight: "", bp: "", sugar: "", spo2: "", op_no: "",
+  })
 
   const { data: lead, isLoading } = useQuery({
     queryKey: ["lead", id],
@@ -140,25 +145,15 @@ export default function LeadDetail() {
     enabled: !!id,
   })
 
-  const { data: followUps } = useQuery({
-    queryKey: ["lead-followups", id],
-    queryFn: () => leadsApi.getFollowUps(id!),
-    enabled: !!id,
-  })
-
-  const currentUser = useAuthStore((s) => s.user)
-  const { data: doctorsData } = useQuery({
-    queryKey: ["doctors", "leads-dropdown", currentUser?.admin_group_id],
-    queryFn: () => doctorsApi.list({ page_size: 200, admin_group_id: currentUser?.admin_group_id || undefined }),
-    enabled: !!currentUser,
-  })
-  const doctors: DoctorListItem[] = Array.isArray(doctorsData) ? doctorsData : doctorsData?.items || []
-
   const statusMutation = useMutation({
     mutationFn: (status: string) => leadsApi.updateStatus(id!, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["lead", id] })
+      queryClient.invalidateQueries({ queryKey: ["leads"] })
+      queryClient.invalidateQueries({ queryKey: ["lead-analytics"] })
+      queryClient.invalidateQueries({ queryKey: ["crm-dashboard"] })
       addToast({ title: "Status updated", variant: "success" })
+      setStatusChangeOpen(false)
     },
     onError: () => addToast({ title: "Error", variant: "destructive" }),
   })
@@ -167,7 +162,8 @@ export default function LeadDetail() {
     mutationFn: (data: Record<string, unknown>) => leadsApi.update(id!, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["lead", id] })
-      addToast({ title: "Updated", variant: "success" })
+      queryClient.invalidateQueries({ queryKey: ["leads"] })
+      addToast({ title: "Lead updated", variant: "success" })
       setEditOpen(false)
     },
     onError: () => addToast({ title: "Error", variant: "destructive" }),
@@ -179,15 +175,21 @@ export default function LeadDetail() {
       addToast({ title: "Lead deleted", variant: "success" })
       navigate("/leads?" + searchParams.toString())
     },
-    onError: (err: ApiError) => addToast({ title: "Error", description: err?.response?.data?.detail as string || "Failed to delete lead", variant: "destructive" }),
+    onError: (err: ApiError) => addToast({
+      title: "Error",
+      description: err?.response?.data?.detail as string || "Failed to delete lead",
+      variant: "destructive",
+    }),
   })
 
   const callMutation = useMutation({
     mutationFn: (data: Record<string, unknown>) => leadsApi.addCall(id!, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["lead-calls", id] })
+      queryClient.invalidateQueries({ queryKey: ["lead", id] })
       addToast({ title: "Call recorded", variant: "success" })
-      setCallOutcomeOpen(false); setCallOutcome(""); setCallNotes(""); setCallFollowUp(""); setCallDuration("")
+      setCallOutcomeOpen(false)
+      setCallOutcome(""); setCallNotes(""); setCallFollowUp(""); setCallDuration("")
     },
     onError: () => addToast({ title: "Error", variant: "destructive" }),
   })
@@ -196,161 +198,290 @@ export default function LeadDetail() {
     mutationFn: (data: { channel: string; message: string }) => leadsApi.addCommunication(id!, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["lead-communications", id] })
+      queryClient.invalidateQueries({ queryKey: ["lead", id] })
       addToast({ title: "Message sent", variant: "success" })
-      setCommOpen(false); setCommMessage("")
+      setCommOpen(false)
+      setCommMessage("")
     },
     onError: () => addToast({ title: "Error", variant: "destructive" }),
   })
 
-  const followUpMutation = useMutation({
-    mutationFn: (data: { follow_up_date: string; follow_up_time?: string; priority?: string; reason?: string; notes?: string }) => leadsApi.createFollowUp(id!, data),
+  const noteMutation = useMutation({
+    mutationFn: (note: string) => leadsApi.addCommunication(id!, { channel: "NOTE", message: note }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["lead-followups", id] })
+      queryClient.invalidateQueries({ queryKey: ["lead-communications", id] })
       queryClient.invalidateQueries({ queryKey: ["lead", id] })
-      addToast({ title: "Follow-up scheduled", variant: "success" })
-      setFollowUpOpen(false); setFuDate(""); setFuTime(""); setFuReason(""); setFuNotes("")
-    },
-    onError: () => addToast({ title: "Error", variant: "destructive" }),
-  })
-
-  const apptMutation = useMutation({
-    mutationFn: (data: { appointment_date: string; appointment_time?: string; doctor_id?: string; notes?: string }) => leadsApi.bookAppointment(id!, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["lead", id] })
-      queryClient.invalidateQueries({ queryKey: ["leads"] })
-      addToast({ title: "Appointment booked", variant: "success" })
-      setApptOpen(false); setApptDate(""); setApptTime(""); setApptDoctor(""); setApptNotes("")
+      addToast({ title: "Note added", variant: "success" })
+      setNoteOpen(false)
+      setNoteText("")
     },
     onError: () => addToast({ title: "Error", variant: "destructive" }),
   })
 
   const convertMutation = useMutation({
     mutationFn: (data: Record<string, unknown>) => leadsApi.convert(id!, data),
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["lead", id] })
       queryClient.invalidateQueries({ queryKey: ["leads"] })
-      addToast({ title: "Lead converted", variant: "success" })
+      queryClient.invalidateQueries({ queryKey: ["lead-analytics"] })
+      queryClient.invalidateQueries({ queryKey: ["crm-dashboard"] })
+      addToast({ title: "Lead converted successfully", variant: "success" })
       setConvertOpen(false)
+      const patientId = (result as Record<string, unknown>)?.patient_id as string
+      if (patientId) {
+        navigate(`/patients/${patientId}`)
+      }
     },
-    onError: (err: ApiError) => addToast({ title: "Error", description: err?.response?.data?.detail as string || "Conversion failed", variant: "destructive" }),
+    onError: (err: { response?: { data?: { detail?: string } } }) => {
+      addToast({
+        title: "Conversion failed",
+        description: err?.response?.data?.detail || "Failed to convert lead",
+        variant: "destructive",
+      })
+    },
   })
 
-  const cycleStatus = useCallback(() => {
-    if (!lead) return
-    const idx = statusOptions.indexOf(lead.status as typeof statusOptions[number])
-    if (idx < 0 || idx >= statusOptions.length - 1) return
-    const next = statusOptions[idx + 1]
-    if (next === "CONVERTED") {
-      openConvert(lead)
-      return
-    }
-    statusMutation.mutate(next)
-  }, [lead, statusMutation])
-
-  function openEdit(l: Lead) {
-    setLeadName(l.lead_name); setMobile(l.mobile); setEmail(l.email || "")
-    setAge(l.age?.toString() || ""); setGender(l.gender || ""); setCity(l.city || "")
-    setSource(l.source); setInterestedTreatment(l.interested_treatment || "")
-    setBudget(l.budget?.toString() || ""); setPreferredVisitDate(l.preferred_visit_date || "")
-    setNotes(l.notes || ""); setLeadScore(l.lead_score?.toString() || ""); setPriority(l.priority || "")
+  const openEdit = useCallback((l: Lead) => {
+    setLeadName(l.lead_name)
+    setMobile(l.mobile)
+    setEmail(l.email || "")
+    setAge(l.age?.toString() || "")
+    setGender(l.gender || "")
+    setCity(l.city || "")
+    setSource(l.source)
+    setInterestedTreatment(l.interested_treatment || "")
+    setBudget(l.budget?.toString() || "")
+    setPreferredVisitDate(l.preferred_visit_date || "")
+    setNotes(l.notes || "")
+    setLeadScore(l.lead_score?.toString() || "")
+    setPriority(l.priority || "")
     setEditOpen(true)
-  }
+  }, [])
 
-  function handleUpdate() {
-    updateMutation.mutate({
-      lead_name: leadName, mobile, email: email || undefined,
-      age: age ? parseInt(age) : undefined, gender: gender || undefined,
-      city: city || undefined, source, interested_treatment: interestedTreatment || undefined,
-      budget: budget ? parseFloat(budget) : undefined,
-      preferred_visit_date: preferredVisitDate || undefined, notes: notes || undefined,
-      lead_score: leadScore ? parseInt(leadScore) : undefined, priority: priority || undefined,
-    })
-  }
-
-  function openConvert(l: Lead) {
-    setConvertPatientName(l.lead_name); setConvertAge(l.age?.toString() || "")
-    setConvertGender(l.gender || ""); setConvertPhone(l.mobile); setConvertEmail(l.email || "")
-    setConvertCity(l.city || ""); setConvertNotes(""); setConvertOpen(true)
-  }
-
-  function handleCall() {
+  const handleCall = useCallback(() => {
     if (lead?.mobile) {
       window.location.href = `tel:${lead.mobile}`
     }
-    setTimeout(() => setCallOutcomeOpen(true), 500)
-  }
+  }, [lead])
+
+  const handleWhatsApp = useCallback(() => {
+    if (lead?.mobile) {
+      const phone = lead.mobile.replace(/[^0-9]/g, "")
+      const hospitalName = lead.hospital_name || "our dental clinic"
+      const msg =
+        `Hello ${lead.lead_name},\n\n` +
+        `Thank you for contacting ${hospitalName}.\n\n` +
+        `We appreciate your interest in our dental services. Our team has received your enquiry regarding **${lead.interested_treatment || "dental treatment"}**.\n\n` +
+        `One of our patient care executives will contact you shortly to understand your requirements and assist you in planning your visit.\n\n` +
+        `If you have any immediate questions, feel free to reply to this message or call us.\n\n` +
+        `We look forward to welcoming you to ${hospitalName} and providing you with the highest standard of dental care.\n\n` +
+        `Warm Regards,\n${hospitalName}\nPatient Care Team`
+      const encodedMsg = encodeURIComponent(msg)
+      leadsApi.addCommunication(lead.id, {
+        channel: "WHATSAPP",
+        message: msg,
+        template_name: "GREETING",
+      }).then(() => {
+        queryClient.invalidateQueries({ queryKey: ["lead-communications", lead.id] })
+        queryClient.invalidateQueries({ queryKey: ["lead", lead.id] })
+        queryClient.invalidateQueries({ queryKey: ["lead-analytics"] })
+        queryClient.invalidateQueries({ queryKey: ["crm-dashboard"] })
+      }).catch(() => {
+        // Communication recording failed, but still open WhatsApp
+      }).finally(() => {
+        window.open(`https://wa.me/${phone}?text=${encodedMsg}`, "_blank")
+      })
+    }
+  }, [lead, queryClient])
+
+  const handleEmail = useCallback(() => {
+    if (lead?.email) {
+      const hospitalName = lead.hospital_name || "Our Dental Clinic"
+      const subject = encodeURIComponent(`${hospitalName} - Inquiry Regarding ${lead.interested_treatment || "Dental Treatment"}`)
+      const body = encodeURIComponent(
+        `Dear ${lead.lead_name},\n\n` +
+        `Thank you for contacting ${hospitalName}.\n\n` +
+        `We have received your enquiry regarding ${lead.interested_treatment || "dental treatment"}.\n\n` +
+        `Lead Source: ${lead.source?.replace(/_/g, " ") || "N/A"}\n\n` +
+        `One of our patient care executives will reach out to you shortly to assist with your requirements and help schedule a consultation.\n\n` +
+        `If you have any immediate questions, please feel free to contact us.\n\n` +
+        `Warm Regards,\n${hospitalName}\nPatient Care Team`
+      )
+      window.open(`mailto:${lead.email}?subject=${subject}&body=${body}`, "_blank")
+    }
+  }, [lead])
 
   const callItems: LeadCall[] = Array.isArray(calls) ? calls : []
   const commItems: LeadCommunication[] = Array.isArray(communications) ? communications : []
-  const fuItems: LeadFollowUp[] = Array.isArray(followUps) ? followUps : []
 
   if (isLoading) return (
     <div className="space-y-4 p-4">
-      {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-lg" />)}
+      <Skeleton className="h-8 w-48" />
+      <Skeleton className="h-24 w-full rounded-xl" />
+      <div className="grid grid-cols-6 gap-3">
+        {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-xl" />)}
+      </div>
+      <Skeleton className="h-64 w-full rounded-xl" />
     </div>
   )
-  if (!lead) return <div className="p-4 text-gray-500">Lead not found</div>
+
+  if (!lead) return (
+    <div className="p-12 text-center">
+      <AlertTriangle className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+      <p className="text-gray-500 font-medium">Lead not found</p>
+      <Button variant="outline" className="mt-4" onClick={() => navigate("/leads")}>
+        <ArrowLeft className="h-4 w-4 mr-1.5" /> Back to Leads
+      </Button>
+    </div>
+  )
 
   const daysSinceCreated = differenceInDays(new Date(), new Date(lead.created_at))
-  const conversionProbability = lead.lead_score != null ? `${Math.min(lead.lead_score + 10, 95)}%` : "—"
-  const timelineItems = [
-    { type: "created", label: "Lead created", date: lead.created_at, color: "bg-blue-500" },
-    ...callItems.map((c) => ({ type: "call", label: `Call: ${c.outcome?.replace(/_/g, " ") || "Unknown"}`, date: c.created_at, color: "bg-purple-500" })),
-    ...commItems.map((c) => ({ type: "comm", label: `Message sent via ${c.channel}`, date: c.created_at, color: "bg-green-500" })),
-  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
+  const handleQuickAction = (key: string) => {
+    switch (key) {
+      case "call": handleCall(); break
+      case "whatsapp": handleWhatsApp(); break
+      case "email": handleEmail(); break
+      case "convert":
+        if (lead.status === "CONVERTED") {
+          addToast({ title: "Already converted", variant: "success" })
+        } else {
+          setConvertForm({
+            full_name: lead.lead_name, email: lead.email || "", phone: lead.mobile,
+            gender: lead.gender || "", age: lead.age?.toString() || "",
+            patient_source: lead.source || "", source_campaign_name: "",
+            source_campaign_id: "", source_campaign_date: "", address: lead.city || "",
+            medical_history: lead.notes || "", abha_id: "",
+            height: "", weight: "", bp: "", sugar: "", spo2: "", op_no: "",
+          })
+          setConvertOpen(true)
+        }
+        break
+      case "note": setNoteOpen(true); break
+      case "feedback": setActiveTab("feedback"); break
+    }
+  }
+
+  const statusInfo = statusConfig[lead.status] || statusConfig.NEW
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
       <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-        <button onClick={() => navigate("/leads?" + searchParams.toString())} className="flex items-center gap-1 hover:text-[#0EA5E9] transition-colors">
-          <ArrowLeft className="h-3.5 w-3.5" /> Back to Leads
+        <button
+          onClick={() => navigate("/leads?" + searchParams.toString())}
+          className="flex items-center gap-1 hover:text-blue-600 transition-colors"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" /> Leads
         </button>
         <ChevronRight className="h-3 w-3 text-gray-300" />
         <span className="text-gray-700 font-medium truncate">{lead.lead_name}</span>
       </div>
 
       <Card className="sticky top-0 z-10 shadow-sm border-gray-200">
-        <CardContent className="p-4">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-lg font-bold text-gray-900">{lead.lead_name}</h1>
-                  <span className="text-xs text-gray-400 font-mono">#{lead.id.slice(0, 8).toUpperCase()}</span>
+        <CardContent className="p-0">
+          <div className="p-5">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <div className="h-14 w-14 rounded-full bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center shrink-0 ring-2 ring-white shadow-sm">
+                  <span className="text-xl font-bold text-blue-600">
+                    {lead.lead_name.charAt(0).toUpperCase()}
+                  </span>
                 </div>
-                <div className="flex items-center gap-3 mt-1 text-sm text-gray-500 flex-wrap">
-                  <span className="flex items-center gap-1"><Phone className="h-3 w-3" /> {lead.mobile}</span>
-                  <span>{lead.source?.replace(/_/g, " ")}</span>
-                  {lead.assigned_staff_id && <span>Staff: {lead.assigned_staff_id.slice(0, 8)}</span>}
-                  <span>Created: {format(new Date(lead.created_at), "dd MMM yyyy")}</span>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <h1 className="text-xl font-bold text-gray-900">{lead.lead_name}</h1>
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusInfo.bg} ${statusInfo.text}`}>
+                      {statusInfo.label}
+                    </span>
+                    {lead.priority && (
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${
+                        priorityConfig[lead.priority]?.text || "text-gray-700"
+                      } ${priorityConfig[lead.priority]?.bg || "bg-gray-50"}`}>
+                        <Star className="h-3 w-3" fill={lead.priority === "HIGH" ? "currentColor" : "none"} />
+                        {priorityConfig[lead.priority]?.label || lead.priority}
+                      </span>
+                    )}
+                    <Badge variant="outline" className="text-xs">
+                      {lead.source?.replace(/_/g, " ")}
+                    </Badge>
+                    <span className="text-xs text-gray-400 font-mono mt-1">
+                      #{lead.id.slice(-6).toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-4 mt-1.5 text-sm text-gray-500 flex-wrap">
+                    <span className="flex items-center gap-1.5">
+                      <Phone className="h-3.5 w-3.5 text-gray-400" />
+                      {lead.mobile}
+                    </span>
+                    {lead.email && (
+                      <span className="flex items-center gap-1.5">
+                        <Mail className="h-3.5 w-3.5 text-gray-400" />
+                        {lead.email}
+                      </span>
+                    )}
+                    <span className="flex items-center gap-1.5">
+                      <Calendar className="h-3.5 w-3.5 text-gray-400" />
+                      Created {format(new Date(lead.created_at), "dd MMM yyyy")}
+                    </span>
+                    {lead.interested_treatment && (
+                      <span className="flex items-center gap-1.5">
+                        <Activity className="h-3.5 w-3.5 text-gray-400" />
+                        {lead.interested_treatment}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap shrink-0">
-              <button onClick={handleCall} className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium bg-[#0EA5E9] text-white hover:bg-[#0284C7] transition-colors">
-                <Phone className="h-3.5 w-3.5" /> Call
-              </button>
-              {lead.mobile && (
-                <a href={`https://wa.me/${lead.mobile.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(
-                  `Hi ${lead.lead_name},\n\nThank you for your interest in our dental services. How can we help you today?\n\nRegards,\nOur Clinic`
-                )}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors">
-                  <MessageSquare className="h-3.5 w-3.5" /> WhatsApp
-                </a>
-              )}
-              <Button size="sm" variant="outline" onClick={() => { setApptOpen(true); setActiveTab("appointments") }}>
-                <Calendar className="h-3.5 w-3.5 mr-1" /> Appointment
-              </Button>
-                {lead.status !== "CONVERTED" && lead.status !== "LOST" && lead.status !== "NOT_INTERESTED" && lead.status !== "NO_RESPONSE" && (
-                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => openConvert(lead)}>
-                    <Target className="h-3.5 w-3.5 mr-1" /> Convert
-                  </Button>
-                )}
-              <Button size="sm" variant="outline" onClick={() => openEdit(lead)}>
-                <Edit3 className="h-3.5 w-3.5 mr-1" /> Edit
-              </Button>
-              <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => setDeleteOpen(true)}>
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+
+              <div className="flex items-center gap-2 flex-wrap shrink-0">
+                <TooltipProvider>
+                  {quickActions.map((action) => (
+                    <Tooltip key={action.key}>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => handleQuickAction(action.key)}
+                          className={`h-9 w-9 rounded-lg ${action.color} text-white flex items-center justify-center transition-all hover:scale-105 active:scale-95 shadow-sm`}
+                        >
+                          <action.icon className="h-4 w-4" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        <p className="text-xs">{action.label}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ))}
+                </TooltipProvider>
+                <div className="h-8 w-px bg-gray-200 mx-1" />
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon-sm">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52 bg-white shadow-lg border-gray-200">
+                    <DropdownMenuItem onClick={() => openEdit(lead)} className="cursor-pointer">
+                      <Edit3 className="h-4 w-4 mr-2.5 text-gray-500" /> Edit Lead
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setStatusChangeOpen(true)} className="cursor-pointer">
+                      <RefreshCw className="h-4 w-4 mr-2.5 text-gray-500" /> Change Status
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="bg-gray-100" />
+                    <DropdownMenuItem onClick={() => setCallOutcomeOpen(true)} className="cursor-pointer">
+                      <PhoneCall className="h-4 w-4 mr-2.5 text-gray-500" /> Log Call Outcome
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setConvertOpen(true)} className="cursor-pointer">
+                      <Target className="h-4 w-4 mr-2.5 text-gray-500" /> Convert to Patient
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="bg-gray-100" />
+                    <DropdownMenuItem
+                      className="text-red-600 cursor-pointer focus:text-red-700 focus:bg-red-50"
+                      onClick={() => setDeleteOpen(true)}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2.5" /> Delete Lead
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
           </div>
         </CardContent>
@@ -362,7 +493,7 @@ export default function LeadDetail() {
             <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Lead Score</p>
             <div className="flex items-center gap-2 mt-1">
               <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                <div className="h-full bg-[#0EA5E9] rounded-full" style={{ width: `${Math.min((lead.lead_score ?? 0), 100)}%` }} />
+                <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min((lead.lead_score ?? 0), 100)}%` }} />
               </div>
               <span className="text-sm font-bold text-gray-800">{lead.lead_score ?? 0}</span>
             </div>
@@ -370,7 +501,7 @@ export default function LeadDetail() {
         </Card>
         <Card className="border-gray-200">
           <CardContent className="p-3">
-            <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Days Since Created</p>
+            <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Age</p>
             <p className="text-lg font-bold text-gray-800 mt-0.5">{daysSinceCreated}d</p>
           </CardContent>
         </Card>
@@ -392,27 +523,38 @@ export default function LeadDetail() {
         </Card>
         <Card className="border-gray-200">
           <CardContent className="p-3">
-            <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Expected Revenue</p>
-            <p className="text-sm font-bold text-gray-800 mt-0.5">{lead.budget ? `\u20B9${lead.budget.toLocaleString()}` : "—"}</p>
+            <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Budget</p>
+            <p className="text-sm font-bold text-gray-800 mt-0.5">{lead.budget ? `₹${lead.budget.toLocaleString()}` : "—"}</p>
           </CardContent>
         </Card>
         <Card className="border-gray-200">
           <CardContent className="p-3">
-            <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Conversion Prob.</p>
-            <p className="text-lg font-bold text-gray-800 mt-0.5">{conversionProbability}</p>
+            <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Automation</p>
+            <p className="text-sm font-bold text-gray-800 mt-0.5">
+              {lead.automation_status === "ACTIVE" && lead.current_attempt != null && lead.total_attempts
+                ? `Attempt ${lead.current_attempt} of ${lead.total_attempts}`
+                : lead.automation_status === "STOPPED"
+                ? "Stopped"
+                : lead.automation_status === "CLOSED"
+                ? "Closed"
+                : "—"}
+            </p>
+            {lead.automation_status && lead.automation_status !== "ACTIVE" && (
+              <p className="text-[10px] text-gray-400 mt-0.5">{lead.automation_closure_reason?.replace(/_/g, " ") || ""}</p>
+            )}
           </CardContent>
         </Card>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="w-full justify-start border-b border-gray-200 rounded-none bg-transparent p-0 h-auto space-x-1">
-          {["overview", "communication", "follow-ups", "appointments", "timeline", "conversion"].map((tab) => (
+        <TabsList className="w-full justify-start border-b border-gray-200 rounded-none bg-transparent p-0 h-auto space-x-1 overflow-x-auto">
+          {["overview", "timeline", "communication", "notes", "feedback", "conversion"].map((tab) => (
             <TabsTrigger
               key={tab}
               value={tab}
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#0EA5E9] data-[state=active]:text-[#0EA5E9] px-4 py-2.5 text-sm font-medium capitalize bg-transparent data-[state=active]:bg-transparent"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 px-4 py-2.5 text-sm font-medium capitalize bg-transparent data-[state=active]:bg-transparent whitespace-nowrap"
             >
-              {tab.replace("-", " ")}
+              {tab === "conversion" ? "Conversion" : tab}
             </TabsTrigger>
           ))}
         </TabsList>
@@ -421,70 +563,92 @@ export default function LeadDetail() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2 space-y-4">
               <Card className="border-gray-200">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-semibold text-gray-800">Contact Information</h3>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-400">Status:</span>
-                      <button
-                        onClick={cycleStatus}
-                        disabled={lead.status === "CONVERTED" || lead.status === "LOST"}
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium transition-all ${statusStyles[lead.status] || "bg-gray-100 text-gray-700"} ${lead.status !== "CONVERTED" && lead.status !== "LOST" ? "cursor-pointer hover:opacity-80" : "cursor-default"}`}
-                        title="Click to advance to next status"
-                      >
-                        {lead.status.replace(/_/g, " ")}
-                        {(lead.status !== "CONVERTED" && lead.status !== "LOST") && <ChevronRight className="h-3 w-3" />}
-                      </button>
-                    </div>
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-semibold text-gray-800">Contact & Lead Information</h3>
+                    <Button size="sm" variant="outline" onClick={() => openEdit(lead)}>
+                      <Edit3 className="h-3.5 w-3.5 mr-1" /> Edit
+                    </Button>
                   </div>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="grid grid-cols-2 gap-y-4 gap-x-6 text-sm">
                     <div>
                       <Label className="text-[11px] text-gray-400 font-medium">Phone</Label>
-                      <p className="flex items-center gap-1.5 mt-0.5"><Phone className="h-3.5 w-3.5 text-gray-400" /> {lead.mobile}</p>
-                      {lead.alternate_mobile && <p className="flex items-center gap-1.5 text-gray-500 mt-0.5"><Phone className="h-3.5 w-3.5" /> {lead.alternate_mobile}</p>}
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <Phone className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                        <span className="text-gray-800">{lead.mobile}</span>
+                        <button onClick={handleCall} className="ml-1 text-blue-500 hover:text-blue-700">
+                          <Phone className="h-3 w-3" />
+                        </button>
+                        <button onClick={handleWhatsApp} className="text-green-500 hover:text-green-700">
+                          <MessageCircle className="h-3 w-3" />
+                        </button>
+                      </div>
+                      {lead.alternate_mobile && (
+                        <div className="flex items-center gap-1.5 mt-1 text-gray-500">
+                          <Phone className="h-3 w-3 text-gray-400" />
+                          <span className="text-xs">{lead.alternate_mobile}</span>
+                        </div>
+                      )}
                     </div>
                     <div>
                       <Label className="text-[11px] text-gray-400 font-medium">Email</Label>
-                      <p className="flex items-center gap-1.5 mt-0.5"><Mail className="h-3.5 w-3.5 text-gray-400" /> {lead.email || "—"}</p>
+                      <p className="flex items-center gap-1.5 mt-0.5">
+                        <Mail className="h-3.5 w-3.5 text-gray-400" />
+                        <span className="text-gray-800">{lead.email || "—"}</span>
+                        {lead.email && (
+                          <button onClick={handleEmail} className="ml-1 text-purple-500 hover:text-purple-700">
+                            <Mail className="h-3 w-3" />
+                          </button>
+                        )}
+                      </p>
                     </div>
                     <div>
                       <Label className="text-[11px] text-gray-400 font-medium">Age / Gender</Label>
-                      <p className="flex items-center gap-1.5 mt-0.5"><span className="h-3.5 w-3.5 inline-flex items-center justify-center text-gray-400">#</span> {lead.age ? `${lead.age} yrs` : "—"} {lead.gender ? `/ ${lead.gender}` : ""}</p>
+                      <p className="mt-0.5 text-gray-800">
+                        {lead.age ? `${lead.age} yrs` : "—"} {lead.gender ? `/ ${lead.gender}` : ""}
+                      </p>
                     </div>
                     <div>
                       <Label className="text-[11px] text-gray-400 font-medium">City</Label>
-                      <p className="flex items-center gap-1.5 mt-0.5"><MapPin className="h-3.5 w-3.5 text-gray-400" /> {lead.city || "—"}</p>
+                      <p className="flex items-center gap-1.5 mt-0.5">
+                        <MapPin className="h-3.5 w-3.5 text-gray-400" />
+                        <span className="text-gray-800">{lead.city || "—"}</span>
+                      </p>
                     </div>
                     <div>
                       <Label className="text-[11px] text-gray-400 font-medium">Interested Treatment</Label>
-                      <p className="flex items-center gap-1.5 mt-0.5"><Activity className="h-3.5 w-3.5 text-gray-400" /> {lead.interested_treatment || "—"}</p>
+                      <p className="flex items-center gap-1.5 mt-0.5">
+                        <Activity className="h-3.5 w-3.5 text-gray-400" />
+                        <span className="text-gray-800 font-medium">{lead.interested_treatment || "—"}</span>
+                      </p>
                     </div>
                     <div>
                       <Label className="text-[11px] text-gray-400 font-medium">Budget</Label>
-                      <p className="flex items-center gap-1.5 mt-0.5"><IndianRupee className="h-3.5 w-3.5 text-gray-400" /> {lead.budget ? `\u20B9${lead.budget.toLocaleString()}` : "—"}</p>
+                      <p className="flex items-center gap-1.5 mt-0.5">
+                        <IndianRupee className="h-3.5 w-3.5 text-gray-400" />
+                        <span className="text-gray-800 font-medium">{lead.budget ? `₹${lead.budget.toLocaleString()}` : "—"}</span>
+                      </p>
                     </div>
                     {lead.preferred_visit_date && (
                       <div>
                         <Label className="text-[11px] text-gray-400 font-medium">Preferred Visit</Label>
-                        <p className="flex items-center gap-1.5 mt-0.5"><Calendar className="h-3.5 w-3.5 text-gray-400" /> {format(new Date(lead.preferred_visit_date), "dd MMM yyyy")}</p>
+                        <p className="flex items-center gap-1.5 mt-0.5">
+                          <Calendar className="h-3.5 w-3.5 text-gray-400" />
+                          <span className="text-gray-800">{format(new Date(lead.preferred_visit_date), "dd MMM yyyy")}</span>
+                        </p>
                       </div>
                     )}
                     <div>
-                      <Label className="text-[11px] text-gray-400 font-medium">Priority</Label>
-                      <div className="mt-0.5">
-                        {lead.priority ? (
-                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium border ${priorityStyles[lead.priority] || priorityStyles.MEDIUM}`}>
-                            <Star className="h-3 w-3" fill={lead.priority === "HIGH" ? "currentColor" : "none"} />
-                            {lead.priority}
-                          </span>
-                        ) : <span className="text-gray-400">—</span>}
-                      </div>
+                      <Label className="text-[11px] text-gray-400 font-medium">Lead Source</Label>
+                      <p className="mt-0.5">
+                        <Badge variant="outline">{lead.source?.replace(/_/g, " ")}</Badge>
+                      </p>
                     </div>
                   </div>
                   {lead.notes && (
-                    <div className="mt-3 pt-3 border-t border-gray-100">
+                    <div className="mt-4 pt-4 border-t border-gray-100">
                       <Label className="text-[11px] text-gray-400 font-medium">Notes</Label>
-                      <p className="text-gray-600 whitespace-pre-wrap text-sm mt-0.5">{lead.notes}</p>
+                      <p className="text-gray-600 whitespace-pre-wrap text-sm mt-1">{lead.notes}</p>
                     </div>
                   )}
                 </CardContent>
@@ -495,184 +659,211 @@ export default function LeadDetail() {
               <Card className="border-gray-200">
                 <CardContent className="p-4">
                   <h3 className="text-sm font-semibold text-gray-800 mb-3">Lead Details</h3>
-                  <div className="space-y-2.5 text-sm">
+                  <div className="space-y-3 text-sm">
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-400 text-[12px]">Source</span>
-                      <span className="text-gray-700 text-[12px] font-medium">{lead.source?.replace(/_/g, " ")}</span>
+                      <span className="text-gray-400 text-xs">Status</span>
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${statusInfo.bg} ${statusInfo.text}`}>
+                        {statusInfo.label}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-400 text-[12px]">Priority</span>
+                      <span className="text-gray-400 text-xs">Priority</span>
                       {lead.priority ? (
-                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium border ${priorityStyles[lead.priority] || priorityStyles.MEDIUM}`}>
+                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium border ${
+                          priorityConfig[lead.priority]?.text
+                        } ${priorityConfig[lead.priority]?.bg}`}>
                           <Star className="h-2.5 w-2.5" fill={lead.priority === "HIGH" ? "currentColor" : "none"} />
-                          {lead.priority}
+                          {priorityConfig[lead.priority]?.label}
                         </span>
                       ) : <span className="text-gray-400">—</span>}
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-400 text-[12px]">Lead Score</span>
+                      <span className="text-gray-400 text-xs">Lead Score</span>
                       <div className="flex items-center gap-1.5">
                         <div className="h-1.5 w-16 bg-gray-200 rounded-full overflow-hidden">
-                          <div className="h-full bg-[#0EA5E9] rounded-full" style={{ width: `${Math.min((lead.lead_score ?? 0), 100)}%` }} />
+                          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min((lead.lead_score ?? 0), 100)}%` }} />
                         </div>
                         <span className="text-xs font-medium text-gray-700">{lead.lead_score ?? 0}</span>
                       </div>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-400 text-[12px]">Last Contacted</span>
-                      <span className="text-[12px] text-gray-700">{lead.last_contacted_at ? format(new Date(lead.last_contacted_at), "dd MMM hh:mm a") : "—"}</span>
+                      <span className="text-gray-400 text-xs">Created</span>
+                      <span className="text-xs text-gray-700">{format(new Date(lead.created_at), "dd MMM yyyy")}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-400 text-[12px]">Next Follow-up</span>
-                      <span className={`text-[12px] ${lead.next_follow_up_date && new Date(lead.next_follow_up_date) < new Date() ? "text-red-600 font-medium" : "text-gray-700"}`}>
-                        {lead.next_follow_up_date ? format(new Date(lead.next_follow_up_date), "dd MMM yyyy") : "—"}
+                      <span className="text-gray-400 text-xs">Last Contacted</span>
+                      <span className="text-xs text-gray-700">
+                        {lead.last_contacted_at ? format(new Date(lead.last_contacted_at), "dd MMM hh:mm a") : "—"}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-400 text-[12px]">Created</span>
-                      <span className="text-[12px] text-gray-700">{format(new Date(lead.created_at), "dd MMM yyyy")}</span>
+                      <span className="text-gray-400 text-xs">Next Follow-up</span>
+                      <span className={`text-xs ${lead.next_follow_up_date && new Date(lead.next_follow_up_date) < new Date() ? "text-red-600 font-medium" : "text-gray-700"}`}>
+                        {lead.next_follow_up_date ? format(new Date(lead.next_follow_up_date), "dd MMM yyyy") : "—"}
+                      </span>
                     </div>
                     {lead.assigned_staff_id && (
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-400 text-[12px]">Assigned Staff</span>
-                        <span className="text-[12px] text-gray-700 font-mono">{lead.assigned_staff_id.slice(0, 8)}</span>
+                        <span className="text-gray-400 text-xs">Assigned Staff</span>
+                        <span className="text-xs text-gray-700 font-mono">{lead.assigned_staff_id.slice(0, 8)}</span>
                       </div>
                     )}
                     {lead.assigned_doctor_id && (
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-400 text-[12px]">Assigned Doctor</span>
-                        <span className="text-[12px] text-gray-700 font-mono">{lead.assigned_doctor_id.slice(0, 8)}</span>
+                        <span className="text-gray-400 text-xs">Assigned Doctor</span>
+                        <span className="text-xs text-gray-700 font-mono">{lead.assigned_doctor_id.slice(0, 8)}</span>
+                      </div>
+                    )}
+                    {lead.converted_patient_id && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-400 text-xs">Converted Patient</span>
+                        <button
+                          onClick={() => navigate(`/patients/${lead.converted_patient_id}`)}
+                          className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                        >
+                          <ExternalLink className="h-3 w-3" /> View
+                        </button>
                       </div>
                     )}
                   </div>
                 </CardContent>
               </Card>
 
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" className="flex-1 border-gray-300" onClick={handleCall}>
-                  <PhoneCall className="h-3.5 w-3.5 mr-1" /> Log Call
+              {lead.status !== "CONVERTED" && lead.status !== "LOST" && lead.status !== "NOT_INTERESTED" && (
+                <Button
+                  size="sm"
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                  onClick={() => setConvertOpen(true)}
+                >
+                  <Target className="h-3.5 w-3.5 mr-1" /> Convert to Patient
                 </Button>
-                <Button size="sm" variant="outline" className="flex-1 border-gray-300" onClick={() => { setCommOpen(true); setActiveTab("communication") }}>
-                  <MessageSquare className="h-3.5 w-3.5 mr-1" /> Message
-                </Button>
-              </div>
-              <Button size="sm" variant="outline" className="w-full border-gray-300" onClick={() => { setFollowUpOpen(true); setActiveTab("follow-ups") }}>
-                <Calendar className="h-3.5 w-3.5 mr-1" /> Schedule Follow-up
-              </Button>
+              )}
             </div>
           </div>
         </TabsContent>
 
-        <TabsContent value="communication" className="space-y-4">
-          <Card className="border-gray-200">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-              <h3 className="text-sm font-semibold text-gray-800">Communications</h3>
-              <Button size="sm" variant="outline" onClick={() => setCommOpen(true)}>
-                <MessageSquare className="h-3.5 w-3.5 mr-1" /> Send Message
-              </Button>
-            </div>
-            <CardContent className="p-4">
-              {commItems.length === 0 ? (
-                <p className="text-xs text-gray-400 py-8 text-center">No communications yet</p>
-              ) : (
-                <div className="space-y-2">
-                  {commItems.map((c) => (
-                    <div key={c.id} className="rounded-lg border border-gray-100 p-3 text-sm bg-white">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${c.channel === "WHATSAPP" ? "bg-green-50 text-green-700" : c.channel === "SMS" ? "bg-blue-50 text-blue-700" : "bg-purple-50 text-purple-700"}`}>{c.channel}</span>
-                        <span className="text-[11px] text-gray-400">{format(new Date(c.created_at), "dd MMM hh:mm a")}</span>
-                      </div>
-                      <p className="text-gray-700 text-[13px]">{c.message}</p>
-                      {c.status && <p className="text-[11px] text-gray-400 mt-1">Status: {c.status}</p>}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="follow-ups" className="space-y-4">
-          <Card className="border-gray-200">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-              <h3 className="text-sm font-semibold text-gray-800">Follow-Ups</h3>
-              <Button size="sm" variant="outline" onClick={() => setFollowUpOpen(true)}>
-                <Plus className="h-3.5 w-3.5 mr-1" /> Schedule Follow-up
-              </Button>
-            </div>
-            <CardContent className="p-4">
-              {fuItems.length === 0 ? (
-                <p className="text-xs text-gray-400 py-8 text-center">No follow-ups scheduled</p>
-              ) : (
-                <div className="space-y-2">
-                  {fuItems.map((fu: LeadFollowUp) => (
-                    <div key={fu.id} className="flex items-center justify-between rounded-lg border border-gray-100 p-3 text-sm bg-white">
-                      <div className="flex items-center gap-3">
-                        {fu.status === "COMPLETED" ? (
-                          <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-                        ) : fu.status === "MISSED" ? (
-                          <XCircle className="h-4 w-4 text-red-500 shrink-0" />
-                        ) : (
-                          <Clock className="h-4 w-4 text-amber-500 shrink-0" />
-                        )}
-                        <div>
-                          <p className="font-medium text-gray-700 text-[13px]">{fu.follow_up_date ? format(new Date(fu.follow_up_date), "dd MMM yyyy") : "—"}{fu.follow_up_time ? ` at ${fu.follow_up_time.slice(0, 5)}` : ""}</p>
-                          {fu.notes && <p className="text-[12px] text-gray-500">{fu.notes}</p>}
-                        </div>
-                      </div>
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-gray-100 text-gray-700">{fu.status}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="appointments" className="space-y-4">
-          <Card className="border-gray-200">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-              <h3 className="text-sm font-semibold text-gray-800">Appointments</h3>
-              <Button size="sm" variant="outline" onClick={() => setApptOpen(true)}>
-                <Plus className="h-3.5 w-3.5 mr-1" /> Book Appointment
-              </Button>
-            </div>
-            <CardContent className="p-4">
-              {lead.status !== "APPOINTMENT_BOOKED" && lead.status !== "VISITED" ? (
-                <p className="text-xs text-gray-400 py-8 text-center">No appointments booked yet</p>
-              ) : (
-                <p className="text-xs text-gray-500 py-4">Appointment booked for this lead.</p>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         <TabsContent value="timeline" className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 space-y-4">
+          <Card className="border-gray-200">
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h3 className="text-sm font-semibold text-gray-800">Activity Timeline</h3>
+            </div>
+            <CardContent className="p-5">
+              <LeadTimeline lead={lead} calls={callItems} communications={commItems} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="communication" className="space-y-4">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            <div className="xl:col-span-2 space-y-4">
               <Card className="border-gray-200">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                  <h3 className="text-sm font-semibold text-gray-800">Call Log</h3>
-                  <Button size="sm" variant="outline" onClick={() => setCallOutcomeOpen(true)}>
-                    <PhoneCall className="h-3.5 w-3.5 mr-1" /> Log Call
-                  </Button>
+                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-sm font-semibold text-gray-800">Communications</h3>
+                    <span className="text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">{commItems.length}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" variant="outline" onClick={handleWhatsApp}>
+                      <MessageCircle className="h-3.5 w-3.5 mr-1" /> WhatsApp
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setCommOpen(true)}>
+                      <Plus className="h-3.5 w-3.5 mr-1" /> Send Message
+                    </Button>
+                  </div>
                 </div>
-                <CardContent className="p-4">
-                  {callItems.length === 0 ? (
-                    <p className="text-xs text-gray-400 py-8 text-center">No calls logged yet</p>
+                <CardContent className="p-0">
+                  {commItems.length === 0 ? (
+                    <div className="py-12 text-center">
+                      <div className="h-16 w-16 rounded-full bg-gray-50 flex items-center justify-center mx-auto mb-4">
+                        <MessageSquare className="h-8 w-8 text-gray-300" />
+                      </div>
+                      <p className="text-sm font-medium text-gray-500">No communications yet</p>
+                      <p className="text-xs text-gray-400 mt-1">Send your first message using the buttons above</p>
+                    </div>
                   ) : (
-                    <div className="space-y-2">
-                      {callItems.map((c) => (
-                        <div key={c.id} className="flex items-center justify-between rounded-lg border border-gray-100 p-3 text-sm bg-white">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <PhoneCall className="h-3.5 w-3.5 text-gray-400" />
-                              <span className="font-medium text-gray-700 text-[13px]">{c.outcome?.replace(/_/g, " ") || "Unknown"}</span>
-                              {c.duration_seconds && <span className="text-[11px] text-gray-400">({Math.floor(c.duration_seconds / 60)}m {c.duration_seconds % 60}s)</span>}
+                    <div className="divide-y divide-gray-50">
+                      {commItems.map((c) => (
+                        <div key={c.id} className="px-5 py-4 hover:bg-gray-50/50 transition-colors">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex items-start gap-3 min-w-0 flex-1">
+                              <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                                c.channel === "WHATSAPP" ? "bg-green-50" :
+                                c.channel === "EMAIL" ? "bg-purple-50" :
+                                c.channel === "NOTE" ? "bg-gray-50" :
+                                c.channel === "FEEDBACK" ? "bg-amber-50" :
+                                "bg-blue-50"
+                              }`}>
+                                {c.channel === "WHATSAPP" ? <MessageCircle className="h-4 w-4 text-green-600" /> :
+                                 c.channel === "EMAIL" ? <Mail className="h-4 w-4 text-purple-600" /> :
+                                 c.channel === "NOTE" ? <FileText className="h-4 w-4 text-gray-600" /> :
+                                 c.channel === "FEEDBACK" ? <Star className="h-4 w-4 text-amber-600" /> :
+                                 <MessageSquare className="h-4 w-4 text-blue-600" />}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${
+                                    c.channel === "WHATSAPP" ? "bg-green-50 text-green-700" :
+                                    c.channel === "EMAIL" ? "bg-purple-50 text-purple-700" :
+                                    c.channel === "NOTE" ? "bg-gray-50 text-gray-700" :
+                                    c.channel === "FEEDBACK" ? "bg-amber-50 text-amber-700" :
+                                    "bg-blue-50 text-blue-700"
+                                  }`}>{c.channel}</span>
+                                  {c.delivery_status && c.channel === "WHATSAPP" && (
+                                    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                      c.delivery_status === "SENT" ? "bg-green-50 text-green-700" :
+                                      c.delivery_status === "DELIVERED" ? "bg-blue-50 text-blue-700" :
+                                      c.delivery_status === "READ" ? "bg-emerald-50 text-emerald-700" :
+                                      c.delivery_status === "FAILED" ? "bg-red-50 text-red-700" :
+                                      "bg-amber-50 text-amber-700"
+                                    }`}>
+                                      {c.delivery_status === "SENT" && <CheckCircle2 className="h-3 w-3" />}
+                                      {c.delivery_status === "DELIVERED" && <CheckCircle2 className="h-3 w-3" />}
+                                      {c.delivery_status === "READ" && <CheckCircle2 className="h-3 w-3" />}
+                                      {c.delivery_status === "FAILED" && <XCircle className="h-3 w-3" />}
+                                      {c.delivery_status}
+                                    </span>
+                                  )}
+                                  {c.channel !== "WHATSAPP" && c.status && c.status !== "PENDING" && (
+                                    <Badge variant={c.status === "SENT" || c.status === "STORED" ? "success" : c.status === "FAILED" ? "danger" : "warning"} className="text-[10px]">
+                                      {c.status}
+                                    </Badge>
+                                  )}
+                                  {c.template_name && (
+                                    <Badge variant="outline" className="text-[10px] text-gray-400">
+                                      {c.template_name}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className="text-sm text-gray-700 mt-1.5 whitespace-pre-wrap line-clamp-3">{c.message}</p>
+                                <div className="flex items-center gap-3 mt-1.5">
+                                  <span className="text-[11px] text-gray-400">
+                                    {format(new Date(c.created_at), "dd MMM yyyy, hh:mm a")}
+                                  </span>
+                                  {c.sent_by_name && (
+                                    <span className="text-[11px] text-gray-400 flex items-center gap-1">
+                                      <User className="h-3 w-3" /> {c.sent_by_name}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                            {c.notes && <p className="text-gray-500 text-[12px] mt-0.5 ml-6">{c.notes}</p>}
+                            <div className="flex items-center gap-1 shrink-0">
+                              {c.channel === "WHATSAPP" && !c.provider_message_id && (
+                                <button
+                                  onClick={() => {
+                                    const phone = lead?.mobile?.replace(/[^0-9]/g, "")
+                                    if (phone) {
+                                      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(c.message)}`, "_blank")
+                                    }
+                                  }}
+                                  className="h-7 w-7 rounded-lg hover:bg-green-50 flex items-center justify-center text-gray-400 hover:text-green-600 transition-colors"
+                                  title="Open in WhatsApp"
+                                >
+                                  <ExternalLink className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
                           </div>
-                          <span className="text-[11px] text-gray-400">{format(new Date(c.created_at), "dd MMM hh:mm a")}</span>
                         </div>
                       ))}
                     </div>
@@ -683,23 +874,46 @@ export default function LeadDetail() {
 
             <div className="space-y-4">
               <Card className="border-gray-200">
-                <div className="px-4 py-3 border-b border-gray-100">
-                  <h3 className="text-sm font-semibold text-gray-800">Activity Timeline</h3>
+                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                  <h3 className="text-sm font-semibold text-gray-800">Call Log</h3>
+                  <span className="text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">{callItems.length}</span>
                 </div>
-                <CardContent className="p-4">
-                  {timelineItems.length === 0 ? (
-                    <p className="text-xs text-gray-400 py-4 text-center">No activity yet</p>
+                <CardContent className="p-0">
+                  {callItems.length === 0 ? (
+                    <div className="py-8 text-center">
+                      <PhoneCall className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                      <p className="text-sm text-gray-400">No calls logged</p>
+                    </div>
                   ) : (
-                    <div className="space-y-0">
-                      {timelineItems.map((item, i) => (
-                        <div key={`${item.type}-${i}`} className="flex gap-3 text-sm">
-                          <div className="flex flex-col items-center">
-                            <div className={`h-2 w-2 rounded-full ${item.color} shrink-0`} />
-                            {i < timelineItems.length - 1 && <div className="w-px flex-1 bg-gray-200 min-h-[24px]" />}
-                          </div>
-                          <div className="pb-4">
-                            <p className="font-medium text-gray-700 text-[13px]">{item.label}</p>
-                            <p className="text-[11px] text-gray-400">{format(new Date(item.date), "dd MMM yyyy hh:mm a")}</p>
+                    <div className="divide-y divide-gray-50">
+                      {callItems.map((c) => (
+                        <div key={c.id} className="px-4 py-3 hover:bg-gray-50/50 transition-colors">
+                          <div className="flex items-start gap-3">
+                            <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${
+                              c.outcome === "INTERESTED" || c.outcome === "CONVERTED" ? "bg-green-50" :
+                              c.outcome === "NOT_INTERESTED" ? "bg-red-50" :
+                              "bg-gray-50"
+                            }`}>
+                              <PhoneCall className={`h-4 w-4 ${
+                                c.outcome === "INTERESTED" || c.outcome === "CONVERTED" ? "text-green-600" :
+                                c.outcome === "NOT_INTERESTED" ? "text-red-600" :
+                                "text-gray-500"
+                              }`} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-gray-700 text-[13px]">{c.outcome?.replace(/_/g, " ") || "Unknown"}</span>
+                                {c.duration_seconds && (
+                                  <span className="text-[10px] text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded font-mono">
+                                    {Math.floor(c.duration_seconds / 60)}m {c.duration_seconds % 60}s
+                                  </span>
+                                )}
+                              </div>
+                              {c.notes && <p className="text-gray-500 text-[12px] mt-0.5 line-clamp-2">{c.notes}</p>}
+                              <span className="text-[10px] text-gray-400 mt-1 block">
+                                {format(new Date(c.created_at), "dd MMM, hh:mm a")}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -707,42 +921,206 @@ export default function LeadDetail() {
                   )}
                 </CardContent>
               </Card>
+
+              <Card className="border-gray-200">
+                <CardContent className="p-4 space-y-2">
+                  <Button size="sm" className="w-full" onClick={handleCall}>
+                    <Phone className="h-3.5 w-3.5 mr-1.5" /> Call Now
+                  </Button>
+                  <Button size="sm" variant="outline" className="w-full" onClick={() => setCallOutcomeOpen(true)}>
+                    <Plus className="h-3.5 w-3.5 mr-1.5" /> Log Call Outcome
+                  </Button>
+                </CardContent>
+              </Card>
             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="notes" className="space-y-4">
+          <Card className="border-gray-200">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h3 className="text-sm font-semibold text-gray-800">Notes</h3>
+              <Button size="sm" variant="outline" onClick={() => setNoteOpen(true)}>
+                <Plus className="h-3.5 w-3.5 mr-1" /> Add Note
+              </Button>
+            </div>
+            <CardContent className="p-5">
+              {commItems.filter((c) => c.channel === "NOTE").length === 0 ? (
+                <div className="py-8 text-center">
+                  <FileText className="h-10 w-10 mx-auto mb-3 text-gray-300" />
+                  <p className="text-sm text-gray-400">No notes yet</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {commItems.filter((c) => c.channel === "NOTE").map((note) => (
+                    <div key={note.id} className="rounded-lg border border-gray-100 p-3 bg-white hover:border-gray-200 transition-colors">
+                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{note.message}</p>
+                      <div className="flex items-center gap-3 mt-2 text-[11px] text-gray-400">
+                        <span>{format(new Date(note.created_at), "dd MMM yyyy, hh:mm a")}</span>
+                        <Badge variant="outline" className="text-[10px]">Staff Note</Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="feedback" className="space-y-4">
+          <Card className="border-gray-200">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-800">Lead Feedback</h3>
+            </div>
+            <CardContent className="p-5">
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-sm font-medium">Rating</Label>
+                  <div className="flex gap-1 mt-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setFeedbackRating(star)}
+                        className={`h-10 w-10 rounded-lg flex items-center justify-center transition-all ${
+                          star <= feedbackRating
+                            ? "bg-amber-100 text-amber-500 scale-110"
+                            : "bg-gray-50 text-gray-300 hover:bg-gray-100"
+                        }`}
+                      >
+                        <Star className="h-5 w-5" fill={star <= feedbackRating ? "currentColor" : "none"} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Comment</Label>
+                  <Textarea
+                    value={feedbackComment}
+                    onChange={(e) => setFeedbackComment(e.target.value)}
+                    rows={4}
+                    placeholder="Share your feedback about this lead..."
+                    className="mt-2"
+                  />
+                </div>
+                <Button
+                  onClick={() => {
+                    if (!feedbackComment.trim()) {
+                      addToast({ title: "Validation", description: "Please enter feedback", variant: "destructive" })
+                      return
+                    }
+                    leadsApi.addCommunication(lead.id, {
+                      channel: "FEEDBACK",
+                      message: JSON.stringify({ rating: feedbackRating, comment: feedbackComment }),
+                    }).then(() => {
+                      queryClient.invalidateQueries({ queryKey: ["lead", lead.id] })
+                      queryClient.invalidateQueries({ queryKey: ["lead-communications", lead.id] })
+                      queryClient.invalidateQueries({ queryKey: ["lead-analytics"] })
+                      queryClient.invalidateQueries({ queryKey: ["crm-dashboard"] })
+                      addToast({ title: "Feedback recorded", variant: "success" })
+                      setFeedbackRating(0)
+                      setFeedbackComment("")
+                    }).catch(() => {
+                      addToast({ title: "Error", description: "Failed to save feedback", variant: "destructive" })
+                    })
+                  }}
+                  disabled={!feedbackComment.trim()}
+                >
+                  <Star className="h-4 w-4 mr-1.5" /> Submit Feedback
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="conversion" className="space-y-4">
           {lead.status === "CONVERTED" ? (
             <Card className="border-gray-200">
               <CardContent className="py-8 text-center">
-                <CheckCircle2 className="h-12 w-12 text-emerald-500 mx-auto mb-3" />
-                <h3 className="text-base font-semibold text-gray-900 mb-1">Lead Converted</h3>
+                <div className="h-16 w-16 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle2 className="h-8 w-8 text-green-500" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-1">Lead Converted</h3>
                 <p className="text-sm text-gray-500 mb-4">
-                  This lead was converted to patient {lead.converted_patient_id ? `#${lead.converted_patient_id.slice(-6).toUpperCase()}` : ""}
+                  This lead was successfully converted to a patient
+                  {lead.converted_patient_id ? ` (#${lead.converted_patient_id.slice(-6).toUpperCase()})` : ""}
                 </p>
-                {lead.converted_patient_id && (
-                  <Button onClick={() => navigate(`/patients/${lead.converted_patient_id}`)}>
-                    <Users className="h-4 w-4 mr-1.5" /> View Patient
-                  </Button>
-                )}
+                <div className="flex items-center justify-center gap-3">
+                  {lead.converted_patient_id && (
+                    <Button onClick={() => navigate(`/patients/${lead.converted_patient_id}`)}>
+                      <Users className="h-4 w-4 mr-1.5" /> View Patient Profile
+                    </Button>
+                  )}
+                </div>
               </CardContent>
             </Card>
-          ) : lead.status === "LOST" || lead.status === "NOT_INTERESTED" || lead.status === "NO_RESPONSE" ? (
+          ) : lead.status === "LOST" || lead.status === "NOT_INTERESTED" ? (
             <Card className="border-gray-200">
               <CardContent className="py-8 text-center">
                 <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-3" />
                 <h3 className="text-base font-semibold text-gray-900 mb-1">Lead Inactive</h3>
-                <p className="text-sm text-gray-500">This lead was marked as {lead.status.replace(/_/g, " ").toLowerCase()}.</p>
+                <p className="text-sm text-gray-500">
+                  This lead was marked as {lead.status === "NOT_INTERESTED" ? "closed" : lead.status.toLowerCase()}.
+                </p>
+                <Button variant="outline" className="mt-4" onClick={() => setStatusChangeOpen(true)}>
+                  <RefreshCw className="h-4 w-4 mr-1.5" /> Change Status
+                </Button>
               </CardContent>
             </Card>
           ) : (
             <Card className="border-gray-200">
-              <div className="px-4 py-3 border-b border-gray-100">
+              <div className="px-5 py-4 border-b border-gray-100">
                 <h3 className="text-sm font-semibold text-gray-800">Convert to Patient</h3>
               </div>
-              <CardContent className="p-4 space-y-4">
-                <p className="text-sm text-gray-500">Converting this lead will create a new patient record and case.</p>
-                <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => openConvert(lead)}>
+              <CardContent className="p-5 space-y-4">
+                <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-4 text-sm text-emerald-800">
+                  <div className="flex items-start gap-3">
+                    <Target className="h-5 w-5 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-medium mb-1">Ready to convert this lead?</p>
+                      <p className="text-emerald-700">
+                        Converting will create a new patient record and OP registration.
+                        The original lead will be preserved for audit purposes.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="p-3 rounded-lg bg-gray-50">
+                    <p className="text-xs text-gray-500">Patient Name</p>
+                    <p className="font-medium text-gray-900">{lead.lead_name}</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-gray-50">
+                    <p className="text-xs text-gray-500">Phone</p>
+                    <p className="font-medium text-gray-900">{lead.mobile}</p>
+                  </div>
+                  {lead.email && (
+                    <div className="p-3 rounded-lg bg-gray-50">
+                      <p className="text-xs text-gray-500">Email</p>
+                      <p className="font-medium text-gray-900">{lead.email}</p>
+                    </div>
+                  )}
+                  {lead.interested_treatment && (
+                    <div className="p-3 rounded-lg bg-gray-50">
+                      <p className="text-xs text-gray-500">Treatment Interest</p>
+                      <p className="font-medium text-gray-900">{lead.interested_treatment}</p>
+                    </div>
+                  )}
+                </div>
+                <Button
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  onClick={() => {
+                    setConvertForm({
+                      full_name: lead.lead_name, email: lead.email || "", phone: lead.mobile,
+                      gender: lead.gender || "", age: lead.age?.toString() || "",
+                      patient_source: lead.source || "", source_campaign_name: "",
+                      source_campaign_id: "", source_campaign_date: "", address: lead.city || "",
+                      medical_history: lead.notes || "", abha_id: "",
+                      height: "", weight: "", bp: "", sugar: "", spo2: "", op_no: "",
+                    })
+                    setConvertOpen(true)
+                  }}
+                >
                   <Target className="h-4 w-4 mr-1.5" /> Convert Now
                 </Button>
               </CardContent>
@@ -750,6 +1128,41 @@ export default function LeadDetail() {
           )}
         </TabsContent>
       </Tabs>
+
+      <Dialog open={statusChangeOpen} onOpenChange={setStatusChangeOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Change Lead Status</DialogTitle>
+            <DialogDescription>Select the new status for this lead</DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Label>New Status</Label>
+            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                {statusOptions.map((s) => (
+                  <SelectItem key={s} value={s} disabled={s === lead.status}>
+                    <span className="flex items-center gap-2">
+                      {s === lead.status ? "✓ " : ""}{s.replace(/_/g, " ")}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStatusChangeOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => selectedStatus && statusMutation.mutate(selectedStatus)}
+              disabled={!selectedStatus || statusMutation.isPending}
+            >
+              {statusMutation.isPending ? "Updating..." : "Update Status"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
@@ -798,15 +1211,28 @@ export default function LeadDetail() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
-            <Button onClick={handleUpdate} disabled={updateMutation.isPending}>Save</Button>
+            <Button onClick={() => {
+              updateMutation.mutate({
+                lead_name: leadName, mobile, email: email || undefined,
+                age: age ? parseInt(age) : undefined, gender: gender || undefined,
+                city: city || undefined, source,
+                interested_treatment: interestedTreatment || undefined,
+                budget: budget ? parseFloat(budget) : undefined,
+                preferred_visit_date: preferredVisitDate || undefined,
+                notes: notes || undefined,
+                lead_score: leadScore ? parseInt(leadScore) : undefined,
+                priority: priority || undefined,
+              })
+            }} disabled={updateMutation.isPending}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={callOutcomeOpen} onOpenChange={setCallOutcomeOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Record Call Outcome</DialogTitle>
-            <DialogDescription>How did the call go? Select an outcome below.</DialogDescription>
+          <DialogHeader>
+            <DialogTitle>Record Call Outcome</DialogTitle>
+            <DialogDescription>How did the call go?</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div>
@@ -823,8 +1249,12 @@ export default function LeadDetail() {
             <div><Label>Notes</Label><Textarea value={callNotes} onChange={(e) => setCallNotes(e.target.value)} rows={3} placeholder="Call notes..." /></div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCallOutcomeOpen(false)}>Skip</Button>
-            <Button onClick={() => callMutation.mutate({ outcome: callOutcome, notes: callNotes || undefined, follow_up_date: callFollowUp || undefined, duration_seconds: callDuration ? parseInt(callDuration) : undefined })} disabled={callMutation.isPending || !callOutcome}>
+            <Button variant="outline" onClick={() => setCallOutcomeOpen(false)}>Cancel</Button>
+            <Button onClick={() => callMutation.mutate({
+              outcome: callOutcome, notes: callNotes || undefined,
+              follow_up_date: callFollowUp || undefined,
+              duration_seconds: callDuration ? parseInt(callDuration) : undefined,
+            })} disabled={callMutation.isPending || !callOutcome}>
               {callMutation.isPending ? "Saving..." : "Save Call"}
             </Button>
           </DialogFooter>
@@ -854,85 +1284,332 @@ export default function LeadDetail() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={followUpOpen} onOpenChange={setFollowUpOpen}>
+      <Dialog open={noteOpen} onOpenChange={setNoteOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Schedule Follow-up</DialogTitle></DialogHeader>
-          <div className="space-y-3 py-2">
-            <div><Label>Date *</Label><Input type="date" value={fuDate} onChange={(e) => setFuDate(e.target.value)} /></div>
-            <div><Label>Time</Label><Input type="time" value={fuTime} onChange={(e) => setFuTime(e.target.value)} /></div>
-            <div><Label>Reason</Label><Input value={fuReason} onChange={(e) => setFuReason(e.target.value)} placeholder="e.g. Follow up on treatment interest" /></div>
-            <div><Label>Notes</Label><Textarea value={fuNotes} onChange={(e) => setFuNotes(e.target.value)} rows={3} placeholder="Additional notes..." /></div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setFollowUpOpen(false)}>Cancel</Button>
-            <Button onClick={() => followUpMutation.mutate({ follow_up_date: fuDate, follow_up_time: fuTime || undefined, reason: fuReason || undefined, notes: fuNotes || undefined })} disabled={followUpMutation.isPending || !fuDate}>Schedule</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={apptOpen} onOpenChange={setApptOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Book Appointment</DialogTitle></DialogHeader>
-          <div className="space-y-3 py-2">
-            <div><Label>Date *</Label><Input type="date" value={apptDate} onChange={(e) => setApptDate(e.target.value)} /></div>
-            <div><Label>Time</Label><Input type="time" value={apptTime} onChange={(e) => setApptTime(e.target.value)} /></div>
-            <div><Label>Doctor</Label>
-              <Select value={apptDoctor} onValueChange={setApptDoctor}>
-                <SelectTrigger><SelectValue placeholder="Select doctor (optional)" /></SelectTrigger>
-                <SelectContent>
-                  {doctors.length > 0 ? doctors.map((doc: DoctorListItem) => (
-                    <SelectItem key={doc.id} value={doc.id}>{doc.full_name}</SelectItem>
-                  )) : <SelectItem value="__none__" disabled>No doctors available</SelectItem>}
-                </SelectContent>
-              </Select>
-            </div>
-            <div><Label>Notes</Label><Textarea value={apptNotes} onChange={(e) => setApptNotes(e.target.value)} rows={3} placeholder="Appointment notes..." /></div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setApptOpen(false)}>Cancel</Button>
-            <Button onClick={() => apptMutation.mutate({ appointment_date: apptDate, appointment_time: apptTime || undefined, doctor_id: apptDoctor || undefined, notes: apptNotes || undefined })} disabled={apptMutation.isPending || !apptDate}>Book</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={convertOpen} onOpenChange={setConvertOpen}>
-        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Convert Lead to Patient</DialogTitle>
-            <DialogDescription>A new patient record and case will be created. The lead history will be preserved.</DialogDescription>
+          <DialogHeader>
+            <DialogTitle>Add Note</DialogTitle>
+            <DialogDescription>Record an internal note about this lead</DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-3 py-2">
-            <div className="col-span-2"><Label>Patient Name</Label><Input value={convertPatientName} onChange={(e) => setConvertPatientName(e.target.value)} placeholder="Full name" /></div>
-            <div><Label>Phone</Label><Input value={convertPhone} onChange={(e) => setConvertPhone(e.target.value)} /></div>
-            <div><Label>Email</Label><Input value={convertEmail} onChange={(e) => setConvertEmail(e.target.value)} /></div>
-            <div><Label>Age</Label><NumericInput mode="integer" min={0} max={150} value={convertAge} onChange={(v) => setConvertAge(v)} /></div>
-            <div><Label>Gender</Label>
-              <Select value={convertGender} onValueChange={setConvertGender}>
-                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="MALE">Male</SelectItem>
-                  <SelectItem value="FEMALE">Female</SelectItem>
-                  <SelectItem value="OTHER">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="col-span-2"><Label>City</Label><Input value={convertCity} onChange={(e) => setConvertCity(e.target.value)} /></div>
-            <div className="col-span-2"><Label>Notes</Label><Textarea value={convertNotes} onChange={(e) => setConvertNotes(e.target.value)} rows={3} /></div>
+          <div className="space-y-3 py-2">
+            <div><Label>Note</Label><Textarea value={noteText} onChange={(e) => setNoteText(e.target.value)} rows={4} placeholder="Enter your note..." /></div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConvertOpen(false)}>Cancel</Button>
-            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => {
-              const data: Record<string, string | number | undefined> = {}
-              if (convertPatientName) data.patient_name = convertPatientName
-              if (convertAge) data.age = parseInt(convertAge)
-              if (convertGender) data.gender = convertGender
-              if (convertPhone) data.phone = convertPhone
-              if (convertEmail) data.email = convertEmail
-              if (convertCity) data.city = convertCity
-              if (convertNotes) data.notes = convertNotes
-              convertMutation.mutate(data)
-            }} disabled={convertMutation.isPending}>
-              {convertMutation.isPending ? "Converting..." : "Convert to Patient"}
+            <Button variant="outline" onClick={() => { setNoteOpen(false); setNoteText("") }}>Cancel</Button>
+            <Button onClick={() => noteText.trim() && noteMutation.mutate(noteText.trim())} disabled={!noteText.trim() || noteMutation.isPending}>
+              {noteMutation.isPending ? "Saving..." : "Save Note"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={convertOpen} onOpenChange={(o) => { if (!o) { setConvertStep(1) } setConvertOpen(o) }}>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col">
+          <DialogHeader className="px-6 pt-6 pb-0 shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+                <Target className="h-5 w-5 text-emerald-600" />
+              </div>
+              <div>
+                <DialogTitle>Convert Lead to Patient</DialogTitle>
+                <DialogDescription>
+                  {convertStep === 1 ? "Review lead information and complete patient details" : "Confirm the conversion before proceeding"}
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          {convertStep === 1 && (
+            <div className="overflow-y-auto px-6 py-4 space-y-4 flex-1">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <User className="h-4 w-4 text-blue-600" />
+                    <h4 className="text-xs font-semibold text-blue-800 uppercase tracking-wider">Lead Information</h4>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Name</span>
+                      <span className="font-medium text-gray-900">{convertForm.full_name || lead.lead_name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Phone</span>
+                      <span className="font-medium text-gray-900">{convertForm.phone || lead.mobile}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Email</span>
+                      <span className="font-medium text-gray-900">{convertForm.email || lead.email || "—"}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Source</span>
+                      <span className="font-medium text-gray-900">{lead.source?.replace(/_/g, " ")}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Treatment</span>
+                      <span className="font-medium text-gray-900">{lead.interested_treatment || "—"}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Budget</span>
+                      <span className="font-medium text-gray-900">{lead.budget ? `₹${lead.budget.toLocaleString()}` : "—"}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Status</span>
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${statusInfo.bg} ${statusInfo.text}`}>{statusInfo.label}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-emerald-100 bg-emerald-50/50 p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Users className="h-4 w-4 text-emerald-600" />
+                    <h4 className="text-xs font-semibold text-emerald-800 uppercase tracking-wider">Patient Profile</h4>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Name</span>
+                      <span className="font-medium text-gray-900">{convertForm.full_name || lead.lead_name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Phone</span>
+                      <span className="font-medium text-gray-900">{convertForm.phone || lead.mobile}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Email</span>
+                      <span className="font-medium text-gray-900">{convertForm.email || lead.email || "—"}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Gender</span>
+                      <span className="font-medium text-gray-900">{convertForm.gender || lead.gender || "—"}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Age</span>
+                      <span className="font-medium text-gray-900">{convertForm.age || lead.age?.toString() || "—"}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Source</span>
+                      <span className="font-medium text-gray-900">Lead Conversion</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">OP No.</span>
+                      <span className="font-medium text-gray-900">{convertForm.op_no || "Auto-generated"}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-gray-100 pt-4">
+                <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-3">Patient Registration Details</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="conv-name" className="text-xs">Full Name <span className="text-red-500">*</span></Label>
+                    <Input id="conv-name" className="h-9" value={convertForm.full_name} onChange={(e) => setConvertForm({ ...convertForm, full_name: e.target.value })} required />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="conv-phone" className="text-xs">Phone <span className="text-red-500">*</span></Label>
+                    <Input id="conv-phone" className="h-9" value={convertForm.phone} onChange={(e) => setConvertForm({ ...convertForm, phone: e.target.value })} required />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="conv-email" className="text-xs">Email</Label>
+                    <Input id="conv-email" type="email" className="h-9" value={convertForm.email} onChange={(e) => setConvertForm({ ...convertForm, email: e.target.value })} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="conv-gender" className="text-xs">Gender</Label>
+                    <select id="conv-gender" value={convertForm.gender} onChange={(e) => setConvertForm({ ...convertForm, gender: e.target.value })}
+                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                      <option value="">Select</option>
+                      <option value="MALE">Male</option>
+                      <option value="FEMALE">Female</option>
+                      <option value="OTHER">Other</option>
+                    </select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="conv-age" className="text-xs">Age</Label>
+                    <NumericInput id="conv-age" mode="integer" min={0} max={150} className="h-9" value={convertForm.age} onChange={(v) => setConvertForm({ ...convertForm, age: v })} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="conv-address" className="text-xs">Address</Label>
+                    <Input id="conv-address" className="h-9" value={convertForm.address} onChange={(e) => setConvertForm({ ...convertForm, address: e.target.value })} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="conv-op-no" className="text-xs">OP No.</Label>
+                    <Input id="conv-op-no" className="h-9" value={convertForm.op_no} onChange={(e) => setConvertForm({ ...convertForm, op_no: e.target.value })} placeholder="Auto" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="conv-abha-id" className="text-xs">ABHA ID</Label>
+                    <Input id="conv-abha-id" className="h-9" value={convertForm.abha_id} onChange={(e) => setConvertForm({ ...convertForm, abha_id: e.target.value })} placeholder="14-digit" maxLength={20} />
+                  </div>
+                  <div className="col-span-2 grid gap-2">
+                    <Label htmlFor="conv-source" className="text-xs">How Did You Hear About Us?</Label>
+                    <SearchableSelect value={convertForm.patient_source} onValueChange={(v) => setConvertForm({ ...convertForm, patient_source: v })}
+                      options={["Walk-In","Google Search","Google Maps","Instagram","Facebook","WhatsApp","Website","Referral - Existing Patient","Referral - Doctor","Referral - Clinic","Advertisement","Banner","Newspaper","YouTube","Campaign","Event","Lead","Other"]}
+                      placeholder="Search or select source..." />
+                  </div>
+                  {convertForm.patient_source === "Campaign" && (
+                    <div className="col-span-2 grid grid-cols-3 gap-3 rounded-lg border border-blue-100 bg-blue-50 p-3">
+                      <div className="grid gap-1">
+                        <Label className="text-xs">Campaign Name</Label>
+                        <Input className="h-8 text-xs" placeholder="Campaign name" value={convertForm.source_campaign_name}
+                          onChange={(e) => setConvertForm({ ...convertForm, source_campaign_name: e.target.value })} />
+                      </div>
+                      <div className="grid gap-1">
+                        <Label className="text-xs">Campaign ID</Label>
+                        <Input className="h-8 text-xs" placeholder="ID" value={convertForm.source_campaign_id}
+                          onChange={(e) => setConvertForm({ ...convertForm, source_campaign_id: e.target.value })} />
+                      </div>
+                      <div className="grid gap-1">
+                        <Label className="text-xs">Campaign Date</Label>
+                        <Input type="date" className="h-8 text-xs" value={convertForm.source_campaign_date}
+                          onChange={(e) => setConvertForm({ ...convertForm, source_campaign_date: e.target.value })} />
+                      </div>
+                    </div>
+                  )}
+                  <div className="col-span-2 grid gap-2">
+                    <Label htmlFor="conv-medical-history" className="text-xs">Medical History</Label>
+                    <Textarea id="conv-medical-history" value={convertForm.medical_history}
+                      onChange={(e) => setConvertForm({ ...convertForm, medical_history: e.target.value })}
+                      placeholder="Past medical history, allergies, medications..." rows={2} />
+                  </div>
+                  <div className="col-span-2 border-t pt-3">
+                    <p className="text-xs font-semibold text-gray-600 mb-2">Vitals (Optional)</p>
+                    <div className="grid grid-cols-5 gap-3">
+                      <div className="grid gap-1">
+                        <Label className="text-[10px]">Height (cm)</Label>
+                        <NumericInput mode="decimal" decimalPlaces={1} suffix="cm" className="h-8 text-xs" value={convertForm.height} onChange={(v) => setConvertForm({ ...convertForm, height: v })} />
+                      </div>
+                      <div className="grid gap-1">
+                        <Label className="text-[10px]">Weight (kg)</Label>
+                        <NumericInput mode="decimal" decimalPlaces={1} suffix="kg" className="h-8 text-xs" value={convertForm.weight} onChange={(v) => setConvertForm({ ...convertForm, weight: v })} />
+                      </div>
+                      <div className="grid gap-1">
+                        <Label className="text-[10px]">BP</Label>
+                        <Input className="h-8 text-xs" placeholder="120/80" value={convertForm.bp} onChange={(e) => setConvertForm({ ...convertForm, bp: e.target.value })} />
+                      </div>
+                      <div className="grid gap-1">
+                        <Label className="text-[10px]">Sugar</Label>
+                        <Input className="h-8 text-xs" placeholder="mg/dL" value={convertForm.sugar} onChange={(e) => setConvertForm({ ...convertForm, sugar: e.target.value })} />
+                      </div>
+                      <div className="grid gap-1">
+                        <Label className="text-[10px]">SpO2 (%)</Label>
+                        <NumericInput mode="decimal" decimalPlaces={1} suffix="%" className="h-8 text-xs" placeholder="98" value={convertForm.spo2} onChange={(v) => setConvertForm({ ...convertForm, spo2: v })} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {convertStep === 2 && (
+            <div className="overflow-y-auto px-6 py-4 space-y-4 flex-1">
+              <div className="rounded-lg bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium mb-1">Please confirm the conversion</p>
+                    <p className="text-amber-700 text-xs">
+                      The lead will be converted to a patient and a welcome message will be sent.
+                      The original lead record will be preserved for audit purposes.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-lg border border-gray-200 p-4">
+                  <h4 className="text-xs font-semibold text-blue-800 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <User className="h-3.5 w-3.5" /> Lead Record
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between py-1 border-b border-gray-50">
+                      <span className="text-gray-500 text-xs">Name</span>
+                      <span className="font-medium text-gray-900 text-xs">{lead.lead_name}</span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-gray-50">
+                      <span className="text-gray-500 text-xs">Phone</span>
+                      <span className="font-medium text-gray-900 text-xs">{lead.mobile}</span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-gray-50">
+                      <span className="text-gray-500 text-xs">Status</span>
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${statusInfo.bg} ${statusInfo.text}`}>{statusInfo.label}</span>
+                    </div>
+                    <div className="flex justify-between py-1">
+                      <span className="text-gray-500 text-xs">Source</span>
+                      <span className="font-medium text-gray-900 text-xs">{lead.source?.replace(/_/g, " ")}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="rounded-lg border border-gray-200 p-4">
+                  <h4 className="text-xs font-semibold text-emerald-800 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <Users className="h-3.5 w-3.5" /> Patient Record
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between py-1 border-b border-gray-50">
+                      <span className="text-gray-500 text-xs">Name</span>
+                      <span className="font-medium text-gray-900 text-xs">{convertForm.full_name || lead.lead_name}</span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-gray-50">
+                      <span className="text-gray-500 text-xs">Phone</span>
+                      <span className="font-medium text-gray-900 text-xs">{convertForm.phone || lead.mobile}</span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-gray-50">
+                      <span className="text-gray-500 text-xs">Gender</span>
+                      <span className="font-medium text-gray-900 text-xs">{convertForm.gender || lead.gender || "—"}</span>
+                    </div>
+                    <div className="flex justify-between py-1">
+                      <span className="text-gray-500 text-xs">Age</span>
+                      <span className="font-medium text-gray-900 text-xs">{convertForm.age || lead.age?.toString() || "—"}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-lg bg-emerald-50 border border-emerald-100 p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <MessageCircle className="h-4 w-4 text-emerald-600" />
+                  <h4 className="text-xs font-semibold text-emerald-800">Post-Conversion Welcome Message</h4>
+                </div>
+                <p className="text-xs text-emerald-700 whitespace-pre-wrap">
+                  Hello {convertForm.full_name || lead.lead_name},{'\n\n'}
+                  Welcome to {lead.hospital_name || "our hospital"}.{'\n\n'}
+                  Your registration has been successfully completed and your enquiry has been converted into a patient profile.{'\n\n'}
+                  Thank you for choosing {lead.hospital_name || "our hospital"}.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-gray-100">
+            {convertStep === 1 ? (
+              <>
+                <Button variant="outline" onClick={() => { setConvertOpen(false); setConvertStep(1) }}>Cancel</Button>
+                <Button onClick={() => setConvertStep(2)}>
+                  <ArrowRight className="h-4 w-4 mr-1.5" /> Continue to Review
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => setConvertStep(1)}>
+                  <ArrowLeft className="h-4 w-4 mr-1.5" /> Back
+                </Button>
+                <Button
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                  disabled={convertMutation.isPending}
+                  onClick={() => {
+                    const cleaned: Record<string, unknown> = {}
+                    for (const [key, value] of Object.entries(convertForm)) {
+                      if (value !== "" && value !== undefined) {
+                        if (key === "height" || key === "weight") cleaned[key] = Number(value)
+                        else cleaned[key] = value
+                      }
+                    }
+                    convertMutation.mutate(cleaned)
+                  }}
+                >
+                  {convertMutation.isPending ? (
+                    <><RefreshCw className="h-4 w-4 mr-1.5 animate-spin" /> Converting...</>
+                  ) : (
+                    <><CheckCircle2 className="h-4 w-4 mr-1.5" /> Confirm Conversion</>
+                  )}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -947,7 +1624,11 @@ export default function LeadDetail() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction className="bg-red-600 hover:bg-red-700 text-white" onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending}>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => deleteMutation.mutate()}
+              disabled={deleteMutation.isPending}
+            >
               {deleteMutation.isPending ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -24,16 +24,16 @@ export function SettingsSaveBar({
       animate={{ y: 0, opacity: 1 }}
       exit={{ y: 80, opacity: 0 }}
       transition={{ type: "spring", damping: 25, stiffness: 300 }}
-      className="fixed bottom-0 left-0 right-0 z-50"
+      className="fixed bottom-0 left-0 right-0 z-[var(--ds-z-sticky)]"
     >
-      <div className="bg-white/90 backdrop-blur-xl border-t border-[var(--color-border)] shadow-[0_-4px_20px_-4px_rgba(0,0,0,0.08)]">
+      <div className="bg-[var(--ds-surface)]/90 backdrop-blur-xl border-t border-[var(--ds-border)] shadow-[0_-4px_20px_-4px_rgba(0,0,0,0.08)]">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className={cn(
               "w-2 h-2 rounded-full",
-              hasChanges ? "bg-[var(--color-warning)] animate-pulse" : "bg-[var(--color-success)]"
+              hasChanges ? "bg-[var(--ds-warning)] animate-pulse" : "bg-[var(--ds-success)]"
             )} />
-            <span className="text-sm font-medium text-[var(--color-text-secondary)]">
+            <span className="text-sm font-medium text-[var(--ds-text-secondary)]">
               {hasChanges ? "Unsaved changes" : "All changes saved"}
             </span>
           </div>
@@ -42,9 +42,9 @@ export function SettingsSaveBar({
               onClick={onReset}
               disabled={isSaving || !hasChanges}
               className={cn(
-                "h-8 px-3 rounded-lg text-sm font-medium transition-all",
-                "border border-[var(--color-border)] bg-white text-[var(--color-text-secondary)]",
-                "hover:bg-[var(--color-bg)] hover:text-[var(--color-text-primary)]",
+                "h-8 px-3 rounded-[var(--ds-radius-lg)] text-sm font-medium transition-all",
+                "border border-[var(--ds-border)] bg-[var(--ds-surface)] text-[var(--ds-text-secondary)]",
+                "hover:bg-[var(--ds-surface-hover)] hover:text-[var(--ds-text)]",
                 "disabled:opacity-50 disabled:cursor-not-allowed"
               )}
             >
@@ -54,11 +54,11 @@ export function SettingsSaveBar({
               onClick={onSave}
               disabled={isSaving || !hasChanges}
               className={cn(
-                "h-8 px-4 rounded-lg text-sm font-medium transition-all",
-                "bg-[var(--color-primary)] text-white shadow-sm",
-                "hover:bg-[var(--color-primary-hover)] active:scale-[0.98]",
+                "h-8 px-4 rounded-[var(--ds-radius-lg)] text-sm font-medium transition-all",
+                "bg-[var(--ds-primary)] text-white shadow-sm",
+                "hover:bg-[var(--ds-primary-hover)] active:scale-[0.98]",
                 "disabled:opacity-50 disabled:cursor-not-allowed",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]/30"
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-primary)]/30"
               )}
             >
               {isSaving ? (

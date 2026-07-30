@@ -59,6 +59,8 @@ interface EnquiryDetail {
   created_at?: string; updated_at?: string
   description: string; notes?: string; trigger_event?: string
   generation_reason?: string; visit_number?: number; total_visits?: number
+  occurrence_number?: number
+  total_attempts?: number
   patient?: {
     id: string; name?: string; phone?: string; email?: string; age?: number; gender?: string
     op_number?: string; status?: string; address?: string; city?: string
@@ -341,6 +343,13 @@ export function EnquiryDetailSheet({
                     <Badge className={`text-[10px] border-0 ${STATUS_STYLES[item.status || ""] || "bg-slate-100"}`}>
                       {item.status}
                     </Badge>
+                    {item.enquiry_type === "LEAD_FOLLOW_UP" && item.occurrence_number && (
+                      <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200">
+                        {item.total_attempts
+                          ? `Attempt ${item.occurrence_number} of ${item.total_attempts}`
+                          : `Attempt #${item.occurrence_number}`}
+                      </Badge>
+                    )}
                   </div>
                 </div>
               </div>

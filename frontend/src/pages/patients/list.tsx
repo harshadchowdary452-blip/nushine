@@ -8,16 +8,13 @@ import {
   flexRender,
   type ColumnDef,
 } from "@tanstack/react-table"
-import { motion } from "framer-motion"
 import { Plus, Eye, Edit, Trash2, Users, UserPlus, SlidersHorizontal } from "lucide-react"
 import { format } from "date-fns"
-import PageHeader from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { NumericInput } from "@/components/ui/numeric-input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog"
@@ -27,11 +24,11 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import SearchableSelect from "@/components/ui/searchable-select"
 import { patientsApi, doctorsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
-import DentalEmptyState from "@/components/ui/dental-empty-state"
 import QuickExport from "@/components/ui/quick-export"
 import { useServerFilters } from "@/hooks/useServerFilters"
 import { FilterChips } from "@/components/ui/filter-bar"
 import PatientFilterBar from "./filter-bar"
+import { PageHeader, EmptyState, LoadingSkeleton, Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/design-system"
 import type { Patient, PaginatedResponse, User } from "@/types"
 import { extractDetail } from "@/types"
 import { useAuthStore } from "@/store/authStore"
@@ -272,12 +269,14 @@ export default function PatientList() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Patients" description="Manage patient records">
-        {currentUser?.role !== "DOCTOR" && (
-          <Button onClick={openDialog}><Plus className="h-4 w-4" /> Add Patient</Button>
-        )}
-        <QuickExport module="patients" label="patients" />
-      </PageHeader>
+      <PageHeader title="Patients" description="Manage patient records"
+        actions={<>
+          {currentUser?.role !== "DOCTOR" && (
+            <Button onClick={openDialog}><Plus className="h-4 w-4" /> Add Patient</Button>
+          )}
+          <QuickExport module="patients" label="patients" />
+        </>}
+      />
 
       <Card>
         <CardContent className="p-6">
@@ -325,11 +324,9 @@ export default function PatientList() {
           </div>
 
           {isLoading ? (
-            <div className="space-y-3">
-              {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
-            </div>
+            <LoadingSkeleton rows={5} />
           ) : patients.length === 0 ? (
-            <DentalEmptyState
+            <EmptyState
               icon={Users}
               title={hasActiveFilters ? "No patients match your filters" : "No patients yet"}
               description={hasActiveFilters ? "Try adjusting or clearing your filters." : "Begin your patient journey by registering the first patient in your dental practice."}
@@ -343,37 +340,37 @@ export default function PatientList() {
             />
           ) : (
             <>
-              <div className="overflow-x-auto rounded-md border mobile-card-view">
-                <table className="w-full text-sm">
-                  <thead>
+              <div className="mobile-card-view">
+                <Table>
+                  <TableHeader>
                     {table.getHeaderGroups().map((hg) => (
-                      <tr key={hg.id} className="border-b bg-muted/50">
+                      <TableRow key={hg.id}>
                         {hg.headers.map((header) => (
-                          <th key={header.id} className="px-4 py-3 text-left font-medium text-muted-foreground">
+                          <TableHead key={header.id}>
                             {flexRender(header.column.columnDef.header, header.getContext())}
-                          </th>
+                          </TableHead>
                         ))}
-                      </tr>
+                      </TableRow>
                     ))}
-                  </thead>
-                  <tbody>
+                  </TableHeader>
+                  <TableBody>
                     {table.getRowModel().rows.map((row) => (
-                      <motion.tr key={row.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                        className="border-b transition-colors hover:bg-muted/50 cursor-pointer"
+                      <TableRow key={row.id}
+                        className="cursor-pointer"
                         onClick={() => navigate(`/patients/${row.original.id}`)}>
                         {row.getVisibleCells().map((cell) => {
                           const header = cell.column.columnDef.header
                           const label = typeof header === "string" ? header : cell.column.id
                           return (
-                            <td key={cell.id} className="px-4 py-3" data-label={label}>
+                            <TableCell key={cell.id} data-label={label}>
                               {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                            </td>
+                            </TableCell>
                           )
                         })}
-                      </motion.tr>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
 
               <div className="flex items-center justify-between mt-4">

@@ -831,6 +831,7 @@ export type LeadCallOutcome =
 export interface Lead {
   id: string;
   hospital_id: string;
+  hospital_name: string | null;
   assigned_staff_id: string | null;
   assigned_doctor_id: string | null;
   converted_patient_id: string | null;
@@ -851,6 +852,12 @@ export interface Lead {
   last_contacted_at: string | null;
   next_follow_up_date: string | null;
   priority: string | null;
+  automation_status: string | null;
+  current_attempt: number | null;
+  total_attempts: number | null;
+  automation_closed_at: string | null;
+  automation_closed_by: string | null;
+  automation_closure_reason: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -869,9 +876,18 @@ export interface LeadCall {
 export interface LeadCommunication {
   id: string;
   lead_id: string;
+  hospital_id: string | null;
+  sent_by: string | null;
+  sent_by_name: string | null;
   channel: string;
+  message_type: string;
+  template_name: string | null;
   message: string;
+  message_preview: string | null;
   status: string;
+  delivery_status: string | null;
+  provider_message_id: string | null;
+  direction: string;
   sent_at: string | null;
   created_at: string;
 }
@@ -1167,9 +1183,11 @@ export interface GeneratedEnquiry {
   id: string
   hospital_id: string
   patient_id: string
+  lead_id: string | null
   treatment_plan_id: string | null
   treatment_type_id: string | null
   appointment_id: string | null
+  case_id: string | null
   doctor_id: string | null
   assigned_staff_id: string | null
   rule_id: string | null
@@ -1184,7 +1202,15 @@ export interface GeneratedEnquiry {
   priority: string
   follow_up_id: string | null
   status: string
+  occurrence_number: number | null
+  total_attempts: number | null
+  recurrence_interval_days: number | null
+  chain_id: string | null
+  is_recurring: boolean | null
   created_at: string | null
+  lead?: { id: string; lead_name: string; mobile: string } | null
+  patient?: { id: string; name: string; phone: string } | null
+  patient_phone?: string | null
 }
 
 export interface GeneratedEnquiriesDashboard {

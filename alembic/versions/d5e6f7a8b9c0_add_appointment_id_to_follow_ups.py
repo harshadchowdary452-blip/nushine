@@ -1,7 +1,7 @@
 """add appointment_id to follow_ups
 
 Revision ID: d5e6f7a8b9c0
-Revises: d4e5f6a7b8c9
+Revises: d4e5f6a7b8d1
 Create Date: 2026-06-12 06:30:00.000000
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 
 revision: str = 'd5e6f7a8b9c0'
-down_revision: Union[str, None] = 'd4e5f6a7b8c9'
+down_revision: Union[str, None] = 'd4e5f6a7b8d1'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

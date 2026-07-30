@@ -1,0 +1,327 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   DESIGN SYSTEM TOKENS  —  NuShine Enterprise Dental Platform
+   Version 1.0  ·  July 2026
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer base {
+  :root {
+    /* ─── Color Palette ─── */
+    --ds-primary: #2D3B69;
+    --ds-primary-hover: #3D4F85;
+    --ds-primary-active: #1E2A4A;
+    --ds-primary-subtle: #EDEFF5;
+    --ds-primary-light: #D8DCE8;
+    --ds-primary-foreground: #FFFFFF;
+
+    --ds-accent: #C4956A;
+    --ds-accent-hover: #B58456;
+    --ds-accent-active: #A67648;
+    --ds-accent-subtle: #F7F0E8;
+    --ds-accent-light: #EDE0D0;
+    --ds-accent-foreground: #FFFFFF;
+
+    --ds-surface: #FFFFFF;
+    --ds-surface-hover: #F9F8F6;
+    --ds-surface-elevated: #FFFFFF;
+    --ds-surface-secondary: #F4F3F0;
+
+    --ds-background: #F6F5F2;
+    --ds-background-elevated: #FAF9F7;
+    --ds-background-subtle: #F0EFEC;
+
+    --ds-border: #E4E2DC;
+    --ds-border-light: #EDEBE6;
+    --ds-border-hover: #D0CDC6;
+
+    --ds-text: #1C1B18;
+    --ds-text-secondary: #6B6963;
+    --ds-text-tertiary: #9C9A94;
+    --ds-text-placeholder: #B8B6B0;
+    --ds-text-disabled: #C4C2BC;
+    --ds-text-inverse: #FFFFFF;
+
+    /* ─── Status Colors ─── */
+    --ds-success: #4A7C6F;
+    --ds-success-hover: #3D6B5F;
+    --ds-success-subtle: #E8F0ED;
+    --ds-success-foreground: #FFFFFF;
+
+    --ds-warning: #CE8F4A;
+    --ds-warning-hover: #BD7E3A;
+    --ds-warning-subtle: #F7EEE3;
+    --ds-warning-foreground: #FFFFFF;
+
+    --ds-danger: #C95A5A;
+    --ds-danger-hover: #B84848;
+    --ds-danger-subtle: #F5E8E8;
+    --ds-danger-foreground: #FFFFFF;
+
+    --ds-info: #4A7B9C;
+    --ds-info-hover: #3A6B8C;
+    --ds-info-subtle: #E8EFF4;
+    --ds-info-foreground: #FFFFFF;
+
+    /* ─── Status Semantic Maps ─── */
+    --ds-status-active-bg: var(--ds-success-subtle);
+    --ds-status-active-text: var(--ds-success);
+    --ds-status-followup-bg: var(--ds-warning-subtle);
+    --ds-status-followup-text: var(--ds-warning);
+    --ds-status-completed-bg: var(--ds-primary-subtle);
+    --ds-status-completed-text: var(--ds-primary);
+    --ds-status-inactive-bg: var(--ds-background-subtle);
+    --ds-status-inactive-text: var(--ds-text-tertiary);
+    --ds-status-discontinued-bg: var(--ds-danger-subtle);
+    --ds-status-discontinued-text: var(--ds-danger);
+    --ds-status-new-bg: var(--ds-success-subtle);
+    --ds-status-new-text: var(--ds-success);
+    --ds-status-progress-bg: var(--ds-primary-subtle);
+    --ds-status-progress-text: var(--ds-primary);
+    --ds-status-cancelled-bg: var(--ds-danger-subtle);
+    --ds-status-cancelled-text: var(--ds-danger);
+    --ds-status-scheduled-bg: var(--ds-info-subtle);
+    --ds-status-scheduled-text: var(--ds-info);
+    --ds-status-pending-bg: var(--ds-warning-subtle);
+    --ds-status-pending-text: var(--ds-warning);
+    --ds-status-paid-bg: var(--ds-success-subtle);
+    --ds-status-paid-text: var(--ds-success);
+    --ds-status-partial-bg: var(--ds-accent-subtle);
+    --ds-status-partial-text: var(--ds-accent);
+    --ds-status-overdue-bg: var(--ds-danger-subtle);
+    --ds-status-overdue-text: var(--ds-danger);
+    --ds-status-refunded-bg: var(--ds-background-subtle);
+    --ds-status-refunded-text: var(--ds-text-tertiary);
+
+    /* ─── Sidebar ─── */
+    --ds-sidebar-bg: #1E222E;
+    --ds-sidebar-surface: #262B3A;
+    --ds-sidebar-border: #2E3345;
+    --ds-sidebar-text: #A5A9B8;
+    --ds-sidebar-text-active: #FFFFFF;
+    --ds-sidebar-hover: rgba(255, 255, 255, 0.06);
+    --ds-sidebar-active-bg: rgba(255, 255, 255, 0.08);
+    --ds-sidebar-active-indicator: var(--ds-accent);
+    --ds-sidebar-icon: #7A7E90;
+    --ds-sidebar-icon-active: var(--ds-accent);
+    --ds-sidebar-width: 280px;
+    --ds-sidebar-collapsed-width: 72px;
+    --ds-sidebar-brand-h: 64px;
+    --ds-sidebar-item-h: 40px;
+    --ds-sidebar-item-gap: 2px;
+    --ds-sidebar-section-gap: 24px;
+    --ds-sidebar-padding-x: 12px;
+
+    /* ─── Header ─── */
+    --ds-header-bg: var(--ds-surface);
+    --ds-header-border: var(--ds-border);
+    --ds-header-height: 56px;
+
+    /* ─── Typography ─── */
+    --ds-font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+    --ds-font-family-heading: 'Plus Jakarta Sans', 'DM Sans', system-ui, sans-serif;
+    --ds-font-family-mono: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
+
+    --ds-text-display: 600 32px/1.2 var(--ds-font-family-heading);
+    --ds-text-h1: 600 26px/1.25 var(--ds-font-family-heading);
+    --ds-text-h2: 600 20px/1.3 var(--ds-font-family-heading);
+    --ds-text-h3: 600 16px/1.4 var(--ds-font-family-heading);
+    --ds-text-h4: 600 14px/1.4 var(--ds-font-family-heading);
+    --ds-text-subtitle: 500 13px/1.5 var(--ds-font-family);
+    --ds-text-body: 400 14px/1.6 var(--ds-font-family);
+    --ds-text-body-sm: 400 13px/1.5 var(--ds-font-family);
+    --ds-text-caption: 400 12px/1.5 var(--ds-font-family);
+    --ds-text-label: 500 12px/1.4 var(--ds-font-family);
+    --ds-text-button: 500 13px/1 var(--ds-font-family);
+    --ds-text-button-lg: 500 14px/1 var(--ds-font-family);
+    --ds-text-table: 400 13px/1.5 var(--ds-font-family);
+    --ds-text-table-header: 600 11px/1.2 var(--ds-font-family);
+    --ds-text-overline: 500 10px/1.3 var(--ds-font-family);
+
+    /* ─── Spacing ─── */
+    --ds-spacing-0: 0px;
+    --ds-spacing-px: 1px;
+    --ds-spacing-0_5: 2px;
+    --ds-spacing-1: 4px;
+    --ds-spacing-1_5: 6px;
+    --ds-spacing-2: 8px;
+    --ds-spacing-2_5: 10px;
+    --ds-spacing-3: 12px;
+    --ds-spacing-3_5: 14px;
+    --ds-spacing-4: 16px;
+    --ds-spacing-5: 20px;
+    --ds-spacing-6: 24px;
+    --ds-spacing-7: 28px;
+    --ds-spacing-8: 32px;
+    --ds-spacing-9: 36px;
+    --ds-spacing-10: 40px;
+    --ds-spacing-12: 48px;
+    --ds-spacing-14: 56px;
+    --ds-spacing-16: 64px;
+    --ds-spacing-20: 80px;
+    --ds-spacing-24: 96px;
+
+    /* ─── Border Radius ─── */
+    --ds-radius-sm: 4px;
+    --ds-radius-md: 6px;
+    --ds-radius-lg: 8px;
+    --ds-radius-xl: 12px;
+    --ds-radius-2xl: 16px;
+    --ds-radius-3xl: 20px;
+    --ds-radius-full: 9999px;
+
+    /* ─── Shadows ─── */
+    --ds-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --ds-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03);
+    --ds-shadow-md: 0 4px 8px rgba(0, 0, 0, 0.04), 0 2px 4px rgba(0, 0, 0, 0.03);
+    --ds-shadow-lg: 0 8px 20px rgba(0, 0, 0, 0.05), 0 4px 8px rgba(0, 0, 0, 0.03);
+    --ds-shadow-xl: 0 12px 32px rgba(0, 0, 0, 0.06), 0 6px 12px rgba(0, 0, 0, 0.03);
+    --ds-shadow-2xl: 0 20px 48px rgba(0, 0, 0, 0.08), 0 8px 20px rgba(0, 0, 0, 0.04);
+    --ds-shadow-elevated: 0 2px 16px rgba(0, 0, 0, 0.06);
+    --ds-shadow-drawer: -8px 0 24px rgba(0, 0, 0, 0.06);
+    --ds-shadow-dialog: 0 20px 60px rgba(0, 0, 0, 0.12);
+    --ds-shadow-dropdown: 0 8px 20px rgba(0, 0, 0, 0.06);
+    --ds-shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04);
+    --ds-shadow-card-hover: 0 4px 14px rgba(0, 0, 0, 0.06);
+
+    /* ─── Transitions ─── */
+    --ds-transition-fast: 120ms ease;
+    --ds-transition-base: 200ms ease;
+    --ds-transition-slow: 300ms ease;
+    --ds-transition-spring: 400ms cubic-bezier(0.22, 1, 0.36, 1);
+
+    /* ─── Z-Index Scale ─── */
+    --ds-z-sticky: 100;
+    --ds-z-header: 200;
+    --ds-z-sidebar: 300;
+    --ds-z-overlay: 400;
+    --ds-z-dropdown: 500;
+    --ds-z-dialog: 600;
+    --ds-z-toast: 700;
+    --ds-z-tooltip: 800;
+
+    /* ─── Layout ─── */
+    --ds-container-max: 1600px;
+    --ds-container-narrow: 960px;
+    --ds-container-padding: var(--ds-spacing-6);
+    --ds-container-padding-sm: var(--ds-spacing-4);
+    --ds-container-padding-lg: var(--ds-spacing-8);
+    --ds-page-padding-y: var(--ds-spacing-6);
+    --ds-page-padding-y-lg: var(--ds-spacing-8);
+    --ds-section-gap: var(--ds-spacing-6);
+    --ds-section-gap-lg: var(--ds-spacing-8);
+    --ds-section-gap-sm: var(--ds-spacing-4);
+    --ds-element-gap: var(--ds-spacing-4);
+    --ds-element-gap-sm: var(--ds-spacing-3);
+
+    /* ─── Content Grouping ─── */
+    --ds-group-gap: var(--ds-spacing-5);
+    --ds-stack-gap: var(--ds-spacing-3);
+    --ds-inline-gap: var(--ds-spacing-3);
+
+    /* ─── Cards ─── */
+    --ds-card-padding: var(--ds-spacing-5);
+    --ds-card-gap: var(--ds-spacing-4);
+    --ds-card-radius: var(--ds-radius-xl);
+    --ds-card-shadow: var(--ds-shadow-card);
+    --ds-card-shadow-hover: var(--ds-shadow-card-hover);
+
+    /* ─── Tables ─── */
+    --ds-table-cell-padding: var(--ds-spacing-3) var(--ds-spacing-4);
+    --ds-table-radius: var(--ds-radius-lg);
+
+    /* ─── Forms ─── */
+    --ds-input-height: 40px;
+    --ds-input-padding: 0 var(--ds-spacing-3);
+    --ds-input-radius: var(--ds-radius-lg);
+    --ds-input-border: var(--ds-border);
+    --ds-input-border-hover: var(--ds-border-hover);
+    --ds-input-border-focus: var(--ds-primary);
+    --ds-input-shadow: var(--ds-shadow-xs);
+    --ds-input-font: var(--ds-text-body);
+
+    /* ─── Header + Sidebar Dimensions ─── */
+    --ds-header-h: 56px;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════════
+     DARK THEME  —  intentionally designed, not inverted
+     ═══════════════════════════════════════════════════════════════════════════ */
+  .dark {
+    --ds-primary: #7B8DB8;
+    --ds-primary-hover: #8FA0C9;
+    --ds-primary-active: #6678A3;
+    --ds-primary-subtle: #252A3A;
+    --ds-primary-light: #2E3447;
+    --ds-primary-foreground: #FFFFFF;
+
+    --ds-accent: #C4956A;
+    --ds-accent-hover: #D4A882;
+    --ds-accent-active: #B58456;
+    --ds-accent-subtle: #2C2620;
+    --ds-accent-light: #3A3228;
+    --ds-accent-foreground: #FFFFFF;
+
+    --ds-surface: #1B1D23;
+    --ds-surface-hover: #22242C;
+    --ds-surface-elevated: #24262E;
+    --ds-surface-secondary: #202228;
+
+    --ds-background: #14151A;
+    --ds-background-elevated: #1A1C22;
+    --ds-background-subtle: #1E2026;
+
+    --ds-border: #2C2E35;
+    --ds-border-light: #26282F;
+    --ds-border-hover: #383A42;
+
+    --ds-text: #E8E6E1;
+    --ds-text-secondary: #A09E98;
+    --ds-text-tertiary: #6B6963;
+    --ds-text-placeholder: #4A4844;
+    --ds-text-disabled: #3A3835;
+    --ds-text-inverse: #14151A;
+
+    --ds-success: #6BAF9E;
+    --ds-success-hover: #7DC0B0;
+    --ds-success-subtle: #1C2A26;
+    --ds-success-foreground: #FFFFFF;
+
+    --ds-warning: #D4A060;
+    --ds-warning-hover: #E2B070;
+    --ds-warning-subtle: #2E2820;
+    --ds-warning-foreground: #FFFFFF;
+
+    --ds-danger: #D47A7A;
+    --ds-danger-hover: #E08A8A;
+    --ds-danger-subtle: #2E2020;
+    --ds-danger-foreground: #FFFFFF;
+
+    --ds-info: #6B9FB8;
+    --ds-info-hover: #7CB0C9;
+    --ds-info-subtle: #1C262C;
+    --ds-info-foreground: #FFFFFF;
+
+    --ds-sidebar-bg: #111218;
+    --ds-sidebar-surface: #1A1C24;
+    --ds-sidebar-border: #242630;
+    --ds-sidebar-text: #7A7D8A;
+    --ds-sidebar-text-active: #F0EFEC;
+    --ds-sidebar-hover: rgba(255, 255, 255, 0.05);
+    --ds-sidebar-active-bg: rgba(255, 255, 255, 0.07);
+    --ds-sidebar-active-indicator: var(--ds-accent);
+    --ds-sidebar-icon: #5E6170;
+    --ds-sidebar-icon-active: var(--ds-accent);
+
+    --ds-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
+    --ds-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2), 0 1px 2px rgba(0, 0, 0, 0.15);
+    --ds-shadow-md: 0 4px 8px rgba(0, 0, 0, 0.25), 0 2px 4px rgba(0, 0, 0, 0.2);
+    --ds-shadow-lg: 0 8px 20px rgba(0, 0, 0, 0.3), 0 4px 8px rgba(0, 0, 0, 0.2);
+    --ds-shadow-xl: 0 12px 32px rgba(0, 0, 0, 0.35), 0 6px 12px rgba(0, 0, 0, 0.2);
+    --ds-shadow-2xl: 0 20px 48px rgba(0, 0, 0, 0.4), 0 8px 20px rgba(0, 0, 0, 0.25);
+    --ds-shadow-elevated: 0 2px 16px rgba(0, 0, 0, 0.3);
+    --ds-shadow-drawer: -8px 0 24px rgba(0, 0, 0, 0.3);
+    --ds-shadow-dialog: 0 20px 60px rgba(0, 0, 0, 0.4);
+    --ds-shadow-dropdown: 0 8px 20px rgba(0, 0, 0, 0.3);
+    --ds-shadow-card: 0 1px 3px rgba(0, 0, 0, 0.15);
+    --ds-shadow-card-hover: 0 4px 14px rgba(0, 0, 0, 0.2);
+  }
+}

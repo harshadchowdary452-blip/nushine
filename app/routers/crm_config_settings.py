@@ -65,6 +65,11 @@ def _follow_up_to_dict(c: CrmFollowUpConfig) -> dict:
         "start_delay_days": c.start_delay_days,
         "auto_close_on_completion": c.auto_close_on_completion,
         "skip_wellness_if_appointment": getattr(c, 'skip_wellness_if_appointment', False),
+        "max_attempts": getattr(c, 'max_attempts', 3),
+        "days_between_attempts": getattr(c, 'days_between_attempts', 3),
+        "auto_close_after_final": getattr(c, 'auto_close_after_final', False),
+        "auto_close_action": getattr(c, 'auto_close_action', 'KEEP_OPEN'),
+        "stop_automation_on": getattr(c, 'stop_automation_on', 'CONVERTED,NOT_INTERESTED,LOST'),
         "created_at": c.created_at.isoformat() if c.created_at else None,
         "updated_at": c.updated_at.isoformat() if c.updated_at else None,
     }
@@ -89,6 +94,11 @@ class FollowUpConfigData(BaseModel):
     start_delay_days: int = 0
     auto_close_on_completion: bool = False
     skip_wellness_if_appointment: bool = False
+    max_attempts: int = 3
+    days_between_attempts: int = 3
+    auto_close_after_final: bool = False
+    auto_close_action: str = "KEEP_OPEN"
+    stop_automation_on: str = "CONVERTED,NOT_INTERESTED,LOST"
 
 
 class TreatmentFollowUpSave(BaseModel):
@@ -110,6 +120,10 @@ def _validate_follow_up(data):
     errors = []
     if data.start_delay_days < 0:
         errors.append("start_delay_days must be >= 0")
+    if hasattr(data, 'max_attempts') and data.max_attempts < 1:
+        errors.append("max_attempts must be >= 1")
+    if hasattr(data, 'days_between_attempts') and data.days_between_attempts < 1:
+        errors.append("days_between_attempts must be >= 1")
     if errors:
         raise HTTPException(status_code=422, detail="; ".join(errors))
 
@@ -133,16 +147,20 @@ async def get_general_settings(
     data = {}
     for c in configs:
         data[c.config_key] = c.config_value
-    data.setdefault("crm_enabled", "true")
-    data.setdefault("crm_working_days", "MON,TUE,WED,THU,FRI,SAT")
-    data.setdefault("crm_reminder_time", "09:00")
-    data.setdefault("crm_business_start", "09:00")
-    data.setdefault("crm_business_end", "18:00")
-    data.setdefault("crm_timezone", "Asia/Kolkata")
-    data.setdefault("crm_reminder_offset", "1")
-    data.setdefault("crm_weekend_policy", "SKIP")
-    data.setdefault("crm_holidays", "[]")
-    return data
+    defaults = {
+        "crm_enabled": "true",
+        "crm_working_days": "MON,TUE,WED,THU,FRI,SAT",
+        "crm_reminder_time": "09:00",
+        "crm_business_start": "09:00",
+        "crm_business_end": "18:00",
+        "crm_timezone": "Asia/Kolkata",
+        "crm_reminder_offset": "1",
+        "crm_weekend_policy": "SKIP",
+        "crm_holidays": "[]",
+    }
+    for key, val in defaults.items():
+        data.setdefault(key, val)
+    return {"config": data}
 
 
 @router.put("/general")
@@ -158,7 +176,7 @@ async def update_general_settings(
         return {"updated": 0}
     updated = 0
     for key, value in updates.items():
-        str_value = str(value) if not isinstance(value, str) else value
+        str_value = str(value).lower() if not isinstance(value, str) else value
         existing = (await db.execute(
             select(CrmConfig).where(
                 and_(CrmConfig.config_key == key, CrmConfig.hospital_id == hid)
@@ -198,6 +216,9 @@ async def get_lead_settings(
     return {"config": {
         "enabled": True, "start_delay_days": 1,
         "auto_close_on_completion": False, "skip_wellness_if_appointment": False,
+        "max_attempts": 3, "days_between_attempts": 3,
+        "auto_close_after_final": False, "auto_close_action": "KEEP_OPEN",
+        "stop_automation_on": "CONVERTED,NOT_INTERESTED,LOST",
     }}
 
 
@@ -220,12 +241,22 @@ async def update_lead_settings(
         config.start_delay_days = data.start_delay_days
         config.auto_close_on_completion = data.auto_close_on_completion
         config.skip_wellness_if_appointment = data.skip_wellness_if_appointment
+        config.max_attempts = data.max_attempts
+        config.days_between_attempts = data.days_between_attempts
+        config.auto_close_after_final = data.auto_close_after_final
+        config.auto_close_action = data.auto_close_action
+        config.stop_automation_on = data.stop_automation_on
     else:
         config = CrmFollowUpConfig(
             hospital_id=hid, context_type="LEAD", treatment_type_id=None,
             enabled=data.enabled, start_delay_days=data.start_delay_days,
             auto_close_on_completion=data.auto_close_on_completion,
             skip_wellness_if_appointment=data.skip_wellness_if_appointment,
+            max_attempts=data.max_attempts,
+            days_between_attempts=data.days_between_attempts,
+            auto_close_after_final=data.auto_close_after_final,
+            auto_close_action=data.auto_close_action,
+            stop_automation_on=data.stop_automation_on,
         )
         db.add(config)
     await db.commit()
@@ -256,6 +287,9 @@ async def get_opd_settings(
     return {"config": {
         "enabled": True, "start_delay_days": 0,
         "auto_close_on_completion": False, "skip_wellness_if_appointment": False,
+        "max_attempts": 3, "days_between_attempts": 3,
+        "auto_close_after_final": False, "auto_close_action": "KEEP_OPEN",
+        "stop_automation_on": "CONVERTED,NOT_INTERESTED,LOST",
     }}
 
 
@@ -278,12 +312,22 @@ async def update_opd_settings(
         config.start_delay_days = data.start_delay_days
         config.auto_close_on_completion = data.auto_close_on_completion
         config.skip_wellness_if_appointment = data.skip_wellness_if_appointment
+        config.max_attempts = data.max_attempts
+        config.days_between_attempts = data.days_between_attempts
+        config.auto_close_after_final = data.auto_close_after_final
+        config.auto_close_action = data.auto_close_action
+        config.stop_automation_on = data.stop_automation_on
     else:
         config = CrmFollowUpConfig(
             hospital_id=hid, context_type="OPD", treatment_type_id=None,
             enabled=data.enabled, start_delay_days=data.start_delay_days,
             auto_close_on_completion=data.auto_close_on_completion,
             skip_wellness_if_appointment=data.skip_wellness_if_appointment,
+            max_attempts=data.max_attempts,
+            days_between_attempts=data.days_between_attempts,
+            auto_close_after_final=data.auto_close_after_final,
+            auto_close_action=data.auto_close_action,
+            stop_automation_on=data.stop_automation_on,
         )
         db.add(config)
     await db.commit()
@@ -347,9 +391,8 @@ async def get_treatment_settings(
     return {"items": items}
 
 
-@router.put("/treatment/{treatment_type_id}")
-async def update_treatment_follow_up(
-    treatment_type_id: str,
+@router.put("/treatment/defaults")
+async def update_treatment_defaults(
     data: FollowUpConfigData,
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
@@ -358,35 +401,51 @@ async def update_treatment_follow_up(
     hid = _verify_hospital_admin(current_user)
     _validate_follow_up(data)
 
-    tt = await db.get(TreatmentType, treatment_type_id)
-    if not tt:
-        raise HTTPException(status_code=404, detail="Treatment type not found")
-
-    q = select(CrmFollowUpConfig).where(
-        and_(
-            CrmFollowUpConfig.hospital_id == hid,
-            CrmFollowUpConfig.context_type == "TREATMENT",
-            CrmFollowUpConfig.treatment_type_id == treatment_type_id,
+    tt_q = select(TreatmentType).where(TreatmentType.is_active == True)
+    hosp_names = select(TreatmentType.name).where(
+        TreatmentType.hospital_id == hid, TreatmentType.is_active == True
+    )
+    tt_q = tt_q.where(
+        or_(
+            TreatmentType.hospital_id == hid,
+            and_(
+                TreatmentType.hospital_id.is_(None),
+                not_(TreatmentType.name.in_(hosp_names)),
+            ),
         )
     )
-    result = await db.execute(q)
-    config = result.scalar_one_or_none()
-    if config:
-        config.enabled = data.enabled
-        config.start_delay_days = data.start_delay_days
-        config.auto_close_on_completion = data.auto_close_on_completion
-        config.skip_wellness_if_appointment = data.skip_wellness_if_appointment
-    else:
-        config = CrmFollowUpConfig(
-            hospital_id=hid, context_type="TREATMENT", treatment_type_id=treatment_type_id,
-            enabled=data.enabled, start_delay_days=data.start_delay_days,
-            auto_close_on_completion=data.auto_close_on_completion,
-            skip_wellness_if_appointment=data.skip_wellness_if_appointment,
+    tt_result = await db.execute(tt_q)
+    treatment_types = list(tt_result.scalars().all())
+
+    saved = 0
+    for tt in treatment_types:
+        q = select(CrmFollowUpConfig).where(
+            and_(
+                CrmFollowUpConfig.hospital_id == hid,
+                CrmFollowUpConfig.context_type == "TREATMENT",
+                CrmFollowUpConfig.treatment_type_id == tt.id,
+            )
         )
-        db.add(config)
+        result = await db.execute(q)
+        config = result.scalar_one_or_none()
+        if config:
+            config.enabled = data.enabled
+            config.start_delay_days = data.start_delay_days
+            config.auto_close_on_completion = data.auto_close_on_completion
+            config.skip_wellness_if_appointment = data.skip_wellness_if_appointment
+        else:
+            config = CrmFollowUpConfig(
+                hospital_id=hid, context_type="TREATMENT",
+                treatment_type_id=tt.id,
+                enabled=data.enabled, start_delay_days=data.start_delay_days,
+                auto_close_on_completion=data.auto_close_on_completion,
+                skip_wellness_if_appointment=data.skip_wellness_if_appointment,
+            )
+            db.add(config)
+        saved += 1
     await db.commit()
     _invalidate(hid)
-    return {"config": _follow_up_to_dict(config)}
+    return {"saved": saved}
 
 
 @router.put("/treatment")
@@ -429,6 +488,48 @@ async def bulk_update_treatment_follow_ups(
     await db.commit()
     _invalidate(hid)
     return {"saved": saved}
+
+
+@router.put("/treatment/{treatment_type_id}")
+async def update_treatment_follow_up(
+    treatment_type_id: str,
+    data: FollowUpConfigData,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    verify_permission(current_user, Permission.MANAGE_LEADS)
+    hid = _verify_hospital_admin(current_user)
+    _validate_follow_up(data)
+
+    tt = await db.get(TreatmentType, treatment_type_id)
+    if not tt:
+        raise HTTPException(status_code=404, detail="Treatment type not found")
+
+    q = select(CrmFollowUpConfig).where(
+        and_(
+            CrmFollowUpConfig.hospital_id == hid,
+            CrmFollowUpConfig.context_type == "TREATMENT",
+            CrmFollowUpConfig.treatment_type_id == treatment_type_id,
+        )
+    )
+    result = await db.execute(q)
+    config = result.scalar_one_or_none()
+    if config:
+        config.enabled = data.enabled
+        config.start_delay_days = data.start_delay_days
+        config.auto_close_on_completion = data.auto_close_on_completion
+        config.skip_wellness_if_appointment = data.skip_wellness_if_appointment
+    else:
+        config = CrmFollowUpConfig(
+            hospital_id=hid, context_type="TREATMENT", treatment_type_id=treatment_type_id,
+            enabled=data.enabled, start_delay_days=data.start_delay_days,
+            auto_close_on_completion=data.auto_close_on_completion,
+            skip_wellness_if_appointment=data.skip_wellness_if_appointment,
+        )
+        db.add(config)
+    await db.commit()
+    _invalidate(hid)
+    return {"config": _follow_up_to_dict(config)}
 
 
 # ═══════════════════════════════════════════════════════════════════════════

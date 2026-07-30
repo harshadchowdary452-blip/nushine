@@ -4,16 +4,16 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 select-none",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-primary)]/20 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 select-none",
   {
     variants: {
       variant: {
-        default: "bg-indigo-600 text-white shadow-sm hover:bg-indigo-700 active:scale-[0.97]",
-        destructive: "bg-red-500 text-white shadow-sm hover:bg-red-600 active:scale-[0.97]",
-        outline: "border border-gray-200 bg-white text-gray-700 shadow-sm hover:bg-gray-50 hover:border-gray-300 active:scale-[0.97]",
-        secondary: "bg-gray-100 text-gray-700 hover:bg-gray-200 active:scale-[0.97]",
-        ghost: "text-gray-500 hover:bg-gray-100 hover:text-gray-700",
-        link: "text-indigo-600 underline-offset-4 hover:underline",
+        default: "bg-[var(--ds-primary)] text-white shadow-sm hover:bg-[var(--ds-primary-hover)] active:scale-[0.97]",
+        destructive: "bg-[var(--ds-danger)] text-white shadow-sm hover:bg-[var(--ds-danger-hover)] active:scale-[0.97]",
+        outline: "border border-[var(--ds-border)] bg-[var(--ds-surface)] text-[var(--ds-text)] shadow-sm hover:bg-[var(--ds-surface-hover)] hover:border-[var(--ds-border-hover)] active:scale-[0.97]",
+        secondary: "bg-[var(--ds-surface-secondary)] text-[var(--ds-text)] hover:bg-[var(--ds-border)] active:scale-[0.97]",
+        ghost: "text-[var(--ds-text-secondary)] hover:bg-[var(--ds-surface-hover)] hover:text-[var(--ds-text)]",
+        link: "text-[var(--ds-primary)] underline-offset-4 hover:underline",
       },
       size: {
         default: "h-9 px-4 py-2 rounded-lg",

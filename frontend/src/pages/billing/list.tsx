@@ -11,16 +11,11 @@ import {
   type ColumnDef,
   type SortingState,
 } from "@tanstack/react-table"
-import { motion } from "framer-motion"
 import { Plus, Search, Eye, Trash2, Receipt, DollarSign, CreditCard, AlertCircle, Download } from "lucide-react"
 import { format } from "date-fns"
-import PageHeader from "@/components/layout/page-header"
-import KpiCard from "@/components/layout/kpi-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { NumericInput } from "@/components/ui/numeric-input"
-
-import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent } from "@/components/ui/card"
 import {
   Dialog,
@@ -42,14 +37,10 @@ import { billingApi, casesApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
 import QuickExport from "@/components/ui/quick-export"
 import { formatIndianRupees } from "@/lib/currency"
+import { PageHeader, EmptyState, LoadingSkeleton, MetricCard, StatusBadge, Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/design-system"
 import type { Billing, Case, PaginatedResponse } from "@/types"
 import { extractDetail } from "@/types"
 import { useAuthStore } from "@/store/authStore"
-
-function StatusBadge({ status }: { status: string }) {
-  const cls = `status-badge status-badge-${status?.toLowerCase().replace(/_/g, "_")}`;
-  return <span className={cls}>{status?.replace(/_/g, " ")}</span>;
-}
 
 interface InvoiceForm {
   [key: string]: unknown
@@ -295,32 +286,19 @@ export default function BillingList() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Billing" description="Manage invoices and payments">
-        <Button onClick={openDialog}>
-          <Plus className="h-4 w-4" /> New Invoice
-        </Button>
-        <QuickExport module="billings" label="billings" />
-      </PageHeader>
+      <PageHeader title="Billing" description="Manage invoices and payments"
+        actions={<>
+          <Button onClick={openDialog}>
+            <Plus className="h-4 w-4" /> New Invoice
+          </Button>
+          <QuickExport module="billings" label="billings" />
+        </>}
+      />
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <KpiCard
-          title="Total Revenue"
-          value={formatIndianRupees(kpis.total)}
-          icon={DollarSign}
-          description="All time revenue"
-        />
-        <KpiCard
-          title="Paid Amount"
-          value={formatIndianRupees(kpis.paid)}
-          icon={CreditCard}
-          description="Total collected"
-        />
-        <KpiCard
-          title="Pending Amount"
-          value={formatIndianRupees(kpis.pending)}
-          icon={AlertCircle}
-          description="Outstanding payments"
-        />
+        <MetricCard title="Total Revenue" value={formatIndianRupees(kpis.total)} icon={DollarSign} />
+        <MetricCard title="Paid Amount" value={formatIndianRupees(kpis.paid)} icon={CreditCard} />
+        <MetricCard title="Pending Amount" value={formatIndianRupees(kpis.pending)} icon={AlertCircle} />
       </div>
 
       <Card>
@@ -338,37 +316,20 @@ export default function BillingList() {
           </div>
 
           {isLoading ? (
-            <div className="space-y-3">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
-            </div>
+            <LoadingSkeleton rows={5} />
           ) : billings.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-muted">
-                <Receipt className="h-10 w-10 text-muted-foreground" />
-              </div>
-              <h3 className="text-lg font-semibold">No invoices yet</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Create your first invoice.
-              </p>
-              <Button className="mt-4" onClick={openDialog}>
-                <Plus className="h-4 w-4" /> New Invoice
-              </Button>
-            </div>
+            <EmptyState icon={Receipt} title="No invoices yet" description="Create your first invoice."
+              action={<Button onClick={openDialog}><Plus className="h-4 w-4" /> New Invoice</Button>}
+            />
           ) : (
             <>
-              <div className="overflow-x-auto rounded-md border mobile-card-view">
-                <table className="w-full text-sm">
-                  <thead>
+              <div className="mobile-card-view">
+                <Table>
+                  <TableHeader>
                     {table.getHeaderGroups().map((hg) => (
-                      <tr key={hg.id} className="border-b bg-muted/50">
+                      <TableRow key={hg.id}>
                         {hg.headers.map((header) => (
-                          <th
-                            key={header.id}
-                            className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer select-none"
-                            onClick={header.column.getToggleSortingHandler()}
-                          >
+                          <TableHead key={header.id} onClick={header.column.getToggleSortingHandler()}>
                             <div className="flex items-center gap-1">
                               {flexRender(header.column.columnDef.header, header.getContext())}
                               {{
@@ -376,32 +337,27 @@ export default function BillingList() {
                                 desc: " ↓",
                               }[header.column.getIsSorted() as string] ?? null}
                             </div>
-                          </th>
+                          </TableHead>
                         ))}
-                      </tr>
+                      </TableRow>
                     ))}
-                  </thead>
-                  <tbody>
+                  </TableHeader>
+                  <TableBody>
                     {table.getRowModel().rows.map((row) => (
-                      <motion.tr
-                        key={row.id}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="border-b transition-colors hover:bg-muted/50"
-                      >
+                      <TableRow key={row.id}>
                         {row.getVisibleCells().map((cell) => {
                           const header = cell.column.columnDef.header
                           const label = typeof header === "string" ? header : cell.column.id
                           return (
-                            <td key={cell.id} className="px-4 py-3" data-label={label}>
+                            <TableCell key={cell.id} data-label={label}>
                               {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                            </td>
+                            </TableCell>
                           )
                         })}
-                      </motion.tr>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
 
               <div className="flex items-center justify-between mt-4">

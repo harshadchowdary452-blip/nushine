@@ -30,6 +30,11 @@ class FollowUpSnapshot:
     start_delay_days: int = 0
     auto_close_on_completion: bool = False
     skip_wellness_if_appointment: bool = False
+    max_attempts: int = 3
+    days_between_attempts: int = 3
+    auto_close_after_final: bool = False
+    auto_close_action: str = "KEEP_OPEN"
+    stop_automation_on: str = "CONVERTED,NOT_INTERESTED,LOST"
 
 
 @dataclass
@@ -118,6 +123,11 @@ class CRMSettingsService:
                 start_delay_days=row.start_delay_days,
                 auto_close_on_completion=row.auto_close_on_completion,
                 skip_wellness_if_appointment=getattr(row, 'skip_wellness_if_appointment', False),
+                max_attempts=getattr(row, 'max_attempts', 3),
+                days_between_attempts=getattr(row, 'days_between_attempts', 3),
+                auto_close_after_final=getattr(row, 'auto_close_after_final', False),
+                auto_close_action=getattr(row, 'auto_close_action', 'KEEP_OPEN'),
+                stop_automation_on=getattr(row, 'stop_automation_on', 'CONVERTED,NOT_INTERESTED,LOST'),
             )
             if row.context_type == "TREATMENT" and row.treatment_type_id:
                 out[f"TREATMENT:{row.treatment_type_id}"] = snap

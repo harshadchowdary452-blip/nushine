@@ -53,9 +53,10 @@ class GeneratedEnquiry(Base):
     source_entity_type: Mapped[str] = mapped_column(String(30), nullable=True)
     source_entity_id: Mapped[str] = mapped_column(String(36), nullable=True)
 
-    # Recurrence fields (RECALL only)
+    # Recurrence fields (RECALL + LEAD_FOLLOW_UP)
     is_recurring: Mapped[bool] = mapped_column(default=False)
     occurrence_number: Mapped[int] = mapped_column(Integer, default=1)
+    total_attempts: Mapped[int] = mapped_column(Integer, nullable=True)
     recurrence_interval_days: Mapped[int] = mapped_column(Integer, nullable=True)
     chain_id: Mapped[str] = mapped_column(String(36), nullable=True, index=True)
 

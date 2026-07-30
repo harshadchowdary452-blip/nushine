@@ -376,7 +376,7 @@ export const leadsApi = {
   updateStatus: (id: string, status: string) => api.put<Lead>(`/leads/${id}/status`, { status }).then((r) => r.data),
   delete: (id: string) => api.delete(`/leads/${id}`).then((r) => r.data),
   getCommunications: (id: string) => api.get<LeadCommunication[]>(`/leads/${id}/communications`).then((r) => r.data),
-  addCommunication: (id: string, data: { channel: string; message: string }) =>
+  addCommunication: (id: string, data: { channel: string; message: string; template_name?: string }) =>
     api.post<LeadCommunication>(`/leads/${id}/communications`, data).then((r) => r.data),
   getCalls: (id: string) => api.get<LeadCall[]>(`/leads/${id}/calls`).then((r) => r.data),
   addCall: (id: string, data: { outcome?: string; notes?: string; follow_up_date?: string; duration_seconds?: number }) =>
@@ -698,14 +698,18 @@ export const crmSettingsApi = {
     updateGeneral: (data: Record<string, string>) =>
       api.put("/crm-config/general", data).then((r) => r.data),
     getLead: () => api.get("/crm-config/lead").then((r) => r.data),
-    updateLead: (data: { enabled: boolean; start_delay_days: number; auto_close_on_completion: boolean; skip_wellness_if_appointment: boolean }) =>
+    updateLead: (data: { enabled: boolean; start_delay_days: number; auto_close_on_completion: boolean; skip_wellness_if_appointment: boolean; max_attempts: number; days_between_attempts: number; auto_close_after_final: boolean; auto_close_action: string; stop_automation_on: string }) =>
       api.put("/crm-config/lead", data).then((r) => r.data),
     getOpd: () => api.get("/crm-config/opd").then((r) => r.data),
-    updateOpd: (data: { enabled: boolean; start_delay_days: number; auto_close_on_completion: boolean; skip_wellness_if_appointment: boolean }) =>
+    updateOpd: (data: { enabled: boolean; start_delay_days: number; auto_close_on_completion: boolean; skip_wellness_if_appointment: boolean; max_attempts: number; days_between_attempts: number; auto_close_after_final: boolean; auto_close_action: string; stop_automation_on: string }) =>
       api.put("/crm-config/opd", data).then((r) => r.data),
     getTreatment: () => api.get("/crm-config/treatment").then((r) => r.data),
     updateTreatment: (treatmentTypeId: string, data: { enabled: boolean; start_delay_days: number; auto_close_on_completion: boolean; skip_wellness_if_appointment: boolean }) =>
       api.put(`/crm-config/treatment/${treatmentTypeId}`, data).then((r) => r.data),
+    updateTreatmentDefaults: (data: { enabled: boolean; start_delay_days: number; auto_close_on_completion: boolean; skip_wellness_if_appointment: boolean }) =>
+      api.put("/crm-config/treatment/defaults", data).then((r) => r.data),
+    updateTreatmentBulk: (items: { treatment_type_id: string; enabled: boolean; start_delay_days: number; auto_close_on_completion: boolean; skip_wellness_if_appointment: boolean }[]) =>
+      api.put("/crm-config/treatment", items).then((r) => r.data),
     getCase: () => api.get("/crm-config/case").then((r) => r.data),
     updateCase: (section: string, data: { enabled: boolean; start_delay_days: number; auto_close_on_completion: boolean; skip_wellness_if_appointment: boolean }) =>
       api.put(`/crm-config/case/${section}`, data).then((r) => r.data),

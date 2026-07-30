@@ -93,6 +93,8 @@ interface CalendarItem {
     id: string; date?: string; time?: string; doctor_name?: string
     appointment_type?: string; purpose?: string; status?: string
   }
+  occurrence_number?: number
+  total_attempts?: number
   recurrence?: {
     is_recurring: boolean; occurrence_number?: number
     interval_days?: number; chain_id?: string
@@ -225,7 +227,7 @@ const DEFAULT_TEMPLATES: Record<string, string> = {
 
 Thank you for contacting {{hospital_name}}.
 
-We understand that you are interested in {{interested_treatment}}.
+We understand that you are interested in {{treatment_name}}.
 
 Our team is available to answer your questions and help you schedule a consultation at your convenience.
 
@@ -533,7 +535,7 @@ export default function EnquiryCalendar() {
     const isLead = item.enquiry_type === "LEAD_FOLLOW_UP"
     const vars: Record<string, string> = {
       hospital_name: item.hospital?.name || currentUser?.hospital_name || "our clinic",
-      hospital_phone: item.hospital?.phone || item.hospital_phone || currentUser?.hospital_phone || "",
+      hospital_phone: item.hospital?.phone || currentUser?.hospital_phone || "",
       hospital_address: item.hospital?.address || "",
       clinic_name: item.hospital?.name || "",
       current_date: new Date().toISOString().slice(0, 10),
@@ -567,7 +569,7 @@ export default function EnquiryCalendar() {
       vars.appointment_time = item.appointment?.time || ""
       vars.appointment_type = item.appointment?.appointment_type || ""
       vars.case_name = item.case?.case_number || ""
-      vars.case_completion_date = item.case?.case_number ? item.case.case_number : ""
+      vars.case_completion_date = ""
       vars.completed_treatments = ""
       vars.next_recall_date = item.recurrence ? item.due_date || "" : ""
       vars.recall_interval = ""
@@ -942,6 +944,13 @@ export default function EnquiryCalendar() {
                             <Badge variant="outline" className={`text-[10px] ${tc.bg} ${tc.text} ${tc.border}`}>
                               {ENQUIRY_TYPE_LABELS[item.enquiry_type || ""] || item.enquiry_type || item.follow_up_type || "—"}
                             </Badge>
+                            {item.enquiry_type === "LEAD_FOLLOW_UP" && item.occurrence_number && (
+                              <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 ml-1">
+                                {item.total_attempts
+                                  ? `Attempt ${item.occurrence_number} of ${item.total_attempts}`
+                                  : `Attempt #${item.occurrence_number}`}
+                              </Badge>
+                            )}
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1">

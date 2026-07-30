@@ -8,16 +8,13 @@ import {
   flexRender,
   type ColumnDef,
 } from "@tanstack/react-table"
-import { motion } from "framer-motion"
 import {
   Plus, Search, Eye, Trash2, Calendar, List, ChevronLeft, ChevronRight,
   CalendarDays, User as UserIcon, X, SlidersHorizontal,
 } from "lucide-react"
 import { format, eachDayOfInterval, startOfMonth, endOfMonth, getDay, isSameDay } from "date-fns"
-import PageHeader from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import {
@@ -34,26 +31,13 @@ import { useServerFilters } from "@/hooks/useServerFilters"
 import { FilterChips } from "@/components/ui/filter-bar"
 import AppointmentFilterBar from "./filter-bar"
 import AppointmentScheduler from "@/components/appointments/AppointmentScheduler"
+import { PageHeader, EmptyState, LoadingSkeleton, StatusBadge, Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/design-system"
 import type { Appointment, Patient, User, PaginatedResponse } from "@/types"
 import { extractDetail } from "@/types"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/store/authStore"
 
 const DATE_PRESET_KEYS = new Set(["date_preset"])
-
-function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    SCHEDULED: "bg-blue-50 text-blue-700 border-blue-200",
-    COMPLETED: "bg-green-50 text-green-700 border-green-200",
-    CANCELLED: "bg-red-50 text-red-700 border-red-200",
-    RESCHEDULED: "bg-orange-50 text-orange-700 border-orange-200",
-  }
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${colors[status] || "bg-gray-50 text-gray-600 border-gray-200"}`}>
-      {status?.replace(/_/g, " ")}
-    </span>
-  )
-}
 
 interface AppointmentForm {
   patient_id: string; doctor_id: string; appointment_date: string;
@@ -322,12 +306,14 @@ export default function AppointmentList() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Appointments" description="Manage appointments">
-        {currentUser?.role !== "DOCTOR" && (
-          <Button onClick={openDialog}><Plus className="h-4 w-4" /> New Appointment</Button>
-        )}
-        <QuickExport module="appointments" label="appointments" />
-      </PageHeader>
+      <PageHeader title="Appointments" description="Manage appointments"
+        actions={<>
+          {currentUser?.role !== "DOCTOR" && (
+            <Button onClick={openDialog}><Plus className="h-4 w-4" /> New Appointment</Button>
+          )}
+          <QuickExport module="appointments" label="appointments" />
+        </>}
+      />
 
       <Card>
         <CardContent className="p-6">
@@ -425,56 +411,49 @@ export default function AppointmentList() {
           {view === "list" && (
             <>
               {isLoading ? (
-                <div className="space-y-3">
-                  {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
-                </div>
+                <LoadingSkeleton rows={5} />
               ) : appointments.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-muted">
-                    <CalendarDays className="h-10 w-10 text-muted-foreground" />
-                  </div>
-                  <h3 className="text-lg font-semibold">No appointments found</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {hasActiveFilters ? "Try adjusting your filters." : "Schedule your first appointment."}
-                  </p>
-                  {hasActiveFilters ? (
-                    <Button className="mt-4" variant="outline" onClick={resetFilters}>Clear Filters</Button>
+                <EmptyState
+                  icon={CalendarDays}
+                  title="No appointments found"
+                  description={hasActiveFilters ? "Try adjusting your filters." : "Schedule your first appointment."}
+                  action={hasActiveFilters ? (
+                    <Button variant="outline" onClick={resetFilters}>Clear Filters</Button>
                   ) : currentUser?.role !== "DOCTOR" ? (
-                    <Button className="mt-4" onClick={openDialog}><Plus className="h-4 w-4" /> New Appointment</Button>
-                  ) : null}
-                </div>
+                    <Button onClick={openDialog}><Plus className="h-4 w-4" /> New Appointment</Button>
+                  ) : undefined}
+                />
               ) : (
                 <>
-                  <div className="overflow-x-auto rounded-md border mobile-card-view">
-                    <table className="w-full text-sm">
-                      <thead>
+                  <div className="mobile-card-view">
+                    <Table>
+                      <TableHeader>
                         {table.getHeaderGroups().map((hg) => (
-                          <tr key={hg.id} className="border-b bg-muted/50">
+                          <TableRow key={hg.id}>
                             {hg.headers.map((header) => (
-                              <th key={header.id} className="px-4 py-3 text-left font-medium text-muted-foreground">
+                              <TableHead key={header.id}>
                                 {flexRender(header.column.columnDef.header, header.getContext())}
-                              </th>
+                              </TableHead>
                             ))}
-                          </tr>
+                          </TableRow>
                         ))}
-                      </thead>
-                      <tbody>
+                      </TableHeader>
+                      <TableBody>
                         {table.getRowModel().rows.map((row) => (
-                          <motion.tr key={row.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                            className="border-b transition-colors hover:bg-muted/50">
+                          <TableRow key={row.id}>
                             {row.getVisibleCells().map((cell) => {
                               const header = cell.column.columnDef.header
                               const label = typeof header === "string" ? header : cell.column.id
                               return (
-                                <td key={cell.id} className="px-4 py-3" data-label={label}>
+                                <TableCell key={cell.id} data-label={label}>
                                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                </td>
+                                </TableCell>
                               )
                             })}
-                          </motion.tr>
+                          </TableRow>
                         ))}
-                      </tbody>
-                    </table>
+                      </TableBody>
+                    </Table>
                   </div>
 
                   {/* Server-side pagination */}

@@ -28,14 +28,14 @@ export function SettingsField({
     return (
       <div className={cn("flex items-center justify-between gap-4", disabled && "opacity-50", className)}>
         <div className="flex-1 min-w-0">
-          <label htmlFor={htmlFor} className="text-sm font-medium text-[var(--color-text-primary)]">
+          <label htmlFor={htmlFor} className="text-sm font-medium text-[var(--ds-text)]">
             {label}
-            {required && <span className="text-[var(--color-danger)] ml-1">*</span>}
+            {required && <span className="text-[var(--ds-danger)] ml-1">*</span>}
           </label>
           {description && (
-            <p className="text-xs text-[var(--color-text-muted)] mt-0.5">{description}</p>
+            <p className="text-xs text-[var(--ds-text-tertiary)] mt-0.5">{description}</p>
           )}
-          {error && <p className="text-xs text-[var(--color-danger)] mt-1">{error}</p>}
+          {error && <p className="text-xs text-[var(--ds-danger)] mt-1">{error}</p>}
         </div>
         <div className="flex-shrink-0">{children}</div>
       </div>
@@ -44,15 +44,15 @@ export function SettingsField({
 
   return (
     <div className={cn("space-y-1.5", disabled && "opacity-50", className)}>
-      <label htmlFor={htmlFor} className="block text-sm font-medium text-[var(--color-text-primary)]">
+      <label htmlFor={htmlFor} className="block text-sm font-medium text-[var(--ds-text)]">
         {label}
-        {required && <span className="text-[var(--color-danger)] ml-1">*</span>}
+        {required && <span className="text-[var(--ds-danger)] ml-1">*</span>}
       </label>
       {description && (
-        <p className="text-xs text-[var(--color-text-muted)]">{description}</p>
+        <p className="text-xs text-[var(--ds-text-tertiary)]">{description}</p>
       )}
       {children}
-      {error && <p className="text-xs text-[var(--color-danger)]">{error}</p>}
+      {error && <p className="text-xs text-[var(--ds-danger)]">{error}</p>}
     </div>
   );
 }

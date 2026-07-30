@@ -9,7 +9,6 @@ import { format } from "date-fns"
 import { casesApi, doctorsApi } from "@/services/endpoints"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
@@ -19,8 +18,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle
 } from "@/components/ui/dialog"
 import { useToast } from "@/components/ui/toast"
-import PageHeader from "@/components/layout/page-header"
 import CaseReportForm from "@/components/cases/CaseReportForm"
+import { PageHeader, EmptyState, StatusBadge } from "@/design-system"
 import type { Case } from "@/types"
 import { extractDetail } from "@/types"
 
@@ -39,14 +38,6 @@ const STATUS_OPTIONS = [
   { value: "COMPLETED", label: "Completed" },
   { value: "CANCELLED", label: "Cancelled" },
 ]
-
-const statusColors: Record<string, string> = {
-  OPEN: "bg-blue-50 text-blue-700 border-blue-200",
-  IN_PROGRESS: "bg-amber-50 text-amber-700 border-amber-200",
-  ON_HOLD: "bg-gray-50 text-gray-600 border-gray-300",
-  COMPLETED: "bg-green-50 text-green-700 border-green-200",
-  CANCELLED: "bg-red-50 text-red-700 border-red-200",
-}
 
 export default function CaseReportsList() {
   const navigate = useNavigate()
@@ -105,11 +96,13 @@ export default function CaseReportsList() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Case Reports" description="Manage patient case reports">
-        <Button onClick={() => setCreateOpen(true)}>
-           <Plus className="h-4 w-4 mr-2" /> New Case Report
-        </Button>
-      </PageHeader>
+      <PageHeader title="Case Reports" description="Manage patient case reports"
+        actions={
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" /> New Case Report
+          </Button>
+        }
+      />
 
       {/* Filters */}
       <Card>
@@ -170,10 +163,7 @@ export default function CaseReportsList() {
           {isFetching ? (
             <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin" /></div>
           ) : cases.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground">
-              <FolderOpen className="h-10 w-10 mx-auto mb-3 opacity-40" />
-              No case histories found
-            </div>
+            <EmptyState icon={FolderOpen} title="No case histories found" />
           ) : (
             <div className="overflow-auto">
               <Table>
@@ -199,9 +189,7 @@ export default function CaseReportsList() {
                       <TableCell className="text-xs">{c.doctor_name || "—"}</TableCell>
                       <TableCell className="text-xs max-w-[200px] truncate">{c.chief_complaint}</TableCell>
                       <TableCell>
-                        <Badge className={`text-[10px] ${statusColors[c.status] || "bg-gray-50"}`}>
-                          {c.status}
-                        </Badge>
+                        <StatusBadge status={c.status} />
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                         {c.created_at ? format(new Date(c.created_at), "dd MMM yyyy") : "—"}
