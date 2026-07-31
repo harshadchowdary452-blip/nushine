@@ -36,7 +36,7 @@ const channelIcons: Record<string, React.ElementType> = {
 const channelColors: Record<string, string> = {
   WHATSAPP: "text-green-600 bg-green-50",
   EMAIL: "text-blue-600 bg-blue-50",
-  SMS: "text-purple-600 bg-purple-50",
+  SMS: "text-[var(--ds-accent-600)] bg-[var(--ds-accent-50)]",
 }
 
 const statusBadge: Record<string, string> = {
@@ -71,7 +71,7 @@ export default function CommunicationHistory() {
             <CardTitle className="text-lg">All Communications</CardTitle>
             <div className="flex gap-3">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ds-text-tertiary)]" />
                 <Input
                   placeholder="Search messages..."
                   className="pl-10 w-60"
@@ -97,10 +97,10 @@ export default function CommunicationHistory() {
         <CardContent>
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600" />
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--ds-border)] border-t-blue-600" />
             </div>
           ) : items.length === 0 ? (
-            <div className="py-12 text-center text-gray-400">No communications found</div>
+            <div className="py-12 text-center text-[var(--ds-text-tertiary)]">No communications found</div>
           ) : (
             <div className="space-y-3">
               {items
@@ -115,34 +115,34 @@ export default function CommunicationHistory() {
                   return (
                     <div
                       key={c.id}
-                      className="flex items-start gap-4 rounded-lg border p-4 transition-colors hover:bg-gray-50"
+                      className="flex items-start gap-4 rounded-lg border p-4 transition-colors hover:bg-[var(--ds-surface-hover)]"
                     >
                       <div
-                        className={`flex h-10 w-10 items-center justify-center rounded-full ${channelColors[c.channel] || "bg-gray-50 text-gray-500"}`}
+                        className={`flex h-10 w-10 items-center justify-center rounded-full ${channelColors[c.channel] || "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]"}`}
                       >
                         <Icon className="h-5 w-5" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium uppercase tracking-wide text-gray-400">
+                          <span className="text-xs font-medium uppercase tracking-wide text-[var(--ds-text-tertiary)]">
                             {c.channel}
                           </span>
                           {c.message_type && (
-                            <span className="text-xs text-gray-400">
+                            <span className="text-xs text-[var(--ds-text-tertiary)]">
                               • {c.message_type.replace(/_/g, " ")}
                             </span>
                           )}
                           <Badge
-                            className={`ml-auto text-xs ${statusBadge[c.status] || "bg-gray-50 text-gray-600"}`}
+                            className={`ml-auto text-xs ${statusBadge[c.status] || "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]"}`}
                           >
                             {c.status}
                           </Badge>
                         </div>
                         {c.subject && (
-                          <p className="mt-1 text-sm font-medium text-gray-900">{c.subject}</p>
+                          <p className="mt-1 text-sm font-medium text-[var(--ds-text)]">{c.subject}</p>
                         )}
-                        <p className="mt-0.5 text-sm text-gray-600 line-clamp-2">{c.message}</p>
-                        <p className="mt-1 text-xs text-gray-400">
+                        <p className="mt-0.5 text-sm text-[var(--ds-text-secondary)] line-clamp-2">{c.message}</p>
+                        <p className="mt-1 text-xs text-[var(--ds-text-tertiary)]">
                           {c.sent_at ? new Date(c.sent_at).toLocaleString() : ""}
                         </p>
                       </div>

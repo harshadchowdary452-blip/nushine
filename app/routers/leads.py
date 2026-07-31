@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
@@ -95,6 +96,8 @@ async def get_leads(
     source: Optional[str] = Query(None),
     assigned_staff_id: Optional[str] = Query(None),
     hospital_id: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)
 ):
     verify_permission(current_user, Permission.VIEW_LEADS, Permission.MANAGE_LEADS)
@@ -106,6 +109,10 @@ async def get_leads(
         filters["source"] = source
     if assigned_staff_id:
         filters["assigned_staff_id"] = assigned_staff_id
+    if date_from:
+        filters["created_at__ge"] = date_from
+    if date_to:
+        filters["created_at__lt"] = (datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1)).isoformat()
     role = current_user.get("role")
     if role in ("HOSPITAL_ADMIN", "DOCTOR"):
         if current_user.get("hospital_id"):

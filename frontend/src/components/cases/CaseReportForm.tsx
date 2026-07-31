@@ -510,7 +510,7 @@ export default function CaseReportForm({
       </div>
 
       {mode === "edit" ? (
-        <div className="sticky bottom-4 flex gap-3 bg-white p-4 rounded-lg border border-gray-200 shadow-lg">
+        <div className="sticky bottom-4 flex gap-3 bg-[var(--ds-surface)] p-4 rounded-lg border border-[var(--ds-border)] shadow-lg">
           <Button variant="outline" className="flex-1" type="button" onClick={onCancel} disabled={saving}>Cancel</Button>
           <Button className="flex-1" type="submit" disabled={saving}>
             {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}

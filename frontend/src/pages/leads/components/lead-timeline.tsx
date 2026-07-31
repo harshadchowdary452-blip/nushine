@@ -31,11 +31,11 @@ interface LeadTimelineProps {
 
 const typeConfig: Record<string, { icon: React.ElementType; color: string; bgColor: string }> = {
   created: { icon: Plus, color: "text-blue-600", bgColor: "bg-blue-50" },
-  call: { icon: Phone, color: "text-purple-600", bgColor: "bg-purple-50" },
+  call: { icon: Phone, color: "text-[var(--ds-accent-600)]", bgColor: "bg-[var(--ds-accent-50)]" },
   communication: { icon: MessageSquare, color: "text-green-600", bgColor: "bg-green-50" },
   "follow-up": { icon: Calendar, color: "text-orange-600", bgColor: "bg-orange-50" },
-  "status-change": { icon: ArrowRight, color: "text-indigo-600", bgColor: "bg-indigo-50" },
-  note: { icon: FileText, color: "text-gray-600", bgColor: "bg-gray-50" },
+  "status-change": { icon: ArrowRight, color: "text-[var(--ds-primary-600)]", bgColor: "bg-[var(--ds-primary-50)]" },
+  note: { icon: FileText, color: "text-[var(--ds-text-secondary)]", bgColor: "bg-[var(--ds-background-subtle)]" },
   feedback: { icon: Star, color: "text-amber-600", bgColor: "bg-amber-50" },
   appointment: { icon: Clock, color: "text-cyan-600", bgColor: "bg-cyan-50" },
   converted: { icon: CheckCircle2, color: "text-emerald-600", bgColor: "bg-emerald-50" },
@@ -135,15 +135,15 @@ export default function LeadTimeline({ lead, calls, communications }: LeadTimeli
   if (!timelineItems.length) {
     return (
       <div className="py-12 text-center">
-        <Activity className="h-10 w-10 mx-auto mb-3 text-gray-300" />
-        <p className="text-sm text-gray-400">No timeline activity yet</p>
+        <Activity className="h-10 w-10 mx-auto mb-3 text-[var(--ds-text-tertiary)]" />
+        <p className="text-sm text-[var(--ds-text-tertiary)]">No timeline activity yet</p>
       </div>
     )
   }
 
   return (
     <div className="relative">
-      <div className="absolute left-[19px] top-3 bottom-3 w-0.5 bg-gray-100" />
+      <div className="absolute left-[19px] top-3 bottom-3 w-0.5 bg-[var(--ds-background-subtle)]" />
       <div className="space-y-0">
         {timelineItems.map((item, i) => {
           const Icon = item.icon
@@ -160,7 +160,7 @@ export default function LeadTimeline({ lead, calls, communications }: LeadTimeli
               </div>
               <div className="flex-1 min-w-0 pt-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-medium text-gray-900">{item.label}</span>
+                  <span className="text-sm font-medium text-[var(--ds-text)]">{item.label}</span>
                   {item.type === "follow-up" && !!item.metadata?.status && (
                     <Badge variant={(() => {
                       const s = String(item.metadata?.status)
@@ -175,8 +175,8 @@ export default function LeadTimeline({ lead, calls, communications }: LeadTimeli
                     <Badge variant="outline">{String(item.metadata?.channel || "")}</Badge>
                   )}
                 </div>
-                <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{item.description}</p>
-                <p className="text-[11px] text-gray-400 mt-1">
+                <p className="text-xs text-[var(--ds-text-secondary)] mt-0.5 line-clamp-2">{item.description}</p>
+                <p className="text-[11px] text-[var(--ds-text-tertiary)] mt-1">
                   {format(new Date(item.date), "dd MMM yyyy, hh:mm a")}
                 </p>
               </div>

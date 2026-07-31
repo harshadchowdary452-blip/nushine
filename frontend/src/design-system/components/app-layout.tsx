@@ -2,30 +2,23 @@ import { useEffect, useRef, type ReactNode } from "react"
 import { useLocation } from "react-router-dom"
 import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
-import { useRecentlyOpenedStore } from "@/store/recentlyOpenedStore"
-import { routeLabels } from "./routeLabels"
 import EnterpriseSidebar from "./sidebar"
 import EnterpriseHeader from "./header"
 import GlobalSearch from "./global-search"
 
+// Entrance travel is deliberately small (--ds-motion-distance-md ≈ 8px):
+// enough to signal "new page", not enough to read as the UI rebuilding.
+// MotionConfig reducedMotion="user" (App.tsx) collapses this to a plain
+// opacity swap for users who opt out of motion.
 const pageVariants = {
-  initial: { y: 12, opacity: 0 },
-  animate: { y: 0, opacity: 1, transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] } },
-  exit: { y: -12, opacity: 0, transition: { duration: 0.2 } },
+  initial: { y: 8, opacity: 0 },
+  animate: { y: 0, opacity: 1, transition: { duration: 0.18, ease: [0, 0, 0.2, 1] as [number, number, number, number] } },
+  exit: { y: -8, opacity: 0, transition: { duration: 0.12 } },
 }
 
 export default function EnterpriseAppLayout({ children }: { children: ReactNode }) {
   const location = useLocation()
-  const recentStore = useRecentlyOpenedStore()
   const mainRef = useRef<HTMLElement | null>(null)
-
-  // Track recently opened pages
-  useEffect(() => {
-    const label = routeLabels[location.pathname]
-    if (label && location.pathname !== "/") {
-      recentStore.push({ path: location.pathname, label })
-    }
-  }, [location.pathname]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset the content scroll position on navigation
   useEffect(() => {
@@ -33,7 +26,10 @@ export default function EnterpriseAppLayout({ children }: { children: ReactNode 
   }, [location.pathname])
 
   return (
-    <div className="app-shell flex overflow-hidden bg-[var(--ds-background)] antialiased">
+    <div
+      className="app-shell flex overflow-hidden bg-[var(--ds-background)] antialiased"
+      style={{ backgroundImage: "var(--ds-app-wash)" }}
+    >
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:px-4 focus:py-2 focus:bg-[var(--ds-primary)] focus:text-[var(--ds-primary-foreground)] focus:rounded-[var(--ds-radius-lg)] focus:text-sm focus:font-medium"

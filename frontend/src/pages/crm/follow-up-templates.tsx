@@ -81,10 +81,10 @@ const ROLES = ["RECEPTION", "DOCTOR", "CRM_EXECUTIVE", "HOSPITAL_ADMIN"]
 const channelColors: Record<string, string> = {
   WHATSAPP: "bg-green-50 text-green-600",
   SMS: "bg-blue-50 text-blue-600",
-  EMAIL: "bg-purple-50 text-purple-600",
+  EMAIL: "bg-[var(--ds-accent-50)] text-[var(--ds-accent-600)]",
   PHONE: "bg-amber-50 text-amber-600",
-  TASK: "bg-gray-50 text-gray-600",
-  NOTIFICATION: "bg-indigo-50 text-indigo-600",
+  TASK: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
+  NOTIFICATION: "bg-[var(--ds-primary-50)] text-[var(--ds-primary-600)]",
 }
 
 const priorityColors: Record<string, string> = {
@@ -243,7 +243,7 @@ export default function FollowUpTemplates() {
             </CardTitle>
             <div className="flex gap-2">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ds-text-tertiary)]" />
                 <Input
                   placeholder="Search templates..."
                   className="pl-9 w-56"
@@ -298,7 +298,7 @@ export default function FollowUpTemplates() {
                   {filtered.map((t) => (
                     <tr
                       key={t.id}
-                      className="border-b last:border-0 hover:bg-gray-50 transition-colors"
+                      className="border-b last:border-0 hover:bg-[var(--ds-surface-hover)] transition-colors"
                     >
                       <td className="py-3 pr-4 font-medium">{t.name}</td>
                       <td className="py-3 pr-4 text-muted-foreground">{t.procedure || "—"}</td>
@@ -338,7 +338,7 @@ export default function FollowUpTemplates() {
                           {t.is_active ? (
                             <ToggleRight className="h-4 w-4 text-green-600" />
                           ) : (
-                            <ToggleLeft className="h-4 w-4 text-gray-400" />
+                            <ToggleLeft className="h-4 w-4 text-[var(--ds-text-tertiary)]" />
                           )}
                         </Button>
                       </td>

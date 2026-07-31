@@ -321,8 +321,8 @@ export default function AdminGroups() {
               </div>
               {!editingGroup && (
                 <>
-                  <div className="border-t border-gray-100 pt-4">
-                    <p className="text-sm font-medium text-gray-700 mb-3">Admin Credentials</p>
+                  <div className="border-t border-[var(--ds-border-light)] pt-4">
+                    <p className="text-sm font-medium text-[var(--ds-text-secondary)] mb-3">Admin Credentials</p>
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="admin_full_name">Admin Full Name</Label>
@@ -364,7 +364,7 @@ export default function AdminGroups() {
                 <Label htmlFor="is_active">Active</Label>
               </div>
             </div>
-            <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-gray-100">
+            <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-[var(--ds-border-light)]">
               <Button type="button" variant="outline" onClick={closeDialog}>
                 Cancel
               </Button>

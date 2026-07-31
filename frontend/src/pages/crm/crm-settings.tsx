@@ -40,9 +40,9 @@ import { cn } from "@/lib/utils";
 import { crmSettingsApi } from "@/services/endpoints";
 
 const TABS = [
-  { key: "general", label: "General", icon: Zap, color: "from-blue-600 to-indigo-600", desc: "Global CRM automation behavior and business hours" },
+  { key: "general", label: "General", icon: Zap, color: "from-blue-600 to-[var(--ds-primary-600)]", desc: "Global CRM automation behavior and business hours" },
   { key: "lead", label: "Lead", icon: Users, color: "from-emerald-500 to-teal-600", desc: "New lead follow-up automation" },
-  { key: "opd", label: "OPD", icon: Stethoscope, color: "from-violet-500 to-purple-600", desc: "Post-consultation follow-up" },
+  { key: "opd", label: "OPD", icon: Stethoscope, color: "from-[var(--ds-accent-500)] to-[var(--ds-accent-600)]", desc: "Post-consultation follow-up" },
   { key: "treatment", label: "Treatment", icon: ClipboardList, color: "from-amber-500 to-orange-600", desc: "Treatment completion wellness checks" },
   { key: "case", label: "Case", icon: HeartPulse, color: "from-rose-500 to-pink-600", desc: "Case recovery and periodic recall" },
 ] as const;
@@ -610,7 +610,7 @@ function LeadTab({ form }: TabProps) {
         )}
 
         {!enabled && (
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-slate-50 border border-slate-200 text-sm text-slate-600 mt-3">
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-[var(--ds-background-subtle)] border border-[var(--ds-border)] text-sm text-[var(--ds-text-secondary)] mt-3">
             <Info className="w-4 h-4 shrink-0" />
             <span>Lead follow-up automation is disabled. No enquiries will be generated for new leads.</span>
           </div>
@@ -750,7 +750,7 @@ function OpdTab({ form }: TabProps) {
         )}
 
         {!enabled && (
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-slate-50 border border-slate-200 text-sm text-slate-600 mt-3">
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-[var(--ds-background-subtle)] border border-[var(--ds-border)] text-sm text-[var(--ds-text-secondary)] mt-3">
             <Info className="w-4 h-4 shrink-0" />
             <span>OPD follow-up is disabled. No enquiries will be generated after consultations.</span>
           </div>
@@ -827,7 +827,7 @@ function TreatmentTab({ form }: TabProps) {
         )}
 
         {!enabled && (
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-slate-50 border border-slate-200 text-sm text-slate-600 mt-3">
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-[var(--ds-background-subtle)] border border-[var(--ds-border)] text-sm text-[var(--ds-text-secondary)] mt-3">
             <Info className="w-4 h-4 shrink-0" />
             <span>Treatment wellness is disabled. No enquiries will be generated after treatment completion.</span>
           </div>
@@ -905,7 +905,7 @@ function CaseTab({ form }: TabProps) {
         )}
 
         {!recoveryEnabled && (
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-slate-50 border border-slate-200 text-sm text-slate-600 mt-3">
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-[var(--ds-background-subtle)] border border-[var(--ds-border)] text-sm text-[var(--ds-text-secondary)] mt-3">
             <Info className="w-4 h-4 shrink-0" />
             <span>Recovery wellness is disabled. No enquiries will be generated after case completion.</span>
           </div>
@@ -975,7 +975,7 @@ function CaseTab({ form }: TabProps) {
         )}
 
         {!recallEnabled && (
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-slate-50 border border-slate-200 text-sm text-slate-600 mt-3">
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-[var(--ds-background-subtle)] border border-[var(--ds-border)] text-sm text-[var(--ds-text-secondary)] mt-3">
             <Info className="w-4 h-4 shrink-0" />
             <span>Periodic recall is disabled. No recall enquiries will be generated.</span>
           </div>
@@ -990,7 +990,7 @@ function PreviewPanel({ values, activeTab }: { values: SettingsFormType; activeT
     <div className="space-y-4">
       <div className="flex items-center gap-2 mb-2">
         <Eye className="w-4 h-4 text-[var(--ds-primary)]" />
-        <h3 className="font-[var(--ds-text-h3)] text-[var(--ds-text)]">Live Preview</h3>
+        <h3 className="ds-card-title text-[var(--ds-text)]">Live Preview</h3>
       </div>
 
       <PreviewCard

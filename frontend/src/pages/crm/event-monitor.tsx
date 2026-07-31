@@ -81,7 +81,7 @@ const statusColors: Record<string, string> = {
   COMPLETED: "bg-green-50 text-green-700",
   FAILED: "bg-red-50 text-red-700",
   RETRYING: "bg-amber-50 text-amber-700",
-  SKIPPED: "bg-gray-50 text-gray-500",
+  SKIPPED: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
 }
 
 const statusDotColors: Record<string, string> = {
@@ -90,7 +90,7 @@ const statusDotColors: Record<string, string> = {
   COMPLETED: "bg-green-400",
   FAILED: "bg-red-400",
   RETRYING: "bg-amber-400",
-  SKIPPED: "bg-gray-400",
+  SKIPPED: "bg-[var(--ds-text-tertiary)]",
 }
 
 const EVENT_STATUSES = ["PENDING", "PROCESSING", "COMPLETED", "FAILED", "RETRYING", "SKIPPED"]
@@ -147,7 +147,7 @@ function PayloadModal({
               {formatLabel(event.entity_type)}
             </div>
           </div>
-          <pre className="bg-gray-950 text-green-400 rounded-lg p-4 overflow-auto text-xs leading-relaxed">
+          <pre className="bg-[var(--ds-neutral-950)] text-green-400 rounded-lg p-4 overflow-auto text-xs leading-relaxed">
             <code>{JSON.stringify(payload, null, 2)}</code>
           </pre>
         </div>
@@ -352,7 +352,7 @@ export default function EventMonitor() {
                 </TableHeader>
                 <TableBody>
                   {events.map((ev) => {
-                    const dotColor = statusDotColors[ev.status] || "bg-gray-400"
+                    const dotColor = statusDotColors[ev.status] || "bg-[var(--ds-text-tertiary)]"
                     return (
                       <TableRow key={ev.id}>
                         <TableCell className="font-mono text-xs" title={ev.event_id}>
@@ -363,7 +363,7 @@ export default function EventMonitor() {
                         <TableCell className="text-xs">{formatLabel(ev.entity_type)}</TableCell>
                         <TableCell>
                           <Badge
-                            className={`text-[10px] font-medium ${statusColors[ev.status] || "bg-gray-50 text-gray-600"}`}
+                            className={`text-[10px] font-medium ${statusColors[ev.status] || "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]"}`}
                           >
                             <span
                               className={`inline-block h-1.5 w-1.5 rounded-full ${dotColor} mr-1.5`}

@@ -165,7 +165,7 @@ export default function BillingDetail() {
       </div>
 
       <Tabs defaultValue="invoice" className="w-full">
-        <TabsList className="bg-white border border-border rounded-xl p-1">
+        <TabsList className="bg-[var(--ds-surface)] border border-border rounded-xl p-1">
           <TabsTrigger value="invoice">Invoice</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
           <TabsTrigger value="timeline">Timeline</TabsTrigger>
@@ -205,11 +205,11 @@ export default function BillingDetail() {
                   {formatIndianRupees(billing.pending_amount)}
                 </p>
               </div>
-              <div className={`rounded-xl p-4 border ${billing.discount_percent > 0 || billing.discount_amount > 0 ? "bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200" : "bg-gray-50 border-gray-200"}`}>
-                <p className="text-sm text-purple-600 font-medium">Discount</p>
+              <div className={`rounded-xl p-4 border ${billing.discount_percent > 0 || billing.discount_amount > 0 ? "bg-gradient-to-br from-[var(--ds-accent-50)] to-[var(--ds-accent-100)] border-[var(--ds-accent-200)]" : "bg-[var(--ds-background-subtle)] border-[var(--ds-border)]"}`}>
+                <p className="text-sm text-[var(--ds-accent-600)] font-medium">Discount</p>
                 <p className="text-2xl font-bold mt-1">
                   {(billing.discount_percent > 0 || billing.discount_amount > 0) ? (
-                    <span className="text-purple-800">
+                    <span className="text-[var(--ds-accent-800)]">
                       {billing.discount_type === "PERCENTAGE"
                         ? `${billing.discount_percent}%`
                         : formatIndianRupees(billing.discount_amount)}
@@ -217,19 +217,19 @@ export default function BillingDetail() {
                       ({formatIndianRupees(billing.discount_amount)})
                     </span>
                   ) : (
-                    <span className="text-gray-400 text-lg">No discount</span>
+                    <span className="text-[var(--ds-text-tertiary)] text-lg">No discount</span>
                   )}
                 </p>
                 {billing.discount_reason && (
-                  <p className="text-xs text-gray-500 mt-1">{billing.discount_reason}</p>
+                  <p className="text-xs text-[var(--ds-text-secondary)] mt-1">{billing.discount_reason}</p>
                 )}
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-              <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl p-4 border border-indigo-200">
-                <p className="text-sm text-indigo-600 font-medium">Final Amount</p>
-                <p className="text-2xl font-bold text-indigo-800 mt-1">
+              <div className="bg-gradient-to-br from-[var(--ds-primary-50)] to-[var(--ds-primary-100)] rounded-xl p-4 border border-[var(--ds-primary-200)]">
+                <p className="text-sm text-[var(--ds-primary-600)] font-medium">Final Amount</p>
+                <p className="text-2xl font-bold text-[var(--ds-primary-800)] mt-1">
                   {formatIndianRupees(billing.total_amount)}
                 </p>
               </div>
@@ -353,15 +353,15 @@ export default function BillingDetail() {
               const actionConfig: Record<string, { icon: string; color: string; label: string }> = {
                 CREATE_BILLING: { icon: "\u2795", color: "text-blue-600 bg-blue-100", label: "Created" },
                 PAYMENT_UPDATE: { icon: "\uD83D\uDCB0", color: "text-green-600 bg-green-100", label: "Payment" },
-                DISCOUNT_APPLIED: { icon: "\uD83C\uDFAF", color: "text-purple-600 bg-purple-100", label: "Discount" },
+                DISCOUNT_APPLIED: { icon: "\uD83C\uDFAF", color: "text-[var(--ds-accent-600)] bg-[var(--ds-accent-100)]", label: "Discount" },
                 DELETE_BILLING: { icon: "\u274C", color: "text-red-600 bg-red-100", label: "Deleted" },
               };
               return (
                 <div className="relative">
-                  <div className="absolute left-6 top-2 bottom-2 w-0.5 bg-gray-200" />
+                  <div className="absolute left-6 top-2 bottom-2 w-0.5 bg-[var(--ds-surface-secondary)]" />
                   <div className="space-y-0">
                     {historyEntries.map((entry: { id: string; action: string; created_at: string; changes_summary?: string; new_data?: string }) => {
-                      const cfg = actionConfig[entry.action] || { icon: "\uD83D\uDCCB", color: "text-gray-600 bg-gray-100", label: entry.action };
+                      const cfg = actionConfig[entry.action] || { icon: "\uD83D\uDCCB", color: "text-[var(--ds-text-secondary)] bg-[var(--ds-background-subtle)]", label: entry.action };
                       return (
                         <div key={entry.id} className="relative flex gap-4 pb-6 last:pb-0">
                           <div className={`relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${cfg.color}`}>
@@ -383,7 +383,7 @@ export default function BillingDetail() {
                                   try {
                                     const nd = JSON.parse(entry.new_data);
                                     return Object.entries(nd).map(([k, v]) => (
-                                      <span key={k} className="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-0.5 text-xs text-text-muted border border-border">
+                                      <span key={k} className="inline-flex items-center gap-1 rounded-md bg-[var(--ds-background-subtle)] px-2 py-0.5 text-xs text-text-muted border border-border">
                                         <span className="capitalize">{k.replace(/_/g, " ")}:</span>
                                         <span className="font-medium text-text-primary">
                                           {k.includes("amount") || k.includes("paid") || k.includes("pending") || k.includes("total")
@@ -456,7 +456,7 @@ export default function BillingDetail() {
                   onChange={(v) => setDiscountFixed(v)} />
               </div>
             )}
-            <div className="rounded-lg bg-gray-50 p-3 space-y-1 text-sm">
+            <div className="rounded-lg bg-[var(--ds-background-subtle)] p-3 space-y-1 text-sm">
               <p className="flex justify-between">
                 <span>Original Amount:</span>
                 <span className="font-semibold">{formatIndianRupees(originalAmount)}</span>
@@ -488,7 +488,7 @@ export default function BillingDetail() {
                 value={discountReason}
                 onChange={(e) => setDiscountReason(e.target.value)} />
             </div>
-            <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+            <Button className="w-full bg-[var(--ds-accent-600)] hover:bg-[var(--ds-accent-700)] text-white"
               onClick={() => {
                 if (discountType === "PERCENTAGE") {
                   const pct = parseFloat(discountPercent);

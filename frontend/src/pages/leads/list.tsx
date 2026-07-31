@@ -82,14 +82,14 @@ const priorityColors: Record<string, string> = {
 
 const statusColors: Record<string, string> = {
   NEW: "bg-blue-50 text-blue-700 ring-blue-600/20",
-  CONTACTED: "bg-purple-50 text-purple-700 ring-purple-600/20",
+  CONTACTED: "bg-[var(--ds-accent-50)] text-[var(--ds-accent-700)] ring-[var(--ds-accent-600)]",
   INTERESTED: "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
   FOLLOW_UP_REQUIRED: "bg-amber-50 text-amber-700 ring-amber-600/20",
-  APPOINTMENT_BOOKED: "bg-indigo-50 text-indigo-700 ring-indigo-600/20",
+  APPOINTMENT_BOOKED: "bg-[var(--ds-primary-50)] text-[var(--ds-primary-700)] ring-[var(--ds-primary-600)]",
   VISITED: "bg-teal-50 text-teal-700 ring-teal-600/20",
   CONVERTED: "bg-green-50 text-green-700 ring-green-600/20",
   LOST: "bg-red-50 text-red-700 ring-red-600/20",
-  NOT_INTERESTED: "bg-gray-50 text-gray-600 ring-gray-500/20",
+  NOT_INTERESTED: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)] ring-[var(--ds-border-light)]/20",
   NO_RESPONSE: "bg-orange-50 text-orange-700 ring-orange-600/20",
 }
 
@@ -150,10 +150,23 @@ export default function LeadList() {
 
   const statusFromUrl = searchParams.get("status") || ""
   const sourceFromUrl = searchParams.get("source") || ""
+  const dateFromFromUrl = searchParams.get("date_from") || ""
+  const dateToFromUrl = searchParams.get("date_to") || ""
 
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState(statusFromUrl)
   const [sourceFilter, setSourceFilter] = useState(sourceFromUrl)
+  const [dateFrom, setDateFrom] = useState(dateFromFromUrl)
+  const [dateTo, setDateTo] = useState(dateToFromUrl)
+
+  const updateParam = (key: string, value: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (value) next.set(key, value)
+      else next.delete(key)
+      return next
+    }, { replace: true })
+  }
   const [sortField, setSortField] = useState<string>("created_at")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
   const [page, setPage] = useState(1)
@@ -187,11 +200,13 @@ export default function LeadList() {
   const [notes, setNotes] = useState("")
 
   const { data: leads, isLoading } = useQuery({
-    queryKey: ["leads", statusFilter, sourceFilter, page, pageSize],
+    queryKey: ["leads", statusFilter, sourceFilter, dateFrom, dateTo, page, pageSize],
     queryFn: () =>
       leadsApi.list({
         status: statusFilter || undefined,
         source: sourceFilter || undefined,
+        date_from: dateFrom || undefined,
+        date_to: dateTo || undefined,
         page,
         page_size: pageSize,
       }),
@@ -407,13 +422,13 @@ export default function LeadList() {
   const SortHeader = useCallback(
     ({ field, children }: { field: string; children: React.ReactNode }) => (
       <th
-        className="text-left px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 transition-colors"
+        className="text-left px-3 py-3 font-medium text-[var(--ds-text-secondary)] text-xs uppercase tracking-wider cursor-pointer select-none hover:text-[var(--ds-text-secondary)] transition-colors"
         onClick={() => toggleSort(field)}
       >
         <div className="flex items-center gap-1">
           {children}
           <ArrowUpDown
-            className={`h-3 w-3 ${sortField === field ? "text-[var(--ds-primary)]" : "text-gray-300"}`}
+            className={`h-3 w-3 ${sortField === field ? "text-[var(--ds-primary)]" : "text-[var(--ds-text-tertiary)]"}`}
           />
         </div>
       </th>
@@ -473,11 +488,11 @@ export default function LeadList() {
               className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all ${
                 statusFilter === s.key
                   ? "border-blue-300 bg-blue-50 ring-1 ring-blue-200"
-                  : "border-gray-100 hover:border-gray-200 hover:bg-gray-50"
+                  : "border-[var(--ds-border-light)] hover:border-[var(--ds-border)] hover:bg-[var(--ds-surface-hover)]"
               }`}
             >
               <span className={`text-lg font-bold ${s.color}`}>{val}</span>
-              <span className="text-[10px] text-gray-500 mt-0.5">{s.label}</span>
+              <span className="text-[10px] text-[var(--ds-text-secondary)] mt-0.5">{s.label}</span>
             </button>
           )
         })}
@@ -487,7 +502,7 @@ export default function LeadList() {
         <CardContent className="p-3 space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative flex-1 min-w-[220px]">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[var(--ds-text-tertiary)]" />
               <Input
                 placeholder="Search name, phone, email, treatment..."
                 value={search}
@@ -497,7 +512,7 @@ export default function LeadList() {
               {search && (
                 <button
                   onClick={() => setSearch("")}
-                  className="absolute right-2 top-2.5 text-gray-400 hover:text-gray-600"
+                  className="absolute right-2 top-2.5 text-[var(--ds-text-tertiary)] hover:text-[var(--ds-text-secondary)]"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -559,12 +574,12 @@ export default function LeadList() {
                 <Columns className="h-3.5 w-3.5 mr-1" /> Columns
               </Button>
               {showColumnChooser && (
-                <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[var(--ds-z-dropdown)] p-2">
-                  <p className="text-xs font-medium text-gray-500 px-2 py-1">Toggle Columns</p>
+                <div className="absolute right-0 top-full mt-1 w-48 bg-[var(--ds-surface)] border border-[var(--ds-border)] rounded-lg shadow-lg z-[var(--ds-z-dropdown)] p-2">
+                  <p className="text-xs font-medium text-[var(--ds-text-secondary)] px-2 py-1">Toggle Columns</p>
                   {columnOptions.map((col) => (
                     <label
                       key={col.key}
-                      className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer text-sm"
+                      className="flex items-center gap-2 px-2 py-1.5 hover:bg-[var(--ds-surface-hover)] rounded cursor-pointer text-sm"
                     >
                       <input
                         type="checkbox"
@@ -576,7 +591,7 @@ export default function LeadList() {
                               : [...prev, col.key],
                           )
                         }}
-                        className="rounded border-gray-300"
+                        className="rounded border-[var(--ds-border-strong)]"
                       />
                       {col.label}
                     </label>
@@ -585,8 +600,8 @@ export default function LeadList() {
               )}
             </div>
             {selectedLeads.size > 0 && (
-              <div className="flex items-center gap-2 ml-2 pl-2 border-l border-gray-200">
-                <span className="text-xs text-gray-500">{selectedLeads.size} selected</span>
+              <div className="flex items-center gap-2 ml-2 pl-2 border-l border-[var(--ds-border)]">
+                <span className="text-xs text-[var(--ds-text-secondary)]">{selectedLeads.size} selected</span>
                 <Button
                   variant="outline"
                   size="sm"
@@ -602,13 +617,13 @@ export default function LeadList() {
           </div>
 
           {showFilters && (
-            <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
+            <div className="flex flex-wrap gap-2 pt-2 border-t border-[var(--ds-border-light)]">
               <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500">Treatment:</span>
+                <span className="text-xs text-[var(--ds-text-secondary)]">Treatment:</span>
                 <Input placeholder="Filter by treatment" className="h-8 w-48 text-sm" />
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500">Priority:</span>
+                <span className="text-xs text-[var(--ds-text-secondary)]">Priority:</span>
                 <Select>
                   <SelectTrigger className="h-8 w-32">
                     <SelectValue placeholder="All" />
@@ -622,10 +637,28 @@ export default function LeadList() {
                 </Select>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500">Date Range:</span>
-                <Input type="date" className="h-8 w-36 text-sm" />
-                <span className="text-xs text-gray-400">to</span>
-                <Input type="date" className="h-8 w-36 text-sm" />
+                <span className="text-xs text-[var(--ds-text-secondary)]">Date Range:</span>
+                <Input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => {
+                    setDateFrom(e.target.value)
+                    updateParam("date_from", e.target.value)
+                  }}
+                  className="h-8 w-36 text-sm"
+                  aria-label="Date from"
+                />
+                <span className="text-xs text-[var(--ds-text-tertiary)]">to</span>
+                <Input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => {
+                    setDateTo(e.target.value)
+                    updateParam("date_to", e.target.value)
+                  }}
+                  className="h-8 w-36 text-sm"
+                  aria-label="Date to"
+                />
               </div>
               <Button
                 variant="ghost"
@@ -665,7 +698,7 @@ export default function LeadList() {
               : "Add your first lead to start tracking inquiries"
           }
           action={
-            !search && !statusFilter && !sourceFilter ? (
+            !search && !statusFilter && !sourceFilter && !dateFrom && !dateTo ? (
               <Button onClick={() => setCreateOpen(true)}>
                 <Plus className="h-4 w-4 mr-1.5" /> Add Lead
               </Button>
@@ -673,39 +706,39 @@ export default function LeadList() {
           }
         />
       ) : (
-        <div className="rounded-xl border border-gray-200 overflow-hidden bg-white">
+        <div className="rounded-xl border border-[var(--ds-border)] overflow-hidden bg-[var(--ds-surface)]">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
+                <tr className="bg-[var(--ds-background-subtle)] border-b border-[var(--ds-border)]">
                   <th className="px-3 py-3 w-10">
                     <input
                       type="checkbox"
                       checked={selectAll}
                       onChange={toggleSelectAll}
-                      className="rounded border-gray-300"
+                      className="rounded border-[var(--ds-border-strong)]"
                     />
                   </th>
                   {visibleColumns.includes("lead_name") && (
                     <SortHeader field="lead_name">Lead Name</SortHeader>
                   )}
                   {visibleColumns.includes("contact") && (
-                    <th className="text-left px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">
+                    <th className="text-left px-3 py-3 font-medium text-[var(--ds-text-secondary)] text-xs uppercase tracking-wider">
                       Contact
                     </th>
                   )}
                   {visibleColumns.includes("source") && (
-                    <th className="text-left px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">
+                    <th className="text-left px-3 py-3 font-medium text-[var(--ds-text-secondary)] text-xs uppercase tracking-wider">
                       Source
                     </th>
                   )}
                   {visibleColumns.includes("treatment") && (
-                    <th className="text-left px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">
+                    <th className="text-left px-3 py-3 font-medium text-[var(--ds-text-secondary)] text-xs uppercase tracking-wider">
                       Treatment
                     </th>
                   )}
                   {visibleColumns.includes("priority") && (
-                    <th className="text-left px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">
+                    <th className="text-left px-3 py-3 font-medium text-[var(--ds-text-secondary)] text-xs uppercase tracking-wider">
                       Priority
                     </th>
                   )}
@@ -719,17 +752,17 @@ export default function LeadList() {
                     <SortHeader field="budget">Budget</SortHeader>
                   )}
                   {visibleColumns.includes("city") && (
-                    <th className="text-left px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">
+                    <th className="text-left px-3 py-3 font-medium text-[var(--ds-text-secondary)] text-xs uppercase tracking-wider">
                       City
                     </th>
                   )}
                   {visibleColumns.includes("status") && (
-                    <th className="text-left px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">
+                    <th className="text-left px-3 py-3 font-medium text-[var(--ds-text-secondary)] text-xs uppercase tracking-wider">
                       Status
                     </th>
                   )}
                   {visibleColumns.includes("assigned") && (
-                    <th className="text-left px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">
+                    <th className="text-left px-3 py-3 font-medium text-[var(--ds-text-secondary)] text-xs uppercase tracking-wider">
                       Assigned
                     </th>
                   )}
@@ -737,20 +770,20 @@ export default function LeadList() {
                     <SortHeader field="created_at">Created</SortHeader>
                   )}
                   {visibleColumns.includes("last_contacted") && (
-                    <th className="text-left px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider">
+                    <th className="text-left px-3 py-3 font-medium text-[var(--ds-text-secondary)] text-xs uppercase tracking-wider">
                       Last Contact
                     </th>
                   )}
-                  <th className="text-right px-3 py-3 font-medium text-gray-500 text-xs uppercase tracking-wider w-20">
+                  <th className="text-right px-3 py-3 font-medium text-[var(--ds-text-secondary)] text-xs uppercase tracking-wider w-20">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-[var(--ds-border-light)]">
                 {filtered.map((lead) => (
                   <tr
                     key={lead.id}
-                    className={`hover:bg-gray-50/70 transition-colors cursor-pointer ${
+                    className={`hover:bg-[var(--ds-background-subtle)]/70 transition-colors cursor-pointer ${
                       selectedLeads.has(lead.id) ? "bg-blue-50/40" : ""
                     }`}
                     onClick={() => navigate(`/leads/${lead.id}`)}
@@ -760,7 +793,7 @@ export default function LeadList() {
                         type="checkbox"
                         checked={selectedLeads.has(lead.id)}
                         onChange={() => toggleSelect(lead.id)}
-                        className="rounded border-gray-300"
+                        className="rounded border-[var(--ds-border-strong)]"
                       />
                     </td>
                     {visibleColumns.includes("lead_name") && (
@@ -770,10 +803,10 @@ export default function LeadList() {
                             <Users className="h-4 w-4 text-blue-500" />
                           </div>
                           <div>
-                            <p className="font-medium text-gray-900 truncate max-w-[180px]">
+                            <p className="font-medium text-[var(--ds-text)] truncate max-w-[180px]">
                               {lead.lead_name}
                             </p>
-                            <p className="text-[11px] text-gray-400 font-mono">
+                            <p className="text-[11px] text-[var(--ds-text-tertiary)] font-mono">
                               #{lead.id.slice(-6).toUpperCase()}
                             </p>
                           </div>
@@ -782,9 +815,9 @@ export default function LeadList() {
                     )}
                     {visibleColumns.includes("contact") && (
                       <td className="px-3 py-3">
-                        <p className="text-gray-700 text-[13px]">{lead.mobile}</p>
+                        <p className="text-[var(--ds-text-secondary)] text-[13px]">{lead.mobile}</p>
                         {lead.email && (
-                          <p className="text-[11px] text-gray-400 truncate max-w-[150px]">
+                          <p className="text-[11px] text-[var(--ds-text-tertiary)] truncate max-w-[150px]">
                             {lead.email}
                           </p>
                         )}
@@ -799,7 +832,7 @@ export default function LeadList() {
                     )}
                     {visibleColumns.includes("treatment") && (
                       <td className="px-3 py-3">
-                        <span className="text-[13px] text-gray-600">
+                        <span className="text-[13px] text-[var(--ds-text-secondary)]">
                           {lead.interested_treatment || "—"}
                         </span>
                       </td>
@@ -823,44 +856,44 @@ export default function LeadList() {
                       <td className="px-3 py-3">
                         {lead.next_follow_up_date ? (
                           <div className="flex items-center gap-1 text-[12px]">
-                            <Clock className="h-3 w-3 text-gray-400" />
+                            <Clock className="h-3 w-3 text-[var(--ds-text-tertiary)]" />
                             <span
                               className={
                                 new Date(lead.next_follow_up_date) < new Date()
                                   ? "text-red-600 font-medium"
-                                  : "text-gray-600"
+                                  : "text-[var(--ds-text-secondary)]"
                               }
                             >
                               {format(new Date(lead.next_follow_up_date), "dd MMM")}
                             </span>
                           </div>
                         ) : (
-                          <span className="text-[12px] text-gray-400">—</span>
+                          <span className="text-[12px] text-[var(--ds-text-tertiary)]">—</span>
                         )}
                       </td>
                     )}
                     {visibleColumns.includes("score") && (
                       <td className="px-3 py-3">
                         <div className="flex items-center gap-1.5">
-                          <div className="h-1.5 w-12 bg-gray-200 rounded-full overflow-hidden">
+                          <div className="h-1.5 w-12 bg-[var(--ds-surface-secondary)] rounded-full overflow-hidden">
                             <div
                               className="h-full bg-blue-500 rounded-full"
                               style={{ width: `${Math.min(lead.lead_score ?? 0, 100)}%` }}
                             />
                           </div>
-                          <span className="text-[11px] font-medium text-gray-600">
+                          <span className="text-[11px] font-medium text-[var(--ds-text-secondary)]">
                             {lead.lead_score ?? 0}
                           </span>
                         </div>
                       </td>
                     )}
                     {visibleColumns.includes("budget") && (
-                      <td className="px-3 py-3 text-[13px] text-gray-700">
+                      <td className="px-3 py-3 text-[13px] text-[var(--ds-text-secondary)]">
                         {lead.budget ? `₹${lead.budget.toLocaleString()}` : "—"}
                       </td>
                     )}
                     {visibleColumns.includes("city") && (
-                      <td className="px-3 py-3 text-[13px] text-gray-600">{lead.city || "—"}</td>
+                      <td className="px-3 py-3 text-[13px] text-[var(--ds-text-secondary)]">{lead.city || "—"}</td>
                     )}
                     {visibleColumns.includes("status") && (
                       <td className="px-3 py-3">
@@ -874,8 +907,8 @@ export default function LeadList() {
                     {visibleColumns.includes("assigned") && (
                       <td className="px-3 py-3">
                         {lead.assigned_staff_id || lead.assigned_doctor_id ? (
-                          <div className="flex items-center gap-1 text-[12px] text-gray-600">
-                            <UserCog className="h-3 w-3 text-gray-400" />
+                          <div className="flex items-center gap-1 text-[12px] text-[var(--ds-text-secondary)]">
+                            <UserCog className="h-3 w-3 text-[var(--ds-text-tertiary)]" />
                             <span className="truncate max-w-[100px]">
                               {lead.assigned_doctor_id
                                 ? userMap[lead.assigned_doctor_id] ||
@@ -887,17 +920,17 @@ export default function LeadList() {
                             </span>
                           </div>
                         ) : (
-                          <span className="text-[12px] text-gray-400">—</span>
+                          <span className="text-[12px] text-[var(--ds-text-tertiary)]">—</span>
                         )}
                       </td>
                     )}
                     {visibleColumns.includes("created") && (
-                      <td className="px-3 py-3 text-[12px] text-gray-500">
+                      <td className="px-3 py-3 text-[12px] text-[var(--ds-text-secondary)]">
                         {format(new Date(lead.created_at), "dd MMM yy")}
                       </td>
                     )}
                     {visibleColumns.includes("last_contacted") && (
-                      <td className="px-3 py-3 text-[12px] text-gray-500">
+                      <td className="px-3 py-3 text-[12px] text-[var(--ds-text-secondary)]">
                         {lead.last_contacted_at
                           ? format(new Date(lead.last_contacted_at), "dd MMM")
                           : "—"}
@@ -912,33 +945,33 @@ export default function LeadList() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent
                           align="end"
-                          className="w-52 bg-white shadow-lg border-gray-200"
+                          className="w-52 bg-[var(--ds-surface)] shadow-lg border-[var(--ds-border)]"
                         >
                           <DropdownMenuItem
                             onClick={() => navigate(`/leads/${lead.id}`)}
                             className="cursor-pointer"
                           >
-                            <Eye className="h-4 w-4 mr-2.5 text-gray-500" /> View Details
+                            <Eye className="h-4 w-4 mr-2.5 text-[var(--ds-text-secondary)]" /> View Details
                           </DropdownMenuItem>
-                          <DropdownMenuSeparator className="bg-gray-100" />
+                          <DropdownMenuSeparator className="bg-[var(--ds-background-subtle)]" />
                           <DropdownMenuItem
                             onClick={() => handleCall(lead)}
                             className="cursor-pointer"
                           >
-                            <Phone className="h-4 w-4 mr-2.5 text-gray-500" /> Call
+                            <Phone className="h-4 w-4 mr-2.5 text-[var(--ds-text-secondary)]" /> Call
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => handleWhatsApp(lead)}
                             className="cursor-pointer"
                           >
-                            <MessageSquare className="h-4 w-4 mr-2.5 text-gray-500" /> WhatsApp
+                            <MessageSquare className="h-4 w-4 mr-2.5 text-[var(--ds-text-secondary)]" /> WhatsApp
                           </DropdownMenuItem>
-                          <DropdownMenuSeparator className="bg-gray-100" />
+                          <DropdownMenuSeparator className="bg-[var(--ds-background-subtle)]" />
                           <DropdownMenuItem
                             onClick={() => navigate(`/leads/${lead.id}`)}
                             className="cursor-pointer"
                           >
-                            <Calendar className="h-4 w-4 mr-2.5 text-gray-500" /> Schedule Follow-up
+                            <Calendar className="h-4 w-4 mr-2.5 text-[var(--ds-text-secondary)]" /> Schedule Follow-up
                           </DropdownMenuItem>
                           {lead.status !== "CONVERTED" &&
                             lead.status !== "LOST" &&
@@ -948,11 +981,11 @@ export default function LeadList() {
                                 onClick={() => navigate(`/leads/${lead.id}`)}
                                 className="cursor-pointer"
                               >
-                                <Target className="h-4 w-4 mr-2.5 text-gray-500" /> Convert to
+                                <Target className="h-4 w-4 mr-2.5 text-[var(--ds-text-secondary)]" /> Convert to
                                 Patient
                               </DropdownMenuItem>
                             )}
-                          <DropdownMenuSeparator className="bg-gray-100" />
+                          <DropdownMenuSeparator className="bg-[var(--ds-background-subtle)]" />
                           <DropdownMenuItem
                             className="text-red-600 cursor-pointer focus:text-red-700 focus:bg-red-50"
                             onClick={() => {
@@ -971,9 +1004,9 @@ export default function LeadList() {
             </table>
           </div>
 
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50/50">
+          <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--ds-border)] bg-[var(--ds-background-subtle)]/50">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-[var(--ds-text-secondary)]">
                 Showing {filtered.length} of {totalLeads} leads
               </span>
               <Select
@@ -1003,7 +1036,7 @@ export default function LeadList() {
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <span className="text-xs text-gray-600 px-2">Page {page}</span>
+              <span className="text-xs text-[var(--ds-text-secondary)] px-2">Page {page}</span>
               <Button
                 variant="outline"
                 size="icon-sm"
@@ -1019,7 +1052,7 @@ export default function LeadList() {
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="sm:max-w-xl max-h-[90vh] flex flex-col p-0 gap-0">
-          <DialogHeader className="px-6 py-5 border-b border-gray-100 shrink-0">
+          <DialogHeader className="px-6 py-5 border-b border-[var(--ds-border-light)] shrink-0">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center">
                 <Users className="h-5 w-5 text-blue-600" />
@@ -1036,13 +1069,13 @@ export default function LeadList() {
             <section>
               <div className="flex items-center gap-2 mb-3">
                 <div className="h-0.5 w-5 bg-blue-500 rounded-full" />
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <h4 className="text-xs font-semibold text-[var(--ds-text-secondary)] uppercase tracking-wider">
                   Basic Information
                 </h4>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
-                  <Label className="text-xs font-medium text-gray-600">
+                  <Label className="text-xs font-medium text-[var(--ds-text-secondary)]">
                     Lead Name <span className="text-red-500">*</span>
                   </Label>
                   <Input
@@ -1053,7 +1086,7 @@ export default function LeadList() {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs font-medium text-gray-600">Age</Label>
+                  <Label className="text-xs font-medium text-[var(--ds-text-secondary)]">Age</Label>
                   <NumericInput
                     mode="integer"
                     min={0}
@@ -1065,7 +1098,7 @@ export default function LeadList() {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs font-medium text-gray-600">Gender</Label>
+                  <Label className="text-xs font-medium text-[var(--ds-text-secondary)]">Gender</Label>
                   <Select value={gender} onValueChange={setGender}>
                     <SelectTrigger className="mt-1">
                       <SelectValue placeholder="Select" />
@@ -1078,7 +1111,7 @@ export default function LeadList() {
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-xs font-medium text-gray-600">City</Label>
+                  <Label className="text-xs font-medium text-[var(--ds-text-secondary)]">City</Label>
                   <Input
                     value={city}
                     onChange={(e) => setCity(e.target.value)}
@@ -1087,7 +1120,7 @@ export default function LeadList() {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs font-medium text-gray-600">
+                  <Label className="text-xs font-medium text-[var(--ds-text-secondary)]">
                     Source <span className="text-red-500">*</span>
                   </Label>
                   <Select value={source} onValueChange={setSource}>
@@ -1107,14 +1140,14 @@ export default function LeadList() {
             </section>
             <section>
               <div className="flex items-center gap-2 mb-3">
-                <div className="h-0.5 w-5 bg-purple-500 rounded-full" />
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <div className="h-0.5 w-5 bg-[var(--ds-accent-500)] rounded-full" />
+                <h4 className="text-xs font-semibold text-[var(--ds-text-secondary)] uppercase tracking-wider">
                   Contact Information
                 </h4>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-xs font-medium text-gray-600">
+                  <Label className="text-xs font-medium text-[var(--ds-text-secondary)]">
                     Mobile <span className="text-red-500">*</span>
                   </Label>
                   <Input
@@ -1125,7 +1158,7 @@ export default function LeadList() {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs font-medium text-gray-600">Alternate Mobile</Label>
+                  <Label className="text-xs font-medium text-[var(--ds-text-secondary)]">Alternate Mobile</Label>
                   <Input
                     value={alternateMobile}
                     onChange={(e) => setAlternateMobile(e.target.value)}
@@ -1134,7 +1167,7 @@ export default function LeadList() {
                   />
                 </div>
                 <div className="col-span-2">
-                  <Label className="text-xs font-medium text-gray-600">Email</Label>
+                  <Label className="text-xs font-medium text-[var(--ds-text-secondary)]">Email</Label>
                   <Input
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -1147,13 +1180,13 @@ export default function LeadList() {
             <section>
               <div className="flex items-center gap-2 mb-3">
                 <div className="h-0.5 w-5 bg-emerald-500 rounded-full" />
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <h4 className="text-xs font-semibold text-[var(--ds-text-secondary)] uppercase tracking-wider">
                   Lead Details
                 </h4>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
-                  <Label className="text-xs font-medium text-gray-600">Interested Treatment</Label>
+                  <Label className="text-xs font-medium text-[var(--ds-text-secondary)]">Interested Treatment</Label>
                   <Input
                     value={interestedTreatment}
                     onChange={(e) => setInterestedTreatment(e.target.value)}
@@ -1162,7 +1195,7 @@ export default function LeadList() {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs font-medium text-gray-600">Budget</Label>
+                  <Label className="text-xs font-medium text-[var(--ds-text-secondary)]">Budget</Label>
                   <NumericInput
                     mode="currency"
                     prefix="₹"
@@ -1173,7 +1206,7 @@ export default function LeadList() {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs font-medium text-gray-600">Preferred Visit Date</Label>
+                  <Label className="text-xs font-medium text-[var(--ds-text-secondary)]">Preferred Visit Date</Label>
                   <Input
                     type="date"
                     value={preferredVisitDate}
@@ -1182,7 +1215,7 @@ export default function LeadList() {
                   />
                 </div>
                 <div className="col-span-2">
-                  <Label className="text-xs font-medium text-gray-600">Notes</Label>
+                  <Label className="text-xs font-medium text-[var(--ds-text-secondary)]">Notes</Label>
                   <Textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
@@ -1194,7 +1227,7 @@ export default function LeadList() {
               </div>
             </section>
           </div>
-          <DialogFooter className="px-6 py-4 border-t border-gray-100 shrink-0 bg-white">
+          <DialogFooter className="px-6 py-4 border-t border-[var(--ds-border-light)] shrink-0 bg-[var(--ds-surface)]">
             <Button variant="outline" onClick={() => setCreateOpen(false)}>
               Cancel
             </Button>

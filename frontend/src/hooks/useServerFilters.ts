@@ -75,6 +75,11 @@ export function useServerFilters(opts?: UseServerFiltersOptions) {
     })
   }, [])
 
+  const setSort = useCallback((field: string, dir: "asc" | "desc") => {
+    setSortField(field)
+    setSortDir(dir)
+  }, [])
+
   const setFilter = useCallback((key: string, value: string) => {
     if (key === "search") {
       setSearchInput(value)
@@ -129,7 +134,7 @@ export function useServerFilters(opts?: UseServerFiltersOptions) {
   return {
     filters, setFilter, resetFilters, queryParams, queryKey, activeChips,
     activeFilters, hasActiveFilters,
-    page, setPage, sortField, sortDir, toggleSort,
+    page, setPage, sortField, sortDir, toggleSort, setSort,
   }
 }
 

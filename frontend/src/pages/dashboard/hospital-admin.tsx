@@ -1,107 +1,142 @@
 import { useState, useMemo, useCallback, useEffect } from "react"
-import { motion } from "framer-motion"
-import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "react-router-dom"
+import { useQuery } from "@tanstack/react-query"
 import {
-  Calendar,
-  Users,
-  FolderOpen,
-  Activity,
-  FileText,
-  DollarSign,
-  TrendingUp,
-  IndianRupee,
-  PieChart,
-  Clock,
-  AlertTriangle,
-  CheckCircle2,
-  UserPlus,
-  Phone,
-  BarChart3,
-  Sparkles,
-  Stethoscope,
-  PauseCircle,
-  AlertOctagon,
-  Timer,
-  ClipboardCheck,
-  LayoutList,
-  Building2,
+  Activity, AlertOctagon, AlertTriangle, BarChart3, CalendarCheck2, CheckCircle2,
+  CircleDollarSign, ClipboardCheck, Clock, FileText, FolderKanban, FolderOpen,
+  IndianRupee, LayoutList, Megaphone, PauseCircle, Phone, Stethoscope,
+  Timer, TrendingUp, UserPlus, Wallet,
 } from "lucide-react"
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-  PieChart as RePieChart,
-  Pie,
-  Cell,
-} from "recharts"
 import { useAuthStore } from "@/store/authStore"
-import { dashboardApi, consentFormsApi, doctorsApi } from "@/services/endpoints"
-import { useToast } from "@/components/ui/toast"
+import { consentFormsApi, dashboardApi, doctorsApi } from "@/services/endpoints"
 import { getHospitalOverride, setHospitalOverride } from "@/lib/hospital-override"
-import { Skeleton } from "@/components/ui/skeleton"
-import KpiCard from "@/components/layout/kpi-card"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import QuickViewDrawer from "@/components/ui/quick-view-drawer"
-import DateFilterBar from "@/components/ui/date-filter-bar"
-import AnalyticsDrawer from "@/components/analytics-drawer"
-import type { Performer } from "@/types"
-import { formatIndianRupees, formatIndianNumber } from "@/lib/currency"
 import { cn } from "@/lib/utils"
+import { formatIndianNumber, formatIndianRupees } from "@/lib/currency"
+import { Label, QuickViewDrawer, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, useToast } from "@/design-system"
+import {
+  AlertCenter, BusinessInsights, CommandCenter, DashboardChart, DashboardHeader,
+  DashboardSection, DashboardShell, DepartmentPerformance, DonutChart, ExecutiveSummary,
+  KpiGrid, QuickActionCenter, RecentActivity, WidgetCard, downloadCSV, useDashboardFilter,
+  useDashboardPersonalization, BiInsightsGrid, BI_INSIGHTS_WIDGETS, SavedViewsMenu,
+} from "@/design-system/dashboard"
+import type {
+  ActivityEvent, AlertItem, Insight, KpiDatum, PerformerDatum, QuickAction,
+  SummaryHighlight, SummaryMetric,
+} from "@/design-system/dashboard"
+import { buildDrilldownPath } from "@/lib/dashboard-links"
 
-const PIE_COLORS = [
-  "var(--ds-chart-5)",
-  "var(--ds-chart-8)",
-  "var(--ds-chart-6)",
-  "var(--ds-chart-4)",
-  "var(--ds-chart-10)",
-  "var(--ds-chart-13)",
-  "var(--ds-chart-11)",
-  "var(--ds-chart-12)",
-]
+/* ────────────────────────────────────────────────────────────────────────────
+   Types mirroring GET /dashboards/hospital-admin
+   ──────────────────────────────────────────────────────────────────────────── */
 
-const STATUS_COLORS: Record<string, string> = {
-  SCHEDULED: "bg-blue-100 text-blue-700",
-  CONFIRMED: "bg-green-100 text-green-700",
-  CHECKED_IN: "bg-purple-100 text-purple-700",
-  IN_PROGRESS: "bg-amber-100 text-amber-700",
-  COMPLETED: "bg-emerald-100 text-emerald-700",
-  CANCELLED: "bg-red-100 text-red-700",
-  NO_SHOW: "bg-gray-100 text-gray-600",
-  RESCHEDULED: "bg-orange-100 text-orange-700",
+interface TrendPoint {
+  month: string
+  revenue?: number
+  expenses?: number
+  profit?: number
+  profit_margin?: number
+  count?: number
 }
 
-const ChartTooltip = ({
-  active,
-  payload,
-  label,
-}: {
-  active?: boolean
-  payload?: Array<{ name: string; value: number; color: string }>
-  label?: string
-}) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="rounded-xl border border-gray-100 bg-white p-3 shadow-lg">
-        <p className="text-sm font-semibold text-gray-900 mb-1">{label}</p>
-        {payload.map((p, i) => (
-          <p key={i} className="text-xs" style={{ color: p.color }}>
-            {p.name}: {formatIndianRupees(p.value ?? 0)}
-          </p>
-        ))}
-      </div>
-    )
+interface DoctorPerf {
+  id?: string
+  name?: string
+  value?: number
+}
+
+interface TreatmentPerf {
+  name?: string
+  value?: number
+}
+
+interface Comparison {
+  revenue_change?: number
+  patient_change?: number
+  appointment_change?: number
+  case_change?: number
+}
+
+interface HospitalAdminStats {
+  hospital_name?: string
+  today_appointments: number
+  total_revenue: number
+  monthly_revenue: number
+  yearly_revenue: number
+  total_patients: number
+  total_cases: number
+  total_active_cases: number
+  total_expenses: number
+  net_profit: number
+  profit_margin: number
+  period_revenue: number
+  total_pending_billing: number
+  period_patients: number
+  period_appointments: number
+  period_cases: number
+  total_follow_ups: number
+  pending_follow_ups: number
+  completed_follow_ups: number
+  missed_follow_ups: number
+  revenue_trend: TrendPoint[]
+  patient_growth_trend: TrendPoint[]
+  appointment_count_trend: TrendPoint[]
+  case_count_trend: TrendPoint[]
+  revenue_expense_trend: TrendPoint[]
+  profit_trend: TrendPoint[]
+  expense_breakdown: Array<{ category: string; amount: number }>
+  doctor_performance: DoctorPerf[]
+  treatment_performance: TreatmentPerf[]
+  today_appointments_list: Array<Record<string, string>>
+  pending_actions: {
+    follow_ups: number
+    billings_count: number
+    billings_amount: number
   }
-  return null
+  recent_activity: Array<{ type: string; description: string; date: string }>
+  revenue_sources: Array<{ method: string; amount: number }>
+  crm_insights: {
+    total_leads?: number
+    new_leads?: number
+    converted_leads?: number
+    conversion_rate?: number
+    leads_by_source?: Array<{ source: string; count: number }>
+  }
+  treatment_kpis?: {
+    active_treatments: number
+    overdue_treatments: number
+    completed_today: number
+    waiting_patient: number
+    waiting_lab: number
+    completed_this_month: number
+    completion_rate: number
+    total_treatments: number
+  }
+  comparison: Comparison
+  appointment_trend?: { label: string; count: number }[]
+  appointment_heatmap?: { day: number; hour: number; count: number }[]
+  treatment_category_breakdown?: { name: string; count: number; cost?: number }[]
+  lead_source_breakdown?: { source: string; count: number }[]
+  payment_method_breakdown?: { method: string; amount: number }[]
+  gender_distribution?: { gender: string; count: number }[]
+  age_group_distribution?: { group: string; count: number }[]
 }
 
-const container = { hidden: {}, show: { transition: { staggerChildren: 0.03 } } }
-const item = { hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }
+interface ConsentStats {
+  total?: number
+  this_month?: number
+  recent?: Array<{ id: string; patient_name: string; consent_type: string; created_at?: string }>
+}
+
+const STATUS_STYLE: Record<string, string> = {
+  SCHEDULED: "bg-[var(--ds-info-subtle)] text-[var(--ds-info)]",
+  CONFIRMED: "bg-[var(--ds-success-subtle)] text-[var(--ds-success)]",
+  CHECKED_IN: "bg-[var(--ds-accent-subtle)] text-[var(--ds-accent)]",
+  IN_PROGRESS: "bg-[var(--ds-warning-subtle)] text-[var(--ds-warning)]",
+  COMPLETED: "bg-[var(--ds-success-subtle)] text-[var(--ds-success)]",
+  CANCELLED: "bg-[var(--ds-danger-subtle)] text-[var(--ds-danger)]",
+  NO_SHOW: "bg-[var(--ds-surface-secondary)] text-[var(--ds-text-secondary)]",
+  RESCHEDULED: "bg-[var(--ds-warning-subtle)] text-[var(--ds-warning)]",
+}
 
 function getGreeting(): string {
   const h = new Date().getHours()
@@ -110,37 +145,36 @@ function getGreeting(): string {
   return "Good Evening"
 }
 
+/* ──────────────────────────────────────────────────────────────────────────── */
+
 export default function HospitalAdminDashboard() {
   const { user } = useAuthStore()
   const navigate = useNavigate()
   const { addToast } = useToast()
-  const [quickView, setQuickView] = useState<{
-    type: "doctor" | "patient"
-    id: string
-    name: string
-  } | null>(null)
-  const [drawerMetric, setDrawerMetric] = useState<string | null>(null)
-  const [period, setPeriod] = useState("this_month")
-  const [startDate, setStartDate] = useState("")
-  const [endDate, setEndDate] = useState("")
+  const filter = useDashboardFilter("this_month")
+  const biPersonalization = useDashboardPersonalization("hospital-admin-bi", BI_INSIGHTS_WIDGETS)
+  const [quickView, setQuickView] = useState<{ type: "doctor"; id: string; name: string } | null>(null)
   const [doctorId, setDoctorId] = useState("")
+  const onQuickViewClose = useCallback(() => setQuickView(null), [])
 
   const override = getHospitalOverride()
   const isReadOnly = user?.role !== "HOSPITAL_ADMIN"
   const activeHospitalId = override ?? user?.hospital_id ?? null
 
-  const dashParams = useMemo(() => {
-    const p: Record<string, string> = { period }
-    if (period === "custom" && startDate) p.start_date = startDate
-    if (period === "custom" && endDate) p.end_date = endDate
-    if (doctorId) p.doctor_id = doctorId
-    return p
-  }, [period, startDate, endDate, doctorId])
+  const dashParams = useMemo(
+    () => ({
+      ...filter.apiParams,
+      ...(doctorId ? { doctor_id: doctorId } : {}),
+    }),
+    [filter.apiParams, doctorId],
+  )
 
   const {
     data: stats,
     isLoading,
     isError,
+    isFetching,
+    refetch,
   } = useQuery({
     queryKey: ["dash", "hospital", user?.id, activeHospitalId, dashParams],
     queryFn: () => dashboardApi.hospitalAdmin(dashParams),
@@ -162,7 +196,7 @@ export default function HospitalAdminDashboard() {
   }, [isError, isReadOnly, override, navigate, addToast])
 
   const { data: consentStats } = useQuery({
-    queryKey: ["consent-form-stats", activeHospitalId, period, doctorId],
+    queryKey: ["consent-form-stats", activeHospitalId, doctorId],
     queryFn: () => consentFormsApi.getStats(activeHospitalId || ""),
     enabled: !!activeHospitalId,
   })
@@ -173,838 +207,600 @@ export default function HospitalAdminDashboard() {
     enabled: !!activeHospitalId,
   })
 
-  const onDoctorClick = useCallback(
-    (id?: string) => {
-      const item = (stats?.doctor_performance ?? []).find((d: Performer) => d.id === id)
-      if (item) setQuickView({ type: "doctor", id: item.id, name: item.name })
-    },
-    [stats?.doctor_performance],
-  )
+  const onDoctorClick = useCallback((perf?: DoctorPerf) => {
+    if (perf?.id) setQuickView({ type: "doctor", id: perf.id, name: perf.name || "" })
+  }, [])
 
   if (!user) return null
 
-  if (isLoading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-16 w-full rounded-xl" />
-        <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-          {[...Array(8)].map((_, i) => (
-            <Skeleton key={i} className="h-[88px] rounded-xl" />
+  const s = stats as HospitalAdminStats | undefined
+  const cmp = s?.comparison ?? {}
+  const treatmentKpis = s?.treatment_kpis
+  const drill = (entity: Parameters<typeof buildDrilldownPath>[0], opts: { status?: string; billingStatus?: string } = {}) =>
+    buildDrilldownPath(entity, filter.period, filter.startDate, filter.endDate, opts)
+
+  const revenueSpark = (s?.revenue_trend ?? []).map((t) => t.revenue ?? 0)
+  const patientSpark = (s?.patient_growth_trend ?? []).map((t) => t.count ?? 0)
+  const appointmentSpark = (s?.appointment_count_trend ?? []).map((t) => t.count ?? 0)
+  const caseSpark = (s?.case_count_trend ?? []).map((t) => t.count ?? 0)
+
+  /* ── Doctor filter (extraFilters in CommandCenter) ───────────────────────── */
+  const doctors = (doctorsList?.items || doctorsList || []) as Array<{ id: string; full_name?: string; name?: string }>
+  const doctorFilter = (
+    <div className="space-y-1">
+      <Label htmlFor="hospital-doctor" className="ds-form-label text-[var(--ds-text-tertiary)]">
+        Doctor
+      </Label>
+      <Select value={doctorId || "all"} onValueChange={(v) => setDoctorId(v === "all" ? "" : v)}>
+        <SelectTrigger id="hospital-doctor" aria-label="Doctor filter" className="h-9 w-[180px] text-sm">
+          <SelectValue placeholder="All Doctors" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Doctors</SelectItem>
+          {doctors.map((d) => (
+            <SelectItem key={d.id} value={d.id}>{d.full_name || d.name}</SelectItem>
           ))}
-        </div>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Skeleton className="h-[340px] rounded-xl" />
-          <Skeleton className="h-[340px] rounded-xl" />
-        </div>
-      </div>
-    )
+        </SelectContent>
+      </Select>
+    </div>
+  )
+
+  /* ── KPI rows ────────────────────────────────────────────────────────────── */
+  const primaryKpis: KpiDatum[] = [
+    {
+      id: "period-revenue",
+      title: "Period Revenue",
+      value: formatIndianRupees(s?.period_revenue ?? 0),
+      rawValue: s?.period_revenue ?? 0,
+      change: cmp.revenue_change ?? null,
+      previousLabel: filter.previousLabel,
+      icon: IndianRupee,
+      tone: "success",
+      sparkline: revenueSpark,
+      loading: isLoading,
+      onClick: () => navigate(drill("billing")),
+    },
+    {
+      id: "new-patients",
+      title: "New Patients",
+      value: formatIndianNumber(s?.period_patients ?? 0),
+      rawValue: s?.period_patients ?? 0,
+      change: cmp.patient_change ?? null,
+      previousLabel: filter.previousLabel,
+      icon: UserPlus,
+      tone: "accent",
+      sparkline: patientSpark,
+      loading: isLoading,
+      onClick: () => navigate(drill("patients")),
+    },
+    {
+      id: "appointments",
+      title: "Appointments",
+      value: formatIndianNumber(s?.period_appointments ?? 0),
+      rawValue: s?.period_appointments ?? 0,
+      change: cmp.appointment_change ?? null,
+      previousLabel: filter.previousLabel,
+      icon: CalendarCheck2,
+      tone: "info",
+      sparkline: appointmentSpark,
+      loading: isLoading,
+      onClick: () => navigate(drill("appointments")),
+    },
+    {
+      id: "active-cases",
+      title: "New Cases",
+      value: formatIndianNumber(s?.period_cases ?? 0),
+      rawValue: s?.period_cases ?? 0,
+      change: cmp.case_change ?? null,
+      previousLabel: filter.previousLabel,
+      icon: FolderOpen,
+      tone: "warning",
+      sparkline: caseSpark,
+      loading: isLoading,
+      onClick: () => navigate(drill("cases")),
+    },
+  ]
+
+  const financialKpis: KpiDatum[] = [
+    {
+      id: "net-profit",
+      title: "Net Profit",
+      value: formatIndianRupees(s?.net_profit ?? 0),
+      rawValue: s?.net_profit ?? 0,
+      change: null,
+      previousLabel: "This period",
+      icon: Wallet,
+      tone: (s?.net_profit ?? 0) >= 0 ? "success" : "danger",
+      loading: isLoading,
+      onClick: () => navigate(drill("billing")),
+    },
+    {
+      id: "expenses",
+      title: "Expenses",
+      value: formatIndianRupees(s?.total_expenses ?? 0),
+      rawValue: s?.total_expenses ?? 0,
+      change: null,
+      previousLabel: "This period",
+      positiveIsGood: false,
+      icon: FileText,
+      tone: "danger",
+      loading: isLoading,
+    },
+    {
+      id: "profit-margin",
+      title: "Profit Margin",
+      value: s?.profit_margin != null ? `${s.profit_margin.toFixed(1)}%` : "0%",
+      rawValue: s?.profit_margin ?? 0,
+      change: null,
+      previousLabel: "This period",
+      icon: TrendingUp,
+      tone: "primary",
+      loading: isLoading,
+    },
+    {
+      id: "pending-billing",
+      title: "Pending Billings",
+      value: formatIndianRupees(s?.total_pending_billing ?? 0),
+      rawValue: s?.total_pending_billing ?? 0,
+      change: null,
+      previousLabel: "Outstanding",
+      positiveIsGood: false,
+      icon: CircleDollarSign,
+      tone: "warning",
+      loading: isLoading,
+      onClick: () => navigate(drill("billing", { billingStatus: "PARTIAL" })),
+    },
+  ]
+
+  const treatmentKpiRows: KpiDatum[][] = treatmentKpis
+    ? [
+        [
+          { id: "active-treatments", title: "Active Treatments", value: String(treatmentKpis.active_treatments ?? 0), rawValue: treatmentKpis.active_treatments ?? 0, previousLabel: "In pipeline", icon: Stethoscope, tone: "info" as const, loading: isLoading, onClick: () => navigate("/treatments/workflow") },
+          { id: "overdue-treatments", title: "Overdue", value: String(treatmentKpis.overdue_treatments ?? 0), rawValue: treatmentKpis.overdue_treatments ?? 0, previousLabel: "Need attention", positiveIsGood: false, icon: AlertOctagon, tone: (treatmentKpis.overdue_treatments ?? 0) > 0 ? ("danger" as const) : ("success" as const), loading: isLoading, onClick: () => navigate("/treatments/workflow") },
+          { id: "waiting-patient", title: "Waiting (Patient)", value: String(treatmentKpis.waiting_patient ?? 0), rawValue: treatmentKpis.waiting_patient ?? 0, previousLabel: "Awaiting patient", icon: PauseCircle, tone: "warning" as const, loading: isLoading, onClick: () => navigate("/treatments") },
+          { id: "waiting-lab", title: "Waiting (Lab)", value: String(treatmentKpis.waiting_lab ?? 0), rawValue: treatmentKpis.waiting_lab ?? 0, previousLabel: "Awaiting lab", icon: Timer, tone: "warning" as const, loading: isLoading, onClick: () => navigate("/treatments") },
+        ],
+        [
+          { id: "completed-today", title: "Completed Today", value: String(treatmentKpis.completed_today ?? 0), rawValue: treatmentKpis.completed_today ?? 0, previousLabel: "Today", icon: CheckCircle2, tone: "success" as const, loading: isLoading, onClick: () => navigate("/treatments") },
+          { id: "completed-month", title: "Completed (Month)", value: String(treatmentKpis.completed_this_month ?? 0), rawValue: treatmentKpis.completed_this_month ?? 0, previousLabel: "This month", icon: ClipboardCheck, tone: "primary" as const, loading: isLoading, onClick: () => navigate("/treatments") },
+          { id: "completion-rate", title: "Completion Rate", value: `${treatmentKpis.completion_rate ?? 0}%`, rawValue: treatmentKpis.completion_rate ?? 0, previousLabel: "All treatments", icon: TrendingUp, tone: "primary" as const, loading: isLoading, onClick: () => navigate("/treatments") },
+          { id: "total-treatments", title: "Total Treatments", value: String(treatmentKpis.total_treatments ?? 0), rawValue: treatmentKpis.total_treatments ?? 0, previousLabel: "All-time", icon: FolderOpen, tone: "info" as const, loading: isLoading, onClick: () => navigate("/treatments") },
+        ],
+      ]
+    : []
+
+  /* ── Critical alerts ─────────────────────────────────────────────────────── */
+  const alerts: AlertItem[] = []
+  const revenueChange = cmp.revenue_change ?? 0
+  if (revenueChange < 0) {
+    alerts.push({
+      id: "revenue-drop",
+      title: `Revenue down ${Math.abs(revenueChange).toFixed(1)}% vs previous period`,
+      description: "Review collections and outstanding billings to close the gap.",
+      severity: "critical",
+      onClick: () => navigate(drill("billing")),
+    })
+  }
+  if ((treatmentKpis?.overdue_treatments ?? 0) > 0) {
+    alerts.push({
+      id: "overdue-treatments",
+      title: `${treatmentKpis!.overdue_treatments} overdue treatment plan(s)`,
+      description: "Plans past their expected completion need rescheduling.",
+      severity: "critical",
+      onClick: () => navigate("/treatments/workflow"),
+    })
+  }
+  if ((s?.pending_follow_ups ?? 0) > 0) {
+    alerts.push({
+      id: "follow-ups",
+      title: `${s!.pending_follow_ups} follow-up(s) due`,
+      description: "Patients waiting on follow-up calls this period.",
+      severity: "warning",
+      onClick: () => navigate("/patients"),
+    })
+  }
+  if ((s?.pending_actions?.billings_count ?? 0) > 0) {
+    alerts.push({
+      id: "pending-billings",
+      title: `${s!.pending_actions.billings_count} billings with outstanding amounts`,
+      description: `${formatIndianRupees(s!.pending_actions.billings_amount)} pending collection.`,
+      severity: "warning",
+      onClick: () => navigate(drill("billing", { billingStatus: "PARTIAL" })),
+    })
   }
 
-  const cmp = stats?.comparison as Record<string, number> | undefined
-  const todayApptsList: Record<string, string>[] = stats?.today_appointments_list || []
-  const recentActivity: Array<{ type: string; description: string; date: string }> =
-    stats?.recent_activity || []
-  const revenueSources: Array<{ method: string; amount: number }> = stats?.revenue_sources || []
-  const crmInsights = stats?.crm_insights || {}
-  const pendingActions = stats?.pending_actions || {}
-  const revenueExpenseTrend: Array<{
-    month: string
-    revenue: number
-    expenses: number
-    profit: number
-  }> = stats?.revenue_expense_trend || []
-  const doctorPerf: Performer[] = stats?.doctor_performance || []
-  const treatmentPerf: Performer[] = stats?.treatment_performance || []
+  /* ── Insights ───────────────────────────────────────────────────────────── */
+  const insights: Insight[] = []
+  if (revenueChange > 0) {
+    insights.push({ id: "rev-up", text: `Revenue grew ${revenueChange.toFixed(1)}% versus the previous period.`, tone: "positive" })
+  } else if (revenueChange < 0) {
+    insights.push({ id: "rev-down", text: `Revenue declined ${Math.abs(revenueChange).toFixed(1)}% versus the previous period.`, tone: "negative" })
+  }
+  if ((treatmentKpis?.completed_today ?? 0) > 0) {
+    insights.push({ id: "treatments-done", text: `${treatmentKpis!.completed_today} treatment(s) completed today — keep the momentum.`, tone: "positive" })
+  }
+  if (s?.crm_insights?.conversion_rate && s.crm_insights.conversion_rate > 0) {
+    insights.push({ id: "crm", text: `Lead conversion rate is ${s.crm_insights.conversion_rate}% this period.`, tone: "neutral" })
+  }
+
+  /* ── Executive summary narrative (rule-based from real data) ─────────────── */
+  const summaryMetrics: SummaryMetric[] = [
+    { label: "Revenue", value: formatIndianRupees(s?.period_revenue ?? 0), change: cmp.revenue_change ?? null },
+    { label: "New patients", value: formatIndianNumber(s?.period_patients ?? 0), change: cmp.patient_change ?? null },
+    { label: "Appointments", value: formatIndianNumber(s?.period_appointments ?? 0), change: cmp.appointment_change ?? null },
+    { label: "New cases", value: formatIndianNumber(s?.period_cases ?? 0), change: cmp.case_change ?? null },
+    { label: "Net profit", value: formatIndianRupees(s?.net_profit ?? 0), change: null },
+  ]
+  const summaryHighlights: SummaryHighlight[] = []
+  const topDoctor = (s?.doctor_performance ?? [])[0]
+  if (topDoctor?.name) summaryHighlights.push({ icon: Stethoscope, label: "Top doctor", text: `${topDoctor.name} · ${formatIndianRupees(topDoctor.value ?? 0)}` })
+  const topTreatment = (s?.treatment_performance ?? [])[0]
+  if (topTreatment?.name) summaryHighlights.push({ icon: FolderKanban, label: "Top treatment", text: `${topTreatment.name} · ${topTreatment.value ?? 0} patients` })
+  if ((s?.crm_insights?.conversion_rate ?? 0) > 0) {
+    summaryHighlights.push({ icon: Megaphone, label: "Lead conversion", text: `${s!.crm_insights!.conversion_rate}% this period` })
+  }
+  const summaryCaution =
+    (s?.total_pending_billing ?? 0) > 0
+      ? `Pending billings of ${formatIndianRupees(s!.total_pending_billing)} need follow-up.`
+      : (s?.profit_margin ?? 0) > 0 && (s?.profit_margin ?? 0) < 10
+        ? `Profit margin is thin at ${s!.profit_margin.toFixed(1)}% — expenses are eating into revenue.`
+        : undefined
+
+  /* ── Leaderboards ────────────────────────────────────────────────────────── */
+  const doctorLeaderboard: PerformerDatum[] = (s?.doctor_performance ?? []).map((d) => ({
+    id: d.id,
+    name: d.name || "Unnamed doctor",
+    value: formatIndianRupees(d.value ?? 0),
+    subtitle: "Period revenue",
+    onClick: () => onDoctorClick(d),
+  }))
+
+  const treatmentLeaderboard: PerformerDatum[] = (s?.treatment_performance ?? []).map((t) => ({
+    name: t.name || "Unnamed treatment",
+    value: `${t.value ?? 0} patients`,
+    subtitle: "Most performed",
+  }))
+
+  /* ── Activity feed (from endpoint) ───────────────────────────────────────── */
+  const activityFeed: ActivityEvent[] = (s?.recent_activity ?? []).map((act, i) => ({
+    id: `act-${i}`,
+    description: act.description,
+    date: act.date,
+    tone: act.type === "patient_registered" ? "success" : "primary",
+    icon: act.type === "patient_registered" ? UserPlus : CalendarCheck2,
+  }))
+
+  /* ── Quick actions ───────────────────────────────────────────────────────── */
+  const quickActions: QuickAction[] = [
+    { id: "new-patient", label: "New Patient", description: "Register a patient", icon: UserPlus, tone: "accent", onClick: () => navigate("/patients") },
+    { id: "book-appointment", label: "Book Appointment", description: "Schedule a visit", icon: CalendarCheck2, tone: "primary", onClick: () => navigate("/appointments") },
+    { id: "open-case", label: "Open Case", description: "Start a treatment case", icon: FolderKanban, tone: "success", onClick: () => navigate("/cases") },
+    { id: "record-billing", label: "Record Billing", description: "Capture a payment", icon: CircleDollarSign, tone: "warning", onClick: () => navigate("/billing") },
+    { id: "manage-leads", label: "Manage Leads", description: "Track incoming leads", icon: Megaphone, tone: "info", onClick: () => navigate("/leads") },
+    { id: "treatment-queue", label: "Treatment Queue", description: "Work the treatment board", icon: LayoutList, tone: "primary", onClick: () => navigate("/treatments/workflow") },
+  ]
+
+  /* ── Export snapshot ─────────────────────────────────────────────────────── */
+  const handleExport = () => {
+    const rows = [
+      { Metric: "Hospital", Value: s?.hospital_name ?? "" },
+      { Metric: "Today's Appointments", Value: s?.today_appointments ?? 0 },
+      { Metric: "Total Patients", Value: s?.total_patients ?? 0 },
+      { Metric: "Period Revenue", Value: s?.period_revenue ?? 0 },
+      { Metric: "Net Profit", Value: s?.net_profit ?? 0 },
+      { Metric: "Profit Margin %", Value: s?.profit_margin ?? 0 },
+      { Metric: "Expenses", Value: s?.total_expenses ?? 0 },
+      { Metric: "Pending Billings", Value: s?.total_pending_billing ?? 0 },
+      { Metric: "Pending Follow-ups", Value: s?.pending_follow_ups ?? 0 },
+    ]
+    downloadCSV(`hospital-overview-${filter.period}`, rows, ["Metric", "Value"])
+  }
+
+  const revenueExpenseData = (s?.revenue_expense_trend ?? []).map((t) => ({ month: t.month, revenue: t.revenue ?? 0, expenses: t.expenses ?? 0 }))
+  const profitTrendData = (s?.profit_trend ?? []).map((t) => ({ month: t.month, profit: t.profit ?? 0 }))
+  const revenueSourcesDonut = (s?.revenue_sources ?? []).map((r) => ({ name: r.method, value: r.amount }))
+  const expenseDonut = (s?.expense_breakdown ?? []).map((e) => ({ name: e.category, value: e.amount }))
+  const patientTrendData = (s?.patient_growth_trend ?? []).map((t) => ({ month: t.month, count: t.count ?? 0 }))
+  const appointmentTrendData = (s?.appointment_count_trend ?? []).map((t) => ({ month: t.month, count: t.count ?? 0 }))
+  const caseTrendData = (s?.case_count_trend ?? []).map((t) => ({ month: t.month, count: t.count ?? 0 }))
+
+  const crmInsights = s?.crm_insights
+  const pendingActions = s?.pending_actions
+  const consent = consentStats as ConsentStats | undefined
+  const todayAppts = s?.today_appointments_list ?? []
+  const formattedToday = new Date().toLocaleDateString("en-IN", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  })
 
   return (
-    <motion.div className="space-y-5" variants={container} initial="hidden" animate="show">
-      {/* 1. Hero Header */}
-      <motion.div
-        variants={item}
-        className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-700 px-6 py-5"
-      >
-        <div className="absolute inset-0 bg-grid-pattern opacity-10" />
-        <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 backdrop-blur">
-              <Sparkles className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-white">
-                {getGreeting()}, {user.full_name?.split(" ").slice(0, 2).join(" ") || "User"}
-              </h1>
-              <p className="text-sm text-white/70">
-                {new Date().toLocaleDateString("en-IN", {
-                  weekday: "long",
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </p>
-              {isReadOnly && (
-                <p className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] font-semibold text-white backdrop-blur">
-                  <Building2 className="h-3 w-3" strokeWidth={1.5} />
-                  {stats?.hospital_name || "This hospital"} · Read-only
-                </p>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center gap-6">
-            <div className="text-right">
-              <p className="text-[10px] text-white/60 uppercase tracking-wider font-medium">
-                Revenue
-              </p>
-              <p className="text-base font-bold text-white">
-                {formatIndianRupees(stats?.total_revenue || 0)}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-[10px] text-white/60 uppercase tracking-wider font-medium">
-                Patients
-              </p>
-              <p className="text-base font-bold text-white">
-                {formatIndianNumber(stats?.total_patients || 0)}
-              </p>
-            </div>
-          </div>
-        </div>
-      </motion.div>
+    <DashboardShell>
+      <DashboardHeader
+        eyebrow={isReadOnly ? `${s?.hospital_name || "This hospital"} · Read-only` : s?.hospital_name || "Hospital Overview"}
+        title={`${getGreeting()}, ${user.full_name?.split(" ").slice(0, 2).join(" ") || "User"}`}
+        subtitle={formattedToday}
+        stats={[
+          { label: "Revenue", value: formatIndianRupees(s?.total_revenue ?? 0) },
+          { label: "Patients", value: formatIndianNumber(s?.total_patients ?? 0) },
+          { label: "Today's Appts", value: formatIndianNumber(s?.today_appointments ?? 0) },
+          { label: "Active Cases", value: formatIndianNumber(s?.total_active_cases ?? 0) },
+        ]}
+      />
 
-      {/* 2. Global Period Filter */}
-      <motion.div variants={item} className="flex items-center justify-between">
-        <h2 className="text-sm font-bold text-gray-800 flex items-center gap-2">
-          <BarChart3 className="h-4 w-4 text-indigo-500" /> Dashboard Overview
-        </h2>
-        <DateFilterBar
-          period={period}
-          onPeriodChange={setPeriod}
-          startDate={startDate}
-          endDate={endDate}
-          onStartDateChange={setStartDate}
-          onEndDateChange={setEndDate}
-          doctorId={doctorId}
-          onDoctorIdChange={setDoctorId}
-          doctors={doctorsList?.items || doctorsList || []}
-        />
-      </motion.div>
-
-      {/* 3. Operational KPI Cards */}
-      <motion.div variants={item} className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-        <KpiCard
-          icon={Calendar}
-          title="Today's Appts"
-          value={formatIndianNumber(stats?.today_appointments ?? 0)}
-          color="warning"
-          delay={0}
-          onClick={() => setDrawerMetric("appointments")}
-        />
-        <KpiCard
-          icon={Users}
-          title="Total Patients"
-          value={formatIndianNumber(stats?.total_patients ?? 0)}
-          color="info"
-          delay={0.03}
-          onClick={() => setDrawerMetric("patients")}
-          trend={
-            cmp?.patient_change != null
-              ? {
-                  value: `${cmp.patient_change > 0 ? "+" : ""}${cmp.patient_change}%`,
-                  positive: cmp.patient_change >= 0,
-                }
-              : undefined
-          }
-        />
-        <KpiCard
-          icon={FolderOpen}
-          title="Active Cases"
-          value={formatIndianNumber(stats?.total_active_cases ?? 0)}
-          color="danger"
-          delay={0.06}
-          onClick={() => setDrawerMetric("cases")}
-          trend={
-            cmp?.case_change != null
-              ? {
-                  value: `${cmp.case_change > 0 ? "+" : ""}${cmp.case_change}%`,
-                  positive: cmp.case_change >= 0,
-                }
-              : undefined
-          }
-        />
-        <KpiCard
-          icon={AlertTriangle}
-          title="Pending Billing"
-          value={formatIndianRupees(stats?.total_pending_billing ?? 0)}
-          color="warning"
-          delay={0.09}
-        />
-      </motion.div>
-
-      {/* 4. Financial KPI Cards */}
-      <motion.div variants={item} className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-        <KpiCard
-          icon={DollarSign}
-          title="Period Revenue"
-          value={formatIndianRupees(stats?.period_revenue ?? 0)}
-          color="success"
-          delay={0.12}
-          trend={
-            cmp?.revenue_change != null
-              ? {
-                  value: `${cmp.revenue_change > 0 ? "+" : ""}${cmp.revenue_change}%`,
-                  positive: cmp.revenue_change >= 0,
-                }
-              : undefined
-          }
-        />
-        <KpiCard
-          icon={IndianRupee}
-          title="Expenses"
-          value={formatIndianRupees(stats?.total_expenses ?? 0)}
-          color="danger"
-          delay={0.15}
-        />
-        <KpiCard
-          icon={TrendingUp}
-          title="Net Profit"
-          value={formatIndianRupees(stats?.net_profit ?? 0)}
-          color={(stats?.net_profit ?? 0) >= 0 ? "success" : "danger"}
-          delay={0.18}
-        />
-        <KpiCard
-          icon={PieChart}
-          title="Profit Margin"
-          value={stats?.profit_margin != null ? `${stats.profit_margin.toFixed(1)}%` : "0%"}
-          color="primary"
-          delay={0.21}
-        />
-      </motion.div>
-
-      {/* 4b. Treatment KPI Cards */}
-      {stats?.treatment_kpis && (
-        <motion.div variants={item}>
-          <div className="flex items-center gap-2 mb-2">
-            <LayoutList className="h-4 w-4 text-indigo-500" />
-            <h2 className="text-sm font-bold text-gray-800">Treatment Queue</h2>
-          </div>
-          <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-            <KpiCard
-              icon={Stethoscope}
-              title="Active Treatments"
-              value={String(stats.treatment_kpis.active_treatments ?? 0)}
-              color="info"
-              delay={0}
-              onClick={() => setDrawerMetric("treatments")}
-            />
-            <KpiCard
-              icon={AlertOctagon}
-              title="Overdue"
-              value={String(stats.treatment_kpis.overdue_treatments ?? 0)}
-              color={(stats.treatment_kpis.overdue_treatments ?? 0) > 0 ? "danger" : "success"}
-              delay={0.03}
-            />
-            <KpiCard
-              icon={PauseCircle}
-              title="Waiting (Patient)"
-              value={String(stats.treatment_kpis.waiting_patient ?? 0)}
-              color="warning"
-              delay={0.06}
-            />
-            <KpiCard
-              icon={Timer}
-              title="Waiting (Lab)"
-              value={String(stats.treatment_kpis.waiting_lab ?? 0)}
-              color="warning"
-              delay={0.09}
+      <CommandCenter
+        period={filter.period}
+        onPeriodChange={filter.setPeriod}
+        startDate={filter.startDate}
+        endDate={filter.endDate}
+        onStartDateChange={filter.setStartDate}
+        onEndDateChange={filter.setEndDate}
+        rangeSummary={filter.rangeSummary}
+        extraFilters={
+          <div className="flex flex-wrap items-end gap-3">
+            {doctorFilter}
+            <SavedViewsMenu
+              views={biPersonalization.views}
+              onSave={biPersonalization.saveView}
+              onLoad={biPersonalization.loadView}
+              onDelete={biPersonalization.deleteView}
+              onReset={biPersonalization.reset}
+              disabled={isLoading}
             />
           </div>
-          <div className="grid gap-3 grid-cols-2 lg:grid-cols-4 mt-3">
-            <KpiCard
-              icon={CheckCircle2}
-              title="Completed Today"
-              value={String(stats.treatment_kpis.completed_today ?? 0)}
-              color="success"
-              delay={0.12}
-            />
-            <KpiCard
-              icon={ClipboardCheck}
-              title="Completed (Month)"
-              value={String(stats.treatment_kpis.completed_this_month ?? 0)}
-              color="primary"
-              delay={0.15}
-            />
-            <KpiCard
-              icon={TrendingUp}
-              title="Completion Rate"
-              value={
-                stats.treatment_kpis.completion_rate != null
-                  ? `${stats.treatment_kpis.completion_rate}%`
-                  : "0%"
-              }
-              color="primary"
-              delay={0.18}
-            />
-            <KpiCard
-              icon={FolderOpen}
-              title="Total Treatments"
-              value={String(stats.treatment_kpis.total_treatments ?? 0)}
-              color="info"
-              delay={0.21}
-            />
+        }
+        onRefresh={() => void refetch()}
+        refreshing={isFetching}
+        onExport={handleExport}
+      />
+
+      <ExecutiveSummary metrics={summaryMetrics} highlights={summaryHighlights} caution={summaryCaution} loading={isLoading} />
+
+      <AlertCenter items={alerts} loading={isLoading} />
+
+      <KpiGrid items={primaryKpis} cols={4} />
+
+      <KpiGrid items={financialKpis} cols={4} />
+
+      {treatmentKpiRows.length > 0 && (
+        <DashboardSection title="Treatment Queue" description="Live status of treatment plans across this hospital" icon={LayoutList} defaultOpen>
+          <div className="space-y-3">
+            <KpiGrid items={treatmentKpiRows[0]} cols={4} />
+            <KpiGrid items={treatmentKpiRows[1]} cols={4} />
           </div>
-        </motion.div>
+        </DashboardSection>
       )}
 
-      {/* 5. Revenue vs Expenses Chart + Revenue Sources */}
-      <motion.div variants={item} className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader className="px-5 py-3.5">
-            <CardTitle className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-              Revenue vs Expenses
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-5 pb-5">
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart
-                data={
-                  revenueExpenseTrend.length > 0
-                    ? revenueExpenseTrend
-                    : [{ month: "No data", revenue: 0, expenses: 0, profit: 0 }]
-                }
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--ds-border-light)" />
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                <YAxis
-                  tick={{ fontSize: 11 }}
-                  tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
-                />
-                <Tooltip content={<ChartTooltip />} />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="revenue"
-                  name="Revenue"
-                  stroke="var(--ds-chart-4)"
-                  strokeWidth={2}
-                  dot={{ r: 3 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="expenses"
-                  name="Expenses"
-                  stroke="var(--ds-chart-8)"
-                  strokeWidth={2}
-                  dot={{ r: 3 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="profit"
-                  name="Profit"
-                  stroke="var(--ds-chart-5)"
-                  strokeWidth={2}
-                  dot={{ r: 3 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+      <DashboardSection title="Business Analytics" description={`Financial and growth trends for ${filter.label.toLowerCase()}`} icon={Activity} defaultOpen>
+        <div className="grid gap-3 lg:grid-cols-2">
+          <DashboardChart
+            title="Revenue vs Expenses"
+            description="Period revenue against operating expenses"
+            data={revenueExpenseData}
+            xKey="month"
+            series={[
+              { dataKey: "revenue", name: "Revenue", color: "var(--ds-chart-1)", type: "area" },
+              { dataKey: "expenses", name: "Expenses", color: "var(--ds-chart-2)", type: "area" },
+            ]}
+            loading={isLoading}
+            valueFormatter={formatIndianRupees}
+          />
+          <DashboardChart
+            title="Profit Trend"
+            description="Net profit per period bucket"
+            data={profitTrendData}
+            xKey="month"
+            series={[{ dataKey: "profit", name: "Net Profit", color: "var(--ds-chart-3)", type: "bar" }]}
+            loading={isLoading}
+            valueFormatter={formatIndianRupees}
+          />
+          <DonutChart
+            title="Revenue Sources"
+            description="Payments by method"
+            data={revenueSourcesDonut}
+            loading={isLoading}
+            valueFormatter={formatIndianRupees}
+          />
+          <DonutChart
+            title="Expense Breakdown"
+            description="Where the period's expenses went"
+            data={expenseDonut}
+            loading={isLoading}
+            valueFormatter={formatIndianRupees}
+          />
+          <DashboardChart
+            title="Patient Growth"
+            description="New patient registrations"
+            data={patientTrendData}
+            xKey="month"
+            series={[{ dataKey: "count", name: "Patients", color: "var(--ds-chart-4)", type: "line" }]}
+            loading={isLoading}
+          />
+          <DashboardChart
+            title="Appointments & Cases"
+            description="Volume per period bucket"
+            data={appointmentTrendData.map((p, i) => ({ month: p.month, Appointments: p.count, Cases: caseTrendData[i]?.count ?? 0 }))}
+            xKey="month"
+            series={[
+              { dataKey: "Appointments", name: "Appointments", color: "var(--ds-chart-5)", type: "line" },
+              { dataKey: "Cases", name: "Cases", color: "var(--ds-chart-8)", type: "line" },
+            ]}
+            loading={isLoading}
+          />
+        </div>
+      </DashboardSection>
 
-        <Card>
-          <CardHeader className="px-5 py-3.5">
-            <CardTitle className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-              Revenue Sources
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-5 pb-5">
-            {revenueSources.length > 0 ? (
-              <div className="space-y-3">
-                <ResponsiveContainer width="100%" height={160}>
-                  <RePieChart>
-                    <Pie
-                      data={revenueSources}
-                      dataKey="amount"
-                      nameKey="method"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={65}
-                      innerRadius={35}
-                    >
-                      {revenueSources.map((_, i) => (
-                        <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value: unknown) => formatIndianRupees(Number(value))} />
-                  </RePieChart>
-                </ResponsiveContainer>
-                <div className="space-y-1.5">
-                  {revenueSources.map((src, i) => (
-                    <div
-                      key={src.method}
-                      className="flex items-center justify-between text-xs py-1"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-2 h-2 rounded-full"
-                          style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }}
-                        />
-                        <span className="font-medium text-gray-700">{src.method}</span>
-                      </div>
-                      <span className="font-semibold text-gray-900">
-                        {formatIndianRupees(src.amount)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-[220px] text-sm text-gray-400">
-                No payment data for this period
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </motion.div>
+      <DashboardSection
+        title="Enterprise BI Insights"
+        description={`Interactive analytics for ${filter.label.toLowerCase()}`}
+        icon={BarChart3}
+        defaultOpen
+      >
+        <BiInsightsGrid
+          personalization={biPersonalization}
+          stats={s ?? {}}
+          loading={isLoading}
+          error={isError}
+          onRetry={() => void refetch()}
+          onDrill={(entity, opts) => navigate(drill(entity, opts))}
+        />
+      </DashboardSection>
 
-      {/* 6. Doctor Performance + Top Treatments Tables */}
-      <motion.div variants={item} className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader className="px-5 py-3.5">
-            <CardTitle className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-              Doctor Performance
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-5 pb-5">
-            {doctorPerf.length > 0 ? (
-              <div className="space-y-1">
-                {doctorPerf.map((doc, i) => (
-                  <div
-                    key={doc.id || i}
-                    className="flex items-center justify-between py-2 px-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
-                    onClick={() => onDoctorClick(doc.id)}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={cn(
-                          "flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold",
-                          i === 0
-                            ? "bg-amber-100 text-amber-700"
-                            : i === 1
-                              ? "bg-gray-100 text-gray-600"
-                              : i === 2
-                                ? "bg-orange-100 text-orange-700"
-                                : "bg-gray-50 text-gray-500",
-                        )}
-                      >
-                        {i + 1}
-                      </span>
-                      <span className="text-sm font-medium text-gray-900">{doc.name}</span>
-                    </div>
-                    <span className="text-sm font-semibold text-indigo-600">
-                      {formatIndianRupees(doc.value)}
+      <div className="grid gap-3 lg:grid-cols-3">
+        <WidgetCard
+          title="Today's Appointments"
+          description={`${todayAppts.length} scheduled`}
+          className="lg:col-span-2"
+        >
+          {todayAppts.length > 0 ? (
+            <ul className="flex max-h-[320px] flex-col gap-2 overflow-y-auto">
+              {todayAppts.map((appt) => (
+                <li
+                  key={appt.id}
+                  className="flex items-center justify-between gap-3 rounded-[var(--ds-radius-xl)] bg-[var(--ds-surface-secondary)] px-3 py-2.5"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--ds-radius-lg)] bg-[var(--ds-primary-subtle)]">
+                      <Clock className="h-4 w-4 text-[var(--ds-primary)]" aria-hidden="true" />
                     </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-400 text-center py-8">
-                No doctor data for this period
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="px-5 py-3.5">
-            <CardTitle className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-              Top Treatments
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-5 pb-5">
-            {treatmentPerf.length > 0 ? (
-              <div className="space-y-1">
-                {treatmentPerf.map((tp, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between py-2 px-2 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={cn(
-                          "flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold",
-                          i === 0
-                            ? "bg-emerald-100 text-emerald-700"
-                            : i === 1
-                              ? "bg-blue-100 text-blue-700"
-                              : "bg-gray-50 text-gray-500",
-                        )}
-                      >
-                        {i + 1}
-                      </span>
-                      <span className="text-sm font-medium text-gray-900">{tp.name}</span>
-                    </div>
-                    <span className="text-sm font-semibold text-gray-600">{tp.value} patients</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-400 text-center py-8">
-                No treatment data for this period
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* 7. Today's Appointments + Pending Actions */}
-      <motion.div variants={item} className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader className="px-5 py-3.5 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-              Today's Appointments
-            </CardTitle>
-            <span className="text-xs font-medium text-gray-400">
-              {todayApptsList.length} scheduled
-            </span>
-          </CardHeader>
-          <CardContent className="px-5 pb-5">
-            {todayApptsList.length > 0 ? (
-              <div className="space-y-2 max-h-[320px] overflow-y-auto">
-                {todayApptsList.map((appt) => (
-                  <div
-                    key={appt.id}
-                    className="flex items-center justify-between py-2.5 px-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100">
-                        <Clock className="h-4 w-4 text-indigo-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{appt.patient_name}</p>
-                        <p className="text-xs text-gray-500">
-                          {appt.doctor_name} &middot; {appt.time}
-                        </p>
-                      </div>
-                    </div>
-                    <span
-                      className={cn(
-                        "text-[10px] font-semibold px-2 py-0.5 rounded-full",
-                        STATUS_COLORS[appt.status] || "bg-gray-100 text-gray-600",
-                      )}
-                    >
-                      {appt.status.replace("_", " ")}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-10 text-center">
-                <Calendar className="h-8 w-8 text-gray-300 mb-2" />
-                <p className="text-sm text-gray-400">No appointments scheduled for today</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="px-5 py-3.5">
-            <CardTitle className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-              Pending Actions
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-5 pb-5 space-y-4">
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-amber-50 border border-amber-100">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-100">
-                <Phone className="h-4 w-4 text-amber-600" />
-              </div>
-              <div className="flex-1">
-                <p className="text-xs text-amber-600 font-medium">Follow-ups Due</p>
-                <p className="text-lg font-bold text-amber-700">{pendingActions.follow_ups || 0}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-red-50 border border-red-100">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-100">
-                <AlertTriangle className="h-4 w-4 text-red-600" />
-              </div>
-              <div className="flex-1">
-                <p className="text-xs text-red-600 font-medium">Pending Billings</p>
-                <p className="text-lg font-bold text-red-700">
-                  {pendingActions.billings_count || 0}
-                </p>
-                {pendingActions.billings_amount > 0 && (
-                  <p className="text-xs text-red-500">
-                    {formatIndianRupees(pendingActions.billings_amount)}
-                  </p>
-                )}
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-blue-50 border border-blue-100">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100">
-                <CheckCircle2 className="h-4 w-4 text-blue-600" />
-              </div>
-              <div className="flex-1">
-                <p className="text-xs text-blue-600 font-medium">Completed Follow-ups</p>
-                <p className="text-lg font-bold text-blue-700">
-                  {stats?.completed_follow_ups || 0}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* 8. Recent Activity + CRM Insights */}
-      <motion.div variants={item} className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader className="px-5 py-3.5">
-            <CardTitle className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-              Recent Activity
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-5 pb-5">
-            {recentActivity.length > 0 ? (
-              <div className="space-y-3 max-h-[280px] overflow-y-auto">
-                {recentActivity.map((act, i) => (
-                  <div key={i} className="flex items-start gap-3 py-2">
-                    <div
-                      className={cn(
-                        "flex h-7 w-7 items-center justify-center rounded-full mt-0.5",
-                        act.type === "patient_registered" ? "bg-emerald-100" : "bg-blue-100",
-                      )}
-                    >
-                      {act.type === "patient_registered" ? (
-                        <UserPlus className="h-3.5 w-3.5 text-emerald-600" />
-                      ) : (
-                        <Calendar className="h-3.5 w-3.5 text-blue-600" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-900 truncate">{act.description}</p>
-                      <p className="text-xs text-gray-400">
-                        {act.date
-                          ? new Date(act.date).toLocaleDateString("en-IN", {
-                              day: "numeric",
-                              month: "short",
-                            })
-                          : ""}
+                    <div className="ds-min-w-0">
+                      <p className="ds-body truncate text-[var(--ds-text)]">{appt.patient_name}</p>
+                      <p className="ds-caption truncate text-[var(--ds-text-secondary)]">
+                        {appt.doctor_name} · {appt.time}
                       </p>
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-10 text-center">
-                <Activity className="h-8 w-8 text-gray-300 mb-2" />
-                <p className="text-sm text-gray-400">No recent activity</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  <span className={cn("ds-caption shrink-0 rounded-full px-2 py-0.5 font-semibold", STATUS_STYLE[appt.status] || STATUS_STYLE.NO_SHOW)}>
+                    {appt.status.replace("_", " ")}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="ds-caption py-10 text-center text-[var(--ds-text-tertiary)]">No appointments scheduled for today</p>
+          )}
+        </WidgetCard>
 
-        <Card>
-          <CardHeader className="px-5 py-3.5">
-            <CardTitle className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-              CRM Insights
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-5 pb-5 space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-100 text-center">
-                <p className="text-2xl font-bold text-indigo-700">{crmInsights.total_leads || 0}</p>
-                <p className="text-[10px] text-indigo-500 font-medium uppercase tracking-wider">
-                  Total Leads
-                </p>
-              </div>
-              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-center">
-                <p className="text-2xl font-bold text-emerald-700">
-                  {crmInsights.conversion_rate || 0}%
-                </p>
-                <p className="text-[10px] text-emerald-500 font-medium uppercase tracking-wider">
-                  Conversion
-                </p>
+        <WidgetCard title="Pending Actions" description="Follow-ups and collections needing attention">
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 rounded-[var(--ds-radius-xl)] border border-[var(--ds-warning-subtle)] bg-[var(--ds-warning-subtle)] p-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--ds-radius-lg)] bg-[var(--ds-warning)] text-[var(--ds-surface)]">
+                <Phone className="h-4 w-4" aria-hidden="true" />
+              </span>
+              <div className="ds-min-w-0">
+                <p className="ds-caption text-[var(--ds-warning)]">Follow-ups Due</p>
+                <p className="ds-metric text-[var(--ds-warning)]">{pendingActions?.follow_ups ?? 0}</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 rounded-xl bg-blue-50 border border-blue-100 text-center">
-                <p className="text-xl font-bold text-blue-700">{crmInsights.new_leads || 0}</p>
-                <p className="text-[10px] text-blue-500 font-medium uppercase tracking-wider">
-                  New
-                </p>
-              </div>
-              <div className="p-3 rounded-xl bg-purple-50 border border-purple-100 text-center">
-                <p className="text-xl font-bold text-purple-700">
-                  {crmInsights.converted_leads || 0}
-                </p>
-                <p className="text-[10px] text-purple-500 font-medium uppercase tracking-wider">
-                  Converted
-                </p>
-              </div>
-            </div>
-            {crmInsights.leads_by_source?.length > 0 && (
-              <div className="space-y-1.5 pt-2 border-t border-gray-100">
-                <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider mb-2">
-                  Top Sources
-                </p>
-                {crmInsights.leads_by_source.map(
-                  (src: { source: string; count: number }, i: number) => (
-                    <div key={i} className="flex items-center justify-between text-xs py-1">
-                      <span className="font-medium text-gray-700">
-                        {src.source.replace(/_/g, " ")}
-                      </span>
-                      <span className="font-semibold text-gray-900">{src.count}</span>
-                    </div>
-                  ),
+            <div className="flex items-center gap-3 rounded-[var(--ds-radius-xl)] border border-[var(--ds-danger-subtle)] bg-[var(--ds-danger-subtle)] p-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--ds-radius-lg)] bg-[var(--ds-danger)] text-[var(--ds-surface)]">
+                <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+              </span>
+              <div className="ds-min-w-0">
+                <p className="ds-caption text-[var(--ds-danger)]">Pending Billings</p>
+                <p className="ds-metric text-[var(--ds-danger)]">{pendingActions?.billings_count ?? 0}</p>
+                {(pendingActions?.billings_amount ?? 0) > 0 && (
+                  <p className="ds-caption text-[var(--ds-danger)]">{formatIndianRupees(pendingActions!.billings_amount)}</p>
                 )}
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* 9. Consent Forms */}
-      {consentStats && (
-        <motion.div variants={item}>
-          <Card>
-            <CardHeader className="px-5 py-3.5 flex flex-row items-center justify-between">
-              <CardTitle className="text-sm font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-                <FileText className="h-4 w-4" /> Consent Forms
-              </CardTitle>
-              <div className="flex items-center gap-4 text-xs text-gray-500">
-                <span>
-                  Total: <span className="font-bold text-gray-900">{consentStats.total ?? 0}</span>
-                </span>
-                <span>
-                  This month:{" "}
-                  <span className="font-bold text-indigo-600">{consentStats.this_month ?? 0}</span>
-                </span>
+            </div>
+            <div className="flex items-center gap-3 rounded-[var(--ds-radius-xl)] border border-[var(--ds-success-subtle)] bg-[var(--ds-success-subtle)] p-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--ds-radius-lg)] bg-[var(--ds-success)] text-[var(--ds-surface)]">
+                <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+              </span>
+              <div className="ds-min-w-0">
+                <p className="ds-caption text-[var(--ds-success)]">Completed Follow-ups</p>
+                <p className="ds-metric text-[var(--ds-success)]">{s?.completed_follow_ups ?? 0}</p>
               </div>
-            </CardHeader>
-            {consentStats.recent?.length > 0 && (
-              <CardContent className="px-5 pb-5">
-                <div className="space-y-2">
-                  {consentStats.recent
-                    .slice(0, 5)
-                    .map(
-                      (r: {
-                        id: string
-                        patient_name: string
-                        consent_type: string
-                        created_at?: string
-                      }) => (
-                        <div
-                          key={r.id}
-                          className="flex items-center justify-between text-sm py-1.5 px-2 rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                          <span className="font-medium text-gray-900">{r.patient_name}</span>
-                          <span className="text-xs text-gray-500">
-                            {r.consent_type} &middot;{" "}
-                            {r.created_at ? new Date(r.created_at).toLocaleDateString() : ""}
-                          </span>
-                        </div>
-                      ),
-                    )}
-                </div>
-              </CardContent>
-            )}
-          </Card>
-        </motion.div>
-      )}
-
-      {/* 10. Empty State */}
-      {!stats?.total_patients && !stats?.today_appointments && !stats?.total_cases && (
-        <motion.div
-          variants={item}
-          className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 bg-white px-6 py-16 text-center"
-        >
-          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-amber-50">
-            <Calendar className="h-6 w-6 text-amber-500" />
+            </div>
           </div>
-          <h2 className="text-lg font-semibold text-gray-900">No activity yet</h2>
-          <p className="mt-1 text-sm text-gray-500 max-w-sm">
-            Patient registrations and appointments will appear here once you start using the system.
-          </p>
-        </motion.div>
-      )}
+        </WidgetCard>
+      </div>
 
-      {/* Drawers */}
-      {quickView && (
-        <QuickViewDrawer
-          open={!!quickView}
-          onClose={() => setQuickView(null)}
-          type={quickView.type}
-          entityId={quickView.id}
-          entityName={quickView.name}
+      <div className="grid gap-3 lg:grid-cols-2">
+        <RecentActivity items={activityFeed} loading={isLoading} />
+        <WidgetCard title="CRM Insights" description="Lead pipeline for this hospital">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-[var(--ds-radius-xl)] border border-[var(--ds-primary-subtle)] bg-[var(--ds-primary-subtle)] p-3 text-center">
+              <p className="ds-metric text-[var(--ds-primary)]">{crmInsights?.total_leads ?? 0}</p>
+              <p className="ds-caption font-medium uppercase tracking-wider text-[var(--ds-primary)]">Total Leads</p>
+            </div>
+            <div className="rounded-[var(--ds-radius-xl)] border border-[var(--ds-success-subtle)] bg-[var(--ds-success-subtle)] p-3 text-center">
+              <p className="ds-metric text-[var(--ds-success)]">{crmInsights?.conversion_rate ?? 0}%</p>
+              <p className="ds-caption font-medium uppercase tracking-wider text-[var(--ds-success)]">Conversion</p>
+            </div>
+            <div className="rounded-[var(--ds-radius-xl)] border border-[var(--ds-info-subtle)] bg-[var(--ds-info-subtle)] p-3 text-center">
+              <p className="ds-metric text-[var(--ds-info)]">{crmInsights?.new_leads ?? 0}</p>
+              <p className="ds-caption font-medium uppercase tracking-wider text-[var(--ds-info)]">New</p>
+            </div>
+            <div className="rounded-[var(--ds-radius-xl)] border border-[var(--ds-accent-subtle)] bg-[var(--ds-accent-subtle)] p-3 text-center">
+              <p className="ds-metric text-[var(--ds-accent)]">{crmInsights?.converted_leads ?? 0}</p>
+              <p className="ds-caption font-medium uppercase tracking-wider text-[var(--ds-accent)]">Converted</p>
+            </div>
+          </div>
+          {(crmInsights?.leads_by_source?.length ?? 0) > 0 && (
+            <div className="mt-4 space-y-1.5 border-t border-[var(--ds-border-light)] pt-3">
+              <p className="ds-caption mb-2 font-medium uppercase tracking-wider text-[var(--ds-text-tertiary)]">Top Sources</p>
+              {crmInsights!.leads_by_source!.map((src, i) => (
+                <div key={i} className="flex items-center justify-between text-xs">
+                  <span className="font-medium text-[var(--ds-text-secondary)]">{src.source.replace(/_/g, " ")}</span>
+                  <span className="ds-numeric font-semibold text-[var(--ds-text)]">{src.count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </WidgetCard>
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        <DepartmentPerformance
+          title="Doctor Performance"
+          description="Ranked by period revenue"
+          items={doctorLeaderboard}
+          loading={isLoading}
         />
+        <DepartmentPerformance
+          title="Top Treatments"
+          description="Most performed this period"
+          items={treatmentLeaderboard}
+          loading={isLoading}
+        />
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        <QuickActionCenter items={quickActions} loading={isLoading} />
+        <BusinessInsights items={insights} loading={isLoading} />
+      </div>
+
+      {consent && (
+        <WidgetCard title="Consent Forms" description="Signed consent documents this month">
+          <div className="mb-3 flex flex-wrap items-center gap-4">
+            <p className="ds-body text-[var(--ds-text-secondary)]">
+              Total: <span className="font-bold text-[var(--ds-text)]">{consent.total ?? 0}</span>
+            </p>
+            <p className="ds-body text-[var(--ds-text-secondary)]">
+              This month: <span className="font-bold text-[var(--ds-primary)]">{consent.this_month ?? 0}</span>
+            </p>
+          </div>
+          {(consent.recent?.length ?? 0) > 0 && (
+            <ul className="space-y-2">
+              {consent.recent!.slice(0, 5).map((r) => (
+                <li key={r.id} className="flex items-center justify-between gap-3 rounded-[var(--ds-radius-lg)] px-2 py-1.5 text-sm">
+                  <span className="font-medium text-[var(--ds-text)]">{r.patient_name}</span>
+                  <span className="ds-caption text-[var(--ds-text-secondary)]">
+                    {r.consent_type} · {r.created_at ? new Date(r.created_at).toLocaleDateString() : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </WidgetCard>
       )}
 
-      <AnalyticsDrawer
-        open={!!drawerMetric}
-        onClose={() => setDrawerMetric(null)}
-        title={
-          drawerMetric === "appointments"
-            ? "Appointments"
-            : drawerMetric === "patients"
-              ? "Patients"
-              : drawerMetric === "cases"
-                ? "Active Cases"
-                : ""
-        }
-        icon={
-          drawerMetric === "appointments" ? (
-            <Calendar className="h-5 w-5" />
-          ) : drawerMetric === "patients" ? (
-            <Users className="h-5 w-5" />
-          ) : drawerMetric === "cases" ? (
-            <FolderOpen className="h-5 w-5" />
-          ) : undefined
-        }
-        color={
-          drawerMetric === "appointments"
-            ? "var(--ds-chart-6)"
-            : drawerMetric === "patients"
-              ? "var(--ds-chart-11)"
-              : drawerMetric === "cases"
-                ? "var(--ds-chart-8)"
-                : "var(--ds-chart-5)"
-        }
-        valueType="number"
-        data={
-          drawerMetric === "patients"
-            ? stats?.patient_growth_trend || []
-            : drawerMetric === "appointments"
-              ? stats?.appointment_count_trend || []
-              : drawerMetric === "cases"
-                ? stats?.case_count_trend || []
-                : []
-        }
-        dataKeys={
-          drawerMetric === "patients"
-            ? [{ key: "count", name: "Patients", color: "var(--ds-chart-11)" }]
-            : drawerMetric === "appointments"
-              ? [{ key: "count", name: "Appointments", color: "var(--ds-chart-6)" }]
-              : drawerMetric === "cases"
-                ? [{ key: "count", name: "Cases", color: "var(--ds-chart-8)" }]
-                : [{ key: "value", name: "Value", color: "var(--ds-chart-5)" }]
-        }
-        xAxisKey="month"
-        chartType="area"
-        trend={
-          drawerMetric === "patients" && cmp?.patient_change != null
-            ? {
-                value: `${cmp.patient_change > 0 ? "+" : ""}${cmp.patient_change}%`,
-                positive: cmp.patient_change >= 0,
-              }
-            : drawerMetric === "appointments" && cmp?.appointment_change != null
-              ? {
-                  value: `${cmp.appointment_change > 0 ? "+" : ""}${cmp.appointment_change}%`,
-                  positive: cmp.appointment_change >= 0,
-                }
-              : drawerMetric === "cases" && cmp?.case_change != null
-                ? {
-                    value: `${cmp.case_change > 0 ? "+" : ""}${cmp.case_change}%`,
-                    positive: cmp.case_change >= 0,
-                  }
-                : null
-        }
-      />
-    </motion.div>
+      {quickView && (
+        <QuickViewDrawer open={!!quickView} onClose={onQuickViewClose} type={quickView.type} entityId={quickView.id} entityName={quickView.name} />
+      )}
+    </DashboardShell>
   )
 }

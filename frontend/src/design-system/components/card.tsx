@@ -34,7 +34,7 @@ const CardTitle = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivE
     <h3
       ref={ref}
       className={cn(
-        "font-[var(--ds-text-h3)] text-[var(--ds-text)]",
+        "ds-card-title text-[var(--ds-text)]",
         className
       )}
       {...props}
@@ -48,7 +48,7 @@ const CardDescription = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HT
     <p
       ref={ref}
       className={cn(
-        "text-[var(--ds-text-body-sm)] text-[var(--ds-text-secondary)] mt-0.5",
+        "ds-secondary-text mt-0.5",
         className
       )}
       {...props}

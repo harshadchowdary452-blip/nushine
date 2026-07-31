@@ -294,10 +294,10 @@ const ENQUIRY_TYPE_COLORS: Record<
     dot: "bg-orange-500",
   },
   OPD_FOLLOW_UP: {
-    bg: "bg-purple-50",
-    text: "text-purple-700",
-    border: "border-purple-200",
-    dot: "bg-purple-500",
+    bg: "bg-[var(--ds-accent-50)]",
+    text: "text-[var(--ds-accent-700)]",
+    border: "border-[var(--ds-accent-200)]",
+    dot: "bg-[var(--ds-accent-500)]",
   },
   TREATMENT_WELLNESS: {
     bg: "bg-green-50",
@@ -331,10 +331,10 @@ const ENQUIRY_TYPE_COLORS: Record<
     dot: "bg-blue-500",
   },
   "7_DAY_FOLLOW_UP": {
-    bg: "bg-purple-50",
-    text: "text-purple-700",
-    border: "border-purple-200",
-    dot: "bg-purple-500",
+    bg: "bg-[var(--ds-accent-50)]",
+    text: "text-[var(--ds-accent-700)]",
+    border: "border-[var(--ds-accent-200)]",
+    dot: "bg-[var(--ds-accent-500)]",
   },
   "6_MONTH_RECALL": {
     bg: "bg-amber-50",
@@ -349,10 +349,10 @@ const ENQUIRY_TYPE_COLORS: Record<
     dot: "bg-emerald-500",
   },
   CUSTOM_FOLLOW_UP: {
-    bg: "bg-gray-50",
-    text: "text-gray-700",
-    border: "border-gray-200",
-    dot: "bg-gray-500",
+    bg: "bg-[var(--ds-background-subtle)]",
+    text: "text-[var(--ds-text-secondary)]",
+    border: "border-[var(--ds-border)]",
+    dot: "bg-[var(--ds-text-tertiary)]",
   },
   CRM_RULE: {
     bg: "bg-cyan-50",
@@ -366,14 +366,14 @@ const STATUS_COLORS: Record<string, string> = {
   PENDING: "bg-amber-100 text-amber-800",
   CONTACTED: "bg-blue-100 text-blue-800",
   INTERESTED: "bg-emerald-100 text-emerald-800",
-  APPOINTMENT_REQUIRED: "bg-purple-100 text-purple-800",
-  APPOINTMENT_BOOKED: "bg-indigo-100 text-indigo-800",
-  COMPLETED: "bg-gray-100 text-gray-600",
-  NO_RESPONSE: "bg-gray-100 text-gray-500",
+  APPOINTMENT_REQUIRED: "bg-[var(--ds-accent-100)] text-[var(--ds-accent-800)]",
+  APPOINTMENT_BOOKED: "bg-[var(--ds-primary-100)] text-[var(--ds-primary-800)]",
+  COMPLETED: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
+  NO_RESPONSE: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
   LOST: "bg-red-100 text-red-800",
-  CANCELLED: "bg-gray-100 text-gray-700",
+  CANCELLED: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
   NEW: "bg-blue-100 text-blue-700",
-  NOT_INTERESTED: "bg-gray-100 text-gray-500",
+  NOT_INTERESTED: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
   CONVERTED: "bg-green-100 text-green-800",
 }
 
@@ -1059,13 +1059,13 @@ export default function EnquiryCalendar() {
             Today
           </div>
         </Card>
-        <Card className="py-2 px-3 bg-indigo-50 border-indigo-200">
-          <div className="text-lg font-bold text-indigo-700">{summary?.due_tomorrow ?? 0}</div>
-          <div className="text-xs text-indigo-600">Tomorrow</div>
+        <Card className="py-2 px-3 bg-[var(--ds-primary-50)] border-[var(--ds-primary-200)]">
+          <div className="text-lg font-bold text-[var(--ds-primary-700)]">{summary?.due_tomorrow ?? 0}</div>
+          <div className="text-xs text-[var(--ds-primary-600)]">Tomorrow</div>
         </Card>
-        <Card className="py-2 px-3 bg-purple-50 border-purple-200">
-          <div className="text-lg font-bold text-purple-700">{summary?.due_this_week ?? 0}</div>
-          <div className="text-xs text-purple-600">This Week</div>
+        <Card className="py-2 px-3 bg-[var(--ds-accent-50)] border-[var(--ds-accent-200)]">
+          <div className="text-lg font-bold text-[var(--ds-accent-700)]">{summary?.due_this_week ?? 0}</div>
+          <div className="text-xs text-[var(--ds-accent-600)]">This Week</div>
         </Card>
       </div>
 
@@ -1181,7 +1181,7 @@ export default function EnquiryCalendar() {
                   type="checkbox"
                   checked={includeTerminal}
                   onChange={(e) => setIncludeTerminal(e.target.checked)}
-                  className="h-3.5 w-3.5 rounded border-gray-300"
+                  className="h-3.5 w-3.5 rounded border-[var(--ds-border-strong)]"
                 />
                 Include Completed/Cancelled
               </label>
@@ -1232,7 +1232,7 @@ export default function EnquiryCalendar() {
             ) : (
               <div className="max-h-[600px] overflow-auto">
                 <Table>
-                  <TableHeader className="sticky top-0 bg-white z-[var(--ds-z-sticky)]">
+                  <TableHeader className="sticky top-0 bg-[var(--ds-surface)] z-[var(--ds-z-sticky)]">
                     <TableRow>
                       <TableHead className="w-2" />
                       <TableHead className="whitespace-nowrap">Patient / Description</TableHead>
@@ -1241,7 +1241,7 @@ export default function EnquiryCalendar() {
                       <TableHead className="whitespace-nowrap">Hospital</TableHead>
                       <TableHead className="whitespace-nowrap">Type</TableHead>
                       <TableHead className="whitespace-nowrap">Status</TableHead>
-                      <TableHead className="whitespace-nowrap sticky right-0 bg-white z-[var(--ds-z-sticky)]">
+                      <TableHead className="whitespace-nowrap sticky right-0 bg-[var(--ds-surface)] z-[var(--ds-z-sticky)]">
                         Actions
                       </TableHead>
                     </TableRow>
@@ -1356,7 +1356,7 @@ export default function EnquiryCalendar() {
                           <TableCell>
                             <div className="flex items-center gap-1">
                               <Badge
-                                className={`text-[10px] ${STATUS_COLORS[item.status || ""] || "bg-gray-100"}`}
+                                className={`text-[10px] ${STATUS_COLORS[item.status || ""] || "bg-[var(--ds-background-subtle)]"}`}
                               >
                                 {od && <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />}
                                 {item.status || "—"}
@@ -1371,7 +1371,7 @@ export default function EnquiryCalendar() {
                               )}
                             </div>
                           </TableCell>
-                          <TableCell className="sticky right-0 bg-white z-[var(--ds-z-sticky)]">
+                          <TableCell className="sticky right-0 bg-[var(--ds-surface)] z-[var(--ds-z-sticky)]">
                             <TooltipProvider>
                               <div
                                 className="flex items-center gap-0.5"
@@ -1460,7 +1460,7 @@ export default function EnquiryCalendar() {
                                         setTimelineOpen(item.id)
                                       }}
                                     >
-                                      <History className="h-3.5 w-3.5 text-gray-500" />
+                                      <History className="h-3.5 w-3.5 text-[var(--ds-text-secondary)]" />
                                     </Button>
                                   </TooltipTrigger>
                                   <TooltipContent>Timeline</TooltipContent>
@@ -1486,11 +1486,11 @@ export default function EnquiryCalendar() {
             <CardTitle className="text-sm">Week View — click a day</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-7 gap-px rounded-lg border bg-gray-100 overflow-hidden">
+            <div className="grid grid-cols-7 gap-px rounded-lg border bg-[var(--ds-background-subtle)] overflow-hidden">
               {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
                 <div
                   key={d}
-                  className="bg-white p-2 text-center text-xs font-semibold text-gray-500"
+                  className="bg-[var(--ds-surface)] p-2 text-center text-xs font-semibold text-[var(--ds-text-secondary)]"
                 >
                   {d}
                 </div>
@@ -1509,11 +1509,11 @@ export default function EnquiryCalendar() {
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={(e) => handleDrop(e, dateStr)}
                       onClick={() => handleDayClick(dateStr)}
-                      className={`min-h-[100px] bg-white p-2 cursor-pointer hover:bg-blue-50 transition-colors
+                      className={`min-h-[100px] bg-[var(--ds-surface)] p-2 cursor-pointer hover:bg-blue-50 transition-colors
                         ${todayCheck ? "ring-2 ring-inset ring-blue-400" : ""}`}
                     >
                       <div
-                        className={`text-xs font-bold mb-1 ${todayCheck ? "text-blue-600" : "text-gray-700"}`}
+                        className={`text-xs font-bold mb-1 ${todayCheck ? "text-blue-600" : "text-[var(--ds-text-secondary)]"}`}
                       >
                         {format(day, "dd MMM")}
                       </div>
@@ -1530,7 +1530,7 @@ export default function EnquiryCalendar() {
                           )
                         })}
                         {dayItemsAll.length > 4 && (
-                          <div className="text-[9px] text-gray-400">
+                          <div className="text-[9px] text-[var(--ds-text-tertiary)]">
                             +{dayItemsAll.length - 4} more
                           </div>
                         )}
@@ -1552,11 +1552,11 @@ export default function EnquiryCalendar() {
             <CardTitle className="text-sm">{format(selDate, "MMMM yyyy")} — click a day</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-7 gap-px rounded-lg border bg-gray-100 overflow-hidden">
+            <div className="grid grid-cols-7 gap-px rounded-lg border bg-[var(--ds-background-subtle)] overflow-hidden">
               {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
                 <div
                   key={d}
-                  className="bg-white p-2 text-center text-xs font-semibold text-gray-500"
+                  className="bg-[var(--ds-surface)] p-2 text-center text-xs font-semibold text-[var(--ds-text-secondary)]"
                 >
                   {d}
                 </div>
@@ -1566,7 +1566,7 @@ export default function EnquiryCalendar() {
                   daysInMonth = calEnd.getDate()
                 const cells: React.ReactNode[] = []
                 for (let i = 0; i < startDay; i++)
-                  cells.push(<div key={`e-${i}`} className="bg-gray-50 p-2" />)
+                  cells.push(<div key={`e-${i}`} className="bg-[var(--ds-background-subtle)] p-2" />)
                 for (let d = 1; d <= daysInMonth; d++) {
                   const dateStr = `${format(selDate, "yyyy-MM")}-${String(d).padStart(2, "0")}`
                   const dayItemsAll = searchedItems.filter((item) => item.due_date === dateStr)
@@ -1578,12 +1578,12 @@ export default function EnquiryCalendar() {
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={(e) => handleDrop(e, dateStr)}
                       onClick={() => handleDayClick(dateStr)}
-                      className={`min-h-[55px] bg-white p-1.5 cursor-pointer hover:bg-blue-50 transition-colors
+                      className={`min-h-[55px] bg-[var(--ds-surface)] p-1.5 cursor-pointer hover:bg-blue-50 transition-colors
                         ${todayCheck ? "ring-2 ring-inset ring-blue-400" : ""}
                         ${isSelected ? "bg-blue-100 ring-2 ring-inset ring-blue-500" : ""}`}
                     >
                       <div
-                        className={`text-xs font-bold ${todayCheck ? "text-blue-600" : isSelected ? "text-blue-700" : "text-gray-700"}`}
+                        className={`text-xs font-bold ${todayCheck ? "text-blue-600" : isSelected ? "text-blue-700" : "text-[var(--ds-text-secondary)]"}`}
                       >
                         {d}
                       </div>
@@ -1597,7 +1597,7 @@ export default function EnquiryCalendar() {
                           )
                         })}
                         {dayItemsAll.length > 3 && (
-                          <div className="text-gray-400">+{dayItemsAll.length - 3}</div>
+                          <div className="text-[var(--ds-text-tertiary)]">+{dayItemsAll.length - 3}</div>
                         )}
                       </div>
                     </div>,
@@ -1653,11 +1653,11 @@ export default function EnquiryCalendar() {
                         onDrop={(e) => handleDrop(e, dateStr)}
                       >
                         <div
-                          className={`px-4 py-2 sticky top-0 z-[var(--ds-z-sticky)] flex items-center gap-2 ${todayCheck ? "bg-blue-50" : "bg-gray-50"}`}
+                          className={`px-4 py-2 sticky top-0 z-[var(--ds-z-sticky)] flex items-center gap-2 ${todayCheck ? "bg-blue-50" : "bg-[var(--ds-background-subtle)]"}`}
                         >
                           {todayCheck && <div className="w-2 h-2 rounded-full bg-blue-500" />}
                           <span
-                            className={`text-sm font-semibold ${todayCheck ? "text-blue-700" : "text-gray-700"}`}
+                            className={`text-sm font-semibold ${todayCheck ? "text-blue-700" : "text-[var(--ds-text-secondary)]"}`}
                           >
                             {format(dayDate, "EEEE, dd MMM yyyy")}
                           </span>
@@ -1983,7 +1983,7 @@ export default function EnquiryCalendar() {
                   <div className="flex flex-col items-center">
                     <div className="w-2.5 h-2.5 rounded-full bg-primary mt-1.5" />
                     {idx < timelineEntries.length - 1 && (
-                      <div className="w-px flex-1 bg-gray-200" />
+                      <div className="w-px flex-1 bg-[var(--ds-surface-secondary)]" />
                     )}
                   </div>
                   <div className="flex-1 pb-4">

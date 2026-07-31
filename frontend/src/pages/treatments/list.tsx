@@ -15,13 +15,13 @@ import type { TreatmentPlan } from "@/types"
 const PAGE_SIZE = 20
 
 const STATUS_COLORS: Record<string, string> = {
-  GENERATED: "bg-gray-100 text-gray-600",
+  GENERATED: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
   ASSIGNED: "bg-blue-100 text-blue-700",
-  SCHEDULED: "bg-indigo-100 text-indigo-700",
+  SCHEDULED: "bg-[var(--ds-primary-100)] text-[var(--ds-primary-700)]",
   IN_PROGRESS: "bg-green-100 text-green-700",
   WAITING_PATIENT: "bg-yellow-100 text-yellow-700",
   WAITING_LAB: "bg-orange-100 text-orange-700",
-  ON_HOLD: "bg-gray-100 text-gray-700",
+  ON_HOLD: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
   COMPLETED: "bg-emerald-100 text-emerald-700",
   CANCELLED: "bg-red-100 text-red-700",
   OVERDUE: "bg-red-200 text-red-800",
@@ -208,13 +208,13 @@ export default function TreatmentList() {
             return (
               <Card key={group.case_id} className="overflow-hidden">
                 <div
-                  className="flex items-center gap-4 p-4 hover:bg-gray-50/50 transition-colors cursor-pointer"
+                  className="flex items-center gap-4 p-4 hover:bg-[var(--ds-background-subtle)]/50 transition-colors cursor-pointer"
                   onClick={() => navigate(`/cases/${group.case_id}`)}
                 >
                   <button
                     type="button"
                     onClick={(e) => toggleExpand(group.case_id, e)}
-                    className="shrink-0 p-1 rounded hover:bg-gray-100"
+                    className="shrink-0 p-1 rounded hover:bg-[var(--ds-surface-hover)]"
                   >
                     {isExpanded
                       ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -240,7 +240,7 @@ export default function TreatmentList() {
 
                   {group.total_sittings > 0 && (
                     <div className="w-24 shrink-0">
-                      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-1.5 bg-[var(--ds-background-subtle)] rounded-full overflow-hidden">
                         <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${progress}%` }} />
                       </div>
                       <p className="text-[10px] text-muted-foreground text-right mt-0.5">{progress}%</p>
@@ -249,11 +249,11 @@ export default function TreatmentList() {
                 </div>
 
                 {isExpanded && (
-                  <div className="border-t bg-gray-50/30">
+                  <div className="border-t bg-[var(--ds-background-subtle)]/30">
                     {group.treatments.map((treatment) => (
                       <div
                         key={treatment.id}
-                        className="flex items-center gap-4 px-4 py-3 ml-11 hover:bg-white transition-colors cursor-pointer border-b border-gray-100 last:border-b-0"
+                        className="flex items-center gap-4 px-4 py-3 ml-11 hover:bg-[var(--ds-surface)] transition-colors cursor-pointer border-b border-[var(--ds-border-light)] last:border-b-0"
                         onClick={() => navigate(`/treatments/${treatment.id}`)}
                       >
                         <div className={cn(
@@ -261,13 +261,13 @@ export default function TreatmentList() {
                           treatment.status === "IN_PROGRESS" && "bg-green-500",
                           treatment.status === "COMPLETED" && "bg-emerald-500",
                           treatment.status === "OVERDUE" && "bg-red-500",
-                          treatment.status === "SCHEDULED" && "bg-indigo-500",
+                          treatment.status === "SCHEDULED" && "bg-[var(--ds-primary-500)]",
                           treatment.status === "ASSIGNED" && "bg-blue-500",
                           treatment.status === "WAITING_PATIENT" && "bg-yellow-500",
                           treatment.status === "WAITING_LAB" && "bg-orange-500",
-                          treatment.status === "ON_HOLD" && "bg-gray-400",
+                          treatment.status === "ON_HOLD" && "bg-[var(--ds-text-tertiary)]",
                           treatment.status === "CANCELLED" && "bg-red-400",
-                          treatment.status === "GENERATED" && "bg-gray-300",
+                          treatment.status === "GENERATED" && "bg-[var(--ds-surface-secondary)]",
                         )} />
 
                         <div className="flex-1 min-w-0">

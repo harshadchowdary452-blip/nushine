@@ -114,23 +114,23 @@ const container = { hidden: {}, show: { transition: { staggerChildren: 0.05 } } 
 
 const statusStyle: Record<string, string> = {
   NEW: "bg-blue-50 text-blue-700",
-  READ: "bg-purple-50 text-purple-700",
+  READ: "bg-[var(--ds-accent-50)] text-[var(--ds-accent-700)]",
   REPLIED: "bg-green-50 text-green-700",
   FOLLOW_UP: "bg-amber-50 text-amber-700",
-  CLOSED: "bg-gray-50 text-gray-600",
+  CLOSED: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
   SPAM: "bg-red-50 text-red-600",
 }
 
 const leadStatusStyle: Record<string, string> = {
   NEW: "bg-blue-50 text-blue-700",
-  CONTACTED: "bg-indigo-50 text-indigo-700",
+  CONTACTED: "bg-[var(--ds-primary-50)] text-[var(--ds-primary-700)]",
   INTERESTED: "bg-emerald-50 text-emerald-700",
   FOLLOW_UP_REQUIRED: "bg-amber-50 text-amber-700",
   APPOINTMENT_BOOKED: "bg-cyan-50 text-cyan-700",
   VISITED: "bg-teal-50 text-teal-700",
   CONVERTED: "bg-green-50 text-green-700",
   LOST: "bg-red-50 text-red-600",
-  NOT_INTERESTED: "bg-gray-50 text-gray-600",
+  NOT_INTERESTED: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
   NO_RESPONSE: "bg-orange-50 text-orange-700",
 }
 
@@ -466,14 +466,14 @@ export default function CampaignResponses() {
 
   const getStatusBadge = (status?: string, map?: Record<string, string>) => {
     const m = map || statusStyle
-    return m[status || ""] || "bg-gray-50 text-gray-600"
+    return m[status || ""] || "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]"
   }
 
   const renderPagination = () => {
     if (totalPages <= 1) return null
     return (
-      <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3">
-        <p className="text-sm text-gray-500">
+      <div className="flex items-center justify-between border-t border-[var(--ds-border-light)] px-4 py-3">
+        <p className="text-sm text-[var(--ds-text-secondary)]">
           Showing {Math.min((page - 1) * limit + 1, totalItems)} to{" "}
           {Math.min(page * limit, totalItems)} of {totalItems}
         </p>
@@ -524,7 +524,7 @@ export default function CampaignResponses() {
         <CardContent className="p-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ds-text-tertiary)]" />
               <Input
                 placeholder="Search by sender name or phone..."
                 className="pl-10"
@@ -544,7 +544,7 @@ export default function CampaignResponses() {
                 }}
               >
                 <SelectTrigger className="w-44">
-                  <Megaphone className="h-4 w-4 mr-2 text-gray-400" />
+                  <Megaphone className="h-4 w-4 mr-2 text-[var(--ds-text-tertiary)]" />
                   <SelectValue placeholder="All Campaigns" />
                 </SelectTrigger>
                 <SelectContent>
@@ -564,7 +564,7 @@ export default function CampaignResponses() {
                 }}
               >
                 <SelectTrigger className="w-36">
-                  <Filter className="h-4 w-4 mr-2 text-gray-400" />
+                  <Filter className="h-4 w-4 mr-2 text-[var(--ds-text-tertiary)]" />
                   <SelectValue placeholder="All Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -582,14 +582,14 @@ export default function CampaignResponses() {
                   type="date"
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
-                  className="h-9 rounded-md border border-gray-200 bg-white px-3 text-sm"
+                  className="h-9 rounded-md border border-[var(--ds-border)] bg-[var(--ds-surface)] px-3 text-sm"
                 />
-                <span className="text-gray-400">-</span>
+                <span className="text-[var(--ds-text-tertiary)]">-</span>
                 <input
                   type="date"
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
-                  className="h-9 rounded-md border border-gray-200 bg-white px-3 text-sm"
+                  className="h-9 rounded-md border border-[var(--ds-border)] bg-[var(--ds-surface)] px-3 text-sm"
                 />
               </div>
             </div>
@@ -608,7 +608,7 @@ export default function CampaignResponses() {
               <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
             </div>
           ) : isError ? (
-            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+            <div className="flex flex-col items-center justify-center py-16 text-[var(--ds-text-tertiary)]">
               <AlertCircle className="h-10 w-10 mb-2" />
               <p className="text-sm">Failed to load responses</p>
               <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>
@@ -616,7 +616,7 @@ export default function CampaignResponses() {
               </Button>
             </div>
           ) : responses.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+            <div className="flex flex-col items-center justify-center py-16 text-[var(--ds-text-tertiary)]">
               <MessageSquare className="h-10 w-10 mb-2" />
               <p className="text-sm">
                 {search || campaignFilter !== "all" || statusFilter !== "all"
@@ -650,21 +650,21 @@ export default function CampaignResponses() {
                         <TableRow key={resp.id}>
                           <TableCell>
                             <div className="flex flex-col">
-                              <span className="font-medium text-sm text-gray-900">
+                              <span className="font-medium text-sm text-[var(--ds-text)]">
                                 {resp.patient_name || "-"}
                               </span>
                               {resp.phone && (
-                                <span className="text-xs text-gray-400">{resp.phone}</span>
+                                <span className="text-xs text-[var(--ds-text-tertiary)]">{resp.phone}</span>
                               )}
                             </div>
                           </TableCell>
                           <TableCell>
-                            <span className="text-sm text-gray-700">
+                            <span className="text-sm text-[var(--ds-text-secondary)]">
                               {resp.campaign_name || "-"}
                             </span>
                           </TableCell>
                           <TableCell className="max-w-xs">
-                            <p className="truncate text-sm text-gray-600" title={resp.message}>
+                            <p className="truncate text-sm text-[var(--ds-text-secondary)]" title={resp.message}>
                               {resp.message}
                             </p>
                           </TableCell>
@@ -677,7 +677,7 @@ export default function CampaignResponses() {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <span className="text-xs text-gray-500 whitespace-nowrap">
+                            <span className="text-xs text-[var(--ds-text-secondary)] whitespace-nowrap">
                               {formatDateTime(resp.reply_time || resp.created_at)}
                             </span>
                           </TableCell>
@@ -693,19 +693,19 @@ export default function CampaignResponses() {
                                 {resp.lead_status || "NEW"}
                               </Badge>
                             ) : (
-                              <span className="text-xs text-gray-400">-</span>
+                              <span className="text-xs text-[var(--ds-text-tertiary)]">-</span>
                             )}
                           </TableCell>
                           <TableCell>
-                            <span className="text-sm text-gray-700">{staffName}</span>
+                            <span className="text-sm text-[var(--ds-text-secondary)]">{staffName}</span>
                           </TableCell>
                           <TableCell>
                             {resp.next_action ? (
-                              <span className="text-xs text-gray-600 bg-gray-100 rounded px-2 py-0.5">
+                              <span className="text-xs text-[var(--ds-text-secondary)] bg-[var(--ds-background-subtle)] rounded px-2 py-0.5">
                                 {resp.next_action}
                               </span>
                             ) : (
-                              <span className="text-xs text-gray-400">-</span>
+                              <span className="text-xs text-[var(--ds-text-tertiary)]">-</span>
                             )}
                           </TableCell>
                           <TableCell>
@@ -797,8 +797,8 @@ export default function CampaignResponses() {
           <DialogBody>
             {replyOpen && (
               <div className="space-y-4">
-                <div className="rounded-lg bg-gray-50 p-3 text-sm text-gray-600">
-                  <p className="font-medium text-gray-800 mb-1">Original message:</p>
+                <div className="rounded-lg bg-[var(--ds-background-subtle)] p-3 text-sm text-[var(--ds-text-secondary)]">
+                  <p className="font-medium text-[var(--ds-text)] mb-1">Original message:</p>
                   <p>{replyOpen.message}</p>
                 </div>
                 <div className="space-y-2">
@@ -959,12 +959,12 @@ export default function CampaignResponses() {
           <DialogBody>
             {appointmentOpen && (
               <div className="space-y-4">
-                <div className="rounded-lg bg-gray-50 p-3">
-                  <p className="text-sm font-medium text-gray-800">
+                <div className="rounded-lg bg-[var(--ds-background-subtle)] p-3">
+                  <p className="text-sm font-medium text-[var(--ds-text)]">
                     {appointmentOpen.patientName || "Patient"}
                   </p>
                   {appointmentOpen.phone && (
-                    <p className="text-xs text-gray-500">{appointmentOpen.phone}</p>
+                    <p className="text-xs text-[var(--ds-text-secondary)]">{appointmentOpen.phone}</p>
                   )}
                 </div>
                 <div className="space-y-2">
@@ -995,13 +995,13 @@ export default function CampaignResponses() {
                     value={apptDate}
                     onChange={(e) => setApptDate(e.target.value)}
                     min={new Date().toISOString().split("T")[0]}
-                    className="flex h-10 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm"
+                    className="flex h-10 w-full rounded-md border border-[var(--ds-border)] bg-[var(--ds-surface)] px-3 py-2 text-sm"
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>Time Slot</Label>
                   {slotsLoading ? (
-                    <div className="flex items-center gap-2 text-sm text-gray-400">
+                    <div className="flex items-center gap-2 text-sm text-[var(--ds-text-tertiary)]">
                       <Loader2 className="h-4 w-4 animate-spin" /> Loading slots...
                     </div>
                   ) : availSlots.length === 0 && apptDoctorId && apptDate ? (
@@ -1101,8 +1101,8 @@ export default function CampaignResponses() {
                     <span>Source: {convertOpen.source || "CAMPAIGN"}</span>
                   </div>
                 </div>
-                <div className="border-t border-gray-100 pt-4 space-y-4">
-                  <p className="text-sm font-medium text-gray-700">Patient Details</p>
+                <div className="border-t border-[var(--ds-border-light)] pt-4 space-y-4">
+                  <p className="text-sm font-medium text-[var(--ds-text-secondary)]">Patient Details</p>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Full Name *</Label>
@@ -1154,7 +1154,7 @@ export default function CampaignResponses() {
                     </div>
                     <div className="space-y-2">
                       <Label>OP Number</Label>
-                      <Input value="Auto-generated" disabled className="text-gray-400" />
+                      <Input value="Auto-generated" disabled className="text-[var(--ds-text-tertiary)]" />
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -1172,7 +1172,7 @@ export default function CampaignResponses() {
                       id="create-appt"
                       checked={convCreateAppt}
                       onChange={(e) => setConvCreateAppt(e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-blue-600"
+                      className="h-4 w-4 rounded border-[var(--ds-border-strong)] text-blue-600"
                     />
                     <Label htmlFor="create-appt" className="text-sm cursor-pointer">
                       Create Appointment after conversion

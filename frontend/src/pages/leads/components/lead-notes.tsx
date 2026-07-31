@@ -82,7 +82,7 @@ export default function LeadNotes({ lead }: LeadNotesProps) {
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-gray-400" />
+          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-[var(--ds-text-tertiary)]" />
           <Input
             placeholder="Search notes..."
             value={search}
@@ -96,7 +96,7 @@ export default function LeadNotes({ lead }: LeadNotesProps) {
       </div>
 
       {isAdding && (
-        <div className="rounded-lg border border-gray-200 p-3 space-y-2 bg-white">
+        <div className="rounded-lg border border-[var(--ds-border)] p-3 space-y-2 bg-[var(--ds-surface)]">
           <Textarea
             placeholder="Write a note..."
             value={newNote}
@@ -121,7 +121,7 @@ export default function LeadNotes({ lead }: LeadNotesProps) {
 
       {pinnedNotes.length > 0 && (
         <div className="space-y-2">
-          <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 uppercase tracking-wider">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-[var(--ds-text-secondary)] uppercase tracking-wider">
             <Pin className="h-3 w-3" /> Pinned
           </div>
           {pinnedNotes.map((note) => (
@@ -136,15 +136,15 @@ export default function LeadNotes({ lead }: LeadNotesProps) {
         </div>
       ) : unpinnedNotes.length === 0 && pinnedNotes.length === 0 && !isAdding ? (
         <div className="py-12 text-center">
-          <FileText className="h-10 w-10 mx-auto mb-3 text-gray-300" />
-          <p className="text-sm text-gray-400">No notes yet</p>
+          <FileText className="h-10 w-10 mx-auto mb-3 text-[var(--ds-text-tertiary)]" />
+          <p className="text-sm text-[var(--ds-text-tertiary)]">No notes yet</p>
         </div>
       ) : null}
 
       {unpinnedNotes.length > 0 && (
         <div className="space-y-2">
           {pinnedNotes.length > 0 && (
-            <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 uppercase tracking-wider mt-4">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-[var(--ds-text-secondary)] uppercase tracking-wider mt-4">
               <FileText className="h-3 w-3" /> All Notes
             </div>
           )}
@@ -159,20 +159,20 @@ export default function LeadNotes({ lead }: LeadNotesProps) {
 
 function NoteCard({ note }: { note: Note }) {
   return (
-    <div className="rounded-lg border border-gray-100 bg-white p-3 hover:border-gray-200 transition-colors">
+    <div className="rounded-lg border border-[var(--ds-border-light)] bg-[var(--ds-surface)] p-3 hover:border-[var(--ds-border)] transition-colors">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <p className="text-sm text-gray-700 whitespace-pre-wrap">{note.note}</p>
+          <p className="text-sm text-[var(--ds-text-secondary)] whitespace-pre-wrap">{note.note}</p>
         </div>
         <div className="flex items-center gap-1 shrink-0">
           {note.is_pinned ? (
             <PinOff className="h-3.5 w-3.5 text-amber-500 cursor-pointer hover:text-amber-600" />
           ) : (
-            <Pin className="h-3.5 w-3.5 text-gray-300 cursor-pointer hover:text-gray-400" />
+            <Pin className="h-3.5 w-3.5 text-[var(--ds-text-tertiary)] cursor-pointer hover:text-[var(--ds-text-tertiary)]" />
           )}
         </div>
       </div>
-      <div className="flex items-center gap-3 mt-2 text-[11px] text-gray-400">
+      <div className="flex items-center gap-3 mt-2 text-[11px] text-[var(--ds-text-tertiary)]">
         <span className="flex items-center gap-1">
           <Clock className="h-3 w-3" />
           {format(new Date(note.created_at), "dd MMM yyyy, hh:mm a")}

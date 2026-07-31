@@ -160,7 +160,7 @@ export default function LoginPage() {
               {features.map((f) => (
                 <div
                   key={f.title}
-                  className="group rounded-xl border border-white/10 bg-white/[0.04] p-3 backdrop-blur-xl transition-all duration-300 hover:bg-white/[0.08] hover:border-white/[0.18]"
+                  className="group rounded-xl border border-white/10 bg-white/[0.04] p-3 backdrop-blur-xl transition-all duration-300 hover:bg-[var(--ds-surface)]/[0.08] hover:border-white/[0.18]"
                 >
                   <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-[var(--ds-primary-300)]/20 to-[var(--ds-primary-400)]/20 mb-2">
                     <f.icon className="w-[14px] h-[14px] text-[var(--ds-primary-300)]" strokeWidth={1.5} />
@@ -226,7 +226,7 @@ export default function LoginPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.1 }}
-            className="rounded-[20px] border border-gray-200/80 bg-white p-6 sm:p-8 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.08),0_2px_8px_-2px_rgba(0,0,0,0.03)]"
+            className="rounded-[20px] border border-[var(--ds-border)]/80 bg-[var(--ds-surface)] p-6 sm:p-8 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.08),0_2px_8px_-2px_rgba(0,0,0,0.03)]"
           >
             {/* Card header */}
             <div className="flex flex-col items-center text-center mb-5">
@@ -318,7 +318,7 @@ export default function LoginPage() {
                     type="checkbox"
                     checked={remember}
                     onChange={(e) => setRemember(e.target.checked)}
-                    className="h-3.5 w-3.5 rounded border-gray-300 text-[var(--ds-primary)] focus:ring-[var(--ds-primary)]/20 transition-all"
+                    className="h-3.5 w-3.5 rounded border-[var(--ds-border-strong)] text-[var(--ds-primary)] focus:ring-[var(--ds-primary)]/20 transition-all"
                   />
                   <span className="group-hover:text-[var(--ds-text)] transition-colors">Remember me</span>
                 </label>
@@ -355,7 +355,7 @@ export default function LoginPage() {
                   title="Sign in to your account"
                   className="relative flex h-10 w-full items-center justify-center gap-2 rounded-[10px] bg-gradient-to-r from-[var(--ds-primary)] via-[var(--ds-primary-600)] to-[var(--ds-primary-800)] text-white text-xs font-semibold shadow-md shadow-[var(--ds-primary)]/25 transition-all duration-300 hover:shadow-lg hover:shadow-[var(--ds-primary)]/30 overflow-hidden group"
                 >
-                  <span className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-all duration-300" />
+                  <span className="absolute inset-0 bg-white/0 group-hover:bg-[var(--ds-surface)]/10 transition-all duration-300" />
                   <span className="relative flex items-center gap-1.5">
                     Sign In
                     <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-0.5" strokeWidth={2} />
@@ -365,7 +365,7 @@ export default function LoginPage() {
             </form>
 
             {/* Security */}
-            <div className="mt-5 pt-4 border-t border-gray-100">
+            <div className="mt-5 pt-4 border-t border-[var(--ds-border-light)]">
               <div className="flex items-center justify-center gap-2 text-center">
                 <ShieldCheck className="h-3.5 w-3.5 text-[var(--ds-primary)]" strokeWidth={1.5} />
                 <p className="text-[11px] text-[var(--ds-text-placeholder)]">

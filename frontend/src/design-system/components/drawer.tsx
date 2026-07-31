@@ -14,7 +14,7 @@ const DrawerOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-[var(--ds-z-dialog)] bg-black/40 data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
+      "ds-motion-overlay fixed inset-0 z-[var(--ds-z-dialog)] bg-[var(--ds-background-overlay)]",
       className
     )}
     {...props}
@@ -36,10 +36,16 @@ const DrawerContent = React.forwardRef<
       ref={ref}
       onCloseAutoFocus={(e) => e.preventDefault()}
       className={cn(
-        "fixed top-0 z-[var(--ds-z-dialog)] h-full w-full max-w-lg border border-[var(--ds-border)] bg-[var(--ds-surface)] shadow-[var(--ds-shadow-drawer)]",
-        "flex flex-col",
-        side === "right" ? "right-0" : "left-0",
-        "data-[state=open]:animate-slide-in-right",
+        "fixed top-0 z-[var(--ds-z-dialog)] flex h-full flex-col border-[var(--ds-border)] bg-[var(--ds-surface)] shadow-[var(--ds-shadow-drawer)]",
+        // Full-bleed on phones; capped panel on anything larger.
+        "w-full sm:max-w-lg",
+        // `h-dvh` keeps the footer above mobile browser chrome.
+        "h-dvh",
+        // Entrance/exit are bound to Radix data-state so the exit animation
+        // actually plays; the previous class only animated entry.
+        side === "right"
+          ? "right-0 border-l ds-motion-drawer-right"
+          : "left-0 border-r ds-motion-drawer-left",
         className
       )}
       {...props}
@@ -93,7 +99,7 @@ const DrawerTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Title
     ref={ref}
-    className={cn("font-[var(--ds-text-h3)] text-[var(--ds-text)]", className)}
+    className={cn("ds-drawer-title text-[var(--ds-text)]", className)}
     {...props}
   />
 ))
@@ -105,7 +111,7 @@ const DrawerDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Description
     ref={ref}
-    className={cn("text-[var(--ds-text-body-sm)] text-[var(--ds-text-secondary)]", className)}
+    className={cn("ds-secondary-text", className)}
     {...props}
   />
 ))

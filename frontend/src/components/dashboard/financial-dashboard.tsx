@@ -13,7 +13,7 @@ import { useAuthStore } from "@/store/authStore"
 import { dashboardApi } from "@/services/endpoints"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import KpiCard from "@/components/layout/kpi-card"
+import { KpiCard } from "@/design-system"
 import DateFilterBar from "@/components/ui/date-filter-bar"
 import { Button } from "@/components/ui/button"
 import { formatIndianRupees, formatIndianNumber } from "@/lib/currency"
@@ -42,8 +42,8 @@ interface ChartTooltipProps {
 const ChartTooltip = ({ active, payload, label }: ChartTooltipProps) => {
   if (active && payload && payload.length) {
     return (
-      <div className="rounded-xl border border-gray-100 bg-white p-3 shadow-lg">
-        <p className="text-sm font-semibold text-gray-900 mb-1">{label}</p>
+      <div className="rounded-xl border border-[var(--ds-border-light)] bg-[var(--ds-surface)] p-3 shadow-lg">
+        <p className="text-sm font-semibold text-[var(--ds-text)] mb-1">{label}</p>
         {payload.map((p, i) => {
           const isFinancial = ["Revenue", "Expenses", "Profit", "revenue", "expenses", "profit"].includes(p.name) || ["revenue", "expenses", "profit"].includes(p.dataKey)
           return (
@@ -120,8 +120,8 @@ function FinancialDashboard({ className }: FinancialDashboardProps) {
     <div className={cn("space-y-4", className)}>
       {/* Quick View Filter */}
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-bold text-gray-800 flex items-center gap-2">
-          <BarChart3 className="h-4 w-4 text-indigo-500" /> Financial Overview
+        <h2 className="text-sm font-bold text-[var(--ds-text)] flex items-center gap-2">
+          <BarChart3 className="h-4 w-4 text-[var(--ds-primary-500)]" /> Financial Overview
         </h2>
         <DateFilterBar period={period} onPeriodChange={setPeriod} startDate={startDate} endDate={endDate} onStartDateChange={setStartDate} onEndDateChange={setEndDate} />
       </div>
@@ -173,7 +173,7 @@ function FinancialDashboard({ className }: FinancialDashboardProps) {
         {/* Revenue vs Expenses */}
         <Card>
           <CardHeader className="px-4 py-3 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Revenue vs Expenses</CardTitle>
+            <CardTitle className="text-sm font-semibold text-[var(--ds-text-secondary)] uppercase tracking-wider">Revenue vs Expenses</CardTitle>
             <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => navigate("/billing")}>
               View Billings <ExternalLink className="h-3 w-3" />
             </Button>
@@ -197,7 +197,7 @@ function FinancialDashboard({ className }: FinancialDashboardProps) {
         {/* Expense Breakdown */}
         <Card>
           <CardHeader className="px-4 py-3 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Expense Breakdown</CardTitle>
+            <CardTitle className="text-sm font-semibold text-[var(--ds-text-secondary)] uppercase tracking-wider">Expense Breakdown</CardTitle>
             <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => navigate("/admin/expenses")}>
               View All <ExternalLink className="h-3 w-3" />
             </Button>
@@ -224,21 +224,21 @@ function FinancialDashboard({ className }: FinancialDashboardProps) {
                   </RePieChart>
                 </ResponsiveContainer>
                 <div className="flex-1 space-y-1.5 w-full">
-                  <div className="flex items-center justify-between text-xs font-semibold text-gray-500 pb-1 border-b">
+                  <div className="flex items-center justify-between text-xs font-semibold text-[var(--ds-text-secondary)] pb-1 border-b">
                     <span>Category</span>
                     <span>Amount</span>
                   </div>
                   {expenseBreakdown.map((item, i) => (
                     <div
                       key={item.category}
-                      className="flex items-center justify-between text-xs py-1 px-2 rounded hover:bg-gray-50 cursor-pointer transition-colors"
+                      className="flex items-center justify-between text-xs py-1 px-2 rounded hover:bg-[var(--ds-surface-hover)] cursor-pointer transition-colors"
                       onClick={() => navigate(`/admin/expenses?category=${encodeURIComponent(item.category)}&period=${period}${startDate ? `&start_date=${startDate}` : ""}${endDate ? `&end_date=${endDate}` : ""}`)}
                     >
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
-                        <span className="font-medium text-gray-700">{item.category}</span>
+                        <span className="font-medium text-[var(--ds-text-secondary)]">{item.category}</span>
                       </div>
-                      <span className="font-semibold text-gray-900">{formatIndianRupees(item.amount)}</span>
+                      <span className="font-semibold text-[var(--ds-text)]">{formatIndianRupees(item.amount)}</span>
                     </div>
                   ))}
                   <div className="flex items-center justify-between text-xs font-bold pt-2 border-t mt-2">
@@ -248,7 +248,7 @@ function FinancialDashboard({ className }: FinancialDashboardProps) {
                 </div>
               </div>
             ) : (
-              <div className="flex items-center justify-center h-[220px] text-sm text-gray-400">
+              <div className="flex items-center justify-center h-[220px] text-sm text-[var(--ds-text-tertiary)]">
                 No expenses for this period
               </div>
             )}

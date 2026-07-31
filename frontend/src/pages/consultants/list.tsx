@@ -1,23 +1,11 @@
 import { useState, useMemo } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import {
-  useReactTable,
-  getCoreRowModel,
-  getSortedRowModel,
-  getPaginationRowModel,
-  getFilteredRowModel,
-  flexRender,
-  type ColumnDef,
-  type SortingState,
-} from "@tanstack/react-table"
-import { motion } from "framer-motion"
+import type { ColumnDef } from "@tanstack/react-table"
 import { Plus, Search, Eye, Edit, UserCog } from "lucide-react"
-import { PageHeader } from "@/design-system"
+import { PageHeader, DataTable } from "@/design-system"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Card, CardContent } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -54,7 +42,6 @@ function getEmptyConsultantForm(): ConsultantForm {
 export default function ConsultantList() {
   const queryClient = useQueryClient()
   const { addToast } = useToast()
-  const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState("")
   const [dialogOpen, setDialogOpen] = useState(false)
   const [form, setForm] = useState<ConsultantForm>(getEmptyConsultantForm)
@@ -127,7 +114,7 @@ export default function ConsultantList() {
         accessorKey: "is_active",
         header: "Status",
         cell: ({ row }) => (
-          <Badge variant={row.original.is_active ? "success" : "secondary"}>
+          <Badge variant={row.original.is_active ? "success" : "default"}>
             {row.original.is_active ? "Active" : "Inactive"}
           </Badge>
         ),
@@ -150,19 +137,6 @@ export default function ConsultantList() {
     [],
   )
 
-  const table = useReactTable({
-    data: consultants,
-    columns,
-    state: { sorting, globalFilter },
-    onSortingChange: setSorting,
-    onGlobalFilterChange: setGlobalFilter,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    initialState: { pagination: { pageSize: 10 } },
-  })
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     createMutation.mutate(form)
@@ -180,114 +154,45 @@ export default function ConsultantList() {
         }
       />
 
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-4">
-            <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search consultants..."
-                value={globalFilter}
-                onChange={(e) => setGlobalFilter(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+      <DataTable
+        columns={columns}
+        data={consultants}
+        loading={isLoading}
+        pagination
+        pageSize={10}
+        toolbar={
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ds-text-tertiary)]" />
+            <Input
+              placeholder="Search consultants..."
+              value={globalFilter}
+              onChange={(e) => setGlobalFilter(e.target.value)}
+              className="pl-10"
+            />
           </div>
-
-          {isLoading ? (
-            <div className="space-y-3">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
-            </div>
-          ) : consultants.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-muted">
-                <UserCog className="h-10 w-10 text-muted-foreground" />
-              </div>
-              <h3 className="text-lg font-semibold">No consultants yet</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Add your first consultant to get started.
+        }
+        emptyIcon={UserCog}
+        emptyTitle="No consultants yet"
+        emptyDescription="Add your first consultant to get started."
+        emptyAction={
+          <Button onClick={() => setDialogOpen(true)}>
+            <UserCog className="h-4 w-4" /> Add Consultant
+          </Button>
+        }
+        mobileCard={(row) => (
+          <div className="flex items-center justify-between gap-3">
+            <div className="ds-min-w-0">
+              <p className="ds-body font-medium text-[var(--ds-text)]">{row.full_name}</p>
+              <p className="ds-caption text-[var(--ds-text-secondary)]">
+                {row.specialization || "—"} · {row.email || "—"}
               </p>
-              <Button className="mt-4" onClick={() => setDialogOpen(true)}>
-                <UserCog className="h-4 w-4" /> Add Consultant
-              </Button>
             </div>
-          ) : (
-            <>
-              <div className="overflow-x-auto rounded-md border mobile-card-view">
-                <table className="w-full text-sm">
-                  <thead>
-                    {table.getHeaderGroups().map((hg) => (
-                      <tr key={hg.id} className="border-b bg-muted/50">
-                        {hg.headers.map((header) => (
-                          <th
-                            key={header.id}
-                            className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer select-none"
-                            onClick={header.column.getToggleSortingHandler()}
-                          >
-                            <div className="flex items-center gap-1">
-                              {flexRender(header.column.columnDef.header, header.getContext())}
-                              {{
-                                asc: " ↑",
-                                desc: " ↓",
-                              }[header.column.getIsSorted() as string] ?? null}
-                            </div>
-                          </th>
-                        ))}
-                      </tr>
-                    ))}
-                  </thead>
-                  <tbody>
-                    {table.getRowModel().rows.map((row) => (
-                      <motion.tr
-                        key={row.id}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="border-b transition-colors hover:bg-muted/50"
-                      >
-                        {row.getVisibleCells().map((cell) => {
-                          const header = cell.column.columnDef.header
-                          const label = typeof header === "string" ? header : cell.column.id
-                          return (
-                            <td key={cell.id} className="px-4 py-3" data-label={label}>
-                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                            </td>
-                          )
-                        })}
-                      </motion.tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="flex items-center justify-between mt-4">
-                <p className="text-sm text-muted-foreground">
-                  Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
-                </p>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => table.previousPage()}
-                    disabled={!table.getCanPreviousPage()}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => table.nextPage()}
-                    disabled={!table.getCanNextPage()}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+            <Badge variant={row.is_active ? "success" : "default"} className="shrink-0">
+              {row.is_active ? "Active" : "Inactive"}
+            </Badge>
+          </div>
+        )}
+      />
 
       <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
         <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
@@ -353,7 +258,7 @@ export default function ConsultantList() {
                 />
               </div>
             </div>
-            <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-gray-100">
+            <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-[var(--ds-border-light)]">
               <Button type="button" variant="outline" onClick={resetForm}>
                 Cancel
               </Button>

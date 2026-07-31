@@ -93,8 +93,8 @@ export default function Breadcrumb({ className, variant = "compact" }: Breadcrum
               {isLast ? (
                 <span
                   className={cn(
-                    "truncate font-semibold text-[var(--ds-text)]",
-                    isCompact ? "text-sm" : "text-base"
+                    "ds-breadcrumb truncate font-semibold text-[var(--ds-text)]",
+                    !isCompact && "text-[var(--ds-font-size-md)]"
                   )}
                   aria-current="page"
                   title={seg.label}
@@ -105,8 +105,8 @@ export default function Breadcrumb({ className, variant = "compact" }: Breadcrum
                 <Link
                   to={seg.path}
                   className={cn(
-                    "flex shrink-0 items-center gap-1.5 truncate text-[var(--ds-text-tertiary)] transition-colors hover:text-[var(--ds-text-secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-primary)]/30 rounded-[var(--ds-radius-sm)]",
-                    isCompact ? "text-xs" : "text-sm"
+                    "ds-breadcrumb flex shrink-0 items-center gap-1.5 truncate rounded-[var(--ds-radius-sm)] text-[var(--ds-text-tertiary)] ds-transition-colors hover:text-[var(--ds-text-secondary)]",
+                    !isCompact && "text-[var(--ds-font-size-sm)]"
                   )}
                 >
                   {idx === 0 && <Home className="h-3 w-3" strokeWidth={1.5} aria-hidden="true" />}

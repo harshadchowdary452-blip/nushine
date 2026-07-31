@@ -178,7 +178,7 @@ export default function WhatsAppTemplates() {
         <>
           <div className="grid gap-4 md:grid-cols-2">
             {allTemplates.map((t: WATemplate) => (
-              <Card key={t.id} className="border-gray-200">
+              <Card key={t.id} className="border-[var(--ds-border)]">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium flex items-center gap-2">
                     <FileText className="h-4 w-4 text-primary" />
@@ -187,14 +187,14 @@ export default function WhatsAppTemplates() {
                   <div className="flex items-center gap-1">
                     <Badge
                       variant="outline"
-                      className={`text-xs ${t.is_active ? "bg-green-50 text-green-700" : "bg-gray-50 text-gray-500"}`}
+                      className={`text-xs ${t.is_active ? "bg-green-50 text-green-700" : "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]"}`}
                     >
                       {t.is_active ? "Active" : "Inactive"}
                     </Badge>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-xs text-gray-600 whitespace-pre-wrap line-clamp-3 mb-3">
+                  <p className="text-xs text-[var(--ds-text-secondary)] whitespace-pre-wrap line-clamp-3 mb-3">
                     {t.message}
                   </p>
                   <div className="flex items-center gap-1">
@@ -231,9 +231,9 @@ export default function WhatsAppTemplates() {
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
               {DEFAULT_TEMPLATES.map((t, i) => (
-                <div key={i} className="rounded-lg border border-gray-200 p-3">
+                <div key={i} className="rounded-lg border border-[var(--ds-border)] p-3">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-800">{t.name}</span>
+                    <span className="text-sm font-medium text-[var(--ds-text)]">{t.name}</span>
                     <Button
                       size="sm"
                       variant="ghost"
@@ -246,7 +246,7 @@ export default function WhatsAppTemplates() {
                       <Plus className="h-3.5 w-3.5 mr-1" /> Add
                     </Button>
                   </div>
-                  <p className="text-xs text-gray-500 line-clamp-2">{t.message}</p>
+                  <p className="text-xs text-[var(--ds-text-secondary)] line-clamp-2">{t.message}</p>
                 </div>
               ))}
             </CardContent>
@@ -276,7 +276,7 @@ export default function WhatsAppTemplates() {
                 rows={8}
                 placeholder="Type your message... Use {PatientName}, {HospitalName}, {Date}, {Time}, {DoctorName} as placeholders"
               />
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-[var(--ds-text-tertiary)] mt-1">
                 Available placeholders: {"{PatientName}"}, {"{HospitalName}"}, {"{Date}"},{" "}
                 {"{Time}"}, {"{DoctorName}"}
               </p>

@@ -192,7 +192,7 @@ const ROLES = ["RECEPTION", "DOCTOR", "CRM_EXECUTIVE", "HOSPITAL_ADMIN"]
 
 const statusColors: Record<string, string> = {
   ACTIVE: "bg-green-50 text-green-700",
-  DISABLED: "bg-gray-50 text-gray-600",
+  DISABLED: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
   DRAFT: "bg-yellow-50 text-yellow-700",
   ARCHIVED: "bg-red-50 text-red-600",
 }
@@ -206,9 +206,9 @@ const logStatusColors: Record<string, string> = {
 const actionTypeColors: Record<string, string> = {
   CREATE_FOLLOW_UP: "bg-blue-50 text-blue-700",
   SEND_WHATSAPP: "bg-green-50 text-green-700",
-  SEND_EMAIL: "bg-purple-50 text-purple-700",
+  SEND_EMAIL: "bg-[var(--ds-accent-50)] text-[var(--ds-accent-700)]",
   CREATE_NOTIFICATION: "bg-amber-50 text-amber-700",
-  CREATE_TASK: "bg-gray-50 text-gray-700",
+  CREATE_TASK: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
   ESCALATE_FOLLOW_UP: "bg-red-50 text-red-700",
 }
 
@@ -565,7 +565,7 @@ export default function AutomationBuilder() {
           value={dashboard.disabled_rules}
           icon={AlertTriangle}
           loading={dashLoading}
-          color="text-gray-500"
+          color="text-[var(--ds-text-secondary)]"
         />
         <KpiCard
           title="Draft"
@@ -616,7 +616,7 @@ export default function AutomationBuilder() {
             </CardTitle>
             <div className="flex gap-2">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ds-text-tertiary)]" />
                 <Input
                   placeholder="Search rules..."
                   className="pl-9 w-56"
@@ -875,7 +875,7 @@ export default function AutomationBuilder() {
                   {ruleDetail.conditions.map((c, i) => (
                     <div
                       key={i}
-                      className="flex items-center gap-2 text-sm bg-gray-50 rounded-lg px-3 py-1.5"
+                      className="flex items-center gap-2 text-sm bg-[var(--ds-background-subtle)] rounded-lg px-3 py-1.5"
                     >
                       <Badge variant="outline" className="text-[10px]">
                         {c.field_name}
@@ -900,7 +900,7 @@ export default function AutomationBuilder() {
                   {ruleDetail.actions.map((a, i) => (
                     <div
                       key={i}
-                      className="flex items-center gap-2 text-sm bg-gray-50 rounded-lg px-3 py-1.5"
+                      className="flex items-center gap-2 text-sm bg-[var(--ds-background-subtle)] rounded-lg px-3 py-1.5"
                     >
                       <Badge className={`text-[10px] ${actionTypeColors[a.action_type] || ""}`}>
                         {formatLabel(a.action_type)}
@@ -969,7 +969,7 @@ export default function AutomationBuilder() {
             {WIZARD_STEPS.map((s, i) => (
               <div key={i} className="flex items-center gap-1 flex-1">
                 <div
-                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${i === step ? "bg-blue-600 text-white" : i < step ? "bg-green-500 text-white" : "bg-gray-200 text-gray-500"}`}
+                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${i === step ? "bg-blue-600 text-white" : i < step ? "bg-green-500 text-white" : "bg-[var(--ds-surface-secondary)] text-[var(--ds-text-secondary)]"}`}
                 >
                   {i < step ? <CheckCircle2 className="h-3.5 w-3.5" /> : i + 1}
                 </div>
@@ -979,7 +979,7 @@ export default function AutomationBuilder() {
                   {s}
                 </span>
                 {i < WIZARD_STEPS.length - 1 && (
-                  <ChevronRight className="h-3 w-3 text-gray-300 shrink-0" />
+                  <ChevronRight className="h-3 w-3 text-[var(--ds-text-tertiary)] shrink-0" />
                 )}
               </div>
             ))}
@@ -1113,7 +1113,7 @@ export default function AutomationBuilder() {
               {formConditions.map((c, i) => (
                 <div
                   key={i}
-                  className="grid grid-cols-12 gap-2 items-end bg-gray-50 rounded-lg p-3"
+                  className="grid grid-cols-12 gap-2 items-end bg-[var(--ds-background-subtle)] rounded-lg p-3"
                 >
                   <div className="col-span-3">
                     <Label className="text-xs">Field</Label>
@@ -1233,7 +1233,7 @@ export default function AutomationBuilder() {
                 </p>
               )}
               {formActions.map((a, i) => (
-                <div key={i} className="bg-gray-50 rounded-lg p-3 space-y-2">
+                <div key={i} className="bg-[var(--ds-background-subtle)] rounded-lg p-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-semibold text-muted-foreground">
@@ -1383,7 +1383,7 @@ export default function AutomationBuilder() {
               {formEscalationEnabled && (
                 <div className="space-y-4">
                   {[1, 2].map((level) => (
-                    <div key={level} className="grid grid-cols-2 gap-4 bg-gray-50 rounded-lg p-3">
+                    <div key={level} className="grid grid-cols-2 gap-4 bg-[var(--ds-background-subtle)] rounded-lg p-3">
                       <div className="space-y-1">
                         <Label className="text-xs">Level {level} — After (days)</Label>
                         <Input
@@ -1431,7 +1431,7 @@ export default function AutomationBuilder() {
           {step === 4 && (
             <div className="space-y-4">
               <h4 className="text-sm font-semibold">Review Rule Configuration</h4>
-              <div className="bg-gray-50 rounded-lg p-4 space-y-3 text-sm">
+              <div className="bg-[var(--ds-background-subtle)] rounded-lg p-4 space-y-3 text-sm">
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <span className="text-muted-foreground">Name:</span>{" "}
@@ -1577,9 +1577,9 @@ export default function AutomationBuilder() {
               <Play className="h-4 w-4 mr-1" /> Run Test
             </Button>
             {testResult && (
-              <div className="bg-gray-50 rounded-lg p-4">
+              <div className="bg-[var(--ds-background-subtle)] rounded-lg p-4">
                 <h4 className="text-sm font-semibold mb-2">Test Results</h4>
-                <pre className="text-xs bg-white rounded-lg p-3 overflow-x-auto border max-h-60 overflow-y-auto">
+                <pre className="text-xs bg-[var(--ds-surface)] rounded-lg p-3 overflow-x-auto border max-h-60 overflow-y-auto">
                   {JSON.stringify(testResult, null, 2)}
                 </pre>
               </div>
@@ -1637,7 +1637,7 @@ export default function AutomationBuilder() {
                     </TableCell>
                     <TableCell>
                       {l.is_test === "Y" ? (
-                        <Badge className="text-[10px] bg-purple-50 text-purple-700">Test</Badge>
+                        <Badge className="text-[10px] bg-[var(--ds-accent-50)] text-[var(--ds-accent-700)]">Test</Badge>
                       ) : null}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
@@ -1672,7 +1672,7 @@ export default function AutomationBuilder() {
           ) : (
             <div className="space-y-2">
               {versions.map((v) => (
-                <div key={v.id} className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2">
+                <div key={v.id} className="flex items-center gap-3 bg-[var(--ds-background-subtle)] rounded-lg px-4 py-2">
                   <Badge variant="outline">v{v.version}</Badge>
                   <span className="text-sm flex-1">{v.change_summary || "No summary"}</span>
                   <span className="text-xs text-muted-foreground">

@@ -1,13 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import {
-  useReactTable,
-  getCoreRowModel,
-  getSortedRowModel,
-  flexRender,
-  type ColumnDef,
-} from "@tanstack/react-table"
+import type { ColumnDef, SortingState } from "@tanstack/react-table"
 import {
   Plus, Search, Eye, Trash2, Calendar, List, ChevronLeft, ChevronRight,
   CalendarDays, User as UserIcon, X, SlidersHorizontal,
@@ -31,7 +25,7 @@ import { useServerFilters } from "@/hooks/useServerFilters"
 import { FilterChips } from "@/components/ui/filter-bar"
 import AppointmentFilterBar from "./filter-bar"
 import AppointmentScheduler from "@/components/appointments/AppointmentScheduler"
-import { PageHeader, EmptyState, LoadingSkeleton, StatusBadge, Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/design-system"
+import { PageHeader, DataTable, StatusBadge } from "@/design-system"
 import type { Appointment, Patient, User, PaginatedResponse } from "@/types"
 import { extractDetail } from "@/types"
 import { cn } from "@/lib/utils"
@@ -67,7 +61,7 @@ export default function AppointmentList() {
 
   const {
     filters, setFilter, resetFilters, queryKey, activeFilters, hasActiveFilters,
-    page, setPage, sortField, sortDir, toggleSort, activeChips,
+    page, setPage, sortField, sortDir, setSort, activeChips,
   } = useServerFilters({ defaultSort: "appointment_date", defaultSortDir: "desc" })
 
   const [view, setView] = useState<"list" | "calendar">("list")
@@ -114,11 +108,6 @@ export default function AppointmentList() {
   const appointments: Appointment[] = useMemo(() => {
     if (Array.isArray(data)) return data
     return data?.items || []
-  }, [data])
-
-  const totalCount = useMemo(() => {
-    if (Array.isArray(data)) return data.length
-    return data?.total || 0
   }, [data])
 
   const totalPages = useMemo(() => {
@@ -210,73 +199,58 @@ export default function AppointmentList() {
     () => [
       {
         accessorKey: "patient_name",
-        header: () => (
-          <button onClick={() => toggleSort("patient_name")} className="flex items-center gap-1 hover:text-foreground">
-            Patient Name
-            {sortField === "patient_name" ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
-          </button>
-        ),
+        header: "Patient Name",
+        enableSorting: true,
         cell: ({ row }) => <span className="font-medium">{row.original.patient_name || "—"}</span>,
       },
       {
         accessorKey: "doctor_name",
-        header: () => (
-          <button onClick={() => toggleSort("doctor_name")} className="flex items-center gap-1 hover:text-foreground">
-            Doctor
-            {sortField === "doctor_name" ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
-          </button>
-        ),
+        header: "Doctor",
+        enableSorting: true,
         cell: ({ row }) => row.original.doctor_name || "—",
       },
       {
         accessorKey: "appointment_date",
-        header: () => (
-          <button onClick={() => toggleSort("appointment_date")} className="flex items-center gap-1 hover:text-foreground">
-            Date
-            {sortField === "appointment_date" ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
-          </button>
-        ),
+        header: "Date",
+        enableSorting: true,
         cell: ({ row }) => format(new Date(row.original.appointment_date), "MMM dd, yyyy"),
       },
       {
         accessorKey: "appointment_time",
         header: "Time",
+        enableSorting: false,
         cell: ({ row }) => row.original.appointment_time || "—",
       },
       {
         accessorKey: "status",
-        header: () => (
-          <button onClick={() => toggleSort("status")} className="flex items-center gap-1 hover:text-foreground">
-            Status
-            {sortField === "status" ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
-          </button>
-        ),
+        header: "Status",
+        enableSorting: true,
         cell: ({ row }) => <StatusBadge status={row.original.status} />,
       },
       {
         id: "actions",
-        header: "Actions",
+        header: "",
+        enableSorting: false,
+        enableHiding: false,
         cell: ({ row }) => (
           <div className="flex items-center gap-1">
-            <Button variant="outline" size="sm" onClick={() => navigate(`/appointments/${row.original.id}`)}>
+            <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); navigate(`/appointments/${row.original.id}`) }}>
               <Eye className="h-4 w-4 mr-1" /> View
             </Button>
-            <Button variant="ghost" size="icon" onClick={() => confirmDelete(row.original)}>
-              <Trash2 className="h-4 w-4 text-danger" />
+            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); confirmDelete(row.original) }}>
+              <Trash2 className="h-4 w-4 text-[var(--ds-danger)]" />
             </Button>
           </div>
         ),
       },
     ],
-    [navigate, sortField, sortDir, toggleSort]
+    [navigate]
   )
 
-  const table = useReactTable({
-    data: appointments,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-  })
+  function handleSortingChange(sorting: SortingState) {
+    const f = sorting[0]
+    setSort(f?.id ?? "", f?.desc ? "desc" : "asc")
+  }
 
   const monthDays = eachDayOfInterval({ start: startOfMonth(currentMonth), end: endOfMonth(currentMonth) })
   const startDay = getDay(startOfMonth(currentMonth))
@@ -353,11 +327,8 @@ export default function AppointmentList() {
             <FilterChips chips={activeChips} onRemove={(k) => setFilter(k, "")} onClearAll={resetFilters} />
           </div>
 
-          {/* View toggle + results count */}
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-sm text-muted-foreground">
-              {totalCount} appointment{totalCount !== 1 ? "s" : ""} found
-            </p>
+          {/* View toggle */}
+          <div className="flex items-center justify-end mb-4">
             <div className="flex items-center gap-2">
               <Button variant={view === "list" ? "default" : "outline"} size="sm" onClick={() => setView("list")}>
                 <List className="h-4 w-4" />
@@ -412,70 +383,42 @@ export default function AppointmentList() {
 
           {/* List View */}
           {view === "list" && (
-            <>
-              {isLoading ? (
-                <LoadingSkeleton rows={5} />
-              ) : appointments.length === 0 ? (
-                <EmptyState
-                  icon={CalendarDays}
-                  title="No appointments found"
-                  description={hasActiveFilters ? "Try adjusting your filters." : "Schedule your first appointment."}
-                  action={hasActiveFilters ? (
-                    <Button variant="outline" onClick={resetFilters}>Clear Filters</Button>
-                  ) : currentUser?.role !== "DOCTOR" ? (
-                    <Button onClick={openDialog}><Plus className="h-4 w-4" /> New Appointment</Button>
-                  ) : undefined}
-                />
-              ) : (
-                <>
-                  <div className="mobile-card-view">
-                    <Table>
-                      <TableHeader>
-                        {table.getHeaderGroups().map((hg) => (
-                          <TableRow key={hg.id}>
-                            {hg.headers.map((header) => (
-                              <TableHead key={header.id}>
-                                {flexRender(header.column.columnDef.header, header.getContext())}
-                              </TableHead>
-                            ))}
-                          </TableRow>
-                        ))}
-                      </TableHeader>
-                      <TableBody>
-                        {table.getRowModel().rows.map((row) => (
-                          <TableRow key={row.id}>
-                            {row.getVisibleCells().map((cell) => {
-                              const header = cell.column.columnDef.header
-                              const label = typeof header === "string" ? header : cell.column.id
-                              return (
-                                <TableCell key={cell.id} data-label={label}>
-                                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                </TableCell>
-                              )
-                            })}
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-
-                  {/* Server-side pagination */}
-                  <div className="flex items-center justify-between mt-4">
-                    <p className="text-sm text-muted-foreground">
-                      Page {page} of {totalPages} ({totalCount} total)
+            <DataTable
+              key={queryKey}
+              columns={columns}
+              data={appointments}
+              loading={isLoading}
+              pagination
+              pageSize={10}
+              manualPagination
+              pageCount={totalPages}
+              onPageChange={(pageIndex) => setPage(pageIndex + 1)}
+              manualSorting
+              initialSorting={sortField ? [{ id: sortField, desc: sortDir === "desc" }] : []}
+              onSortingChange={handleSortingChange}
+              emptyIcon={CalendarDays}
+              emptyTitle="No appointments found"
+              emptyDescription={hasActiveFilters ? "Try adjusting your filters." : "Schedule your first appointment."}
+              emptyAction={
+                hasActiveFilters ? (
+                  <Button variant="outline" onClick={resetFilters}>Clear Filters</Button>
+                ) : currentUser?.role !== "DOCTOR" ? (
+                  <Button onClick={openDialog}><Plus className="h-4 w-4" /> New Appointment</Button>
+                ) : undefined
+              }
+              mobileCard={(row) => (
+                <div className="flex items-center justify-between gap-3">
+                  <div className="ds-min-w-0">
+                    <p className="ds-body font-medium text-[var(--ds-text)]">{row.patient_name || "—"}</p>
+                    <p className="ds-caption text-[var(--ds-text-secondary)]">
+                      {row.doctor_name || "—"} · {format(new Date(row.appointment_date), "dd MMM")} {row.appointment_time || ""}
                     </p>
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" onClick={() => setPage(page - 1)} disabled={page <= 1}>
-                        Previous
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => setPage(page + 1)} disabled={page >= totalPages}>
-                        Next
-                      </Button>
-                    </div>
                   </div>
-                </>
+                  <StatusBadge status={row.status} />
+                </div>
               )}
-            </>
+              onRowClick={(row) => navigate(`/appointments/${row.id}`)}
+            />
           )}
         </CardContent>
       </Card>
@@ -492,7 +435,7 @@ export default function AppointmentList() {
               <div className="grid gap-2">
                 <Label>Patient</Label>
                 {selectedPatient ? (
-                  <div className="rounded-xl border border-border bg-white  p-4">
+                  <div className="rounded-xl border border-border bg-[var(--ds-surface)]  p-4">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
@@ -520,15 +463,15 @@ export default function AppointmentList() {
                       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ds-text-muted)]" />
                       <Input ref={patientSearchRef} placeholder="Search by Name / Phone" value={patientSearch}
                         onChange={(e) => setPatientSearch(e.target.value)}
-                        className="pl-10 bg-white  border-[var(--ds-border)]  text-[var(--ds-text)] " />
+                        className="pl-10 bg-[var(--ds-surface)]  border-[var(--ds-border)]  text-[var(--ds-text)] " />
                     </div>
                     {patientSearch && (
-                      <div className="max-h-[260px] overflow-y-auto rounded-xl border border-[var(--ds-border)]  bg-white ">
+                      <div className="max-h-[260px] overflow-y-auto rounded-xl border border-[var(--ds-border)]  bg-[var(--ds-surface)] ">
                         {filteredPatients.length === 0 ? (
                           <div className="p-6 text-center text-sm text-[var(--ds-text-muted)]">No patients found</div>
                         ) : filteredPatients.map((p) => (
                           <button key={p.id} type="button"
-                            className="w-full px-4 py-3 text-left border-b border-[var(--ds-border)]  last:border-0 hover:bg-gray-50 transition-colors"
+                            className="w-full px-4 py-3 text-left border-b border-[var(--ds-border)]  last:border-0 hover:bg-[var(--ds-surface-hover)] transition-colors"
                             onClick={() => handlePatientSelect(p.id)}>
                             <div className="flex items-center justify-between">
                               <span className="font-medium text-sm text-[var(--ds-text)] ">{p.full_name}</span>
@@ -600,7 +543,7 @@ export default function AppointmentList() {
                 />
               )}
             </div>
-            <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-gray-100">
+            <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-[var(--ds-border-light)]">
               <Button type="button" variant="outline" onClick={resetForm}>Cancel</Button>
               <Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? "Saving..." : "Save"}</Button>
             </DialogFooter>

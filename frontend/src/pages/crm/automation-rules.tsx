@@ -72,10 +72,10 @@ const ROLES = ["RECEPTION", "DOCTOR", "CRM_EXECUTIVE", "HOSPITAL_ADMIN"]
 const channelColors: Record<string, string> = {
   WHATSAPP: "bg-green-50 text-green-600",
   SMS: "bg-blue-50 text-blue-600",
-  EMAIL: "bg-purple-50 text-purple-600",
+  EMAIL: "bg-[var(--ds-accent-50)] text-[var(--ds-accent-600)]",
   PHONE: "bg-amber-50 text-amber-600",
-  TASK: "bg-gray-50 text-gray-600",
-  NOTIFICATION: "bg-indigo-50 text-indigo-600",
+  TASK: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
+  NOTIFICATION: "bg-[var(--ds-primary-50)] text-[var(--ds-primary-600)]",
 }
 
 const priorityColors: Record<string, string> = {
@@ -260,7 +260,7 @@ export default function AutomationRules() {
             </CardTitle>
             <div className="flex gap-2">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ds-text-tertiary)]" />
                 <Input
                   placeholder="Search rules..."
                   className="pl-9 w-56"
@@ -313,7 +313,7 @@ export default function AutomationRules() {
               {filtered.map((r) => (
                 <div
                   key={r.id}
-                  className="flex items-center justify-between rounded-lg border p-4 hover:bg-gray-50 transition-colors"
+                  className="flex items-center justify-between rounded-lg border p-4 hover:bg-[var(--ds-surface-hover)] transition-colors"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -330,7 +330,7 @@ export default function AutomationRules() {
                       {r.is_active ? (
                         <Badge className="text-[10px] bg-green-50 text-green-700">Active</Badge>
                       ) : (
-                        <Badge className="text-[10px] bg-gray-50 text-gray-500">Inactive</Badge>
+                        <Badge className="text-[10px] bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]">Inactive</Badge>
                       )}
                     </div>
                     <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
@@ -355,7 +355,7 @@ export default function AutomationRules() {
                       {r.is_active ? (
                         <ToggleRight className="h-4 w-4 text-green-600" />
                       ) : (
-                        <ToggleLeft className="h-4 w-4 text-gray-400" />
+                        <ToggleLeft className="h-4 w-4 text-[var(--ds-text-tertiary)]" />
                       )}
                     </Button>
                     <Button variant="ghost" size="icon-sm" onClick={() => openEdit(r)}>

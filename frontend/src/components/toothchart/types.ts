@@ -62,27 +62,27 @@ export const CONDITION_LABELS: Record<ToothCondition, string> = {
 }
 
 export const CONDITION_COLORS: Record<ToothCondition, string> = {
-  Decayed: '#1F2937',
-  Restored: '#9CA3AF',
-  Defective: '#94A3B8',
-  Missing: '#D1D5DB',
-  Erupt: '#22C55E',
-  Implant: '#6B7280',
-  Impacted: '#94A3B8',
-  Bridge: '#A855F7',
-  Denture: '#D1D5DB',
+  Decayed: 'var(--ds-toothchart-decay)',
+  Restored: 'var(--ds-toothchart-restoration)',
+  Defective: 'var(--ds-toothchart-others)',
+  Missing: 'var(--ds-toothchart-missing)',
+  Erupt: 'var(--ds-toothchart-mobility)',
+  Implant: 'var(--ds-toothchart-implant)',
+  Impacted: 'var(--ds-toothchart-others)',
+  Bridge: 'var(--ds-toothchart-bridge)',
+  Denture: 'var(--ds-toothchart-missing)',
 }
 
 export const SURFACE_COLORS: Record<string, string> = {
-  Decayed: '#1F2937',
-  Restored: '#9CA3AF',
-  Defective: '#94A3B8',
-  Amalgam: '#808080',
-  Composite: '#D2B48C',
-  Gold: '#F59E0B',
-  Ceramic: '#F5F5DC',
-  Zirconia: '#F0F0F0',
-  Acrylic: '#E8E0D8',
+  Decayed: 'var(--ds-toothchart-decay)',
+  Restored: 'var(--ds-toothchart-restoration)',
+  Defective: 'var(--ds-toothchart-others)',
+  Amalgam: 'var(--ds-toothchart-material-amalgam)',
+  Composite: 'var(--ds-toothchart-material-composite)',
+  Gold: 'var(--ds-toothchart-material-gold)',
+  Ceramic: 'var(--ds-toothchart-material-ceramic)',
+  Zirconia: 'var(--ds-toothchart-material-zirconia)',
+  Acrylic: 'var(--ds-toothchart-material-acrylic)',
 }
 
 export const MATERIAL_OPTIONS = [

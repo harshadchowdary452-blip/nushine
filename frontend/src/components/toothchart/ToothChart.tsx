@@ -187,7 +187,7 @@ export default function ToothChart({
 
   return (
     <div className="flex" style={{ height: '100%', minHeight: 400 }}>
-      <div className="flex-1 flex flex-col bg-[#AFCBE0]" style={{ minWidth: 0 }}>
+      <div className="flex-1 flex flex-col bg-[var(--ds-primary-100)]" style={{ minWidth: 0 }}>
         <Toolbar
           activeFilter={activeFilter}
           setActiveFilter={setActiveFilter}
@@ -199,10 +199,10 @@ export default function ToothChart({
         />
 
         {currentView === 'chart' ? (
-          <div className="flex-1 overflow-auto" style={{ backgroundColor: '#AFCBE0' }}>
+          <div className="flex-1 overflow-auto" style={{ backgroundColor: 'var(--ds-primary-100)' }}>
             <div className="py-2">
               {/* Upper arch */}
-              <div className="text-[9px] text-gray-400 text-center uppercase tracking-wider mb-0.5">Maxillary</div>
+              <div className="text-[9px] text-[var(--ds-text-tertiary)] text-center uppercase tracking-wider mb-0.5">Maxillary</div>
               <NumberStrip teeth={UPPER_TEETH} label="Upper" />
               <div style={{ backgroundColor: 'rgba(255,255,255,0.35)', borderRadius: '4px 4px 0 0', margin: '0 4px', padding: '2px 0' }}>
                 {renderRow(UPPER_TEETH, 'crown', true)}
@@ -212,7 +212,7 @@ export default function ToothChart({
               </div>
 
               {/* Lower arch */}
-              <div className="text-[9px] text-gray-400 text-center uppercase tracking-wider mt-3 mb-0.5">Mandibular</div>
+              <div className="text-[9px] text-[var(--ds-text-tertiary)] text-center uppercase tracking-wider mt-3 mb-0.5">Mandibular</div>
               <NumberStrip teeth={LOWER_TEETH} label="Lower" />
               <div style={{ backgroundColor: 'rgba(255,255,255,0.35)', borderRadius: '0 0 4px 4px', margin: '0 4px', padding: '2px 0' }}>
                 {renderRow(LOWER_TEETH, 'crown', false)}
@@ -223,7 +223,7 @@ export default function ToothChart({
             </div>
           </div>
         ) : (
-          <div className="flex-1 overflow-auto bg-white p-4">
+          <div className="flex-1 overflow-auto bg-[var(--ds-surface)] p-4">
             <FindingsLogTable
               findings={findings}
               onHighlightTooth={handleHighlightTooth}
@@ -239,9 +239,9 @@ export default function ToothChart({
         )}
 
         {/* Status bar */}
-        <div className="flex items-center justify-between px-3 py-1 bg-white border-t border-gray-200 text-[10px] text-gray-400">
+        <div className="flex items-center justify-between px-3 py-1 bg-[var(--ds-surface)] border-t border-[var(--ds-border)] text-[10px] text-[var(--ds-text-tertiary)]">
           <span>{new Date().toLocaleDateString()}</span>
-          <span className="text-gray-500 font-medium">Ready to chart!</span>
+          <span className="text-[var(--ds-text-secondary)] font-medium">Ready to chart!</span>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="2">
             <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
             <path d="M22 4L12 14.01l-3-3" />

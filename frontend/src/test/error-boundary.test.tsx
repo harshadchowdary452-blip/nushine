@@ -29,7 +29,21 @@ describe("ErrorBoundary", () => {
       </ErrorBoundary>
     )
     expect(screen.getByText("Something went wrong")).toBeInTheDocument()
-    expect(screen.getByText("Test error")).toBeInTheDocument()
+    expect(screen.getByRole("alert")).toBeInTheDocument()
+    // Raw exception text must never reach the UI (it can leak stack frames
+    // and internals); it belongs in the console only.
+    expect(screen.queryByText("Test error")).not.toBeInTheDocument()
+    consoleSpy.mockRestore()
+  })
+
+  it("offers a retry action that resets the boundary", () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+    render(
+      <ErrorBoundary>
+        <ThrowingComponent />
+      </ErrorBoundary>
+    )
+    expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument()
     consoleSpy.mockRestore()
   })
 

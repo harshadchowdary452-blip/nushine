@@ -32,7 +32,7 @@ const TYPE_STYLES: Record<string, { dot: string; bg: string; text: string; icon:
   APPOINTMENT_REMINDER: { dot: "bg-blue-500", bg: "bg-blue-50", text: "text-blue-700", icon: "bg-blue-100 text-blue-600" },
   OPD_FOLLOW_UP: { dot: "bg-teal-500", bg: "bg-teal-50", text: "text-teal-700", icon: "bg-teal-100 text-teal-600" },
   TREATMENT_WELLNESS: { dot: "bg-emerald-500", bg: "bg-emerald-50", text: "text-emerald-700", icon: "bg-emerald-100 text-emerald-600" },
-  CASE_WELLNESS: { dot: "bg-violet-500", bg: "bg-violet-50", text: "text-violet-700", icon: "bg-violet-100 text-violet-600" },
+  CASE_WELLNESS: { dot: "bg-[var(--ds-accent-500)]", bg: "bg-[var(--ds-accent-50)]", text: "text-[var(--ds-accent-700)]", icon: "bg-[var(--ds-accent-100)] text-[var(--ds-accent-600)]" },
   RECALL: { dot: "bg-rose-500", bg: "bg-rose-50", text: "text-rose-700", icon: "bg-rose-100 text-rose-600" },
   MISSED_APPOINTMENT: { dot: "bg-red-500", bg: "bg-red-50", text: "text-red-700", icon: "bg-red-100 text-red-600" },
 }
@@ -44,13 +44,13 @@ const PRIORITY_STYLES: Record<string, string> = {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  PENDING: "bg-slate-100 text-slate-700",
+  PENDING: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
   CONTACTED: "bg-blue-100 text-blue-700",
   FOLLOW_UP: "bg-amber-100 text-amber-700",
   COMPLETED: "bg-emerald-100 text-emerald-700",
   CANCELLED: "bg-red-100 text-red-700",
   LOST: "bg-rose-100 text-rose-700",
-  CONVERTED: "bg-violet-100 text-violet-700",
+  CONVERTED: "bg-[var(--ds-accent-100)] text-[var(--ds-accent-700)]",
 }
 
 interface EnquiryDetail {
@@ -206,7 +206,7 @@ type TimelineItem = NonNullable<EnquiryDetail["timeline"]>[number]
 function TimelineEntry({ entry }: { entry: TimelineItem }) {
   const typeColors: Record<string, string> = {
     LEAD_CREATED: "bg-amber-500", LEAD_FOLLOW_UP: "bg-blue-500",
-    LEAD_COMMUNICATION: "bg-emerald-500", APPOINTMENT: "bg-violet-500",
+    LEAD_COMMUNICATION: "bg-emerald-500", APPOINTMENT: "bg-[var(--ds-accent-500)]",
     TREATMENT: "bg-teal-500", CASE: "bg-rose-500",
     PAYMENT: "bg-green-500", VISIT: "bg-cyan-500",
   }
@@ -340,7 +340,7 @@ export function EnquiryDetailSheet({
                     <Badge variant="outline" className={`text-[10px] ${PRIORITY_STYLES[item.priority || ""] || ""}`}>
                       {item.priority || "MEDIUM"}
                     </Badge>
-                    <Badge className={`text-[10px] border-0 ${STATUS_STYLES[item.status || ""] || "bg-slate-100"}`}>
+                    <Badge className={`text-[10px] border-0 ${STATUS_STYLES[item.status || ""] || "bg-[var(--ds-background-subtle)]"}`}>
                       {item.status}
                     </Badge>
                     {item.enquiry_type === "LEAD_FOLLOW_UP" && item.occurrence_number && (
@@ -758,7 +758,7 @@ export function EnquiryDetailSheet({
                               <span className={`shrink-0 px-1.5 py-0.5 rounded font-medium text-[10px] ${
                                 c.channel === "WHATSAPP" ? "bg-green-100 text-green-700" :
                                 c.channel === "EMAIL" ? "bg-blue-100 text-blue-700" :
-                                "bg-slate-100 text-slate-700"
+                                "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]"
                               }`}>{c.channel}</span>
                               <div className="flex-1 min-w-0">
                                 <div className="truncate">{c.message?.substring(0, 100)}</div>

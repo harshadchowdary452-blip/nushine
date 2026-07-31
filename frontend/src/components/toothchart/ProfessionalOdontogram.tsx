@@ -80,7 +80,7 @@ function ToothBox({ n, findings, sel, sz, onClick }: {
   if (sel) { bg = 'var(--ds-primary-50)'; bd = 'var(--ds-primary-500)' }
   else if (miss) { bg = 'var(--ds-neutral-100)'; bd = 'var(--ds-neutral-300)' }
   else if (impl) { bg = 'var(--ds-info-50)'; bd = 'var(--ds-neutral-400)' }
-  else if (tf.length) { const c = findingColor(tf[0]); bg = c + '0D'; bd = c + '30' }
+  else if (tf.length) { const c = findingColor(tf[0]); bg = `color-mix(in srgb, ${c} 5%, transparent)`; bd = `color-mix(in srgb, ${c} 19%, transparent)` }
 
   const dots = tf.slice(0, max).map((f) => ({ label: findingLabel(f), color: findingColor(f) }))
   const over = tf.length - max
@@ -110,7 +110,7 @@ function ToothBox({ n, findings, sel, sz, onClick }: {
               border: `1px solid ${d.color}`, flexShrink: 0,
             }} />
           ))}
-          {over > 0 && <span style={{ fontSize: 7, fontWeight: 700, color: '#6B7280' }}>+{over}</span>}
+          {over > 0 && <span style={{ fontSize: 7, fontWeight: 700, color: 'var(--ds-text-secondary)' }}>+{over}</span>}
         </div>
       )}
     </div>
@@ -122,8 +122,8 @@ function ToothBox({ n, findings, sel, sz, onClick }: {
 function Legend({ findings }: { findings: ToothFinding[] }) {
   const active = useMemo(() => new Set(findings.map((f) => findingLabel(f))), [findings])
   return (
-    <div style={{ background: '#FFF', borderRadius: 8, border: '1px solid #E5E7EB', padding: '8px 12px' }}>
-      <div style={{ fontSize: 10, fontWeight: 600, color: '#374151', marginBottom: 5, letterSpacing: '0.03em' }}>LEGEND</div>
+    <div style={{ background: 'var(--ds-surface)', borderRadius: 8, border: '1px solid #E5E7EB', padding: '8px 12px' }}>
+      <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--ds-text)', marginBottom: 5, letterSpacing: '0.03em' }}>LEGEND</div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
         {FINDING_TYPES.map((item) => {
           const a = active.has(item.name)
@@ -131,9 +131,9 @@ function Legend({ findings }: { findings: ToothFinding[] }) {
             <div key={item.name} style={{
               display: 'inline-flex', alignItems: 'center', gap: 3,
               padding: '2px 6px', borderRadius: 4, fontSize: 9, fontWeight: 500,
-              background: a ? `${item.color}12` : '#F9FAFB',
-              border: `1px solid ${a ? item.color : '#E5E7EB'}`,
-              color: '#374151', opacity: a ? 1 : 0.4,
+              background: a ? `${item.color}12` : 'var(--ds-background-subtle)',
+              border: `1px solid ${a ? item.color : 'var(--ds-border)'}`,
+              color: 'var(--ds-text)', opacity: a ? 1 : 0.4,
             }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: item.color, flexShrink: 0 }} />
               {item.label}
@@ -170,30 +170,30 @@ function Summary({ findings, onUpdate }: { findings: ToothFinding[]; onUpdate?: 
   }, [findings, q])
 
   return (
-    <div style={{ background: '#FFF', borderRadius: 8, border: '1px solid #E5E7EB', overflow: 'hidden' }}>
+    <div style={{ background: 'var(--ds-surface)', borderRadius: 8, border: '1px solid #E5E7EB', overflow: 'hidden' }}>
       <div style={{
-        padding: '6px 12px', borderBottom: '1px solid #E5E7EB', background: '#F8FAFC',
+        padding: '6px 12px', borderBottom: '1px solid #E5E7EB', background: 'var(--ds-background-subtle)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap',
       }}>
-        <span style={{ fontSize: 10, fontWeight: 600, color: '#374151' }}>
+        <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--ds-text)' }}>
           Clinical Summary ({findings.length} finding{findings.length !== 1 ? 's' : ''})
         </span>
           <input type="text" placeholder="Search..." value={q} onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
-            style={{ padding: '2px 8px', borderRadius: 4, border: '1px solid #D1D5DB', fontSize: 10, width: 160, outline: 'none', background: '#FFF' }} />
+            style={{ padding: '2px 8px', borderRadius: 4, border: '1px solid #D1D5DB', fontSize: 10, width: 160, outline: 'none', background: 'var(--ds-surface)' }} />
       </div>
       <div style={{ overflowX: 'auto', maxHeight: 200 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
-            <tr style={{ background: '#F1F3F6', color: '#374151' }}>
+            <tr style={{ background: 'var(--ds-surface-secondary)', color: 'var(--ds-text)' }}>
               {['Tooth', 'Finding', 'Surface', 'Remarks'].map((h) => <th key={h} style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 600, borderBottom: '2px solid #E5E7EB', letterSpacing: '0.03em', whiteSpace: 'nowrap', fontSize: 10 }}>{h}</th>)}
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
-              <tr><td colSpan={4} style={{ textAlign: 'center', padding: 14, color: '#9CA3AF', fontStyle: 'italic' }}>{q ? 'No matches' : 'No findings'}</td></tr>
+              <tr><td colSpan={4} style={{ textAlign: 'center', padding: 14, color: 'var(--ds-text-tertiary)', fontStyle: 'italic' }}>{q ? 'No matches' : 'No findings'}</td></tr>
             ) : rows.map((r) => (
-              <tr key={r.k} style={{ borderBottom: '1px solid #F1F3F6' }}>
+              <tr key={r.k} style={{ borderBottom: '1px solid var(--ds-border-light)' }}>
                 <td style={{ padding: '3px 8px', whiteSpace: 'nowrap', fontSize: 10, fontWeight: 600 }}>#{r.f.toothNumber}</td>
                 <td style={{ padding: '3px 8px', whiteSpace: 'nowrap', fontSize: 10 }}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
@@ -208,7 +208,7 @@ function Summary({ findings, onUpdate }: { findings: ToothFinding[]; onUpdate?: 
                     onBlur={() => commitRemark(r.k)}
                     onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
                     placeholder="Add remarks..."
-                    style={{ border: 'none', background: 'transparent', width: '100%', fontSize: 10, outline: 'none', color: '#6B7280', borderBottom: '1px dotted #E5E7EB' }} />
+                    style={{ border: 'none', background: 'transparent', width: '100%', fontSize: 10, outline: 'none', color: 'var(--ds-text-secondary)', borderBottom: '1px dotted #E5E7EB' }} />
                 </td>
               </tr>
             ))}
@@ -274,21 +274,21 @@ function RightPanel({ n, fings, ro, onAdd, onRemove, onUpdateFinding, onClose }:
 
   return (
     <div style={{
-      width: 260, flexShrink: 0, background: '#FFF', borderLeft: '1px solid #E5E7EB',
+      width: 260, flexShrink: 0, background: 'var(--ds-surface)', borderLeft: '1px solid #E5E7EB',
       display: 'flex', flexDirection: 'column', overflowY: 'auto', fontSize: 11,
     }}>
-      <div style={{ padding: '8px 12px', borderBottom: '1px solid #E5E7EB', background: '#F8FAFC' }}>
+      <div style={{ padding: '8px 12px', borderBottom: '1px solid #E5E7EB', background: 'var(--ds-background-subtle)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
-              <span style={{ fontSize: 16, fontWeight: 700, color: '#111827' }}>#{n}</span>
-              <span style={{ fontSize: 10, color: '#6B7280' }}>{toothName(n)}</span>
+              <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--ds-text)' }}>#{n}</span>
+              <span style={{ fontSize: 10, color: 'var(--ds-text-secondary)' }}>{toothName(n)}</span>
             </div>
-            <div style={{ fontSize: 9, color: '#9CA3AF' }}>Quadrant {quad(n)}</div>
+            <div style={{ fontSize: 9, color: 'var(--ds-text-tertiary)' }}>Quadrant {quad(n)}</div>
           </div>
           <button type="button" onClick={onClose} style={{
             width: 22, height: 22, borderRadius: '50%', border: '1px solid #E5E7EB',
-            background: '#FFF', cursor: 'pointer', fontSize: 11, color: '#6B7280',
+            background: 'var(--ds-surface)', cursor: 'pointer', fontSize: 11, color: 'var(--ds-text-secondary)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>✕</button>
         </div>
@@ -296,9 +296,9 @@ function RightPanel({ n, fings, ro, onAdd, onRemove, onUpdateFinding, onClose }:
 
       {/* Current findings */}
       <div style={{ padding: '8px 12px', borderBottom: '1px solid #E5E7EB' }}>
-        <div style={{ fontSize: 9, fontWeight: 600, color: '#374151', marginBottom: 5, letterSpacing: '0.03em' }}>FINDINGS ({fings.length})</div>
+        <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--ds-text)', marginBottom: 5, letterSpacing: '0.03em' }}>FINDINGS ({fings.length})</div>
         {fings.length === 0 ? (
-          <div style={{ fontSize: 10, color: '#9CA3AF', fontStyle: 'italic' }}>No findings for this tooth</div>
+          <div style={{ fontSize: 10, color: 'var(--ds-text-tertiary)', fontStyle: 'italic' }}>No findings for this tooth</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 130, overflowY: 'auto' }}>
             {disps.map(({ f, label, color }) => (
@@ -308,12 +308,12 @@ function RightPanel({ n, fings, ro, onAdd, onRemove, onUpdateFinding, onClose }:
                 borderLeft: `2px solid ${color}`,
               }}>
                 <div style={{ fontSize: 10, lineHeight: 1.3, flex: 1 }}>
-                  <span style={{ fontWeight: 600, color: '#374151' }}>{label}</span>
+                  <span style={{ fontWeight: 600, color: 'var(--ds-text)' }}>{label}</span>
                   {f.surfaces && f.surfaces.length > 0 && (
-                    <span style={{ color: '#6B7280', fontSize: 9 }}> [{f.surfaces.map((s) => SURF_LABEL[s]).join(',')}]</span>
+                    <span style={{ color: 'var(--ds-text-secondary)', fontSize: 9 }}> [{f.surfaces.map((s) => SURF_LABEL[s]).join(',')}]</span>
                   )}
                   {f.description && label !== f.description && (
-                    <div style={{ color: '#6B7280', fontSize: 9, marginTop: 1 }}>{f.description}</div>
+                    <div style={{ color: 'var(--ds-text-secondary)', fontSize: 9, marginTop: 1 }}>{f.description}</div>
                   )}
                 </div>
                 {!ro && (
@@ -339,15 +339,15 @@ function RightPanel({ n, fings, ro, onAdd, onRemove, onUpdateFinding, onClose }:
       {/* Quick finding chips */}
       {!ro && (
         <div style={{ padding: '8px 12px', borderBottom: '1px solid #E5E7EB' }}>
-          <div style={{ fontSize: 9, fontWeight: 600, color: '#374151', marginBottom: 5, letterSpacing: '0.03em' }}>QUICK FINDINGS</div>
+          <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--ds-text)', marginBottom: 5, letterSpacing: '0.03em' }}>QUICK FINDINGS</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
             {QUICK_FINDINGS.map((ft) => (
               <button type="button" key={ft.name} onClick={() => handleQuick(ft.name)} style={{
                 fontSize: 8, fontWeight: 500, padding: '1px 5px', borderRadius: 3, lineHeight: '16px',
-                border: `1px solid ${ft.color}40`, background: '#FFF', color: ft.color, cursor: 'pointer', whiteSpace: 'nowrap',
+                border: `1px solid ${ft.color}40`, background: 'var(--ds-surface)', color: ft.color, cursor: 'pointer', whiteSpace: 'nowrap',
               }}
                 onMouseEnter={(e) => { e.currentTarget.style.background = ft.color + '15' }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = '#FFF' }}>
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--ds-surface)' }}>
                 {ft.label}
               </button>
             ))}
@@ -358,11 +358,11 @@ function RightPanel({ n, fings, ro, onAdd, onRemove, onUpdateFinding, onClose }:
       {/* Add / Edit finding form */}
       {!ro && (
         <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 4, borderBottom: '1px solid #E5E7EB' }}>
-          <div style={{ fontSize: 9, fontWeight: 600, color: '#374151', letterSpacing: '0.03em' }}>
+          <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--ds-text)', letterSpacing: '0.03em' }}>
             {editId ? 'EDIT FINDING' : 'ADD FINDING'}
           </div>
           <div>
-            <div style={{ fontSize: 8, color: '#6B7280', marginBottom: 1 }}>Finding Type *</div>
+            <div style={{ fontSize: 8, color: 'var(--ds-text-secondary)', marginBottom: 1 }}>Finding Type *</div>
             <select value={findingType} onChange={(e) => setFindingType(e.target.value)} style={inp}>
               <option value="">Select finding type...</option>
               {FINDING_TYPES.map((ft) => <option key={ft.name} value={ft.name}>{ft.label}</option>)}
@@ -374,7 +374,7 @@ function RightPanel({ n, fings, ro, onAdd, onRemove, onUpdateFinding, onClose }:
             <div style={{ display: 'flex', gap: 4 }}>
               <button type="button" onClick={saveEdit} style={{
                 flex: 1, padding: '5px', borderRadius: 4, border: 'none',
-                background: 'var(--ds-primary)', color: '#FFF', fontSize: 9, fontWeight: 600, cursor: 'pointer',
+                background: 'var(--ds-primary)', color: 'var(--ds-surface)', fontSize: 9, fontWeight: 600, cursor: 'pointer',
               }}>Save</button>
               <button type="button" onClick={cancelEdit} style={{
                 padding: '5px 10px', borderRadius: 4, border: '1px solid var(--ds-border)',
@@ -385,7 +385,7 @@ function RightPanel({ n, fings, ro, onAdd, onRemove, onUpdateFinding, onClose }:
             <button type="button" onClick={handleAdd} disabled={!findingType} style={{
               width: '100%', padding: '5px', borderRadius: 4, border: 'none',
               background: !findingType ? 'var(--ds-neutral-200)' : 'var(--ds-primary)',
-              color: !findingType ? 'var(--ds-text-tertiary)' : '#FFF',
+              color: !findingType ? 'var(--ds-text-tertiary)' : 'var(--ds-surface)',
               fontSize: 9, fontWeight: 600, cursor: !findingType ? 'not-allowed' : 'pointer',
             }}>+ Add Finding</button>
           )}
@@ -397,7 +397,7 @@ function RightPanel({ n, fings, ro, onAdd, onRemove, onUpdateFinding, onClose }:
 
 const inp: React.CSSProperties = {
   width: '100%', padding: '3px 6px', borderRadius: 4, border: '1px solid #D1D5DB',
-  fontSize: 10, color: '#374151', background: '#FFF', outline: 'none',
+  fontSize: 10, color: 'var(--ds-text)', background: 'var(--ds-surface)', outline: 'none',
 }
 
 // ─── Exports ──────────────────────────────────────────────────────────
@@ -484,12 +484,12 @@ export default function ProfessionalOdontogram(props: Props) {
     const right = teeth.slice(mid)
     return (
       <div style={{ marginBottom: 8 }}>
-        <div style={{ fontSize: 8, color: '#9CA3AF', textAlign: 'center', marginBottom: 5, letterSpacing: '0.05em', textTransform: 'uppercase', fontWeight: 600 }}>{label}</div>
+        <div style={{ fontSize: 8, color: 'var(--ds-text-tertiary)', textAlign: 'center', marginBottom: 5, letterSpacing: '0.05em', textTransform: 'uppercase', fontWeight: 600 }}>{label}</div>
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 0 }}>
           <div style={{ display: 'flex', gap: 4 }}>
             {left.map((n) => <ToothBox key={n} n={n} findings={findings} sel={sel === n} sz={sz} onClick={() => setSel(n === sel ? null : n)} />)}
           </div>
-          <div style={{ width: 12, textAlign: 'center', color: '#D1D5DB', fontSize: 11, fontWeight: 300, lineHeight: `${sz}px` }}>|</div>
+          <div style={{ width: 12, textAlign: 'center', color: 'var(--ds-border-hover)', fontSize: 11, fontWeight: 300, lineHeight: `${sz}px` }}>|</div>
           <div style={{ display: 'flex', gap: 4 }}>
             {right.map((n) => <ToothBox key={n} n={n} findings={findings} sel={sel === n} sz={sz} onClick={() => setSel(n === sel ? null : n)} />)}
           </div>
@@ -501,18 +501,18 @@ export default function ProfessionalOdontogram(props: Props) {
   return (
     <div style={{
       fontFamily: 'Inter, system-ui, sans-serif', display: 'flex', minHeight: 380, borderRadius: 8,
-      overflow: 'hidden', border: '1px solid #E5E7EB', background: '#FFF',
+      overflow: 'hidden', border: '1px solid #E5E7EB', background: 'var(--ds-surface)',
     }}>
       {/* Left: chart */}
-      <div style={{ flex: 1, minWidth: 0, background: '#F8FAFC', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flex: 1, minWidth: 0, background: 'var(--ds-background-subtle)', display: 'flex', flexDirection: 'column' }}>
         {/* Header */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '8px 14px', background: '#FFF', borderBottom: '1px solid #E5E7EB', flexWrap: 'wrap', gap: 5,
+          padding: '8px 14px', background: 'var(--ds-surface)', borderBottom: '1px solid #E5E7EB', flexWrap: 'wrap', gap: 5,
         }}>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>Clinical Findings</div>
-            <div style={{ fontSize: 9, color: '#6B7280', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ds-text)' }}>Clinical Findings</div>
+            <div style={{ fontSize: 9, color: 'var(--ds-text-secondary)', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               {props.patientName && <span>Patient: {props.patientName}</span>}
               {props.opNumber && <span>OP: {props.opNumber}</span>}
               {props.doctorName && <span>Dr. {props.doctorName}</span>}
@@ -522,7 +522,7 @@ export default function ProfessionalOdontogram(props: Props) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <span style={{
               padding: '2px 6px', borderRadius: 3, fontSize: 9, fontWeight: 600,
-              background: isChild ? '#FEF3C7' : '#DBEAFE', color: isChild ? '#92400E' : '#1E40AF',
+              background: isChild ? 'var(--ds-warning-subtle)' : 'var(--ds-info-100)', color: isChild ? 'var(--ds-warning)' : 'var(--ds-info-800)',
             }}>{isChild ? 'Primary' : 'Permanent'}</span>
             <button type="button" onClick={() => { setIsChild(!isChild); setSel(null) }} style={chip}>
               {isChild ? 'Switch to Permanent' : 'Switch to Primary'}
@@ -532,12 +532,12 @@ export default function ProfessionalOdontogram(props: Props) {
 
         {/* Chart body */}
         <div style={{ flex: 1, overflow: 'auto', padding: 10 }}>
-          <div style={{ background: '#FFF', borderRadius: 8, border: '1px solid #E5E7EB', padding: '12px 10px 8px', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
+          <div style={{ background: 'var(--ds-surface)', borderRadius: 8, border: '1px solid #E5E7EB', padding: '12px 10px 8px', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
             {arch(upper, isChild ? 'Upper Arch (Maxillary — Primary)' : 'Upper Arch (Maxillary — Permanent)', box)}
             <div style={{ borderTop: '1px dashed #D1D5DB', margin: '0 20px 6px' }} />
             {arch(lower, isChild ? 'Lower Arch (Mandibular — Primary)' : 'Lower Arch (Mandibular — Permanent)', box)}
           </div>
-          <div style={{ textAlign: 'center', fontSize: 8, color: '#9CA3AF', marginTop: 5, marginBottom: 8 }}>
+          <div style={{ textAlign: 'center', fontSize: 8, color: 'var(--ds-text-tertiary)', marginTop: 5, marginBottom: 8 }}>
             {findings.length} finding{findings.length !== 1 ? 's' : ''} · {isChild ? 'Primary' : 'Permanent'} dentition
             {sel !== null && <> · Selected: #{sel} — {toothName(sel)}</>}
           </div>
@@ -556,6 +556,6 @@ export default function ProfessionalOdontogram(props: Props) {
 
 const chip: React.CSSProperties = {
   padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 500,
-  border: '1px solid #E5E7EB', background: '#FFF', color: '#374151',
+  border: '1px solid #E5E7EB', background: 'var(--ds-surface)', color: 'var(--ds-text)',
   cursor: 'pointer', whiteSpace: 'nowrap',
 }

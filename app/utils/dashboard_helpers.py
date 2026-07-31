@@ -40,6 +40,10 @@ def get_date_range(period: str = "this_month", start_date: Optional[str] = None,
     elif period == "this_week":
         week_start = today - timedelta(days=today.weekday())
         return week_start, week_start + timedelta(days=7)
+    elif period == "last_week":
+        this_week_start = today - timedelta(days=today.weekday())
+        last_week_start = this_week_start - timedelta(days=7)
+        return last_week_start, this_week_start
     elif period == "this_month":
         month_start = today.replace(day=1)
         next_month = month_start.replace(month=month_start.month % 12 + 1, day=1) if month_start.month < 12 else month_start.replace(year=month_start.year + 1, month=1, day=1)
@@ -72,6 +76,10 @@ def get_date_range(period: str = "this_month", start_date: Optional[str] = None,
     elif period == "this_year":
         year_start = today.replace(month=1, day=1)
         return year_start, year_start.replace(year=year_start.year + 1, month=1, day=1)
+    elif period == "last_year":
+        this_year_start = today.replace(month=1, day=1)
+        last_year_start = this_year_start.replace(year=this_year_start.year - 1, month=1, day=1)
+        return last_year_start, this_year_start
     elif period == "custom" and start_date and end_date:
         try:
             sd = datetime.fromisoformat(start_date).replace(tzinfo=timezone.utc) if "T" in start_date else datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)

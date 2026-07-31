@@ -1,35 +1,47 @@
 import * as React from "react"
-import { cva, type VariantProps } from "class-variance-authority"
-import { cn } from "@/lib/utils"
+import {
+  Badge as DSBadge,
+  badgeVariants as dsBadgeVariants,
+} from "@/design-system/components/badge"
+import type { VariantProps } from "class-variance-authority"
 
-const badgeVariants = cva(
-  "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors",
-  {
-    variants: {
-      variant: {
-        default: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
-        secondary: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
-        primary: "bg-[var(--ds-primary-subtle)] text-[var(--ds-primary)]",
-        success: "bg-[var(--ds-success-subtle)] text-[var(--ds-success)]",
-        warning: "bg-[var(--ds-warning-subtle)] text-[var(--ds-warning)]",
-        danger: "bg-[var(--ds-danger-subtle)] text-[var(--ds-danger)]",
-        destructive: "bg-[var(--ds-danger-subtle)] text-[var(--ds-danger)]",
-        info: "bg-[var(--ds-info-subtle)] text-[var(--ds-info)]",
-        outline: "border border-[var(--ds-border)] text-[var(--ds-text-secondary)]",
-      },
-    },
-    defaultVariants: { variant: "default" },
-  }
-)
+const LEGACY_TO_DS_VARIANT: Record<string, string> = {
+  secondary: "default",
+  destructive: "danger",
+}
 
-export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement>, VariantProps<typeof badgeVariants> {}
+function mapVariant(variant?: string): string {
+  if (!variant) return "default"
+  return LEGACY_TO_DS_VARIANT[variant] ?? variant
+}
+
+export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
+  variant?: "default" | "secondary" | "primary" | "success" | "warning" | "danger" | "destructive" | "info" | "outline" | "accent"
+}
+
+type DSVariantName = NonNullable<DSVariants["variant"]>
 
 const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
-  ({ className, variant, ...props }, ref) => (
-    <span ref={ref} className={cn(badgeVariants({ variant }), className)} {...props} />
+  ({ variant, ...props }, ref) => (
+    <DSBadge ref={ref} variant={mapVariant(variant) as DSVariantName} {...props} />
   )
 )
 Badge.displayName = "Badge"
+
+type DSVariants = VariantProps<typeof dsBadgeVariants>
+
+function badgeVariants({
+  variant,
+  className,
+}: {
+  variant?: string
+  className?: string
+}) {
+  return dsBadgeVariants({
+    variant: mapVariant(variant) as DSVariants["variant"],
+    className,
+  })
+}
 
 // eslint-disable-next-line react-refresh/only-export-components
 export { Badge, badgeVariants }

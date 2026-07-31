@@ -185,7 +185,7 @@ export default function AssignDoctor() {
       </Card>
 
       {/* Summary & Confirm */}
-      <div className="flex items-center justify-between rounded-lg border bg-white p-4">
+      <div className="flex items-center justify-between rounded-lg border bg-[var(--ds-surface)] p-4">
         <div className="text-sm text-muted-foreground">
           {Object.values(assignments).filter(Boolean).length +
             itemList.filter((i: TreatmentPlanItem) => i.assigned_doctor_id).length}{" "}

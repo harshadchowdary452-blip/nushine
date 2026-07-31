@@ -35,7 +35,7 @@ export function SettingsPage({
               </div>
             )}
             <div>
-              <h1 className="font-[var(--ds-text-h1)] text-[var(--ds-text)]">{title}</h1>
+              <h1 className="ds-page-title text-[var(--ds-text)]">{title}</h1>
               {description && (
                 <p className="text-sm text-[var(--ds-text-secondary)] mt-0.5">{description}</p>
               )}

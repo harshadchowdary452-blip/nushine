@@ -19,7 +19,7 @@ import type { TreatmentItem } from "@/components/cases/TreatmentPlanSection"
 const statusColors: Record<string, string> = {
   OPEN: "bg-blue-50 text-blue-700 border-blue-200",
   IN_PROGRESS: "bg-amber-50 text-amber-700 border-amber-200",
-  ON_HOLD: "bg-gray-50 text-gray-600 border-gray-300",
+  ON_HOLD: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)] border-[var(--ds-border-strong)]",
   COMPLETED: "bg-green-50 text-green-700 border-green-200",
   CANCELLED: "bg-red-50 text-red-700 border-red-200",
 }
@@ -395,12 +395,12 @@ function TreatmentPlanView({ caseData, itemList }: { caseData: Case; itemList: T
           <>
             <div className="space-y-2">
               {items.map((it, i) => (
-                <div key={i} className="flex items-start justify-between gap-4 rounded-md border border-gray-100 bg-gray-50/50 px-3 py-2">
+                <div key={i} className="flex items-start justify-between gap-4 rounded-md border border-[var(--ds-border-light)] bg-[var(--ds-background-subtle)]/50 px-3 py-2">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-900">{it.name || "—"}</span>
+                      <span className="text-sm font-medium text-[var(--ds-text)]">{it.name || "—"}</span>
                       {it.status && (
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${it.status === "APPROVED" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${it.status === "APPROVED" ? "bg-green-100 text-green-700" : "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]"}`}>
                           {it.status}
                         </span>
                       )}
@@ -413,24 +413,24 @@ function TreatmentPlanView({ caseData, itemList }: { caseData: Case; itemList: T
                       </div>
                     )}
                     {it.assignedDoctor && <div className="text-xs text-blue-600 mt-0.5">Dr. {it.assignedDoctor}</div>}
-                    {it.remarks && <div className="text-xs text-gray-500 mt-0.5">{it.remarks}</div>}
+                    {it.remarks && <div className="text-xs text-[var(--ds-text-secondary)] mt-0.5">{it.remarks}</div>}
                   </div>
-                  <div className="text-right shrink-0 text-xs text-gray-600 space-y-0.5">
+                  <div className="text-right shrink-0 text-xs text-[var(--ds-text-secondary)] space-y-0.5">
                     {it.estimatedVisits ? <div>{it.estimatedVisits} visit{Number(it.estimatedVisits) !== 1 ? "s" : ""}</div> : null}
-                    {it.estimatedCost ? <div className="font-medium text-gray-900">₹{Number(it.estimatedCost).toLocaleString("en-IN")}</div> : null}
+                    {it.estimatedCost ? <div className="font-medium text-[var(--ds-text)]">₹{Number(it.estimatedCost).toLocaleString("en-IN")}</div> : null}
                   </div>
                 </div>
               ))}
             </div>
-            <div className="flex flex-wrap gap-4 pt-2 border-t border-gray-100 text-xs text-gray-600">
-              <span><strong className="text-gray-900">{items.length}</strong> procedure{items.length !== 1 ? "s" : ""}</span>
-              {allTeeth.size > 0 && <span><strong className="text-gray-900">{allTeeth.size}</strong> tooth{allTeeth.size !== 1 ? "teeth" : ""}</span>}
-              {totalVisits > 0 && <span><strong className="text-gray-900">{totalVisits}</strong> estimated visit{totalVisits !== 1 ? "s" : ""}</span>}
-              {totalCost > 0 && <span><strong className="text-gray-900">₹{totalCost.toLocaleString("en-IN")}</strong> estimated cost</span>}
+            <div className="flex flex-wrap gap-4 pt-2 border-t border-[var(--ds-border-light)] text-xs text-[var(--ds-text-secondary)]">
+              <span><strong className="text-[var(--ds-text)]">{items.length}</strong> procedure{items.length !== 1 ? "s" : ""}</span>
+              {allTeeth.size > 0 && <span><strong className="text-[var(--ds-text)]">{allTeeth.size}</strong> tooth{allTeeth.size !== 1 ? "teeth" : ""}</span>}
+              {totalVisits > 0 && <span><strong className="text-[var(--ds-text)]">{totalVisits}</strong> estimated visit{totalVisits !== 1 ? "s" : ""}</span>}
+              {totalCost > 0 && <span><strong className="text-[var(--ds-text)]">₹{totalCost.toLocaleString("en-IN")}</strong> estimated cost</span>}
             </div>
           </>
         ) : (
-          <p className="text-sm text-gray-500">{caseData.initial_treatment_plan || "No treatment plan recorded."}</p>
+          <p className="text-sm text-[var(--ds-text-secondary)]">{caseData.initial_treatment_plan || "No treatment plan recorded."}</p>
         )}
       </CardContent>
     </Card>
@@ -454,7 +454,7 @@ function TimelineView({ caseId }: { caseId: string }) {
         <div key={entry.id || idx} className="flex gap-3">
           <div className="flex flex-col items-center">
             <div className="w-2.5 h-2.5 rounded-full bg-primary mt-1.5" />
-            {idx < timeline.length - 1 && <div className="w-px flex-1 bg-gray-200" />}
+            {idx < timeline.length - 1 && <div className="w-px flex-1 bg-[var(--ds-surface-secondary)]" />}
           </div>
           <div className="flex-1 pb-4">
             <div className="text-xs text-muted-foreground">
@@ -509,18 +509,18 @@ function GeneratedTreatmentsView({ treatmentPlans }: { treatmentPlans: Treatment
             })()
 
             return (
-              <div key={tp.id} className="rounded-lg border border-gray-200 bg-white p-3 text-sm space-y-2">
+              <div key={tp.id} className="rounded-lg border border-[var(--ds-border)] bg-[var(--ds-surface)] p-3 text-sm space-y-2">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <p className="font-medium text-gray-900">{tp.treatment_name || "—"}</p>
+                      <p className="font-medium text-[var(--ds-text)]">{tp.treatment_name || "—"}</p>
                       <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
                         tp.status === "COMPLETED" ? "bg-green-100 text-green-700" :
                         tp.status === "IN_PROGRESS" ? "bg-blue-100 text-blue-700" :
                         tp.status === "WAITING_PATIENT" || tp.status === "WAITING_LAB" ? "bg-yellow-100 text-yellow-700" :
                         tp.status === "OVERDUE" ? "bg-red-100 text-red-700" :
                         tp.status === "CANCELLED" ? "bg-red-100 text-red-700" :
-                        "bg-gray-100 text-gray-600"
+                        "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]"
                       }`}>
                         {tp.status || "GENERATED"}
                       </span>
@@ -554,7 +554,7 @@ function GeneratedTreatmentsView({ treatmentPlans }: { treatmentPlans: Treatment
                       <span>{completed} / {total} visits</span>
                       {remaining > 0 && <span>{remaining} remaining</span>}
                     </div>
-                    <div className="h-1.5 w-full rounded-full bg-gray-100">
+                    <div className="h-1.5 w-full rounded-full bg-[var(--ds-background-subtle)]">
                       <div
                         className={`h-1.5 rounded-full transition-all ${tp.status === "COMPLETED" ? "bg-green-500" : "bg-blue-500"}`}
                         style={{ width: `${progress}%` }}
@@ -564,8 +564,8 @@ function GeneratedTreatmentsView({ treatmentPlans }: { treatmentPlans: Treatment
                 </div>
 
                 {/* Cost Summary */}
-                <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground border-t border-gray-100 pt-2">
-                  <span>Est. Cost: <strong className="text-gray-900">₹{(tp.cost || 0).toLocaleString("en-IN")}</strong></span>
+                <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground border-t border-[var(--ds-border-light)] pt-2">
+                  <span>Est. Cost: <strong className="text-[var(--ds-text)]">₹{(tp.cost || 0).toLocaleString("en-IN")}</strong></span>
                   <span>Collected: <strong className="text-green-700">₹{(tp.paid_amount || 0).toLocaleString("en-IN")}</strong></span>
                   {pending > 0 && <span>Pending: <strong className="text-amber-600">₹{pending.toLocaleString("en-IN")}</strong></span>}
                   {tp.next_appointment_date && (

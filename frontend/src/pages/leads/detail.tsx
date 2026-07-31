@@ -39,14 +39,14 @@ import type { Lead, LeadCall, LeadCommunication, LeadCallOutcome, ApiError } fro
 
 const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
   NEW: { bg: "bg-blue-500", text: "text-white", label: "New" },
-  CONTACTED: { bg: "bg-purple-500", text: "text-white", label: "Contacted" },
+  CONTACTED: { bg: "bg-[var(--ds-accent-500)]", text: "text-white", label: "Contacted" },
   INTERESTED: { bg: "bg-emerald-500", text: "text-white", label: "Interested" },
   FOLLOW_UP_REQUIRED: { bg: "bg-amber-500", text: "text-white", label: "Follow-up Required" },
-  APPOINTMENT_BOOKED: { bg: "bg-indigo-500", text: "text-white", label: "Appointment Booked" },
+  APPOINTMENT_BOOKED: { bg: "bg-[var(--ds-primary-500)]", text: "text-white", label: "Appointment Booked" },
   VISITED: { bg: "bg-teal-500", text: "text-white", label: "Visited" },
   CONVERTED: { bg: "bg-green-600", text: "text-white", label: "Converted" },
   LOST: { bg: "bg-red-500", text: "text-white", label: "Lost" },
-  NOT_INTERESTED: { bg: "bg-gray-500", text: "text-white", label: "Not Interested" },
+  NOT_INTERESTED: { bg: "bg-[var(--ds-text-tertiary)]", text: "text-white", label: "Not Interested" },
   NO_RESPONSE: { bg: "bg-orange-500", text: "text-white", label: "No Response" },
 }
 
@@ -68,9 +68,9 @@ const callOutcomes: LeadCallOutcome[] = [
 const quickActions = [
   { key: "call", icon: Phone, label: "Call", color: "bg-blue-500 hover:bg-blue-600" },
   { key: "whatsapp", icon: MessageCircle, label: "WhatsApp", color: "bg-green-500 hover:bg-green-600" },
-  { key: "email", icon: Mail, label: "Email", color: "bg-purple-500 hover:bg-purple-600" },
+  { key: "email", icon: Mail, label: "Email", color: "bg-[var(--ds-accent-500)] hover:bg-[var(--ds-accent-600)]" },
   { key: "convert", icon: Target, label: "Convert", color: "bg-emerald-500 hover:bg-emerald-600" },
-  { key: "note", icon: FileText, label: "Note", color: "bg-gray-500 hover:bg-gray-600" },
+  { key: "note", icon: FileText, label: "Note", color: "bg-[var(--ds-text-tertiary)] hover:bg-[var(--ds-text-secondary)]" },
   { key: "feedback", icon: Star, label: "Feedback", color: "bg-amber-500 hover:bg-amber-600" },
 ]
 
@@ -327,8 +327,8 @@ export default function LeadDetail() {
 
   if (!lead) return (
     <div className="p-12 text-center">
-      <AlertTriangle className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-      <p className="text-gray-500 font-medium">Lead not found</p>
+      <AlertTriangle className="h-12 w-12 mx-auto mb-3 text-[var(--ds-text-tertiary)]" />
+      <p className="text-[var(--ds-text-secondary)] font-medium">Lead not found</p>
       <Button variant="outline" className="mt-4" onClick={() => navigate("/leads")}>
         <ArrowLeft className="h-4 w-4 mr-1.5" /> Back to Leads
       </Button>
@@ -366,18 +366,18 @@ export default function LeadDetail() {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
-      <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
+      <div className="flex items-center gap-2 text-sm text-[var(--ds-text-secondary)] mb-2">
         <button
           onClick={() => navigate("/leads?" + searchParams.toString())}
           className="flex items-center gap-1 hover:text-blue-600 transition-colors"
         >
           <ArrowLeft className="h-3.5 w-3.5" /> Leads
         </button>
-        <ChevronRight className="h-3 w-3 text-gray-300" />
-        <span className="text-gray-700 font-medium truncate">{lead.lead_name}</span>
+        <ChevronRight className="h-3 w-3 text-[var(--ds-text-tertiary)]" />
+        <span className="text-[var(--ds-text-secondary)] font-medium truncate">{lead.lead_name}</span>
       </div>
 
-      <Card className="sticky top-0 z-[var(--ds-z-sticky)] shadow-sm border-gray-200">
+      <Card className="sticky top-0 z-[var(--ds-z-sticky)] shadow-sm border-[var(--ds-border)]">
         <CardContent className="p-0">
           <div className="p-5">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -389,14 +389,14 @@ export default function LeadDetail() {
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2.5 flex-wrap">
-                    <h1 className="text-xl font-bold text-gray-900">{lead.lead_name}</h1>
+                    <h1 className="text-xl font-bold text-[var(--ds-text)]">{lead.lead_name}</h1>
                     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusInfo.bg} ${statusInfo.text}`}>
                       {statusInfo.label}
                     </span>
                     {lead.priority && (
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${
-                        priorityConfig[lead.priority]?.text || "text-gray-700"
-                      } ${priorityConfig[lead.priority]?.bg || "bg-gray-50"}`}>
+                        priorityConfig[lead.priority]?.text || "text-[var(--ds-text-secondary)]"
+                      } ${priorityConfig[lead.priority]?.bg || "bg-[var(--ds-background-subtle)]"}`}>
                         <Star className="h-3 w-3" fill={lead.priority === "HIGH" ? "currentColor" : "none"} />
                         {priorityConfig[lead.priority]?.label || lead.priority}
                       </span>
@@ -404,28 +404,28 @@ export default function LeadDetail() {
                     <Badge variant="outline" className="text-xs">
                       {lead.source?.replace(/_/g, " ")}
                     </Badge>
-                    <span className="text-xs text-gray-400 font-mono mt-1">
+                    <span className="text-xs text-[var(--ds-text-tertiary)] font-mono mt-1">
                       #{lead.id.slice(-6).toUpperCase()}
                     </span>
                   </div>
-                  <div className="flex items-center gap-4 mt-1.5 text-sm text-gray-500 flex-wrap">
+                  <div className="flex items-center gap-4 mt-1.5 text-sm text-[var(--ds-text-secondary)] flex-wrap">
                     <span className="flex items-center gap-1.5">
-                      <Phone className="h-3.5 w-3.5 text-gray-400" />
+                      <Phone className="h-3.5 w-3.5 text-[var(--ds-text-tertiary)]" />
                       {lead.mobile}
                     </span>
                     {lead.email && (
                       <span className="flex items-center gap-1.5">
-                        <Mail className="h-3.5 w-3.5 text-gray-400" />
+                        <Mail className="h-3.5 w-3.5 text-[var(--ds-text-tertiary)]" />
                         {lead.email}
                       </span>
                     )}
                     <span className="flex items-center gap-1.5">
-                      <Calendar className="h-3.5 w-3.5 text-gray-400" />
+                      <Calendar className="h-3.5 w-3.5 text-[var(--ds-text-tertiary)]" />
                       Created {format(new Date(lead.created_at), "dd MMM yyyy")}
                     </span>
                     {lead.interested_treatment && (
                       <span className="flex items-center gap-1.5">
-                        <Activity className="h-3.5 w-3.5 text-gray-400" />
+                        <Activity className="h-3.5 w-3.5 text-[var(--ds-text-tertiary)]" />
                         {lead.interested_treatment}
                       </span>
                     )}
@@ -451,28 +451,28 @@ export default function LeadDetail() {
                     </Tooltip>
                   ))}
                 </TooltipProvider>
-                <div className="h-8 w-px bg-gray-200 mx-1" />
+                <div className="h-8 w-px bg-[var(--ds-surface-secondary)] mx-1" />
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="icon-sm">
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-52 bg-white shadow-lg border-gray-200">
+                  <DropdownMenuContent align="end" className="w-52 bg-[var(--ds-surface)] shadow-lg border-[var(--ds-border)]">
                     <DropdownMenuItem onClick={() => openEdit(lead)} className="cursor-pointer">
-                      <Edit3 className="h-4 w-4 mr-2.5 text-gray-500" /> Edit Lead
+                      <Edit3 className="h-4 w-4 mr-2.5 text-[var(--ds-text-secondary)]" /> Edit Lead
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setStatusChangeOpen(true)} className="cursor-pointer">
-                      <RefreshCw className="h-4 w-4 mr-2.5 text-gray-500" /> Change Status
+                      <RefreshCw className="h-4 w-4 mr-2.5 text-[var(--ds-text-secondary)]" /> Change Status
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator className="bg-gray-100" />
+                    <DropdownMenuSeparator className="bg-[var(--ds-background-subtle)]" />
                     <DropdownMenuItem onClick={() => setCallOutcomeOpen(true)} className="cursor-pointer">
-                      <PhoneCall className="h-4 w-4 mr-2.5 text-gray-500" /> Log Call Outcome
+                      <PhoneCall className="h-4 w-4 mr-2.5 text-[var(--ds-text-secondary)]" /> Log Call Outcome
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setConvertOpen(true)} className="cursor-pointer">
-                      <Target className="h-4 w-4 mr-2.5 text-gray-500" /> Convert to Patient
+                      <Target className="h-4 w-4 mr-2.5 text-[var(--ds-text-secondary)]" /> Convert to Patient
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator className="bg-gray-100" />
+                    <DropdownMenuSeparator className="bg-[var(--ds-background-subtle)]" />
                     <DropdownMenuItem
                       className="text-red-600 cursor-pointer focus:text-red-700 focus:bg-red-50"
                       onClick={() => setDeleteOpen(true)}
@@ -488,49 +488,49 @@ export default function LeadDetail() {
       </Card>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <Card className="border-gray-200">
+        <Card className="border-[var(--ds-border)]">
           <CardContent className="p-3">
-            <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Lead Score</p>
+            <p className="text-[11px] font-medium text-[var(--ds-text-tertiary)] uppercase tracking-wide">Lead Score</p>
             <div className="flex items-center gap-2 mt-1">
-              <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+              <div className="flex-1 h-1.5 bg-[var(--ds-surface-secondary)] rounded-full overflow-hidden">
                 <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min((lead.lead_score ?? 0), 100)}%` }} />
               </div>
-              <span className="text-sm font-bold text-gray-800">{lead.lead_score ?? 0}</span>
+              <span className="text-sm font-bold text-[var(--ds-text)]">{lead.lead_score ?? 0}</span>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-gray-200">
+        <Card className="border-[var(--ds-border)]">
           <CardContent className="p-3">
-            <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Age</p>
-            <p className="text-lg font-bold text-gray-800 mt-0.5">{daysSinceCreated}d</p>
+            <p className="text-[11px] font-medium text-[var(--ds-text-tertiary)] uppercase tracking-wide">Age</p>
+            <p className="text-lg font-bold text-[var(--ds-text)] mt-0.5">{daysSinceCreated}d</p>
           </CardContent>
         </Card>
-        <Card className="border-gray-200">
+        <Card className="border-[var(--ds-border)]">
           <CardContent className="p-3">
-            <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Last Contacted</p>
-            <p className="text-sm font-medium text-gray-800 mt-0.5 truncate">
+            <p className="text-[11px] font-medium text-[var(--ds-text-tertiary)] uppercase tracking-wide">Last Contacted</p>
+            <p className="text-sm font-medium text-[var(--ds-text)] mt-0.5 truncate">
               {lead.last_contacted_at ? format(new Date(lead.last_contacted_at), "dd MMM") : "Never"}
             </p>
           </CardContent>
         </Card>
-        <Card className="border-gray-200">
+        <Card className="border-[var(--ds-border)]">
           <CardContent className="p-3">
-            <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Next Follow-up</p>
-            <p className={`text-sm font-medium mt-0.5 truncate ${lead.next_follow_up_date && new Date(lead.next_follow_up_date) < new Date() ? "text-red-600" : "text-gray-800"}`}>
+            <p className="text-[11px] font-medium text-[var(--ds-text-tertiary)] uppercase tracking-wide">Next Follow-up</p>
+            <p className={`text-sm font-medium mt-0.5 truncate ${lead.next_follow_up_date && new Date(lead.next_follow_up_date) < new Date() ? "text-red-600" : "text-[var(--ds-text)]"}`}>
               {lead.next_follow_up_date ? format(new Date(lead.next_follow_up_date), "dd MMM") : "—"}
             </p>
           </CardContent>
         </Card>
-        <Card className="border-gray-200">
+        <Card className="border-[var(--ds-border)]">
           <CardContent className="p-3">
-            <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Budget</p>
-            <p className="text-sm font-bold text-gray-800 mt-0.5">{lead.budget ? `₹${lead.budget.toLocaleString()}` : "—"}</p>
+            <p className="text-[11px] font-medium text-[var(--ds-text-tertiary)] uppercase tracking-wide">Budget</p>
+            <p className="text-sm font-bold text-[var(--ds-text)] mt-0.5">{lead.budget ? `₹${lead.budget.toLocaleString()}` : "—"}</p>
           </CardContent>
         </Card>
-        <Card className="border-gray-200">
+        <Card className="border-[var(--ds-border)]">
           <CardContent className="p-3">
-            <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Automation</p>
-            <p className="text-sm font-bold text-gray-800 mt-0.5">
+            <p className="text-[11px] font-medium text-[var(--ds-text-tertiary)] uppercase tracking-wide">Automation</p>
+            <p className="text-sm font-bold text-[var(--ds-text)] mt-0.5">
               {lead.automation_status === "ACTIVE" && lead.current_attempt != null && lead.total_attempts
                 ? `Attempt ${lead.current_attempt} of ${lead.total_attempts}`
                 : lead.automation_status === "STOPPED"
@@ -540,14 +540,14 @@ export default function LeadDetail() {
                 : "—"}
             </p>
             {lead.automation_status && lead.automation_status !== "ACTIVE" && (
-              <p className="text-[10px] text-gray-400 mt-0.5">{lead.automation_closure_reason?.replace(/_/g, " ") || ""}</p>
+              <p className="text-[10px] text-[var(--ds-text-tertiary)] mt-0.5">{lead.automation_closure_reason?.replace(/_/g, " ") || ""}</p>
             )}
           </CardContent>
         </Card>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="w-full justify-start border-b border-gray-200 rounded-none bg-transparent p-0 h-auto space-x-1 overflow-x-auto">
+        <TabsList className="w-full justify-start border-b border-[var(--ds-border)] rounded-none bg-transparent p-0 h-auto space-x-1 overflow-x-auto">
           {["overview", "timeline", "communication", "notes", "feedback", "conversion"].map((tab) => (
             <TabsTrigger
               key={tab}
@@ -562,20 +562,20 @@ export default function LeadDetail() {
         <TabsContent value="overview" className="space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2 space-y-4">
-              <Card className="border-gray-200">
+              <Card className="border-[var(--ds-border)]">
                 <CardContent className="p-5">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-semibold text-gray-800">Contact & Lead Information</h3>
+                    <h3 className="text-sm font-semibold text-[var(--ds-text)]">Contact & Lead Information</h3>
                     <Button size="sm" variant="outline" onClick={() => openEdit(lead)}>
                       <Edit3 className="h-3.5 w-3.5 mr-1" /> Edit
                     </Button>
                   </div>
                   <div className="grid grid-cols-2 gap-y-4 gap-x-6 text-sm">
                     <div>
-                      <Label className="text-[11px] text-gray-400 font-medium">Phone</Label>
+                      <Label className="text-[11px] text-[var(--ds-text-tertiary)] font-medium">Phone</Label>
                       <div className="flex items-center gap-1.5 mt-0.5">
-                        <Phone className="h-3.5 w-3.5 text-gray-400 shrink-0" />
-                        <span className="text-gray-800">{lead.mobile}</span>
+                        <Phone className="h-3.5 w-3.5 text-[var(--ds-text-tertiary)] shrink-0" />
+                        <span className="text-[var(--ds-text)]">{lead.mobile}</span>
                         <button onClick={handleCall} className="ml-1 text-blue-500 hover:text-blue-700">
                           <Phone className="h-3 w-3" />
                         </button>
@@ -584,71 +584,71 @@ export default function LeadDetail() {
                         </button>
                       </div>
                       {lead.alternate_mobile && (
-                        <div className="flex items-center gap-1.5 mt-1 text-gray-500">
-                          <Phone className="h-3 w-3 text-gray-400" />
+                        <div className="flex items-center gap-1.5 mt-1 text-[var(--ds-text-secondary)]">
+                          <Phone className="h-3 w-3 text-[var(--ds-text-tertiary)]" />
                           <span className="text-xs">{lead.alternate_mobile}</span>
                         </div>
                       )}
                     </div>
                     <div>
-                      <Label className="text-[11px] text-gray-400 font-medium">Email</Label>
+                      <Label className="text-[11px] text-[var(--ds-text-tertiary)] font-medium">Email</Label>
                       <p className="flex items-center gap-1.5 mt-0.5">
-                        <Mail className="h-3.5 w-3.5 text-gray-400" />
-                        <span className="text-gray-800">{lead.email || "—"}</span>
+                        <Mail className="h-3.5 w-3.5 text-[var(--ds-text-tertiary)]" />
+                        <span className="text-[var(--ds-text)]">{lead.email || "—"}</span>
                         {lead.email && (
-                          <button onClick={handleEmail} className="ml-1 text-purple-500 hover:text-purple-700">
+                          <button onClick={handleEmail} className="ml-1 text-[var(--ds-accent-500)] hover:text-[var(--ds-accent-700)]">
                             <Mail className="h-3 w-3" />
                           </button>
                         )}
                       </p>
                     </div>
                     <div>
-                      <Label className="text-[11px] text-gray-400 font-medium">Age / Gender</Label>
-                      <p className="mt-0.5 text-gray-800">
+                      <Label className="text-[11px] text-[var(--ds-text-tertiary)] font-medium">Age / Gender</Label>
+                      <p className="mt-0.5 text-[var(--ds-text)]">
                         {lead.age ? `${lead.age} yrs` : "—"} {lead.gender ? `/ ${lead.gender}` : ""}
                       </p>
                     </div>
                     <div>
-                      <Label className="text-[11px] text-gray-400 font-medium">City</Label>
+                      <Label className="text-[11px] text-[var(--ds-text-tertiary)] font-medium">City</Label>
                       <p className="flex items-center gap-1.5 mt-0.5">
-                        <MapPin className="h-3.5 w-3.5 text-gray-400" />
-                        <span className="text-gray-800">{lead.city || "—"}</span>
+                        <MapPin className="h-3.5 w-3.5 text-[var(--ds-text-tertiary)]" />
+                        <span className="text-[var(--ds-text)]">{lead.city || "—"}</span>
                       </p>
                     </div>
                     <div>
-                      <Label className="text-[11px] text-gray-400 font-medium">Interested Treatment</Label>
+                      <Label className="text-[11px] text-[var(--ds-text-tertiary)] font-medium">Interested Treatment</Label>
                       <p className="flex items-center gap-1.5 mt-0.5">
-                        <Activity className="h-3.5 w-3.5 text-gray-400" />
-                        <span className="text-gray-800 font-medium">{lead.interested_treatment || "—"}</span>
+                        <Activity className="h-3.5 w-3.5 text-[var(--ds-text-tertiary)]" />
+                        <span className="text-[var(--ds-text)] font-medium">{lead.interested_treatment || "—"}</span>
                       </p>
                     </div>
                     <div>
-                      <Label className="text-[11px] text-gray-400 font-medium">Budget</Label>
+                      <Label className="text-[11px] text-[var(--ds-text-tertiary)] font-medium">Budget</Label>
                       <p className="flex items-center gap-1.5 mt-0.5">
-                        <IndianRupee className="h-3.5 w-3.5 text-gray-400" />
-                        <span className="text-gray-800 font-medium">{lead.budget ? `₹${lead.budget.toLocaleString()}` : "—"}</span>
+                        <IndianRupee className="h-3.5 w-3.5 text-[var(--ds-text-tertiary)]" />
+                        <span className="text-[var(--ds-text)] font-medium">{lead.budget ? `₹${lead.budget.toLocaleString()}` : "—"}</span>
                       </p>
                     </div>
                     {lead.preferred_visit_date && (
                       <div>
-                        <Label className="text-[11px] text-gray-400 font-medium">Preferred Visit</Label>
+                        <Label className="text-[11px] text-[var(--ds-text-tertiary)] font-medium">Preferred Visit</Label>
                         <p className="flex items-center gap-1.5 mt-0.5">
-                          <Calendar className="h-3.5 w-3.5 text-gray-400" />
-                          <span className="text-gray-800">{format(new Date(lead.preferred_visit_date), "dd MMM yyyy")}</span>
+                          <Calendar className="h-3.5 w-3.5 text-[var(--ds-text-tertiary)]" />
+                          <span className="text-[var(--ds-text)]">{format(new Date(lead.preferred_visit_date), "dd MMM yyyy")}</span>
                         </p>
                       </div>
                     )}
                     <div>
-                      <Label className="text-[11px] text-gray-400 font-medium">Lead Source</Label>
+                      <Label className="text-[11px] text-[var(--ds-text-tertiary)] font-medium">Lead Source</Label>
                       <p className="mt-0.5">
                         <Badge variant="outline">{lead.source?.replace(/_/g, " ")}</Badge>
                       </p>
                     </div>
                   </div>
                   {lead.notes && (
-                    <div className="mt-4 pt-4 border-t border-gray-100">
-                      <Label className="text-[11px] text-gray-400 font-medium">Notes</Label>
-                      <p className="text-gray-600 whitespace-pre-wrap text-sm mt-1">{lead.notes}</p>
+                    <div className="mt-4 pt-4 border-t border-[var(--ds-border-light)]">
+                      <Label className="text-[11px] text-[var(--ds-text-tertiary)] font-medium">Notes</Label>
+                      <p className="text-[var(--ds-text-secondary)] whitespace-pre-wrap text-sm mt-1">{lead.notes}</p>
                     </div>
                   )}
                 </CardContent>
@@ -656,18 +656,18 @@ export default function LeadDetail() {
             </div>
 
             <div className="space-y-4">
-              <Card className="border-gray-200">
+              <Card className="border-[var(--ds-border)]">
                 <CardContent className="p-4">
-                  <h3 className="text-sm font-semibold text-gray-800 mb-3">Lead Details</h3>
+                  <h3 className="text-sm font-semibold text-[var(--ds-text)] mb-3">Lead Details</h3>
                   <div className="space-y-3 text-sm">
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-400 text-xs">Status</span>
+                      <span className="text-[var(--ds-text-tertiary)] text-xs">Status</span>
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${statusInfo.bg} ${statusInfo.text}`}>
                         {statusInfo.label}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-400 text-xs">Priority</span>
+                      <span className="text-[var(--ds-text-tertiary)] text-xs">Priority</span>
                       {lead.priority ? (
                         <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium border ${
                           priorityConfig[lead.priority]?.text
@@ -675,48 +675,48 @@ export default function LeadDetail() {
                           <Star className="h-2.5 w-2.5" fill={lead.priority === "HIGH" ? "currentColor" : "none"} />
                           {priorityConfig[lead.priority]?.label}
                         </span>
-                      ) : <span className="text-gray-400">—</span>}
+                      ) : <span className="text-[var(--ds-text-tertiary)]">—</span>}
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-400 text-xs">Lead Score</span>
+                      <span className="text-[var(--ds-text-tertiary)] text-xs">Lead Score</span>
                       <div className="flex items-center gap-1.5">
-                        <div className="h-1.5 w-16 bg-gray-200 rounded-full overflow-hidden">
+                        <div className="h-1.5 w-16 bg-[var(--ds-surface-secondary)] rounded-full overflow-hidden">
                           <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min((lead.lead_score ?? 0), 100)}%` }} />
                         </div>
-                        <span className="text-xs font-medium text-gray-700">{lead.lead_score ?? 0}</span>
+                        <span className="text-xs font-medium text-[var(--ds-text-secondary)]">{lead.lead_score ?? 0}</span>
                       </div>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-400 text-xs">Created</span>
-                      <span className="text-xs text-gray-700">{format(new Date(lead.created_at), "dd MMM yyyy")}</span>
+                      <span className="text-[var(--ds-text-tertiary)] text-xs">Created</span>
+                      <span className="text-xs text-[var(--ds-text-secondary)]">{format(new Date(lead.created_at), "dd MMM yyyy")}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-400 text-xs">Last Contacted</span>
-                      <span className="text-xs text-gray-700">
+                      <span className="text-[var(--ds-text-tertiary)] text-xs">Last Contacted</span>
+                      <span className="text-xs text-[var(--ds-text-secondary)]">
                         {lead.last_contacted_at ? format(new Date(lead.last_contacted_at), "dd MMM hh:mm a") : "—"}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-400 text-xs">Next Follow-up</span>
-                      <span className={`text-xs ${lead.next_follow_up_date && new Date(lead.next_follow_up_date) < new Date() ? "text-red-600 font-medium" : "text-gray-700"}`}>
+                      <span className="text-[var(--ds-text-tertiary)] text-xs">Next Follow-up</span>
+                      <span className={`text-xs ${lead.next_follow_up_date && new Date(lead.next_follow_up_date) < new Date() ? "text-red-600 font-medium" : "text-[var(--ds-text-secondary)]"}`}>
                         {lead.next_follow_up_date ? format(new Date(lead.next_follow_up_date), "dd MMM yyyy") : "—"}
                       </span>
                     </div>
                     {lead.assigned_staff_id && (
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-400 text-xs">Assigned Staff</span>
-                        <span className="text-xs text-gray-700 font-mono">{lead.assigned_staff_id.slice(0, 8)}</span>
+                        <span className="text-[var(--ds-text-tertiary)] text-xs">Assigned Staff</span>
+                        <span className="text-xs text-[var(--ds-text-secondary)] font-mono">{lead.assigned_staff_id.slice(0, 8)}</span>
                       </div>
                     )}
                     {lead.assigned_doctor_id && (
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-400 text-xs">Assigned Doctor</span>
-                        <span className="text-xs text-gray-700 font-mono">{lead.assigned_doctor_id.slice(0, 8)}</span>
+                        <span className="text-[var(--ds-text-tertiary)] text-xs">Assigned Doctor</span>
+                        <span className="text-xs text-[var(--ds-text-secondary)] font-mono">{lead.assigned_doctor_id.slice(0, 8)}</span>
                       </div>
                     )}
                     {lead.converted_patient_id && (
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-400 text-xs">Converted Patient</span>
+                        <span className="text-[var(--ds-text-tertiary)] text-xs">Converted Patient</span>
                         <button
                           onClick={() => navigate(`/patients/${lead.converted_patient_id}`)}
                           className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
@@ -743,9 +743,9 @@ export default function LeadDetail() {
         </TabsContent>
 
         <TabsContent value="timeline" className="space-y-4">
-          <Card className="border-gray-200">
-            <div className="px-5 py-4 border-b border-gray-100">
-              <h3 className="text-sm font-semibold text-gray-800">Activity Timeline</h3>
+          <Card className="border-[var(--ds-border)]">
+            <div className="px-5 py-4 border-b border-[var(--ds-border-light)]">
+              <h3 className="text-sm font-semibold text-[var(--ds-text)]">Activity Timeline</h3>
             </div>
             <CardContent className="p-5">
               <LeadTimeline lead={lead} calls={callItems} communications={commItems} />
@@ -756,11 +756,11 @@ export default function LeadDetail() {
         <TabsContent value="communication" className="space-y-4">
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
             <div className="xl:col-span-2 space-y-4">
-              <Card className="border-gray-200">
-                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <Card className="border-[var(--ds-border)]">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--ds-border-light)]">
                   <div className="flex items-center gap-3">
-                    <h3 className="text-sm font-semibold text-gray-800">Communications</h3>
-                    <span className="text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">{commItems.length}</span>
+                    <h3 className="text-sm font-semibold text-[var(--ds-text)]">Communications</h3>
+                    <span className="text-xs text-[var(--ds-text-tertiary)] bg-[var(--ds-background-subtle)] px-2 py-0.5 rounded-full">{commItems.length}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Button size="sm" variant="outline" onClick={handleWhatsApp}>
@@ -774,28 +774,28 @@ export default function LeadDetail() {
                 <CardContent className="p-0">
                   {commItems.length === 0 ? (
                     <div className="py-12 text-center">
-                      <div className="h-16 w-16 rounded-full bg-gray-50 flex items-center justify-center mx-auto mb-4">
-                        <MessageSquare className="h-8 w-8 text-gray-300" />
+                      <div className="h-16 w-16 rounded-full bg-[var(--ds-background-subtle)] flex items-center justify-center mx-auto mb-4">
+                        <MessageSquare className="h-8 w-8 text-[var(--ds-text-tertiary)]" />
                       </div>
-                      <p className="text-sm font-medium text-gray-500">No communications yet</p>
-                      <p className="text-xs text-gray-400 mt-1">Send your first message using the buttons above</p>
+                      <p className="text-sm font-medium text-[var(--ds-text-secondary)]">No communications yet</p>
+                      <p className="text-xs text-[var(--ds-text-tertiary)] mt-1">Send your first message using the buttons above</p>
                     </div>
                   ) : (
-                    <div className="divide-y divide-gray-50">
+                    <div className="divide-y divide-[var(--ds-border-light)]">
                       {commItems.map((c) => (
-                        <div key={c.id} className="px-5 py-4 hover:bg-gray-50/50 transition-colors">
+                        <div key={c.id} className="px-5 py-4 hover:bg-[var(--ds-background-subtle)]/50 transition-colors">
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex items-start gap-3 min-w-0 flex-1">
                               <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
                                 c.channel === "WHATSAPP" ? "bg-green-50" :
-                                c.channel === "EMAIL" ? "bg-purple-50" :
-                                c.channel === "NOTE" ? "bg-gray-50" :
+                                c.channel === "EMAIL" ? "bg-[var(--ds-accent-50)]" :
+                                c.channel === "NOTE" ? "bg-[var(--ds-background-subtle)]" :
                                 c.channel === "FEEDBACK" ? "bg-amber-50" :
                                 "bg-blue-50"
                               }`}>
                                 {c.channel === "WHATSAPP" ? <MessageCircle className="h-4 w-4 text-green-600" /> :
-                                 c.channel === "EMAIL" ? <Mail className="h-4 w-4 text-purple-600" /> :
-                                 c.channel === "NOTE" ? <FileText className="h-4 w-4 text-gray-600" /> :
+                                 c.channel === "EMAIL" ? <Mail className="h-4 w-4 text-[var(--ds-accent-600)]" /> :
+                                 c.channel === "NOTE" ? <FileText className="h-4 w-4 text-[var(--ds-text-secondary)]" /> :
                                  c.channel === "FEEDBACK" ? <Star className="h-4 w-4 text-amber-600" /> :
                                  <MessageSquare className="h-4 w-4 text-blue-600" />}
                               </div>
@@ -803,8 +803,8 @@ export default function LeadDetail() {
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${
                                     c.channel === "WHATSAPP" ? "bg-green-50 text-green-700" :
-                                    c.channel === "EMAIL" ? "bg-purple-50 text-purple-700" :
-                                    c.channel === "NOTE" ? "bg-gray-50 text-gray-700" :
+                                    c.channel === "EMAIL" ? "bg-[var(--ds-accent-50)] text-[var(--ds-accent-700)]" :
+                                    c.channel === "NOTE" ? "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]" :
                                     c.channel === "FEEDBACK" ? "bg-amber-50 text-amber-700" :
                                     "bg-blue-50 text-blue-700"
                                   }`}>{c.channel}</span>
@@ -829,18 +829,18 @@ export default function LeadDetail() {
                                     </Badge>
                                   )}
                                   {c.template_name && (
-                                    <Badge variant="outline" className="text-[10px] text-gray-400">
+                                    <Badge variant="outline" className="text-[10px] text-[var(--ds-text-tertiary)]">
                                       {c.template_name}
                                     </Badge>
                                   )}
                                 </div>
-                                <p className="text-sm text-gray-700 mt-1.5 whitespace-pre-wrap line-clamp-3">{c.message}</p>
+                                <p className="text-sm text-[var(--ds-text-secondary)] mt-1.5 whitespace-pre-wrap line-clamp-3">{c.message}</p>
                                 <div className="flex items-center gap-3 mt-1.5">
-                                  <span className="text-[11px] text-gray-400">
+                                  <span className="text-[11px] text-[var(--ds-text-tertiary)]">
                                     {format(new Date(c.created_at), "dd MMM yyyy, hh:mm a")}
                                   </span>
                                   {c.sent_by_name && (
-                                    <span className="text-[11px] text-gray-400 flex items-center gap-1">
+                                    <span className="text-[11px] text-[var(--ds-text-tertiary)] flex items-center gap-1">
                                       <User className="h-3 w-3" /> {c.sent_by_name}
                                     </span>
                                   )}
@@ -856,7 +856,7 @@ export default function LeadDetail() {
                                       window.open(`https://wa.me/${phone}?text=${encodeURIComponent(c.message)}`, "_blank")
                                     }
                                   }}
-                                  className="h-7 w-7 rounded-lg hover:bg-green-50 flex items-center justify-center text-gray-400 hover:text-green-600 transition-colors"
+                                  className="h-7 w-7 rounded-lg hover:bg-green-50 flex items-center justify-center text-[var(--ds-text-tertiary)] hover:text-green-600 transition-colors"
                                   title="Open in WhatsApp"
                                 >
                                   <ExternalLink className="h-3.5 w-3.5" />
@@ -873,44 +873,44 @@ export default function LeadDetail() {
             </div>
 
             <div className="space-y-4">
-              <Card className="border-gray-200">
-                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-                  <h3 className="text-sm font-semibold text-gray-800">Call Log</h3>
-                  <span className="text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">{callItems.length}</span>
+              <Card className="border-[var(--ds-border)]">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--ds-border-light)]">
+                  <h3 className="text-sm font-semibold text-[var(--ds-text)]">Call Log</h3>
+                  <span className="text-xs text-[var(--ds-text-tertiary)] bg-[var(--ds-background-subtle)] px-2 py-0.5 rounded-full">{callItems.length}</span>
                 </div>
                 <CardContent className="p-0">
                   {callItems.length === 0 ? (
                     <div className="py-8 text-center">
-                      <PhoneCall className="h-8 w-8 mx-auto mb-2 text-gray-300" />
-                      <p className="text-sm text-gray-400">No calls logged</p>
+                      <PhoneCall className="h-8 w-8 mx-auto mb-2 text-[var(--ds-text-tertiary)]" />
+                      <p className="text-sm text-[var(--ds-text-tertiary)]">No calls logged</p>
                     </div>
                   ) : (
-                    <div className="divide-y divide-gray-50">
+                    <div className="divide-y divide-[var(--ds-border-light)]">
                       {callItems.map((c) => (
-                        <div key={c.id} className="px-4 py-3 hover:bg-gray-50/50 transition-colors">
+                        <div key={c.id} className="px-4 py-3 hover:bg-[var(--ds-background-subtle)]/50 transition-colors">
                           <div className="flex items-start gap-3">
                             <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${
                               c.outcome === "INTERESTED" || c.outcome === "CONVERTED" ? "bg-green-50" :
                               c.outcome === "NOT_INTERESTED" ? "bg-red-50" :
-                              "bg-gray-50"
+                              "bg-[var(--ds-background-subtle)]"
                             }`}>
                               <PhoneCall className={`h-4 w-4 ${
                                 c.outcome === "INTERESTED" || c.outcome === "CONVERTED" ? "text-green-600" :
                                 c.outcome === "NOT_INTERESTED" ? "text-red-600" :
-                                "text-gray-500"
+                                "text-[var(--ds-text-secondary)]"
                               }`} />
                             </div>
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2">
-                                <span className="font-medium text-gray-700 text-[13px]">{c.outcome?.replace(/_/g, " ") || "Unknown"}</span>
+                                <span className="font-medium text-[var(--ds-text-secondary)] text-[13px]">{c.outcome?.replace(/_/g, " ") || "Unknown"}</span>
                                 {c.duration_seconds && (
-                                  <span className="text-[10px] text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded font-mono">
+                                  <span className="text-[10px] text-[var(--ds-text-tertiary)] bg-[var(--ds-background-subtle)] px-1.5 py-0.5 rounded font-mono">
                                     {Math.floor(c.duration_seconds / 60)}m {c.duration_seconds % 60}s
                                   </span>
                                 )}
                               </div>
-                              {c.notes && <p className="text-gray-500 text-[12px] mt-0.5 line-clamp-2">{c.notes}</p>}
-                              <span className="text-[10px] text-gray-400 mt-1 block">
+                              {c.notes && <p className="text-[var(--ds-text-secondary)] text-[12px] mt-0.5 line-clamp-2">{c.notes}</p>}
+                              <span className="text-[10px] text-[var(--ds-text-tertiary)] mt-1 block">
                                 {format(new Date(c.created_at), "dd MMM, hh:mm a")}
                               </span>
                             </div>
@@ -922,7 +922,7 @@ export default function LeadDetail() {
                 </CardContent>
               </Card>
 
-              <Card className="border-gray-200">
+              <Card className="border-[var(--ds-border)]">
                 <CardContent className="p-4 space-y-2">
                   <Button size="sm" className="w-full" onClick={handleCall}>
                     <Phone className="h-3.5 w-3.5 mr-1.5" /> Call Now
@@ -937,9 +937,9 @@ export default function LeadDetail() {
         </TabsContent>
 
         <TabsContent value="notes" className="space-y-4">
-          <Card className="border-gray-200">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-              <h3 className="text-sm font-semibold text-gray-800">Notes</h3>
+          <Card className="border-[var(--ds-border)]">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--ds-border-light)]">
+              <h3 className="text-sm font-semibold text-[var(--ds-text)]">Notes</h3>
               <Button size="sm" variant="outline" onClick={() => setNoteOpen(true)}>
                 <Plus className="h-3.5 w-3.5 mr-1" /> Add Note
               </Button>
@@ -947,15 +947,15 @@ export default function LeadDetail() {
             <CardContent className="p-5">
               {commItems.filter((c) => c.channel === "NOTE").length === 0 ? (
                 <div className="py-8 text-center">
-                  <FileText className="h-10 w-10 mx-auto mb-3 text-gray-300" />
-                  <p className="text-sm text-gray-400">No notes yet</p>
+                  <FileText className="h-10 w-10 mx-auto mb-3 text-[var(--ds-text-tertiary)]" />
+                  <p className="text-sm text-[var(--ds-text-tertiary)]">No notes yet</p>
                 </div>
               ) : (
                 <div className="space-y-2">
                   {commItems.filter((c) => c.channel === "NOTE").map((note) => (
-                    <div key={note.id} className="rounded-lg border border-gray-100 p-3 bg-white hover:border-gray-200 transition-colors">
-                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{note.message}</p>
-                      <div className="flex items-center gap-3 mt-2 text-[11px] text-gray-400">
+                    <div key={note.id} className="rounded-lg border border-[var(--ds-border-light)] p-3 bg-[var(--ds-surface)] hover:border-[var(--ds-border)] transition-colors">
+                      <p className="text-sm text-[var(--ds-text-secondary)] whitespace-pre-wrap">{note.message}</p>
+                      <div className="flex items-center gap-3 mt-2 text-[11px] text-[var(--ds-text-tertiary)]">
                         <span>{format(new Date(note.created_at), "dd MMM yyyy, hh:mm a")}</span>
                         <Badge variant="outline" className="text-[10px]">Staff Note</Badge>
                       </div>
@@ -968,9 +968,9 @@ export default function LeadDetail() {
         </TabsContent>
 
         <TabsContent value="feedback" className="space-y-4">
-          <Card className="border-gray-200">
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-800">Lead Feedback</h3>
+          <Card className="border-[var(--ds-border)]">
+            <div className="px-5 py-4 border-b border-[var(--ds-border-light)] flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-[var(--ds-text)]">Lead Feedback</h3>
             </div>
             <CardContent className="p-5">
               <div className="space-y-4">
@@ -985,7 +985,7 @@ export default function LeadDetail() {
                         className={`h-10 w-10 rounded-lg flex items-center justify-center transition-all ${
                           star <= feedbackRating
                             ? "bg-amber-100 text-amber-500 scale-110"
-                            : "bg-gray-50 text-gray-300 hover:bg-gray-100"
+                            : "bg-[var(--ds-background-subtle)] text-[var(--ds-text-tertiary)] hover:bg-[var(--ds-surface-hover)]"
                         }`}
                       >
                         <Star className="h-5 w-5" fill={star <= feedbackRating ? "currentColor" : "none"} />
@@ -1035,13 +1035,13 @@ export default function LeadDetail() {
 
         <TabsContent value="conversion" className="space-y-4">
           {lead.status === "CONVERTED" ? (
-            <Card className="border-gray-200">
+            <Card className="border-[var(--ds-border)]">
               <CardContent className="py-8 text-center">
                 <div className="h-16 w-16 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-4">
                   <CheckCircle2 className="h-8 w-8 text-green-500" />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-1">Lead Converted</h3>
-                <p className="text-sm text-gray-500 mb-4">
+                <h3 className="text-lg font-semibold text-[var(--ds-text)] mb-1">Lead Converted</h3>
+                <p className="text-sm text-[var(--ds-text-secondary)] mb-4">
                   This lead was successfully converted to a patient
                   {lead.converted_patient_id ? ` (#${lead.converted_patient_id.slice(-6).toUpperCase()})` : ""}
                 </p>
@@ -1055,11 +1055,11 @@ export default function LeadDetail() {
               </CardContent>
             </Card>
           ) : lead.status === "LOST" || lead.status === "NOT_INTERESTED" ? (
-            <Card className="border-gray-200">
+            <Card className="border-[var(--ds-border)]">
               <CardContent className="py-8 text-center">
                 <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-3" />
-                <h3 className="text-base font-semibold text-gray-900 mb-1">Lead Inactive</h3>
-                <p className="text-sm text-gray-500">
+                <h3 className="text-base font-semibold text-[var(--ds-text)] mb-1">Lead Inactive</h3>
+                <p className="text-sm text-[var(--ds-text-secondary)]">
                   This lead was marked as {lead.status === "NOT_INTERESTED" ? "closed" : lead.status.toLowerCase()}.
                 </p>
                 <Button variant="outline" className="mt-4" onClick={() => setStatusChangeOpen(true)}>
@@ -1068,9 +1068,9 @@ export default function LeadDetail() {
               </CardContent>
             </Card>
           ) : (
-            <Card className="border-gray-200">
-              <div className="px-5 py-4 border-b border-gray-100">
-                <h3 className="text-sm font-semibold text-gray-800">Convert to Patient</h3>
+            <Card className="border-[var(--ds-border)]">
+              <div className="px-5 py-4 border-b border-[var(--ds-border-light)]">
+                <h3 className="text-sm font-semibold text-[var(--ds-text)]">Convert to Patient</h3>
               </div>
               <CardContent className="p-5 space-y-4">
                 <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-4 text-sm text-emerald-800">
@@ -1086,24 +1086,24 @@ export default function LeadDetail() {
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div className="p-3 rounded-lg bg-gray-50">
-                    <p className="text-xs text-gray-500">Patient Name</p>
-                    <p className="font-medium text-gray-900">{lead.lead_name}</p>
+                  <div className="p-3 rounded-lg bg-[var(--ds-background-subtle)]">
+                    <p className="text-xs text-[var(--ds-text-secondary)]">Patient Name</p>
+                    <p className="font-medium text-[var(--ds-text)]">{lead.lead_name}</p>
                   </div>
-                  <div className="p-3 rounded-lg bg-gray-50">
-                    <p className="text-xs text-gray-500">Phone</p>
-                    <p className="font-medium text-gray-900">{lead.mobile}</p>
+                  <div className="p-3 rounded-lg bg-[var(--ds-background-subtle)]">
+                    <p className="text-xs text-[var(--ds-text-secondary)]">Phone</p>
+                    <p className="font-medium text-[var(--ds-text)]">{lead.mobile}</p>
                   </div>
                   {lead.email && (
-                    <div className="p-3 rounded-lg bg-gray-50">
-                      <p className="text-xs text-gray-500">Email</p>
-                      <p className="font-medium text-gray-900">{lead.email}</p>
+                    <div className="p-3 rounded-lg bg-[var(--ds-background-subtle)]">
+                      <p className="text-xs text-[var(--ds-text-secondary)]">Email</p>
+                      <p className="font-medium text-[var(--ds-text)]">{lead.email}</p>
                     </div>
                   )}
                   {lead.interested_treatment && (
-                    <div className="p-3 rounded-lg bg-gray-50">
-                      <p className="text-xs text-gray-500">Treatment Interest</p>
-                      <p className="font-medium text-gray-900">{lead.interested_treatment}</p>
+                    <div className="p-3 rounded-lg bg-[var(--ds-background-subtle)]">
+                      <p className="text-xs text-[var(--ds-text-secondary)]">Treatment Interest</p>
+                      <p className="font-medium text-[var(--ds-text)]">{lead.interested_treatment}</p>
                     </div>
                   )}
                 </div>
@@ -1328,31 +1328,31 @@ export default function LeadDetail() {
                   </div>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Name</span>
-                      <span className="font-medium text-gray-900">{convertForm.full_name || lead.lead_name}</span>
+                      <span className="text-[var(--ds-text-secondary)]">Name</span>
+                      <span className="font-medium text-[var(--ds-text)]">{convertForm.full_name || lead.lead_name}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Phone</span>
-                      <span className="font-medium text-gray-900">{convertForm.phone || lead.mobile}</span>
+                      <span className="text-[var(--ds-text-secondary)]">Phone</span>
+                      <span className="font-medium text-[var(--ds-text)]">{convertForm.phone || lead.mobile}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Email</span>
-                      <span className="font-medium text-gray-900">{convertForm.email || lead.email || "—"}</span>
+                      <span className="text-[var(--ds-text-secondary)]">Email</span>
+                      <span className="font-medium text-[var(--ds-text)]">{convertForm.email || lead.email || "—"}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Source</span>
-                      <span className="font-medium text-gray-900">{lead.source?.replace(/_/g, " ")}</span>
+                      <span className="text-[var(--ds-text-secondary)]">Source</span>
+                      <span className="font-medium text-[var(--ds-text)]">{lead.source?.replace(/_/g, " ")}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Treatment</span>
-                      <span className="font-medium text-gray-900">{lead.interested_treatment || "—"}</span>
+                      <span className="text-[var(--ds-text-secondary)]">Treatment</span>
+                      <span className="font-medium text-[var(--ds-text)]">{lead.interested_treatment || "—"}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Budget</span>
-                      <span className="font-medium text-gray-900">{lead.budget ? `₹${lead.budget.toLocaleString()}` : "—"}</span>
+                      <span className="text-[var(--ds-text-secondary)]">Budget</span>
+                      <span className="font-medium text-[var(--ds-text)]">{lead.budget ? `₹${lead.budget.toLocaleString()}` : "—"}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Status</span>
+                      <span className="text-[var(--ds-text-secondary)]">Status</span>
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${statusInfo.bg} ${statusInfo.text}`}>{statusInfo.label}</span>
                     </div>
                   </div>
@@ -1365,39 +1365,39 @@ export default function LeadDetail() {
                   </div>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Name</span>
-                      <span className="font-medium text-gray-900">{convertForm.full_name || lead.lead_name}</span>
+                      <span className="text-[var(--ds-text-secondary)]">Name</span>
+                      <span className="font-medium text-[var(--ds-text)]">{convertForm.full_name || lead.lead_name}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Phone</span>
-                      <span className="font-medium text-gray-900">{convertForm.phone || lead.mobile}</span>
+                      <span className="text-[var(--ds-text-secondary)]">Phone</span>
+                      <span className="font-medium text-[var(--ds-text)]">{convertForm.phone || lead.mobile}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Email</span>
-                      <span className="font-medium text-gray-900">{convertForm.email || lead.email || "—"}</span>
+                      <span className="text-[var(--ds-text-secondary)]">Email</span>
+                      <span className="font-medium text-[var(--ds-text)]">{convertForm.email || lead.email || "—"}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Gender</span>
-                      <span className="font-medium text-gray-900">{convertForm.gender || lead.gender || "—"}</span>
+                      <span className="text-[var(--ds-text-secondary)]">Gender</span>
+                      <span className="font-medium text-[var(--ds-text)]">{convertForm.gender || lead.gender || "—"}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Age</span>
-                      <span className="font-medium text-gray-900">{convertForm.age || lead.age?.toString() || "—"}</span>
+                      <span className="text-[var(--ds-text-secondary)]">Age</span>
+                      <span className="font-medium text-[var(--ds-text)]">{convertForm.age || lead.age?.toString() || "—"}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Source</span>
-                      <span className="font-medium text-gray-900">Lead Conversion</span>
+                      <span className="text-[var(--ds-text-secondary)]">Source</span>
+                      <span className="font-medium text-[var(--ds-text)]">Lead Conversion</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-500">OP No.</span>
-                      <span className="font-medium text-gray-900">{convertForm.op_no || "Auto-generated"}</span>
+                      <span className="text-[var(--ds-text-secondary)]">OP No.</span>
+                      <span className="font-medium text-[var(--ds-text)]">{convertForm.op_no || "Auto-generated"}</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="border-t border-gray-100 pt-4">
-                <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-3">Patient Registration Details</h4>
+              <div className="border-t border-[var(--ds-border-light)] pt-4">
+                <h4 className="text-xs font-semibold text-[var(--ds-text-secondary)] uppercase tracking-wider mb-3">Patient Registration Details</h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
                     <Label htmlFor="conv-name" className="text-xs">Full Name <span className="text-red-500">*</span></Label>
@@ -1469,7 +1469,7 @@ export default function LeadDetail() {
                       placeholder="Past medical history, allergies, medications..." rows={2} />
                   </div>
                   <div className="col-span-2 border-t pt-3">
-                    <p className="text-xs font-semibold text-gray-600 mb-2">Vitals (Optional)</p>
+                    <p className="text-xs font-semibold text-[var(--ds-text-secondary)] mb-2">Vitals (Optional)</p>
                     <div className="grid grid-cols-5 gap-3">
                       <div className="grid gap-1">
                         <Label className="text-[10px]">Height (cm)</Label>
@@ -1513,49 +1513,49 @@ export default function LeadDetail() {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="rounded-lg border border-gray-200 p-4">
+                <div className="rounded-lg border border-[var(--ds-border)] p-4">
                   <h4 className="text-xs font-semibold text-blue-800 uppercase tracking-wider mb-3 flex items-center gap-2">
                     <User className="h-3.5 w-3.5" /> Lead Record
                   </h4>
                   <div className="space-y-2 text-sm">
-                    <div className="flex justify-between py-1 border-b border-gray-50">
-                      <span className="text-gray-500 text-xs">Name</span>
-                      <span className="font-medium text-gray-900 text-xs">{lead.lead_name}</span>
+                    <div className="flex justify-between py-1 border-b border-[var(--ds-border-light)]">
+                      <span className="text-[var(--ds-text-secondary)] text-xs">Name</span>
+                      <span className="font-medium text-[var(--ds-text)] text-xs">{lead.lead_name}</span>
                     </div>
-                    <div className="flex justify-between py-1 border-b border-gray-50">
-                      <span className="text-gray-500 text-xs">Phone</span>
-                      <span className="font-medium text-gray-900 text-xs">{lead.mobile}</span>
+                    <div className="flex justify-between py-1 border-b border-[var(--ds-border-light)]">
+                      <span className="text-[var(--ds-text-secondary)] text-xs">Phone</span>
+                      <span className="font-medium text-[var(--ds-text)] text-xs">{lead.mobile}</span>
                     </div>
-                    <div className="flex justify-between py-1 border-b border-gray-50">
-                      <span className="text-gray-500 text-xs">Status</span>
+                    <div className="flex justify-between py-1 border-b border-[var(--ds-border-light)]">
+                      <span className="text-[var(--ds-text-secondary)] text-xs">Status</span>
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${statusInfo.bg} ${statusInfo.text}`}>{statusInfo.label}</span>
                     </div>
                     <div className="flex justify-between py-1">
-                      <span className="text-gray-500 text-xs">Source</span>
-                      <span className="font-medium text-gray-900 text-xs">{lead.source?.replace(/_/g, " ")}</span>
+                      <span className="text-[var(--ds-text-secondary)] text-xs">Source</span>
+                      <span className="font-medium text-[var(--ds-text)] text-xs">{lead.source?.replace(/_/g, " ")}</span>
                     </div>
                   </div>
                 </div>
-                <div className="rounded-lg border border-gray-200 p-4">
+                <div className="rounded-lg border border-[var(--ds-border)] p-4">
                   <h4 className="text-xs font-semibold text-emerald-800 uppercase tracking-wider mb-3 flex items-center gap-2">
                     <Users className="h-3.5 w-3.5" /> Patient Record
                   </h4>
                   <div className="space-y-2 text-sm">
-                    <div className="flex justify-between py-1 border-b border-gray-50">
-                      <span className="text-gray-500 text-xs">Name</span>
-                      <span className="font-medium text-gray-900 text-xs">{convertForm.full_name || lead.lead_name}</span>
+                    <div className="flex justify-between py-1 border-b border-[var(--ds-border-light)]">
+                      <span className="text-[var(--ds-text-secondary)] text-xs">Name</span>
+                      <span className="font-medium text-[var(--ds-text)] text-xs">{convertForm.full_name || lead.lead_name}</span>
                     </div>
-                    <div className="flex justify-between py-1 border-b border-gray-50">
-                      <span className="text-gray-500 text-xs">Phone</span>
-                      <span className="font-medium text-gray-900 text-xs">{convertForm.phone || lead.mobile}</span>
+                    <div className="flex justify-between py-1 border-b border-[var(--ds-border-light)]">
+                      <span className="text-[var(--ds-text-secondary)] text-xs">Phone</span>
+                      <span className="font-medium text-[var(--ds-text)] text-xs">{convertForm.phone || lead.mobile}</span>
                     </div>
-                    <div className="flex justify-between py-1 border-b border-gray-50">
-                      <span className="text-gray-500 text-xs">Gender</span>
-                      <span className="font-medium text-gray-900 text-xs">{convertForm.gender || lead.gender || "—"}</span>
+                    <div className="flex justify-between py-1 border-b border-[var(--ds-border-light)]">
+                      <span className="text-[var(--ds-text-secondary)] text-xs">Gender</span>
+                      <span className="font-medium text-[var(--ds-text)] text-xs">{convertForm.gender || lead.gender || "—"}</span>
                     </div>
                     <div className="flex justify-between py-1">
-                      <span className="text-gray-500 text-xs">Age</span>
-                      <span className="font-medium text-gray-900 text-xs">{convertForm.age || lead.age?.toString() || "—"}</span>
+                      <span className="text-[var(--ds-text-secondary)] text-xs">Age</span>
+                      <span className="font-medium text-[var(--ds-text)] text-xs">{convertForm.age || lead.age?.toString() || "—"}</span>
                     </div>
                   </div>
                 </div>
@@ -1575,7 +1575,7 @@ export default function LeadDetail() {
             </div>
           )}
 
-          <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-gray-100">
+          <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-[var(--ds-border-light)]">
             {convertStep === 1 ? (
               <>
                 <Button variant="outline" onClick={() => { setConvertOpen(false); setConvertStep(1) }}>Cancel</Button>

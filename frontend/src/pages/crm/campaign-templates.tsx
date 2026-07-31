@@ -55,7 +55,7 @@ const channelIcon: Record<string, React.ElementType> = {
 const channelColors: Record<string, string> = {
   WHATSAPP: "bg-green-50 text-green-600",
   SMS: "bg-blue-50 text-blue-600",
-  EMAIL: "bg-purple-50 text-purple-600",
+  EMAIL: "bg-[var(--ds-accent-50)] text-[var(--ds-accent-600)]",
 }
 
 export default function CampaignTemplates() {
@@ -170,7 +170,7 @@ export default function CampaignTemplates() {
               <Loader2 className="h-8 w-8 animate-spin" />
             </div>
           ) : items.length === 0 ? (
-            <div className="py-12 text-center text-gray-400">
+            <div className="py-12 text-center text-[var(--ds-text-tertiary)]">
               <FileText className="mx-auto h-8 w-8 mb-2 opacity-40" />
               <p>No templates yet. Click "New Template" to create one.</p>
             </div>
@@ -188,14 +188,14 @@ export default function CampaignTemplates() {
                         <div
                           className={cn(
                             "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
-                            channelColors[t.channel] || "bg-gray-50 text-gray-600",
+                            channelColors[t.channel] || "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
                           )}
                         >
                           <Icon className="h-4 w-4" />
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-semibold truncate">{t.name}</p>
-                          <p className="text-xs text-gray-400">
+                          <p className="text-xs text-[var(--ds-text-tertiary)]">
                             {t.channel} · {t.category}
                           </p>
                         </div>
@@ -203,18 +203,18 @@ export default function CampaignTemplates() {
                       <Badge
                         className={cn(
                           "text-xs shrink-0",
-                          t.is_active ? "bg-green-50 text-green-600" : "bg-gray-50 text-gray-400",
+                          t.is_active ? "bg-green-50 text-green-600" : "bg-[var(--ds-background-subtle)] text-[var(--ds-text-tertiary)]",
                         )}
                       >
                         {t.is_active ? "Active" : "Inactive"}
                       </Badge>
                     </div>
-                    <p className="text-xs text-gray-500 line-clamp-3">{t.message}</p>
+                    <p className="text-xs text-[var(--ds-text-secondary)] line-clamp-3">{t.message}</p>
                     <div className="flex gap-1 pt-1">
                       <Button
                         variant="ghost"
                         size="icon-sm"
-                        className="text-gray-500"
+                        className="text-[var(--ds-text-secondary)]"
                         title="Edit"
                         onClick={() => openEdit(t)}
                       >
@@ -223,7 +223,7 @@ export default function CampaignTemplates() {
                       <Button
                         variant="ghost"
                         size="icon-sm"
-                        className="text-gray-500"
+                        className="text-[var(--ds-text-secondary)]"
                         title="Duplicate"
                         onClick={() => duplicateMutation.mutate(t.id)}
                       >
@@ -310,15 +310,15 @@ export default function CampaignTemplates() {
                 rows={6}
                 placeholder="Hello {{patient_name}}, this is a message from {{hospital_name}}."
               />
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-[var(--ds-text-tertiary)]">
                 Variables: {"{{patient_name}}"} {"{{doctor_name}}"} {"{{hospital_name}}"}{" "}
                 {"{{appointment_date}}"} {"{{treatment_name}}"}
               </p>
             </div>
             {message && (
-              <div className="rounded-lg border bg-gray-50 p-3">
-                <p className="text-xs font-medium text-gray-500 mb-1">Preview:</p>
-                <p className="text-sm text-gray-700">
+              <div className="rounded-lg border bg-[var(--ds-background-subtle)] p-3">
+                <p className="text-xs font-medium text-[var(--ds-text-secondary)] mb-1">Preview:</p>
+                <p className="text-sm text-[var(--ds-text-secondary)]">
                   {message.replace(/\{\{(\w+)\}\}/g, (_, v) => `[${v}]`)}
                 </p>
               </div>

@@ -5,15 +5,20 @@
    Color strategy
    ──────────────
    · All raw hex lives HERE. Components must only consume --ds-* semantic tokens.
-   · Primary  = "Marina Teal"  — teal-influenced premium blue, deepened for
-     confident CTAs. Not social / Bootstrap / Microsoft / Google blue.
-   · Secondary = "Graphite Slate" — quiet supporting actions, icons, neutrals.
+   · Primary  = "Marine Teal" — deep, premium healthcare teal (calm, clinical,
+     modern-dental). Strong CTAs carry white text at AA; the scale is tuned so
+     the 600 step anchors buttons and the 300/700 steps carry dark-mode UI.
+   · Secondary = "Steel Slate" — cool supporting tone for icons and neutrals.
    · Accent   = "Champagne Gold" — reserved for premium highlights, active
-     states and charts. Used sparingly.
-   · Neutrals = "Warm Stone" — warm, clean greys tuned for 8–10 hour use.
-   · Status   = desaturated, WCAG AA-verified semantic families.
-   · Dark theme is intentionally designed (not inverted) on warm charcoal +
-     marine surfaces with brightened mid-tone text for AA compliance.
+     states, billing and charts. Used sparingly.
+   · Neutrals = "Cool Canvas" — refined cool-grey canvas with a faint teal
+     undertone; every step is visibly separated from its neighbour so cards,
+     tables and dialogs layer instead of flattening, even after 8–10 hours.
+   · Status   = desaturated, WCAG AA-verified semantic families. Workflow
+     states are differentiated (completed = green, progress = teal, planned =
+     blue, pending = amber, cancelled = red) so no two statuses read alike.
+   · Dark theme is intentionally designed (not inverted) on teal-tinted deep
+     charcoal surfaces with brightened mid-tone text for AA compliance.
 
    Tailwind v4 interop
    ───────────────────
@@ -31,132 +36,133 @@
        RAW COLOR SCALES  —  light theme
        ───────────────────────────────────────────────────────────────────── */
 
-    /* Primary · Marina Teal (teal-influenced premium blue) */
-    --ds-primary-50:  #F1F7F8;
-    --ds-primary-100: #DCEBEE;
-    --ds-primary-200: #B7DADD;
-    --ds-primary-300: #8BC2C8;
-    --ds-primary-400: #5CA3AC;
-    --ds-primary-500: #2E7785;
-    --ds-primary-600: #266674;
-    --ds-primary-700: #21535E;
-    --ds-primary-800: #1D434C;
-    --ds-primary-900: #17363D;
-    --ds-primary-950: #0D2026;
+    /* Primary · Marine Teal (premium healthcare teal; calm, clinical, modern) */
+    --ds-primary-50:  #EEF7F6;
+    --ds-primary-100: #D8EFEC;
+    --ds-primary-200: #B3E0DC;
+    --ds-primary-300: #86CAC4;
+    --ds-primary-400: #4FAEA6;
+    --ds-primary-500: #258F87;
+    --ds-primary-600: #16736C;
+    --ds-primary-700: #125B56;
+    --ds-primary-800: #124A46;
+    --ds-primary-900: #113B38;
+    --ds-primary-950: #082320;
 
-    /* Secondary · Graphite Slate */
-    --ds-secondary-50:  #F5F7F9;
-    --ds-secondary-100: #E9EDF1;
-    --ds-secondary-200: #D6DDE4;
-    --ds-secondary-300: #B6C1CC;
-    --ds-secondary-400: #8F9DAC;
-    --ds-secondary-500: #6D7C8D;
-    --ds-secondary-600: #566472;
-    --ds-secondary-700: #46515D;
-    --ds-secondary-800: #39424C;
-    --ds-secondary-900: #2C333B;
-    --ds-secondary-950: #1B2026;
+    /* Secondary · Steel Slate (cool supporting tone) */
+    --ds-secondary-50:  #F3F6F9;
+    --ds-secondary-100: #E6EDF2;
+    --ds-secondary-200: #CFDAE3;
+    --ds-secondary-300: #ADC0CE;
+    --ds-secondary-400: #84A0B3;
+    --ds-secondary-500: #62839A;
+    --ds-secondary-600: #4E6B80;
+    --ds-secondary-700: #40586B;
+    --ds-secondary-800: #35495A;
+    --ds-secondary-900: #2C3C49;
+    --ds-secondary-950: #1B2730;
 
-    /* Accent · Champagne Gold */
-    --ds-accent-50:  #FBF8F3;
-    --ds-accent-100: #F6EFE4;
-    --ds-accent-200: #ECDDC5;
-    --ds-accent-300: #E0C59D;
-    --ds-accent-400: #D2A976;
-    --ds-accent-500: #C6955C;
-    --ds-accent-600: #AE7C47;
-    --ds-accent-700: #8E633A;
-    --ds-accent-800: #725030;
-    --ds-accent-900: #5B4028;
-    --ds-accent-950: #342517;
+    /* Accent · Champagne Gold (deepened midtones for legible accents) */
+    --ds-accent-50:  #FBF7EE;
+    --ds-accent-100: #F6EDD6;
+    --ds-accent-200: #ECDAAC;
+    --ds-accent-300: #E0C27F;
+    --ds-accent-400: #D6A957;
+    --ds-accent-500: #C78F3E;
+    --ds-accent-600: #A87232;
+    --ds-accent-700: #875A2A;
+    --ds-accent-800: #6B4824;
+    --ds-accent-900: #553A1F;
+    --ds-accent-950: #302014;
 
-    /* Neutral · Warm Stone (500 = AA-safe tertiary text on white, 4.99:1) */
+    /* Neutral · Cool Canvas (teal-undertone; 500 = 4.65:1 tertiary text on
+       white, every step visibly separated from its neighbour for layering) */
     --ds-neutral-0:   #FFFFFF;
-    --ds-neutral-25:  #FDFDFC;
-    --ds-neutral-50:  #FAF9F7;
-    --ds-neutral-100: #F3F1EE;
-    --ds-neutral-200: #E7E3DD;
-    --ds-neutral-300: #D5D0C8;
-    --ds-neutral-400: #B2ADA3;
-    --ds-neutral-500: #746F66;
-    --ds-neutral-600: #6B675F;
-    --ds-neutral-700: #524F48;
-    --ds-neutral-800: #3A3833;
-    --ds-neutral-900: #292724;
-    --ds-neutral-950: #161512;
+    --ds-neutral-25:  #FBFDFD;
+    --ds-neutral-50:  #F4F6F7;
+    --ds-neutral-100: #EBEFF1;
+    --ds-neutral-200: #DFE5E8;
+    --ds-neutral-300: #C7D0D4;
+    --ds-neutral-400: #A3AEB4;
+    --ds-neutral-500: #69767D;
+    --ds-neutral-600: #566269;
+    --ds-neutral-700: #414B51;
+    --ds-neutral-800: #2F373C;
+    --ds-neutral-900: #22292E;
+    --ds-neutral-950: #161B1F;
 
-    /* Success · Sage */
-    --ds-success-50:  #F0F6F4;
-    --ds-success-100: #DBEBE6;
-    --ds-success-200: #B8D8CF;
-    --ds-success-300: #8CBEB1;
-    --ds-success-400: #62A090;
-    --ds-success-500: #478575;
-    --ds-success-600: #3A6F62;
-    --ds-success-700: #315A50;
-    --ds-success-800: #2A4941;
-    --ds-success-900: #223B35;
-    --ds-success-950: #12211D;
+    /* Success · Clinic Green (yellow-green, distinct from brand teal) */
+    --ds-success-50:  #EFF7F0;
+    --ds-success-100: #DCEEE0;
+    --ds-success-200: #BBDDC5;
+    --ds-success-300: #8FC5A0;
+    --ds-success-400: #62A97A;
+    --ds-success-500: #3E8F5A;
+    --ds-success-600: #2F7A4B;
+    --ds-success-700: #2A6240;
+    --ds-success-800: #244F36;
+    --ds-success-900: #1F402C;
+    --ds-success-950: #10241A;
 
-    /* Warning · Amber Sand */
-    --ds-warning-50:  #FBF6EF;
-    --ds-warning-100: #F6EADA;
-    --ds-warning-200: #EDD3AE;
-    --ds-warning-300: #E2B878;
-    --ds-warning-400: #D8A050;
-    --ds-warning-500: #C98A3B;
-    --ds-warning-600: #B2712E;
-    --ds-warning-700: #915A28;
-    --ds-warning-800: #744824;
-    --ds-warning-900: #5C3B20;
-    --ds-warning-950: #362212;
+    /* Warning · Amber Ember */
+    --ds-warning-50:  #FCF8EE;
+    --ds-warning-100: #F9EED4;
+    --ds-warning-200: #F2DBA6;
+    --ds-warning-300: #E9C475;
+    --ds-warning-400: #E0AD4E;
+    --ds-warning-500: #D29134;
+    --ds-warning-600: #B57527;
+    --ds-warning-700: #935A21;
+    --ds-warning-800: #764A20;
+    --ds-warning-900: #603C1D;
+    --ds-warning-950: #38210F;
 
-    /* Danger · Terracotta */
-    --ds-danger-50:  #FAF2F2;
-    --ds-danger-100: #F3E0E0;
-    --ds-danger-200: #E6BDBD;
-    --ds-danger-300: #D68F8F;
-    --ds-danger-400: #C76969;
-    --ds-danger-500: #B84F4F;
-    --ds-danger-600: #A03E3E;
-    --ds-danger-700: #843434;
-    --ds-danger-800: #6A2C2C;
-    --ds-danger-900: #552424;
-    --ds-danger-950: #2F1414;
+    /* Danger · Clinic Red */
+    --ds-danger-50:  #FBF1F1;
+    --ds-danger-100: #F6DFDF;
+    --ds-danger-200: #ECBCBC;
+    --ds-danger-300: #DE9191;
+    --ds-danger-400: #CF6A6A;
+    --ds-danger-500: #BD4A4A;
+    --ds-danger-600: #A83A3A;
+    --ds-danger-700: #8B3030;
+    --ds-danger-800: #702828;
+    --ds-danger-900: #582222;
+    --ds-danger-950: #321313;
 
-    /* Info · Azure */
-    --ds-info-50:  #F0F5F9;
-    --ds-info-100: #DCEAF2;
-    --ds-info-200: #B9D3E3;
-    --ds-info-300: #8FB6CE;
-    --ds-info-400: #6597B3;
-    --ds-info-500: #487D99;
-    --ds-info-600: #3A667F;
-    --ds-info-700: #315367;
-    --ds-info-800: #294352;
-    --ds-info-900: #223640;
-    --ds-info-950: #12202A;
+    /* Info · Azure Sky (supporting tech blue — distinct from brand teal) */
+    --ds-info-50:  #EEF5FB;
+    --ds-info-100: #D9E9F7;
+    --ds-info-200: #B3D3EE;
+    --ds-info-300: #84B6E2;
+    --ds-info-400: #5598D3;
+    --ds-info-500: #307DBE;
+    --ds-info-600: #2466A3;
+    --ds-info-700: #205386;
+    --ds-info-800: #1E446C;
+    --ds-info-900: #1B3958;
+    --ds-info-950: #102138;
 
-    /* Plum · CRM / coordination (desaturated violet, used sparingly) */
-    --ds-plum-50:  #F4F2F8;
-    --ds-plum-100: #E9E6F0;
-    --ds-plum-200: #D6D1E4;
-    --ds-plum-300: #B9B1CE;
-    --ds-plum-400: #9A8FB5;
-    --ds-plum-500: #7A6E9E;
-    --ds-plum-600: #64598A;
-    --ds-plum-700: #4F4772;
-    --ds-plum-800: #3F3A5C;
-    --ds-plum-900: #332F49;
-    --ds-plum-950: #1D1B2A;
+    /* Plum · Graphite Violet (CRM / coordination, used sparingly) */
+    --ds-plum-50:  #F5F3F9;
+    --ds-plum-100: #EBE7F2;
+    --ds-plum-200: #D8D1E6;
+    --ds-plum-300: #BCB0D2;
+    --ds-plum-400: #9B8BB9;
+    --ds-plum-500: #7D6C9E;
+    --ds-plum-600: #67598A;
+    --ds-plum-700: #534872;
+    --ds-plum-800: #42395C;
+    --ds-plum-900: #342E48;
+    --ds-plum-950: #1D1A2A;
 
     /* ─────────────────────────────────────────────────────────────────────
-       BRAND  —  semantic tokens (WCAG AA: white on primary-500 = 5.1:1,
-       accent-foreground on accent-500 = 5.6:1)
+       BRAND  —  semantic tokens (WCAG AA: white on primary-600 = 5.65:1,
+       accent-foreground on accent-600 = 4.1:1)
        ───────────────────────────────────────────────────────────────────── */
-    --ds-primary: var(--ds-primary-500);
-    --ds-primary-hover: var(--ds-primary-600);
-    --ds-primary-active: var(--ds-primary-700);
+    --ds-primary: var(--ds-primary-600);
+    --ds-primary-hover: var(--ds-primary-700);
+    --ds-primary-active: var(--ds-primary-800);
     --ds-primary-subtle: var(--ds-primary-50);
     --ds-primary-light: var(--ds-primary-100);
     --ds-primary-foreground: #FFFFFF;
@@ -168,9 +174,9 @@
     --ds-secondary-light: var(--ds-secondary-100);
     --ds-secondary-foreground: #FFFFFF;
 
-    --ds-accent: var(--ds-accent-500);
-    --ds-accent-hover: var(--ds-accent-600);
-    --ds-accent-active: var(--ds-accent-700);
+    --ds-accent: var(--ds-accent-600);
+    --ds-accent-hover: var(--ds-accent-700);
+    --ds-accent-active: var(--ds-accent-800);
     --ds-accent-subtle: var(--ds-accent-50);
     --ds-accent-light: var(--ds-accent-100);
     --ds-accent-foreground: var(--ds-accent-950);
@@ -181,7 +187,7 @@
     --ds-background: var(--ds-neutral-50);
     --ds-background-elevated: var(--ds-neutral-25);
     --ds-background-subtle: var(--ds-neutral-100);
-    --ds-background-overlay: rgba(23, 21, 18, 0.5);
+    --ds-background-overlay: rgba(8, 29, 28, 0.55);
 
     /* ─────────────────────────────────────────────────────────────────────
        SURFACES
@@ -247,8 +253,8 @@
     --ds-status-active-text: var(--ds-success);
     --ds-status-followup-bg: var(--ds-warning-subtle);
     --ds-status-followup-text: var(--ds-warning);
-    --ds-status-completed-bg: var(--ds-primary-subtle);
-    --ds-status-completed-text: var(--ds-primary);
+    --ds-status-completed-bg: var(--ds-success-subtle);
+    --ds-status-completed-text: var(--ds-success);
     --ds-status-inactive-bg: var(--ds-background-subtle);
     --ds-status-inactive-text: var(--ds-text-tertiary);
     --ds-status-discontinued-bg: var(--ds-danger-subtle);
@@ -283,8 +289,8 @@
     --ds-status-rescheduled-text: var(--ds-warning);
     --ds-status-draft-bg: var(--ds-background-subtle);
     --ds-status-draft-text: var(--ds-text-tertiary);
-    --ds-status-planned-bg: var(--ds-primary-subtle);
-    --ds-status-planned-text: var(--ds-primary);
+    --ds-status-planned-bg: var(--ds-info-subtle);
+    --ds-status-planned-text: var(--ds-info);
     --ds-status-on-hold-bg: var(--ds-background-subtle);
     --ds-status-on-hold-text: var(--ds-text-tertiary);
 
@@ -363,34 +369,38 @@
     --ds-chart-16-tint: var(--ds-primary-100);
 
     /* ─────────────────────────────────────────────────────────────────────
-       SIDEBAR  —  "Midnight Marine" dark brand surface (both themes)
+       SIDEBAR  —  "Deep Marine" teal-tinted navy brand surface (both themes).
+       The teal undertone ties the rail to the Marine Teal identity while
+       the gold active indicator provides the premium warm accent.
        ───────────────────────────────────────────────────────────────────── */
-    --ds-sidebar-bg: #142229;
-    --ds-sidebar-surface: #1A2C34;
-    --ds-sidebar-border: #223640;
-    --ds-sidebar-text: #96A6AC;
-    --ds-sidebar-text-active: #F2F6F7;
-    --ds-sidebar-hover: rgba(255, 255, 255, 0.05);
-    --ds-sidebar-active-bg: rgba(255, 255, 255, 0.08);
+    --ds-sidebar-bg: #0B1A1E;
+    --ds-sidebar-surface: #10242A;
+    --ds-sidebar-border: #1C3339;
+    --ds-sidebar-text: #90A6AB;
+    --ds-sidebar-text-active: #F2F8F8;
+    --ds-sidebar-hover: rgba(255, 255, 255, 0.06);
+    --ds-sidebar-active-bg: rgba(255, 255, 255, 0.09);
     --ds-sidebar-active-indicator: var(--ds-accent);
-    --ds-sidebar-icon: #75909A;
+    --ds-sidebar-icon: #65848A;
     --ds-sidebar-icon-active: var(--ds-accent);
-    --ds-sidebar-glow: radial-gradient(120% 55% at 50% 0%, rgba(198, 149, 92, 0.10) 0%, rgba(198, 149, 92, 0.03) 40%, transparent 65%);
-    --ds-sidebar-edge: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0) 36%);
+    --ds-sidebar-glow: radial-gradient(120% 55% at 50% 0%, rgba(134, 202, 196, 0.10) 0%, rgba(134, 202, 196, 0.03) 42%, transparent 68%);
+    --ds-sidebar-edge: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 36%);
     --ds-sidebar-logo-grad-1: #FFFFFF;
-    --ds-sidebar-logo-grad-2: #BFDCE3;
-    --ds-sidebar-width: 280px;
-    --ds-sidebar-collapsed-width: 72px;
-    --ds-sidebar-brand-h: 64px;
-    --ds-sidebar-item-h: 40px;
+    --ds-sidebar-logo-grad-2: #A8DCD6;
+    --ds-sidebar-width: 252px;
+    --ds-sidebar-collapsed-width: 64px;
+    --ds-sidebar-brand-h: 56px;
+    --ds-sidebar-item-h: 36px;
     --ds-sidebar-item-gap: 2px;
-    --ds-sidebar-section-gap: 24px;
-    --ds-sidebar-padding-x: 12px;
+    --ds-sidebar-section-gap: 20px;
+    --ds-sidebar-padding-x: 10px;
 
-    /* ─── Header ─── */
+    /* ─── Header — white surface, brand accent edge + soft elevation ─── */
     --ds-header-bg: var(--ds-surface);
     --ds-header-border: var(--ds-border);
-    --ds-header-height: 56px;
+    --ds-header-height: 50px;
+    --ds-header-accent: linear-gradient(90deg, var(--ds-primary-500) 0%, var(--ds-primary-600) 45%, var(--ds-accent-500) 130%);
+    --ds-header-shadow: 0 1px 0 rgba(22, 35, 38, 0.04), 0 1px 3px rgba(22, 35, 38, 0.03);
 
     /* ─────────────────────────────────────────────────────────────────────
        COMPONENT COLOR MAPPINGS
@@ -398,6 +408,9 @@
     --ds-button-primary-bg: var(--ds-primary);
     --ds-button-primary-hover-bg: var(--ds-primary-hover);
     --ds-button-primary-fg: var(--ds-primary-foreground);
+    /* Premium primary: inner top sheen + soft coloured glow that lifts the
+       CTA off the canvas without shouting. */
+    --ds-button-primary-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 -1px 0 rgba(8, 35, 32, 0.16), 0 1px 2px rgba(8, 35, 32, 0.18), 0 2px 6px rgba(37, 143, 135, 0.20);
     --ds-button-secondary-bg: var(--ds-surface);
     --ds-button-secondary-hover-bg: var(--ds-surface-hover);
     --ds-button-secondary-fg: var(--ds-text);
@@ -406,6 +419,9 @@
     --ds-button-danger-hover-bg: var(--ds-danger-hover);
     --ds-button-danger-fg: var(--ds-danger-foreground);
     --ds-button-ghost-hover-bg: var(--ds-surface-hover);
+
+    /* Soft halo used by 2-step focus rings (inputs, tabs, triggers). */
+    --ds-focus-ring-alpha: rgba(37, 143, 135, 0.16);
 
     --ds-input-bg: var(--ds-surface);
     --ds-input-text: var(--ds-text);
@@ -425,34 +441,405 @@
     --ds-table-header-bg: var(--ds-background-subtle);
     --ds-table-row-hover-bg: var(--ds-surface-hover);
     --ds-table-row-selected-bg: var(--ds-primary-subtle);
+    --ds-table-row-zebra-bg: var(--ds-neutral-50);
 
     --ds-card-bg: var(--ds-surface);
 
     --ds-tooltip-bg: var(--ds-neutral-900);
     --ds-tooltip-fg: var(--ds-neutral-50);
 
-    /* ─── Typography ─── */
+    /* ─────────────────────────────────────────────────────────────────────
+       HERO GRADIENTS  —  premium page-identity gradients (token-driven)
+       ───────────────────────────────────────────────────────────────────── */
+    --ds-hero-gradient: linear-gradient(135deg, var(--ds-primary-600) 0%, var(--ds-primary-800) 55%, var(--ds-primary-950) 100%);
+    --ds-hero-gradient-accent: linear-gradient(135deg, var(--ds-primary-700) 0%, var(--ds-primary-900) 55%, var(--ds-accent-700) 135%);
+    --ds-hero-gradient-subtle: linear-gradient(135deg, var(--ds-primary-50) 0%, var(--ds-info-100) 55%, var(--ds-accent-50) 100%);
+    --ds-hero-grid: linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+
+    /* ─────────────────────────────────────────────────────────────────────
+       CLINICAL FINDING COLORS  —  toothchart / odontogram legend semantics.
+       Domain-specific chart colors (shared across themes).
+       ───────────────────────────────────────────────────────────────────── */
+    --ds-clinical-caries: #8B4513;
+    --ds-clinical-caries-fill: #D4A574;
+    --ds-clinical-caries-dark: #5C2E00;
+    --ds-clinical-amalgam: #808080;
+    --ds-clinical-amalgam-fill: #A0A0A0;
+    --ds-clinical-amalgam-mid: #C0C0C0;
+    --ds-clinical-composite: #DEB887;
+    --ds-clinical-composite-fill: #F0D9B5;
+    --ds-clinical-composite-dark: #C4A265;
+    --ds-clinical-rct: #7B2D8E;
+    --ds-clinical-rct-fill: #D4A0E0;
+    --ds-clinical-rct-dark: #6C3483;
+    --ds-clinical-rc-required: #DC2626;
+    --ds-clinical-rc-required-fill: #FCA5A5;
+    --ds-clinical-crown: #E8E0D8;
+    --ds-clinical-crown-dark: #C4B8A8;
+    --ds-clinical-bridge: #C8B8A0;
+    --ds-clinical-bridge-dark: #A08868;
+    --ds-clinical-implant: #4A90D9;
+    --ds-clinical-implant-fill: #A0C8F0;
+    --ds-clinical-calculus: #C49A3C;
+    --ds-clinical-calculus-fill: #E8D090;
+    --ds-clinical-gingivitis: #E04040;
+    --ds-clinical-periodontitis: #8B0000;
+    --ds-clinical-mobility: #FFA500;
+    --ds-clinical-mobility-high: #FF6600;
+    --ds-clinical-mobility-severe: #FF0000;
+    --ds-clinical-fracture: #FF4444;
+    --ds-clinical-fracture-fill: #FF8888;
+    --ds-clinical-stains: #A0522D;
+    --ds-clinical-attrition: #E8DCC8;
+    --ds-clinical-attrition-dark: #C4B498;
+    --ds-clinical-abrasion: #D8C8B0;
+    --ds-clinical-abrasion-dark: #B8A488;
+    --ds-clinical-erosion: #C8D8E0;
+    --ds-clinical-erosion-dark: #90A8B8;
+    --ds-clinical-missing: #E0E0E0;
+    --ds-clinical-impaction: #6C3483;
+    --ds-clinical-impaction-fill: #D2B4DE;
+    --ds-clinical-tooth: #F5F0E8;
+    --ds-clinical-tooth-mid: #EDE5D6;
+    --ds-clinical-tooth-base: #E8DECC;
+    --ds-clinical-root-stump: #C4A882;
+    --ds-clinical-root-stump-stroke: #8B7355;
+    --ds-clinical-outline: #B0A898;
+    --ds-clinical-outline-light: #C0B8A8;
+    --ds-clinical-toothnum: #888888;
+    --ds-clinical-inactive: #BBBBBB;
+    --ds-clinical-mobility-pink: #FF69B4;
+    --ds-clinical-tongue: #E8B8A0;
+
+    /* Toothchart finding palette (tag legend colors, shared across themes) */
+    --ds-toothchart-decay: #1F2937;
+    --ds-toothchart-gross-decay: #DC2626;
+    --ds-toothchart-root-stumps: #EAB308;
+    --ds-toothchart-missing: #D1D5DB;
+    --ds-toothchart-mobility: #22C55E;
+    --ds-toothchart-fracture: #EC4899;
+    --ds-toothchart-crown: #3B82F6;
+    --ds-toothchart-bridge: #A855F7;
+    --ds-toothchart-rct: #F59E0B;
+    --ds-toothchart-restoration: #9CA3AF;
+    --ds-toothchart-implant: #6B7280;
+    --ds-toothchart-veneers: #FCD34D;
+    --ds-toothchart-impaction: #8B5CF6;
+    --ds-toothchart-others: #94A3B8;
+
+    /* Toothchart surface accents */
+    --ds-toothchart-surface-mesial: #F59E0B;
+    --ds-toothchart-surface-distal: #8B5CF6;
+    --ds-toothchart-surface-buccal: #3B82F6;
+    --ds-toothchart-surface-lingual: #10B981;
+    --ds-toothchart-surface-occlusal: #EF4444;
+    --ds-toothchart-surface-incisal: #EC4899;
+    --ds-toothchart-surface-labial: #6366F1;
+    --ds-toothchart-surface-palatal: #14B8A6;
+
+    /* Toothchart restoration materials (condition fills) */
+    --ds-toothchart-material-amalgam: #808080;
+    --ds-toothchart-material-composite: #D2B48C;
+    --ds-toothchart-material-gold: #F59E0B;
+    --ds-toothchart-material-ceramic: #F5F5DC;
+    --ds-toothchart-material-zirconia: #F0F0F0;
+    --ds-toothchart-material-acrylic: #E8E0D8;
+
+    /* ═════════════════════════════════════════════════════════════════════
+       TYPOGRAPHY
+       ─────────────────────────────────────────────────────────────────────
+       Architecture
+       ────────────
+       1. FAMILIES     — heading / base / mono.
+       2. PRIMITIVES   — the raw, closed type scale. Nothing outside this
+                         file may invent a font-size, weight, leading or
+                         tracking value.
+       3. ROLES        — every semantic role in the product maps onto the
+                         primitives. Components never pick primitives
+                         directly; they consume a role via the matching
+                         `.ds-*` class in design-system/typography.css.
+
+       ⚠ Do NOT author `font: <shorthand>` tokens here. Tailwind resolves
+       `font-[var(--x)]` to `font-weight: var(--x)` and `text-[var(--x)]`
+       to `color: var(--x)`; a shorthand in either position is invalid CSS
+       and is dropped silently by the browser. Roles below are discrete so
+       every property lands correctly and is independently overridable.
+       ───────────────────────────────────────────────────────────────────── */
+
+    /* ── Families ── */
     --ds-font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
     --ds-font-family-heading: 'Plus Jakarta Sans', 'DM Sans', system-ui, sans-serif;
     --ds-font-family-mono: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
 
-    --ds-text-display: 600 32px/1.2 var(--ds-font-family-heading);
-    --ds-text-h1: 600 26px/1.25 var(--ds-font-family-heading);
-    --ds-text-h2: 600 20px/1.3 var(--ds-font-family-heading);
-    --ds-text-h3: 600 16px/1.4 var(--ds-font-family-heading);
-    --ds-text-h4: 600 14px/1.4 var(--ds-font-family-heading);
-    --ds-text-subtitle: 500 13px/1.5 var(--ds-font-family);
-    --ds-text-body: 400 14px/1.6 var(--ds-font-family);
-    --ds-text-body-sm: 400 13px/1.5 var(--ds-font-family);
-    --ds-text-caption: 400 12px/1.5 var(--ds-font-family);
-    --ds-text-label: 500 12px/1.4 var(--ds-font-family);
-    --ds-text-button: 500 13px/1 var(--ds-font-family);
-    --ds-text-button-lg: 500 14px/1 var(--ds-font-family);
-    --ds-text-table: 400 13px/1.5 var(--ds-font-family);
-    --ds-text-table-header: 600 11px/1.2 var(--ds-font-family);
-    --ds-text-overline: 500 10px/1.3 var(--ds-font-family);
+    /* ── Primitive: size scale (closed set — 11 steps) ── */
+    --ds-font-size-3xs: 10px;
+    --ds-font-size-2xs: 11px;
+    --ds-font-size-xs:  12px;
+    --ds-font-size-sm:  13px;
+    --ds-font-size-md:  14px;
+    --ds-font-size-lg:  15px;
+    --ds-font-size-xl:  16px;
+    --ds-font-size-2xl: 18px;
+    --ds-font-size-3xl: 20px;
+    --ds-font-size-4xl: 24px;
+    --ds-font-size-5xl: 30px;
+    --ds-font-size-6xl: 36px;
 
-    /* ─── Spacing ─── */
+    /* ── Primitive: line-height scale ── */
+    --ds-leading-none:    1;
+    --ds-leading-tight:   1.15;
+    --ds-leading-snug:    1.3;
+    --ds-leading-normal:  1.4;
+    --ds-leading-relaxed: 1.5;
+    --ds-leading-loose:   1.6;
+
+    /* ── Primitive: weight scale ── */
+    --ds-weight-regular:  400;
+    --ds-weight-medium:   500;
+    --ds-weight-semibold: 600;
+    --ds-weight-bold:     700;
+
+    /* ── Primitive: letter-spacing scale ── */
+    --ds-tracking-tighter: -0.02em;
+    --ds-tracking-tight:   -0.01em;
+    --ds-tracking-normal:  0em;
+    --ds-tracking-wide:    0.02em;
+    --ds-tracking-wider:   0.04em;
+    --ds-tracking-widest:  0.08em;
+
+    /* ── Role: Display title ── */
+    --ds-display-family: var(--ds-font-family-heading);
+    --ds-display-size: 32px;
+    --ds-display-weight: var(--ds-weight-bold);
+    --ds-display-leading: var(--ds-leading-tight);
+    --ds-display-tracking: var(--ds-tracking-tighter);
+
+    /* ── Role: Page title ── */
+    --ds-page-title-family: var(--ds-font-family-heading);
+    --ds-page-title-size: 22px;
+    --ds-page-title-weight: var(--ds-weight-bold);
+    --ds-page-title-leading: var(--ds-leading-tight);
+    --ds-page-title-tracking: var(--ds-tracking-tighter);
+
+    /* ── Role: Section title ── */
+    --ds-section-title-family: var(--ds-font-family-heading);
+    --ds-section-title-size: 18px;
+    --ds-section-title-weight: var(--ds-weight-semibold);
+    --ds-section-title-leading: var(--ds-leading-snug);
+    --ds-section-title-tracking: var(--ds-tracking-tight);
+
+    /* ── Role: Card title ── */
+    --ds-card-title-family: var(--ds-font-family-heading);
+    --ds-card-title-size: 14px;
+    --ds-card-title-weight: var(--ds-weight-semibold);
+    --ds-card-title-leading: var(--ds-leading-normal);
+    --ds-card-title-tracking: var(--ds-tracking-tight);
+
+    /* ── Role: Widget title (dashboard tiles) ── */
+    --ds-widget-title-family: var(--ds-font-family-heading);
+    --ds-widget-title-size: 13px;
+    --ds-widget-title-weight: var(--ds-weight-semibold);
+    --ds-widget-title-leading: var(--ds-leading-normal);
+    --ds-widget-title-tracking: var(--ds-tracking-tight);
+
+    /* ── Role: Form title (fieldset / form section) ── */
+    --ds-form-title-family: var(--ds-font-family-heading);
+    --ds-form-title-size: 14px;
+    --ds-form-title-weight: var(--ds-weight-semibold);
+    --ds-form-title-leading: var(--ds-leading-normal);
+    --ds-form-title-tracking: var(--ds-tracking-tight);
+
+    /* ── Role: Dialog title ── */
+    --ds-dialog-title-family: var(--ds-font-family-heading);
+    --ds-dialog-title-size: 18px;
+    --ds-dialog-title-weight: var(--ds-weight-semibold);
+    --ds-dialog-title-leading: var(--ds-leading-snug);
+    --ds-dialog-title-tracking: var(--ds-tracking-tight);
+
+    /* ── Role: Drawer title ── */
+    --ds-drawer-title-family: var(--ds-font-family-heading);
+    --ds-drawer-title-size: 18px;
+    --ds-drawer-title-weight: var(--ds-weight-semibold);
+    --ds-drawer-title-leading: var(--ds-leading-snug);
+    --ds-drawer-title-tracking: var(--ds-tracking-tight);
+
+    /* ── Role: Table header ── */
+    --ds-table-header-family: var(--ds-font-family);
+    --ds-table-header-size: var(--ds-font-size-2xs);
+    --ds-table-header-weight: var(--ds-weight-semibold);
+    --ds-table-header-leading: var(--ds-leading-snug);
+    --ds-table-header-tracking: var(--ds-tracking-wider);
+    --ds-table-header-transform: uppercase;
+
+    /* ── Role: Table cell ── */
+    --ds-table-cell-family: var(--ds-font-family);
+    --ds-table-cell-size: var(--ds-font-size-sm);
+    --ds-table-cell-weight: var(--ds-weight-regular);
+    --ds-table-cell-leading: var(--ds-leading-relaxed);
+    --ds-table-cell-tracking: var(--ds-tracking-normal);
+
+    /* ── Role: Navigation label (header / tabs) ── */
+    --ds-nav-label-family: var(--ds-font-family);
+    --ds-nav-label-size: var(--ds-font-size-sm);
+    --ds-nav-label-weight: var(--ds-weight-medium);
+    --ds-nav-label-leading: var(--ds-leading-normal);
+    --ds-nav-label-tracking: var(--ds-tracking-normal);
+
+    /* ── Role: Sidebar label ── */
+    --ds-sidebar-label-family: var(--ds-font-family);
+    --ds-sidebar-label-size: var(--ds-font-size-sm);
+    --ds-sidebar-label-weight: var(--ds-weight-medium);
+    --ds-sidebar-label-leading: var(--ds-leading-normal);
+    --ds-sidebar-label-tracking: var(--ds-tracking-normal);
+
+    /* ── Role: Sidebar section heading ── */
+    --ds-sidebar-section-family: var(--ds-font-family);
+    --ds-sidebar-section-size: var(--ds-font-size-3xs);
+    --ds-sidebar-section-weight: var(--ds-weight-semibold);
+    --ds-sidebar-section-leading: var(--ds-leading-snug);
+    --ds-sidebar-section-tracking: var(--ds-tracking-widest);
+    --ds-sidebar-section-transform: uppercase;
+
+    /* ── Role: Form label ── */
+    --ds-form-label-family: var(--ds-font-family);
+    --ds-form-label-size: var(--ds-font-size-xs);
+    --ds-form-label-weight: var(--ds-weight-medium);
+    --ds-form-label-leading: var(--ds-leading-normal);
+    --ds-form-label-tracking: var(--ds-tracking-wide);
+
+    /* ── Role: Input text ── */
+    --ds-input-text-family: var(--ds-font-family);
+    --ds-input-text-size: var(--ds-font-size-md);
+    --ds-input-text-weight: var(--ds-weight-regular);
+    --ds-input-text-leading: var(--ds-leading-relaxed);
+    --ds-input-text-tracking: var(--ds-tracking-normal);
+
+    /* ── Role: Placeholder text ── */
+    --ds-placeholder-family: var(--ds-font-family);
+    --ds-placeholder-size: var(--ds-font-size-md);
+    --ds-placeholder-weight: var(--ds-weight-regular);
+    --ds-placeholder-leading: var(--ds-leading-relaxed);
+    --ds-placeholder-tracking: var(--ds-tracking-normal);
+
+    /* ── Role: Body text ── */
+    --ds-body-family: var(--ds-font-family);
+    --ds-body-size: var(--ds-font-size-md);
+    --ds-body-weight: var(--ds-weight-regular);
+    --ds-body-leading: var(--ds-leading-relaxed);
+    --ds-body-tracking: var(--ds-tracking-normal);
+
+    /* ── Role: Secondary text ── */
+    --ds-secondary-text-family: var(--ds-font-family);
+    --ds-secondary-text-size: var(--ds-font-size-sm);
+    --ds-secondary-text-weight: var(--ds-weight-regular);
+    --ds-secondary-text-leading: var(--ds-leading-relaxed);
+    --ds-secondary-text-tracking: var(--ds-tracking-normal);
+
+    /* ── Role: Caption ── */
+    --ds-caption-family: var(--ds-font-family);
+    --ds-caption-size: var(--ds-font-size-xs);
+    --ds-caption-weight: var(--ds-weight-regular);
+    --ds-caption-leading: var(--ds-leading-normal);
+    --ds-caption-tracking: var(--ds-tracking-normal);
+
+    /* ── Role: Badge ── */
+    --ds-badge-family: var(--ds-font-family);
+    --ds-badge-size: var(--ds-font-size-2xs);
+    --ds-badge-weight: var(--ds-weight-semibold);
+    --ds-badge-leading: var(--ds-leading-snug);
+    --ds-badge-tracking: var(--ds-tracking-wide);
+
+    /* ── Role: Status label ── */
+    --ds-status-label-family: var(--ds-font-family);
+    --ds-status-label-size: var(--ds-font-size-2xs);
+    --ds-status-label-weight: var(--ds-weight-semibold);
+    --ds-status-label-leading: var(--ds-leading-snug);
+    --ds-status-label-tracking: var(--ds-tracking-wider);
+
+    /* ── Role: Tooltip ── */
+    --ds-tooltip-family: var(--ds-font-family);
+    --ds-tooltip-size: var(--ds-font-size-xs);
+    --ds-tooltip-weight: var(--ds-weight-medium);
+    --ds-tooltip-leading: var(--ds-leading-normal);
+    --ds-tooltip-tracking: var(--ds-tracking-normal);
+
+    /* ── Role: Helper text ── */
+    --ds-helper-family: var(--ds-font-family);
+    --ds-helper-size: var(--ds-font-size-xs);
+    --ds-helper-weight: var(--ds-weight-regular);
+    --ds-helper-leading: var(--ds-leading-normal);
+    --ds-helper-tracking: var(--ds-tracking-normal);
+
+    /* ── Role: Error text ── */
+    --ds-error-text-family: var(--ds-font-family);
+    --ds-error-text-size: var(--ds-font-size-xs);
+    --ds-error-text-weight: var(--ds-weight-medium);
+    --ds-error-text-leading: var(--ds-leading-normal);
+    --ds-error-text-tracking: var(--ds-tracking-normal);
+
+    /* ── Role: Success message ── */
+    --ds-success-text-family: var(--ds-font-family);
+    --ds-success-text-size: var(--ds-font-size-xs);
+    --ds-success-text-weight: var(--ds-weight-medium);
+    --ds-success-text-leading: var(--ds-leading-normal);
+    --ds-success-text-tracking: var(--ds-tracking-normal);
+
+    /* ── Role: Notification ── */
+    --ds-notification-family: var(--ds-font-family);
+    --ds-notification-size: var(--ds-font-size-sm);
+    --ds-notification-weight: var(--ds-weight-regular);
+    --ds-notification-leading: var(--ds-leading-relaxed);
+    --ds-notification-tracking: var(--ds-tracking-normal);
+    --ds-notification-title-weight: var(--ds-weight-semibold);
+
+    /* ── Role: Breadcrumb ── */
+    --ds-breadcrumb-family: var(--ds-font-family);
+    --ds-breadcrumb-size: var(--ds-font-size-xs);
+    --ds-breadcrumb-weight: var(--ds-weight-medium);
+    --ds-breadcrumb-leading: var(--ds-leading-normal);
+    --ds-breadcrumb-tracking: var(--ds-tracking-normal);
+
+    /* ── Role: Button ── */
+    --ds-button-family: var(--ds-font-family);
+    --ds-button-size: var(--ds-font-size-sm);
+    --ds-button-weight: var(--ds-weight-medium);
+    --ds-button-leading: var(--ds-leading-none);
+    --ds-button-tracking: var(--ds-tracking-normal);
+    --ds-button-lg-size: var(--ds-font-size-md);
+    --ds-button-sm-size: var(--ds-font-size-xs);
+
+    /* ── Role: Overline / eyebrow ── */
+    --ds-overline-family: var(--ds-font-family);
+    --ds-overline-size: var(--ds-font-size-3xs);
+    --ds-overline-weight: var(--ds-weight-semibold);
+    --ds-overline-leading: var(--ds-leading-snug);
+    --ds-overline-tracking: var(--ds-tracking-widest);
+    --ds-overline-transform: uppercase;
+
+    /* ── Role: Metric / KPI value ── */
+    --ds-metric-family: var(--ds-font-family-heading);
+    --ds-metric-size: 22px;
+    --ds-metric-weight: var(--ds-weight-bold);
+    --ds-metric-leading: var(--ds-leading-tight);
+    --ds-metric-tracking: var(--ds-tracking-tighter);
+    --ds-metric-lg-size: 26px;
+
+    /* ── Role: Code / monospace numerics ── */
+    --ds-code-family: var(--ds-font-family-mono);
+    --ds-code-size: var(--ds-font-size-sm);
+    --ds-code-weight: var(--ds-weight-regular);
+    --ds-code-leading: var(--ds-leading-relaxed);
+    --ds-code-tracking: var(--ds-tracking-normal);
+
+    /* ─── Spacing ───
+       Global density pass: the mid/large steps are pulled down ~10–15%
+       (16→14, 20→16, 24→20, 32→28, 40→36) so every component that consumes
+       these tokens — cards, tables, forms, dialogs, grids — compacts together
+       and information density rises without touching the 4px alignment grid.
+       The small steps (2/4/6/8/10) are deliberately untouched: below ~10px the
+       saving is invisible and readability starts to suffer. Touch targets,
+       focus rings and body text are separate tokens and are NOT reduced. */
     --ds-spacing-0: 0px;
     --ds-spacing-px: 1px;
     --ds-spacing-0_5: 2px;
@@ -460,20 +847,20 @@
     --ds-spacing-1_5: 6px;
     --ds-spacing-2: 8px;
     --ds-spacing-2_5: 10px;
-    --ds-spacing-3: 12px;
-    --ds-spacing-3_5: 14px;
-    --ds-spacing-4: 16px;
-    --ds-spacing-5: 20px;
-    --ds-spacing-6: 24px;
-    --ds-spacing-7: 28px;
-    --ds-spacing-8: 32px;
-    --ds-spacing-9: 36px;
-    --ds-spacing-10: 40px;
-    --ds-spacing-12: 48px;
-    --ds-spacing-14: 56px;
-    --ds-spacing-16: 64px;
-    --ds-spacing-20: 80px;
-    --ds-spacing-24: 96px;
+    --ds-spacing-3: 10px;
+    --ds-spacing-3_5: 12px;
+    --ds-spacing-4: 14px;
+    --ds-spacing-5: 16px;
+    --ds-spacing-6: 20px;
+    --ds-spacing-7: 24px;
+    --ds-spacing-8: 28px;
+    --ds-spacing-9: 32px;
+    --ds-spacing-10: 36px;
+    --ds-spacing-12: 44px;
+    --ds-spacing-14: 50px;
+    --ds-spacing-16: 56px;
+    --ds-spacing-20: 72px;
+    --ds-spacing-24: 84px;
 
     /* ─── Border Radius ─── */
     --ds-radius-sm: 4px;
@@ -484,25 +871,77 @@
     --ds-radius-3xl: 20px;
     --ds-radius-full: 9999px;
 
-    /* ─── Shadows ─── */
-    --ds-shadow-xs: 0 1px 2px rgba(23, 21, 18, 0.04);
-    --ds-shadow-sm: 0 1px 3px rgba(23, 21, 18, 0.05), 0 1px 2px rgba(23, 21, 18, 0.03);
-    --ds-shadow-md: 0 4px 8px rgba(23, 21, 18, 0.05), 0 2px 4px rgba(23, 21, 18, 0.04);
-    --ds-shadow-lg: 0 8px 20px rgba(23, 21, 18, 0.06), 0 4px 8px rgba(23, 21, 18, 0.04);
-    --ds-shadow-xl: 0 12px 32px rgba(23, 21, 18, 0.07), 0 6px 12px rgba(23, 21, 18, 0.04);
-    --ds-shadow-2xl: 0 20px 48px rgba(23, 21, 18, 0.09), 0 8px 20px rgba(23, 21, 18, 0.05);
-    --ds-shadow-elevated: 0 2px 16px rgba(23, 21, 18, 0.07);
-    --ds-shadow-drawer: -8px 0 24px rgba(23, 21, 18, 0.07);
-    --ds-shadow-dialog: 0 20px 60px rgba(23, 21, 18, 0.14);
-    --ds-shadow-dropdown: 0 8px 20px rgba(23, 21, 18, 0.07);
-    --ds-shadow-card: 0 0 0 1px rgba(23, 21, 18, 0.02), 0 1px 2px rgba(23, 21, 18, 0.04), 0 2px 8px rgba(23, 21, 18, 0.03);
-    --ds-shadow-card-hover: 0 0 0 1px rgba(23, 21, 18, 0.03), 0 4px 14px rgba(23, 21, 18, 0.07);
+    /* ─── Shadows — deep teal-slate tone; elevation reads as depth, not dirt ─── */
+    --ds-shadow-xs: 0 1px 2px rgba(23, 42, 48, 0.05);
+    --ds-shadow-sm: 0 1px 2px rgba(23, 42, 48, 0.05), 0 1px 3px rgba(23, 42, 48, 0.04);
+    --ds-shadow-md: 0 2px 4px rgba(23, 42, 48, 0.05), 0 4px 10px rgba(23, 42, 48, 0.06);
+    --ds-shadow-lg: 0 4px 8px rgba(23, 42, 48, 0.05), 0 10px 24px rgba(23, 42, 48, 0.08);
+    --ds-shadow-xl: 0 6px 12px rgba(23, 42, 48, 0.06), 0 14px 36px rgba(23, 42, 48, 0.10);
+    --ds-shadow-2xl: 0 8px 20px rgba(23, 42, 48, 0.08), 0 24px 56px rgba(23, 42, 48, 0.12);
+    --ds-shadow-elevated: 0 2px 16px rgba(23, 42, 48, 0.08);
+    --ds-shadow-drawer: -8px 0 24px rgba(23, 42, 48, 0.10);
+    --ds-shadow-dialog: 0 20px 60px rgba(8, 29, 28, 0.16);
+    --ds-shadow-dropdown: 0 8px 20px rgba(23, 42, 48, 0.09);
+    --ds-shadow-card: 0 0 0 1px rgba(23, 42, 48, 0.03), 0 1px 2px rgba(23, 42, 48, 0.04), 0 2px 8px rgba(23, 42, 48, 0.05);
+    --ds-shadow-card-hover: 0 0 0 1px rgba(23, 42, 48, 0.04), 0 4px 14px rgba(23, 42, 48, 0.10);
 
-    /* ─── Transitions ─── */
-    --ds-transition-fast: 120ms ease;
-    --ds-transition-base: 200ms ease;
-    --ds-transition-slow: 300ms ease;
-    --ds-transition-spring: 400ms cubic-bezier(0.22, 1, 0.36, 1);
+    /* ─── App canvas wash — faint teal halo at the top of the workspace so the
+       page never reads as flat grey; stays comfortably subtle for 8–10h use ─── */
+    --ds-app-wash: radial-gradient(120% 55% at 50% 0%, color-mix(in oklab, var(--ds-primary-100) 45%, transparent) 0%, color-mix(in oklab, var(--ds-primary-50) 18%, transparent) 46%, transparent 70%);
+
+    /* ═════════════════════════════════════════════════════════════════════
+       MOTION
+       ─────────────────────────────────────────────────────────────────────
+       Durations are deliberately short: enterprise operators repeat the
+       same interaction hundreds of times per shift, so motion must confirm
+       causality without ever becoming a waiting cost. Nothing that blocks
+       input may exceed 200ms.
+
+       Every duration token collapses to 0.01ms under
+       `prefers-reduced-motion: reduce` (see design-system/motion.css), so
+       consuming tokens — never literals — is what makes the whole app
+       reduced-motion compliant for free.
+       ───────────────────────────────────────────────────────────────────── */
+
+    /* ── Easings ── */
+    --ds-ease-standard:   cubic-bezier(0.2, 0, 0.2, 1);
+    --ds-ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
+    --ds-ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
+    --ds-ease-emphasized: cubic-bezier(0.22, 1, 0.36, 1);
+    --ds-ease-spring:     cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    /* ── Durations ── */
+    --ds-duration-instant: 80ms;
+    --ds-duration-fast:    120ms;
+    --ds-duration-base:    180ms;
+    --ds-duration-slow:    240ms;
+    --ds-duration-slower:  320ms;
+
+    /* ── Composed transitions ── */
+    --ds-transition-fast: var(--ds-duration-fast) var(--ds-ease-standard);
+    --ds-transition-base: var(--ds-duration-base) var(--ds-ease-standard);
+    --ds-transition-slow: var(--ds-duration-slow) var(--ds-ease-standard);
+    --ds-transition-spring: var(--ds-duration-slower) var(--ds-ease-emphasized);
+
+    /* ── Per-surface motion contracts ── */
+    --ds-motion-page:     var(--ds-duration-base) var(--ds-ease-decelerate);
+    --ds-motion-dialog:   var(--ds-duration-base) var(--ds-ease-emphasized);
+    --ds-motion-drawer:   var(--ds-duration-slow) var(--ds-ease-emphasized);
+    --ds-motion-dropdown: var(--ds-duration-fast) var(--ds-ease-decelerate);
+    --ds-motion-accordion:var(--ds-duration-base) var(--ds-ease-standard);
+    --ds-motion-tab:      var(--ds-duration-fast) var(--ds-ease-standard);
+    --ds-motion-sidebar:  var(--ds-duration-base) var(--ds-ease-emphasized);
+    --ds-motion-toast:    var(--ds-duration-slow) var(--ds-ease-emphasized);
+    --ds-motion-hover:    var(--ds-duration-fast) var(--ds-ease-standard);
+    --ds-motion-press:    var(--ds-duration-instant) var(--ds-ease-standard);
+
+    /* ── Travel distances (kept small: large translations read as jank) ── */
+    --ds-motion-distance-sm: 4px;
+    --ds-motion-distance-md: 8px;
+    --ds-motion-distance-lg: 16px;
+
+    /* ── Skeleton shimmer ── */
+    --ds-motion-shimmer-duration: 1.4s;
 
     /* ─── Z-Index Scale ─── */
     --ds-z-sticky: 100;
@@ -530,6 +969,15 @@
     --ds-element-gap: var(--ds-spacing-4);
     --ds-element-gap-sm: var(--ds-spacing-3);
 
+    /* ─── Control Sizes (buttons, inputs, segmented controls) ─── */
+    --ds-btn-h: var(--ds-spacing-9);
+    --ds-btn-h-sm: var(--ds-spacing-8);
+    --ds-btn-h-lg: var(--ds-spacing-10);
+    --ds-btn-h-xl: var(--ds-spacing-12);
+    --ds-control-h: var(--ds-spacing-9);
+    --ds-control-h-sm: var(--ds-spacing-8);
+    --ds-control-h-lg: var(--ds-spacing-10);
+
     /* ─── Content Grouping ─── */
     --ds-group-gap: var(--ds-spacing-5);
     --ds-stack-gap: var(--ds-spacing-3);
@@ -547,17 +995,81 @@
     --ds-table-radius: var(--ds-radius-lg);
 
     /* ─── Forms ─── */
-    --ds-input-height: 40px;
+    --ds-input-height: 36px;
     --ds-input-padding: 0 var(--ds-spacing-3);
     --ds-input-radius: var(--ds-radius-lg);
     --ds-input-border: var(--ds-border);
     --ds-input-border-hover: var(--ds-border-hover);
     --ds-input-border-focus: var(--ds-primary);
     --ds-input-shadow: var(--ds-shadow-xs);
-    --ds-input-font: var(--ds-text-body);
+    --ds-input-font-size: var(--ds-input-text-size);
+    --ds-input-font-weight: var(--ds-input-text-weight);
+    --ds-input-line-height: var(--ds-input-text-leading);
 
     /* ─── Header + Sidebar Dimensions ─── */
     --ds-header-h: var(--ds-header-height);
+
+    /* ═════════════════════════════════════════════════════════════════════
+       BREAKPOINTS
+       ─────────────────────────────────────────────────────────────────────
+       Documented as tokens so every breakpoint in the product is named and
+       auditable. CSS cannot interpolate custom properties inside a media
+       query prelude, so `@media` rules must repeat the literal — these
+       tokens are the single source of truth those literals must match, and
+       are readable at runtime for JS-side matchMedia logic.
+
+         xs   < 480    phone (portrait)
+         sm   ≥ 480    phone (landscape) / small tablet
+         md   ≥ 768    tablet
+         lg   ≥ 1024   laptop  — sidebar becomes persistent here
+         xl   ≥ 1280   desktop
+         2xl  ≥ 1536   large desktop
+         3xl  ≥ 1920   ultra-wide (content stops growing, gutters absorb)
+       ───────────────────────────────────────────────────────────────────── */
+    --ds-breakpoint-xs: 480px;
+    --ds-breakpoint-sm: 640px;
+    --ds-breakpoint-md: 768px;
+    --ds-breakpoint-lg: 1024px;
+    --ds-breakpoint-xl: 1280px;
+    --ds-breakpoint-2xl: 1536px;
+    --ds-breakpoint-3xl: 1920px;
+
+    /* ═════════════════════════════════════════════════════════════════════
+       GRID SYSTEM
+       ─────────────────────────────────────────────────────────────────────
+       One 12-column grid, one gutter scale. Card/metric collections use the
+       auto-fit tracks below so cards can never misalign or orphan — the
+       track count is derived from available width rather than hand-authored
+       per breakpoint.
+       ───────────────────────────────────────────────────────────────────── */
+    --ds-grid-columns: 12;
+    --ds-grid-gutter: var(--ds-spacing-4);
+    --ds-grid-gutter-sm: var(--ds-spacing-3);
+    --ds-grid-gutter-lg: var(--ds-spacing-6);
+
+    /* Minimum comfortable track widths for auto-fitting collections */
+    --ds-grid-min-metric: 180px;
+    --ds-grid-min-card: 250px;
+    --ds-grid-min-wide: 340px;
+    --ds-grid-min-form: 220px;
+
+    /* Reading measure — long-form text must not exceed this */
+    --ds-measure: 72ch;
+
+    /* ═════════════════════════════════════════════════════════════════════
+       ACCESSIBILITY
+       ───────────────────────────────────────────────────────────────────── */
+    /* WCAG 2.5.5 / 2.5.8 — minimum interactive target sizes */
+    --ds-target-min: 24px;          /* AA  (2.5.8) absolute floor */
+    --ds-target-comfortable: 36px;  /* pointer-precise default    */
+    --ds-target-touch: 44px;        /* AAA (2.5.5) touch default  */
+
+    /* Focus indicator — WCAG 2.4.11/2.4.13 (non-obscured, ≥2px, 3:1) */
+    --ds-focus-ring-width: 2px;
+    --ds-focus-ring-offset: 2px;
+    --ds-focus-ring-color: var(--ds-focus-ring);
+    --ds-focus-ring-shadow: 0 0 0 var(--ds-focus-ring-offset) var(--ds-surface),
+                            0 0 0 calc(var(--ds-focus-ring-offset) + var(--ds-focus-ring-width)) var(--ds-focus-ring-color);
   }
 
   /* ═══════════════════════════════════════════════════════════════════════════
@@ -566,115 +1078,115 @@
      ═══════════════════════════════════════════════════════════════════════════ */
   .dark {
     /* Raw scales shift darker; same 50 → 950 orientation (50 lightest) */
-    --ds-primary-50:  #EAF3F5;
-    --ds-primary-100: #D3E7EA;
-    --ds-primary-200: #A9CDD4;
-    --ds-primary-300: #7FB2BD;
-    --ds-primary-400: #5A93A0;
-    --ds-primary-500: #3A7481;
-    --ds-primary-600: #2E5F6B;
-    --ds-primary-700: #254B55;
-    --ds-primary-800: #1D3B43;
-    --ds-primary-900: #162D34;
-    --ds-primary-950: #0D1C21;
+     --ds-primary-50:  #E7F4F2;
+     --ds-primary-100: #C9E9E5;
+     --ds-primary-200: #A1D6D0;
+     --ds-primary-300: #7AC1BA;
+     --ds-primary-400: #55A8A0;
+     --ds-primary-500: #3C8B84;
+     --ds-primary-600: #2E726C;
+     --ds-primary-700: #285B57;
+     --ds-primary-800: #224744;
+     --ds-primary-900: #1A3332;
+     --ds-primary-950: #0D2020;
 
-    --ds-secondary-50:  #F1F3F5;
-    --ds-secondary-100: #DCE1E6;
-    --ds-secondary-200: #B7C0C9;
-    --ds-secondary-300: #909BA7;
-    --ds-secondary-400: #6F7B88;
-    --ds-secondary-500: #57616D;
-    --ds-secondary-600: #424A55;
-    --ds-secondary-700: #323841;
-    --ds-secondary-800: #262B33;
-    --ds-secondary-900: #1E2228;
+    --ds-secondary-50:  #EEF2F6;
+    --ds-secondary-100: #D8E0E9;
+    --ds-secondary-200: #B3C1D0;
+    --ds-secondary-300: #8FA1B3;
+    --ds-secondary-400: #6F8295;
+    --ds-secondary-500: #566778;
+    --ds-secondary-600: #435061;
+    --ds-secondary-700: #343E4B;
+    --ds-secondary-800: #292F38;
+    --ds-secondary-900: #202429;
     --ds-secondary-950: #171A1F;
 
-    --ds-accent-50:  #F8EFE0;
-    --ds-accent-100: #EBD7B4;
-    --ds-accent-200: #D8B88B;
-    --ds-accent-300: #BC9666;
-    --ds-accent-400: #9A7A50;
-    --ds-accent-500: #7A6040;
-    --ds-accent-600: #5F4B32;
-    --ds-accent-700: #4A3A27;
-    --ds-accent-800: #3A2E1F;
-    --ds-accent-900: #2E2418;
-    --ds-accent-950: #241C12;
+    --ds-accent-50:  #F7EFDE;
+    --ds-accent-100: #EDDDB5;
+    --ds-accent-200: #DCC48C;
+    --ds-accent-300: #C4A66B;
+    --ds-accent-400: #A4884E;
+    --ds-accent-500: #846C3A;
+    --ds-accent-600: #66542C;
+    --ds-accent-700: #4F4223;
+    --ds-accent-800: #3C331D;
+    --ds-accent-900: #2C2616;
+    --ds-accent-950: #1D190F;
 
-    --ds-neutral-0:   #FFFFFF;
-    --ds-neutral-25:  #191B21;
-    --ds-neutral-50:  #14151A;
-    --ds-neutral-100: #1B1D23;
-    --ds-neutral-200: #21242B;
-    --ds-neutral-300: #282B33;
-    --ds-neutral-400: #3B4048;
-    --ds-neutral-500: #50565F;
-    --ds-neutral-600: #848A94;
-    --ds-neutral-700: #9297A0;
-    --ds-neutral-800: #C1C5CB;
-    --ds-neutral-900: #E8E9EC;
-    --ds-neutral-950: #F6F7F8;
+     --ds-neutral-0:   #FFFFFF;
+     --ds-neutral-25:  #161C1E;
+     --ds-neutral-50:  #101617;
+     --ds-neutral-100: #171E20;
+     --ds-neutral-200: #1F282B;
+     --ds-neutral-300: #283336;
+     --ds-neutral-400: #384447;
+     --ds-neutral-500: #505D61;
+     --ds-neutral-600: #7A8689;
+     --ds-neutral-700: #9AA5A8;
+     --ds-neutral-800: #C6CED0;
+     --ds-neutral-900: #E8EDEE;
+     --ds-neutral-950: #F6FAFA;
 
-    --ds-success-50:  #12201C;
-    --ds-success-100: #162823;
-    --ds-success-200: #1D342B;
-    --ds-success-300: #264638;
-    --ds-success-400: #325C48;
-    --ds-success-500: #41745C;
-    --ds-success-600: #599078;
-    --ds-success-700: #7DAF97;
-    --ds-success-800: #A6CCB9;
-    --ds-success-900: #D1E4DC;
-    --ds-success-950: #EDF5F2;
+     --ds-success-50:  #0F1E14;
+     --ds-success-100: #13281B;
+     --ds-success-200: #1A3524;
+     --ds-success-300: #224530;
+     --ds-success-400: #2C5A3E;
+     --ds-success-500: #3A7550;
+     --ds-success-600: #50946A;
+     --ds-success-700: #7CBB98;
+     --ds-success-800: #A6D7BD;
+     --ds-success-900: #D2EBDD;
+     --ds-success-950: #EFF8F3;
 
-    --ds-warning-50:  #211C13;
-    --ds-warning-100: #2A2216;
-    --ds-warning-200: #362A1B;
-    --ds-warning-300: #46371F;
-    --ds-warning-400: #5C4A2A;
-    --ds-warning-500: #796132;
-    --ds-warning-600: #9C7C3E;
-    --ds-warning-700: #BE9A52;
-    --ds-warning-800: #D9BC7E;
-    --ds-warning-900: #EBD7A8;
-    --ds-warning-950: #F8F0DE;
+    --ds-warning-50:  #221C12;
+    --ds-warning-100: #2B2315;
+    --ds-warning-200: #372C1A;
+    --ds-warning-300: #47391F;
+    --ds-warning-400: #5C4B28;
+    --ds-warning-500: #796432;
+    --ds-warning-600: #9C813E;
+    --ds-warning-700: #BEA252;
+    --ds-warning-800: #D9C27E;
+    --ds-warning-900: #EBDBA8;
+    --ds-warning-950: #F8F2DE;
 
-    --ds-danger-50:  #201414;
-    --ds-danger-100: #2A1A1A;
-    --ds-danger-200: #372020;
-    --ds-danger-300: #492A2A;
-    --ds-danger-400: #603737;
-    --ds-danger-500: #7C4545;
-    --ds-danger-600: #9C5858;
-    --ds-danger-700: #C98585;
-    --ds-danger-800: #D79C9C;
-    --ds-danger-900: #E8C5C5;
-    --ds-danger-950: #F7EBEB;
+    --ds-danger-50:  #211414;
+    --ds-danger-100: #2B1A1A;
+    --ds-danger-200: #382020;
+    --ds-danger-300: #4A2A2A;
+    --ds-danger-400: #623737;
+    --ds-danger-500: #7E4545;
+    --ds-danger-600: #9E5858;
+    --ds-danger-700: #C88585;
+    --ds-danger-800: #D89E9E;
+    --ds-danger-900: #E9C6C6;
+    --ds-danger-950: #F8ECEC;
 
-    --ds-info-50:  #121C23;
-    --ds-info-100: #16232C;
-    --ds-info-200: #1C2D38;
-    --ds-info-300: #253C4B;
-    --ds-info-400: #305263;
-    --ds-info-500: #3F6B82;
-    --ds-info-600: #55839B;
-    --ds-info-700: #7AA4BA;
-    --ds-info-800: #A7C6D6;
-    --ds-info-900: #D3E2EA;
-    --ds-info-950: #EEF4F7;
+     --ds-info-50:  #0E1B29;
+     --ds-info-100: #132233;
+     --ds-info-200: #192E45;
+     --ds-info-300: #213D5B;
+     --ds-info-400: #2A5077;
+     --ds-info-500: #386797;
+     --ds-info-600: #4F83B4;
+     --ds-info-700: #7CA9D1;
+     --ds-info-800: #ACCCE6;
+     --ds-info-900: #D6E6F3;
+     --ds-info-950: #F0F6FB;
 
-    --ds-plum-50:  #EDF0F8;
-    --ds-plum-100: #DEE4F1;
-    --ds-plum-200: #C1CBE3;
-    --ds-plum-300: #A2ADCC;
-    --ds-plum-400: #838DAF;
-    --ds-plum-500: #677195;
-    --ds-plum-600: #525A79;
-    --ds-plum-700: #40465F;
-    --ds-plum-800: #313648;
-    --ds-plum-900: #262A38;
-    --ds-plum-950: #191B26;
+    --ds-plum-50:  #1E1C2B;
+    --ds-plum-100: #252232;
+    --ds-plum-200: #2F2B3F;
+    --ds-plum-300: #3C3750;
+    --ds-plum-400: #4D4667;
+    --ds-plum-500: #615881;
+    --ds-plum-600: #7A6F9C;
+    --ds-plum-700: #9C90B8;
+    --ds-plum-800: #C0B8D4;
+    --ds-plum-900: #E0DCE9;
+    --ds-plum-950: #F2F0F6;
 
     /* ─── Brand semantic ─── */
     --ds-primary: var(--ds-primary-300);
@@ -758,8 +1270,8 @@
     --ds-status-active-text: var(--ds-success-700);
     --ds-status-followup-bg: var(--ds-warning-subtle);
     --ds-status-followup-text: var(--ds-warning-700);
-    --ds-status-completed-bg: var(--ds-primary-subtle);
-    --ds-status-completed-text: var(--ds-primary-400);
+     --ds-status-completed-bg: var(--ds-success-subtle);
+     --ds-status-completed-text: var(--ds-success-700);
     --ds-status-inactive-bg: var(--ds-background-subtle);
     --ds-status-inactive-text: var(--ds-text-tertiary);
     --ds-status-discontinued-bg: var(--ds-danger-subtle);
@@ -794,8 +1306,8 @@
     --ds-status-rescheduled-text: var(--ds-warning-700);
     --ds-status-draft-bg: var(--ds-background-subtle);
     --ds-status-draft-text: var(--ds-text-tertiary);
-    --ds-status-planned-bg: var(--ds-primary-subtle);
-    --ds-status-planned-text: var(--ds-primary-400);
+     --ds-status-planned-bg: var(--ds-info-subtle);
+     --ds-status-planned-text: var(--ds-info-700);
     --ds-status-on-hold-bg: var(--ds-background-subtle);
     --ds-status-on-hold-text: var(--ds-text-tertiary);
 
@@ -868,24 +1380,28 @@
     --ds-chart-16-tint: var(--ds-primary-800);
 
     /* ─── Sidebar — deep marine ─── */
-    --ds-sidebar-bg: #0F1A20;
-    --ds-sidebar-surface: #16232A;
-    --ds-sidebar-border: #1E2E36;
-    --ds-sidebar-text: #8CA0A8;
-    --ds-sidebar-text-active: #EFF5F6;
-    --ds-sidebar-hover: rgba(255, 255, 255, 0.05);
-    --ds-sidebar-active-bg: rgba(255, 255, 255, 0.07);
-    --ds-sidebar-active-indicator: var(--ds-accent);
-    --ds-sidebar-icon: #6A838D;
-    --ds-sidebar-icon-active: var(--ds-accent);
-    --ds-sidebar-glow: radial-gradient(120% 55% at 50% 0%, rgba(198, 149, 92, 0.13) 0%, rgba(198, 149, 92, 0.04) 40%, transparent 65%);
-    --ds-sidebar-edge: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 36%);
-    --ds-sidebar-logo-grad-1: #FFFFFF;
-    --ds-sidebar-logo-grad-2: #BFDCE3;
+     --ds-sidebar-bg: #09171B;
+     --ds-sidebar-surface: #0F2228;
+     --ds-sidebar-border: #1A3238;
+     --ds-sidebar-text: #8AA1A6;
+     --ds-sidebar-text-active: #F2F8F8;
+     --ds-sidebar-hover: rgba(255, 255, 255, 0.06);
+     --ds-sidebar-active-bg: rgba(255, 255, 255, 0.09);
+     --ds-sidebar-active-indicator: var(--ds-accent);
+     --ds-sidebar-icon: #5F7E84;
+     --ds-sidebar-icon-active: var(--ds-accent);
+     --ds-sidebar-glow: radial-gradient(120% 55% at 50% 0%, rgba(122, 193, 186, 0.10) 0%, rgba(122, 193, 186, 0.03) 42%, transparent 68%);
+     --ds-sidebar-edge: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 36%);
+     --ds-sidebar-logo-grad-1: #FFFFFF;
+     --ds-sidebar-logo-grad-2: #A8DCD6;
 
-    /* ─── Component mappings ─── */
-    --ds-tooltip-bg: var(--ds-neutral-900);
-    --ds-tooltip-fg: var(--ds-neutral-50);
+     /* ─── Component mappings ─── */
+     --ds-tooltip-bg: var(--ds-neutral-900);
+     --ds-tooltip-fg: var(--ds-neutral-50);
+
+     --ds-button-primary-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10), inset 0 -1px 0 rgba(0, 0, 0, 0.25), 0 1px 2px rgba(0, 0, 0, 0.30);
+     --ds-focus-ring-alpha: rgba(122, 193, 186, 0.18);
+     --ds-app-wash: radial-gradient(120% 55% at 50% 0%, color-mix(in oklab, var(--ds-primary-800) 42%, transparent) 0%, transparent 62%);
 
     --ds-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.25);
     --ds-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.25), 0 1px 2px rgba(0, 0, 0, 0.2);

@@ -21,6 +21,7 @@ from app.models.post_op import PostOp
 from app.models.treatment_sitting import TreatmentSitting
 from app.models.hospital_monthly_expense import HospitalMonthlyExpense
 from app.models.lead import Lead
+from app.config import settings
 from app.utils.dashboard_helpers import (
     get_date_range, get_previous_date_range, calculate_revenue, calculate_expenses_for_date_range,
     calculate_profit, calculate_profit_margin, revenue_trend_with_expenses
@@ -182,6 +183,235 @@ async def _get_top_performers(db: AsyncSession, field_name: str, field_id: str,
     return [{"name": row[0], "value": float(row[1] or 0)} for row in r.all()]
 
 
+def _trend_format(range_days: int):
+    """Returns (python_format, sql_format, group_label) for the given span."""
+    if range_days <= 1:
+        return ('%Y-%m-%d %H:00', 'YYYY-MM-DD HH24:00' if settings.DB_IS_POSTGRESQL else '%Y-%m-%d %H:00', 'hour')
+    elif range_days <= 31:
+        return ('%Y-%m-%d', 'YYYY-MM-DD' if settings.DB_IS_POSTGRESQL else '%Y-%m-%d', 'day')
+    return ('%Y-%m', 'YYYY-MM' if settings.DB_IS_POSTGRESQL else '%Y-%m', 'month')
+
+
+async def _appointment_trend(db: AsyncSession, hospital_ids: list[str] | None = None,
+                             doctor_id: str | None = None,
+                             date_start: datetime | None = None, date_end: datetime | None = None) -> list:
+    if not date_start or not date_end:
+        now = datetime.now(timezone.utc)
+        date_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        month_end = date_start.replace(month=date_start.month % 12 + 1, day=1) if date_start.month < 12 else date_start.replace(year=date_start.year + 1, month=1, day=1)
+        date_end = month_end
+
+    python_format, sql_format, group_label = _trend_format((date_end - date_start).days)
+
+    query = select(
+        (func.to_char(Appointment.appointment_date, sql_format) if settings.DB_IS_POSTGRESQL
+         else func.strftime(python_format, Appointment.appointment_date)).label(group_label),
+        func.count(Appointment.id).label('count'),
+    ).where(
+        Appointment.appointment_date >= date_start.date(),
+        Appointment.appointment_date < date_end.date(),
+    )
+    if doctor_id:
+        query = query.where(Appointment.doctor_id == doctor_id)
+    elif hospital_ids is not None:
+        pids_r = await db.execute(select(Patient.id).where(Patient.hospital_id.in_(hospital_ids)))
+        pids = [row[0] for row in pids_r.all()]
+        if not pids:
+            return []
+        query = query.where(Appointment.patient_id.in_(pids))
+    query = query.group_by(text(group_label)).order_by(text(group_label))
+    r = await db.execute(query)
+    count_map = {row[0]: row[1] for row in r.all()}
+
+    result = []
+    cursor = date_start
+    if group_label == 'hour':
+        step = timedelta(hours=1)
+    elif group_label == 'day':
+        step = timedelta(days=1)
+    else:
+        step = timedelta(days=31)
+    while cursor < date_end:
+        key = cursor.strftime(python_format)
+        result.append({"label": key, "count": count_map.get(key, 0)})
+        if group_label == 'month':
+            cursor = cursor.replace(month=cursor.month % 12 + 1, day=1) if cursor.month < 12 else cursor.replace(year=cursor.year + 1, month=1, day=1)
+        else:
+            cursor += step
+    return result
+
+
+async def _appointment_heatmap(db: AsyncSession, hospital_ids: list[str] | None = None,
+                               doctor_id: str | None = None,
+                               date_start: datetime | None = None, date_end: datetime | None = None) -> list:
+    if not date_start or not date_end:
+        now = datetime.now(timezone.utc)
+        date_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        month_end = date_start.replace(month=date_start.month % 12 + 1, day=1) if date_start.month < 12 else date_start.replace(year=date_start.year + 1, month=1, day=1)
+        date_end = month_end
+
+    if settings.DB_IS_POSTGRESQL:
+        dow_expr = func.to_char(Appointment.appointment_date, 'ID')
+        hour_expr = func.to_char(Appointment.appointment_time, 'HH24')
+    else:
+        dow_expr = func.strftime('%w', Appointment.appointment_date)
+        hour_expr = func.strftime('%H', Appointment.appointment_time)
+
+    query = select(
+        dow_expr.label('dow'), hour_expr.label('hour'), func.count(Appointment.id).label('count'),
+    ).where(
+        Appointment.appointment_date >= date_start.date(),
+        Appointment.appointment_date < date_end.date(),
+    )
+    if doctor_id:
+        query = query.where(Appointment.doctor_id == doctor_id)
+    elif hospital_ids is not None:
+        pids_r = await db.execute(select(Patient.id).where(Patient.hospital_id.in_(hospital_ids)))
+        pids = [row[0] for row in pids_r.all()]
+        if not pids:
+            return []
+        query = query.where(Appointment.patient_id.in_(pids))
+    query = query.group_by(text('dow'), text('hour')).order_by(text('dow'), text('hour'))
+    r = await db.execute(query)
+
+    result = []
+    for dow_raw, hour, count in r.all():
+        if settings.DB_IS_POSTGRESQL:
+            dow = int(dow_raw) - 1          # 'ID' is 1..7 (Mon..Sun) → 0..6
+        else:
+            dow = (int(dow_raw) + 6) % 7    # SQLite '%w' is 0..6 (Sun..Sat) → 0..6 (Mon..Sun)
+        result.append({"day": dow, "hour": int(hour), "count": count})
+    return result
+
+
+async def _treatment_category_breakdown(db: AsyncSession, case_ids: list[str] | None = None,
+                                        date_start: datetime | None = None, date_end: datetime | None = None,
+                                        limit: int = 8) -> list:
+    if not date_start or not date_end:
+        now = datetime.now(timezone.utc)
+        date_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        month_end = date_start.replace(month=date_start.month % 12 + 1, day=1) if date_start.month < 12 else date_start.replace(year=date_start.year + 1, month=1, day=1)
+        date_end = month_end
+
+    query = select(
+        TreatmentPlan.treatment_name,
+        func.count(TreatmentPlan.id).label('count'),
+        func.coalesce(func.sum(TreatmentPlan.cost), 0).label('cost'),
+    ).where(TreatmentPlan.created_at >= date_start, TreatmentPlan.created_at < date_end)
+    if case_ids is not None:
+        query = query.where(TreatmentPlan.case_id.in_(case_ids))
+    query = query.group_by(TreatmentPlan.treatment_name).order_by(text('count DESC')).limit(limit)
+    r = await db.execute(query)
+    return [{"name": row[0], "count": row[1], "cost": float(row[2])} for row in r.all()]
+
+
+async def _lead_source_breakdown(db: AsyncSession, hospital_ids: list[str] | None = None,
+                                 doctor_id: str | None = None,
+                                 date_start: datetime | None = None, date_end: datetime | None = None,
+                                 limit: int = 8) -> list:
+    if not date_start or not date_end:
+        now = datetime.now(timezone.utc)
+        date_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        month_end = date_start.replace(month=date_start.month % 12 + 1, day=1) if date_start.month < 12 else date_start.replace(year=date_start.year + 1, month=1, day=1)
+        date_end = month_end
+
+    query = select(Lead.source, func.count(Lead.id).label('count')).where(
+        Lead.created_at >= date_start, Lead.created_at < date_end,
+    )
+    if doctor_id:
+        query = query.where(Lead.assigned_staff_id == doctor_id)
+    elif hospital_ids is not None:
+        query = query.where(Lead.hospital_id.in_(hospital_ids))
+    query = query.group_by(Lead.source).order_by(text('count DESC')).limit(limit)
+    r = await db.execute(query)
+    return [{"source": row[0], "count": row[1]} for row in r.all()]
+
+
+async def _payment_method_breakdown(db: AsyncSession, case_ids: list[str] | None = None,
+                                    date_start: datetime | None = None, date_end: datetime | None = None) -> list:
+    if not date_start or not date_end:
+        now = datetime.now(timezone.utc)
+        date_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        month_end = date_start.replace(month=date_start.month % 12 + 1, day=1) if date_start.month < 12 else date_start.replace(year=date_start.year + 1, month=1, day=1)
+        date_end = month_end
+
+    query = select(
+        Billing.payment_method,
+        func.coalesce(func.sum(Billing.paid_amount), 0).label('amount'),
+    ).where(Billing.updated_at >= date_start, Billing.updated_at < date_end)
+    if case_ids is not None:
+        query = query.where(Billing.case_id.in_(case_ids))
+    query = query.group_by(Billing.payment_method).order_by(text('amount DESC'))
+    r = await db.execute(query)
+    return [{"method": row[0] or "Unknown", "amount": float(row[1])} for row in r.all()]
+
+
+async def _gender_distribution(db: AsyncSession, hospital_ids: list[str] | None = None,
+                               doctor_id: str | None = None,
+                               date_start: datetime | None = None, date_end: datetime | None = None) -> list:
+    if not date_start or not date_end:
+        now = datetime.now(timezone.utc)
+        date_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        month_end = date_start.replace(month=date_start.month % 12 + 1, day=1) if date_start.month < 12 else date_start.replace(year=date_start.year + 1, month=1, day=1)
+        date_end = month_end
+
+    query = select(Patient.gender, func.count(Patient.id).label('count')).where(
+        Patient.created_at >= date_start, Patient.created_at < date_end,
+    )
+    if doctor_id:
+        query = query.where(Patient.doctor_id == doctor_id)
+    elif hospital_ids is not None:
+        query = query.where(Patient.hospital_id.in_(hospital_ids))
+    query = query.group_by(Patient.gender).order_by(text('count DESC'))
+    r = await db.execute(query)
+    return [{"gender": row[0] or "Unknown", "count": row[1]} for row in r.all()]
+
+
+async def _age_group_distribution(db: AsyncSession, hospital_ids: list[str] | None = None,
+                                  doctor_id: str | None = None,
+                                  date_start: datetime | None = None, date_end: datetime | None = None) -> list:
+    if not date_start or not date_end:
+        now = datetime.now(timezone.utc)
+        date_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        month_end = date_start.replace(month=date_start.month % 12 + 1, day=1) if date_start.month < 12 else date_start.replace(year=date_start.year + 1, month=1, day=1)
+        date_end = month_end
+
+    query = select(Patient.date_of_birth).where(
+        Patient.created_at >= date_start, Patient.created_at < date_end,
+    )
+    if doctor_id:
+        query = query.where(Patient.doctor_id == doctor_id)
+    elif hospital_ids is not None:
+        query = query.where(Patient.hospital_id.in_(hospital_ids))
+    r = await db.execute(query)
+
+    buckets = [("0-12", 0), ("13-17", 0), ("18-24", 0), ("25-34", 0), ("35-44", 0), ("45-54", 0), ("55-64", 0), ("65+", 0)]
+    today = date.today()
+    for (dob,) in r.all():
+        if not dob:
+            continue
+        age = (today - dob).days // 365
+        if age < 0:
+            continue
+        if age <= 12:
+            buckets[0] = (buckets[0][0], buckets[0][1] + 1)
+        elif age <= 17:
+            buckets[1] = (buckets[1][0], buckets[1][1] + 1)
+        elif age <= 24:
+            buckets[2] = (buckets[2][0], buckets[2][1] + 1)
+        elif age <= 34:
+            buckets[3] = (buckets[3][0], buckets[3][1] + 1)
+        elif age <= 44:
+            buckets[4] = (buckets[4][0], buckets[4][1] + 1)
+        elif age <= 54:
+            buckets[5] = (buckets[5][0], buckets[5][1] + 1)
+        elif age <= 64:
+            buckets[6] = (buckets[6][0], buckets[6][1] + 1)
+        else:
+            buckets[7] = (buckets[7][0], buckets[7][1] + 1)
+    return [{"group": k, "count": v} for k, v in buckets]
+
+
 @router.get("/super-admin")
 async def super_admin_dashboard(
     period: str = Query("this_month", description="today, this_week, this_month, this_quarter, this_year, custom"),
@@ -329,6 +559,58 @@ async def super_admin_dashboard(
     )
     expense_breakdown = [{"category": row[0], "amount": float(row[1])} for row in expense_breakdown_r.all()]
 
+    # --- Period-over-period comparison ---
+    prev_start, prev_end = get_previous_date_range(period, start_date, end_date)
+    prev_period_revenue = await calculate_revenue(db, period="custom", start_date=prev_start.isoformat(), end_date=prev_end.isoformat())
+
+    # Previous-period trend buckets for the comparison chart
+    previous_revenue_expense_trend = await revenue_trend_with_expenses(
+        db, hospital_ids=None, period="custom",
+        start_date=prev_start.isoformat(), end_date=prev_end.isoformat(),
+    )
+
+    period_patients = (await db.execute(
+        select(func.count(Patient.id)).where(Patient.created_at >= date_start, Patient.created_at < date_end)
+    )).scalar() or 0
+    prev_patients = (await db.execute(
+        select(func.count(Patient.id)).where(Patient.created_at >= prev_start, Patient.created_at < prev_end)
+    )).scalar() or 0
+
+    period_appointments = (await db.execute(
+        select(func.count(Appointment.id)).where(Appointment.appointment_date >= date_start.date(), Appointment.appointment_date < date_end.date())
+    )).scalar() or 0
+    prev_appointments = (await db.execute(
+        select(func.count(Appointment.id)).where(Appointment.appointment_date >= prev_start.date(), Appointment.appointment_date < prev_end.date())
+    )).scalar() or 0
+
+    period_cases = (await db.execute(
+        select(func.count(Case.id)).where(Case.created_at >= date_start, Case.created_at < date_end)
+    )).scalar() or 0
+    prev_cases = (await db.execute(
+        select(func.count(Case.id)).where(Case.created_at >= prev_start, Case.created_at < prev_end)
+    )).scalar() or 0
+
+    def pct_change(current: float, previous: float) -> float:
+        if previous == 0:
+            return 100.0 if current > 0 else 0.0
+        return round(((current - previous) / previous) * 100, 1)
+
+    comparison = {
+        "revenue_change": pct_change(period_revenue, prev_period_revenue),
+        "patient_change": pct_change(period_patients, prev_patients),
+        "appointment_change": pct_change(period_appointments, prev_appointments),
+        "case_change": pct_change(period_cases, prev_cases),
+    }
+
+    # --- Enterprise BI aggregates (period-scoped) ---
+    appointment_trend = await _appointment_trend(db, date_start=date_start, date_end=date_end)
+    appointment_heatmap = await _appointment_heatmap(db, date_start=date_start, date_end=date_end)
+    treatment_category_breakdown = await _treatment_category_breakdown(db, date_start=date_start, date_end=date_end)
+    lead_source_breakdown = await _lead_source_breakdown(db, date_start=date_start, date_end=date_end)
+    payment_method_breakdown = await _payment_method_breakdown(db, date_start=date_start, date_end=date_end)
+    gender_distribution = await _gender_distribution(db, date_start=date_start, date_end=date_end)
+    age_group_distribution = await _age_group_distribution(db, date_start=date_start, date_end=date_end)
+
     return {
         "total_groups": total_groups,
         "total_hospitals": total_hospitals,
@@ -336,6 +618,9 @@ async def super_admin_dashboard(
         "total_patients": total_patients,
         "total_active_cases": total_active_cases,
         "total_appointments": total_appointments,
+        "period_patients": period_patients,
+        "period_appointments": period_appointments,
+        "period_cases": period_cases,
         "total_revenue": total_revenue,
         "monthly_revenue": monthly_revenue,
         "yearly_revenue": yearly_revenue,
@@ -349,11 +634,20 @@ async def super_admin_dashboard(
         "revenue_expense_trend": combined_trend,
         "expense_trend": [{"month": t["month"], "expenses": t["expenses"]} for t in combined_trend],
         "profit_trend": [{"month": t["month"], "profit": t["profit"], "profit_margin": t["profit_margin"]} for t in combined_trend],
+        "previous_revenue_expense_trend": previous_revenue_expense_trend,
+        "appointment_trend": appointment_trend,
+        "appointment_heatmap": appointment_heatmap,
+        "treatment_category_breakdown": treatment_category_breakdown,
+        "lead_source_breakdown": lead_source_breakdown,
+        "payment_method_breakdown": payment_method_breakdown,
+        "gender_distribution": gender_distribution,
+        "age_group_distribution": age_group_distribution,
         "total_pending_billing": total_pending_billing,
         "expense_breakdown": expense_breakdown,
         "admin_group_performance": admin_group_performance[:5],
         "hospital_performance": hospital_performance[:5],
         "doctor_performance": doctor_performance[:5],
+        "comparison": comparison,
     }
 
 
@@ -379,6 +673,11 @@ async def group_admin_dashboard(
             "monthly_growth_trend": [], "hospital_performance": [], "doctor_performance": [],
             "revenue_expense_trend": [], "expense_trend": [], "profit_trend": [],
             "selected_hospital_id": None,
+            "appointment_trend": [], "appointment_heatmap": [],
+            "treatment_category_breakdown": [], "lead_source_breakdown": [],
+            "payment_method_breakdown": [], "gender_distribution": [],
+            "age_group_distribution": [],
+            "comparison": {},
         }
 
     now = datetime.now(timezone.utc)
@@ -396,6 +695,11 @@ async def group_admin_dashboard(
             "monthly_growth_trend": [], "hospital_performance": [], "doctor_performance": [],
             "revenue_expense_trend": [], "expense_trend": [], "profit_trend": [],
             "selected_hospital_id": None,
+            "appointment_trend": [], "appointment_heatmap": [],
+            "treatment_category_breakdown": [], "lead_source_breakdown": [],
+            "payment_method_breakdown": [], "gender_distribution": [],
+            "age_group_distribution": [],
+            "comparison": {},
         }
 
     # If hospital_id is provided, validate it belongs to the group and use it
@@ -531,6 +835,72 @@ async def group_admin_dashboard(
     )
     expense_breakdown = [{"category": row[0], "amount": float(row[1])} for row in expense_breakdown_r.all()]
 
+    # --- Period-over-period comparison ---
+    prev_start, prev_end = get_previous_date_range(period, start_date, end_date)
+    prev_period_revenue = await calculate_revenue(db, case_ids, period="custom", start_date=prev_start.isoformat(), end_date=prev_end.isoformat())
+
+    period_patients = (await db.execute(
+        select(func.count(Patient.id)).where(
+            Patient.id.in_(patient_ids) if patient_ids else text("false"),
+            Patient.created_at >= date_start, Patient.created_at < date_end,
+        )
+    )).scalar() or 0
+    prev_patients = (await db.execute(
+        select(func.count(Patient.id)).where(
+            Patient.id.in_(patient_ids) if patient_ids else text("false"),
+            Patient.created_at >= prev_start, Patient.created_at < prev_end,
+        )
+    )).scalar() or 0
+
+    period_appointments = (await db.execute(
+        select(func.count(Appointment.id)).where(
+            Appointment.patient_id.in_(patient_ids) if patient_ids else text("false"),
+            Appointment.appointment_date >= date_start.date(),
+            Appointment.appointment_date < date_end.date(),
+        )
+    )).scalar() or 0
+    prev_appointments = (await db.execute(
+        select(func.count(Appointment.id)).where(
+            Appointment.patient_id.in_(patient_ids) if patient_ids else text("false"),
+            Appointment.appointment_date >= prev_start.date(),
+            Appointment.appointment_date < prev_end.date(),
+        )
+    )).scalar() or 0
+
+    period_cases = (await db.execute(
+        select(func.count(Case.id)).where(
+            Case.id.in_(case_ids) if case_ids else text("false"),
+            Case.created_at >= date_start, Case.created_at < date_end,
+        )
+    )).scalar() or 0
+    prev_cases = (await db.execute(
+        select(func.count(Case.id)).where(
+            Case.id.in_(case_ids) if case_ids else text("false"),
+            Case.created_at >= prev_start, Case.created_at < prev_end,
+        )
+    )).scalar() or 0
+
+    def pct_change(current: float, previous: float) -> float:
+        if previous == 0:
+            return 100.0 if current > 0 else 0.0
+        return round(((current - previous) / previous) * 100, 1)
+
+    comparison = {
+        "revenue_change": pct_change(period_revenue, prev_period_revenue),
+        "patient_change": pct_change(period_patients, prev_patients),
+        "appointment_change": pct_change(period_appointments, prev_appointments),
+        "case_change": pct_change(period_cases, prev_cases),
+    }
+
+    # --- Enterprise BI aggregates (period-scoped, filtered to this group) ---
+    appointment_trend = await _appointment_trend(db, hospital_ids=hospital_ids, date_start=date_start, date_end=date_end)
+    appointment_heatmap = await _appointment_heatmap(db, hospital_ids=hospital_ids, date_start=date_start, date_end=date_end)
+    treatment_category_breakdown = await _treatment_category_breakdown(db, case_ids=case_ids, date_start=date_start, date_end=date_end)
+    lead_source_breakdown = await _lead_source_breakdown(db, hospital_ids=hospital_ids, date_start=date_start, date_end=date_end)
+    payment_method_breakdown = await _payment_method_breakdown(db, case_ids=case_ids, date_start=date_start, date_end=date_end)
+    gender_distribution = await _gender_distribution(db, hospital_ids=hospital_ids, date_start=date_start, date_end=date_end)
+    age_group_distribution = await _age_group_distribution(db, hospital_ids=hospital_ids, date_start=date_start, date_end=date_end)
+
     return {
         "selected_hospital_id": hospital_id,
         "total_hospitals": len(group_hospital_ids),
@@ -542,6 +912,9 @@ async def group_admin_dashboard(
         "monthly_revenue": monthly_revenue,
         "yearly_revenue": yearly_revenue,
         "period_revenue": period_revenue,
+        "period_patients": period_patients,
+        "period_appointments": period_appointments,
+        "period_cases": period_cases,
         "total_expenses": total_expenses,
         "net_profit": net_profit,
         "profit_margin": profit_margin,
@@ -555,6 +928,14 @@ async def group_admin_dashboard(
         "total_pending_billing": total_pending_billing,
         "hospital_performance": hospital_performance[:5],
         "doctor_performance": doctor_performance[:5],
+        "comparison": comparison,
+        "appointment_trend": appointment_trend,
+        "appointment_heatmap": appointment_heatmap,
+        "treatment_category_breakdown": treatment_category_breakdown,
+        "lead_source_breakdown": lead_source_breakdown,
+        "payment_method_breakdown": payment_method_breakdown,
+        "gender_distribution": gender_distribution,
+        "age_group_distribution": age_group_distribution,
         "treatment_kpis": {
             "active_treatments": (await db.execute(select(func.count(TreatmentPlan.id)).where(TreatmentPlan.case_id.in_(case_ids) if case_ids else text("false"), TreatmentPlan.is_active == True, TreatmentPlan.status.in_(["ASSIGNED", "SCHEDULED", "IN_PROGRESS", "WAITING_PATIENT", "WAITING_LAB", "ON_HOLD"])))).scalar() or 0 if case_ids else 0,
             "overdue_treatments": (await db.execute(select(func.count(TreatmentPlan.id)).where(TreatmentPlan.case_id.in_(case_ids) if case_ids else text("false"), TreatmentPlan.is_active == True, TreatmentPlan.status == TreatmentPlanStatus.OVERDUE))).scalar() or 0 if case_ids else 0,
@@ -598,6 +979,10 @@ async def hospital_admin_dashboard(
             "today_appointments_list": [], "pending_actions": {"follow_ups": 0, "billings_count": 0, "billings_amount": 0},
             "recent_activity": [], "revenue_sources": [],
             "crm_insights": {"total_leads": 0, "new_leads": 0, "converted_leads": 0, "conversion_rate": 0, "leads_by_source": []},
+            "appointment_trend": [], "appointment_heatmap": [],
+            "treatment_category_breakdown": [], "lead_source_breakdown": [],
+            "payment_method_breakdown": [], "gender_distribution": [],
+            "age_group_distribution": [],
             "treatment_kpis": {"active_treatments": 0, "overdue_treatments": 0, "completed_today": 0, "waiting_patient": 0, "waiting_lab": 0, "completed_this_month": 0, "completion_rate": 0.0, "total_treatments": 0},
         }
 
@@ -930,6 +1315,15 @@ async def hospital_admin_dashboard(
 
     crm_insights = {"total_leads": total_leads, "new_leads": new_leads, "converted_leads": converted_leads, "conversion_rate": conversion_rate, "leads_by_source": leads_by_source}
 
+    # --- Enterprise BI aggregates (period-scoped to this hospital / doctor) ---
+    appointment_trend = await _appointment_trend(db, hospital_ids=[hospital_id] if not doctor_id else None, doctor_id=doctor_id, date_start=date_start, date_end=date_end)
+    appointment_heatmap = await _appointment_heatmap(db, hospital_ids=[hospital_id] if not doctor_id else None, doctor_id=doctor_id, date_start=date_start, date_end=date_end)
+    treatment_category_breakdown = await _treatment_category_breakdown(db, case_ids=case_ids, date_start=date_start, date_end=date_end)
+    lead_source_breakdown = await _lead_source_breakdown(db, hospital_ids=[hospital_id], date_start=date_start, date_end=date_end)
+    payment_method_breakdown = await _payment_method_breakdown(db, case_ids=case_ids, date_start=date_start, date_end=date_end)
+    gender_distribution = await _gender_distribution(db, hospital_ids=[hospital_id] if not doctor_id else None, doctor_id=doctor_id, date_start=date_start, date_end=date_end)
+    age_group_distribution = await _age_group_distribution(db, hospital_ids=[hospital_id] if not doctor_id else None, doctor_id=doctor_id, date_start=date_start, date_end=date_end)
+
     return {
         "today_appointments": today_appointments,
         "today_appointments_list": today_appt_list,
@@ -938,6 +1332,9 @@ async def hospital_admin_dashboard(
         "total_revenue": total_revenue, "monthly_revenue": monthly_revenue, "yearly_revenue": yearly_revenue,
         "period_revenue": period_revenue, "total_expenses": total_expenses,
         "net_profit": net_profit, "profit_margin": profit_margin,
+        "period_patients": period_patient_count,
+        "period_appointments": period_appointment_count,
+        "period_cases": period_active_case_count,
         "hospital_name": hospital_name,
         "total_patients": total_patients, "total_cases": total_cases, "total_active_cases": total_active_cases,
         "revenue_trend": revenue_trend, "patient_growth_trend": patient_growth_trend,
@@ -957,6 +1354,13 @@ async def hospital_admin_dashboard(
         "treatment_kpis": treatment_kpis,
         "capacity_most_booked_doctors": await _get_most_booked_doctors(db, hospital_id, today),
         "capacity_peak_hours": await _get_peak_hours(db, hospital_id, today),
+        "appointment_trend": appointment_trend,
+        "appointment_heatmap": appointment_heatmap,
+        "treatment_category_breakdown": treatment_category_breakdown,
+        "lead_source_breakdown": lead_source_breakdown,
+        "payment_method_breakdown": payment_method_breakdown,
+        "gender_distribution": gender_distribution,
+        "age_group_distribution": age_group_distribution,
         "comparison": {
             "revenue_change": pct_change(period_revenue, prev_period_revenue),
             "patient_change": pct_change(period_patient_count, prev_patient_count),
@@ -1015,7 +1419,13 @@ async def _get_peak_hours(db: AsyncSession, hospital_id: str, today: date, limit
     return [{"hour": int(row[0]), "appointments": row[1]} for row in r.all()]
 
 @router.get("/doctor")
-async def doctor_dashboard(db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+async def doctor_dashboard(
+    period: str = Query("this_month", description="today, yesterday, last_7_days, last_30_days, this_month, last_month, this_quarter, last_quarter, this_year, custom"),
+    start_date: Optional[str] = Query(None, description="Custom range start (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(None, description="Custom range end (YYYY-MM-DD)"),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
     if current_user.get("role") != Role.DOCTOR.value:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     doctor_id = current_user.get("sub")
@@ -1157,7 +1567,86 @@ async def doctor_dashboard(db: AsyncSession = Depends(get_db), current_user: dic
     available_capacity = max(0, total_capacity - today_scheduled)
     utilization_pct = round((today_scheduled / total_capacity) * 100) if total_capacity > 0 else 0
 
+    # ---- Period-aware KPIs (respect dashboard filter) ----
+    period_start, period_end = get_date_range(period, start_date, end_date)
+    prev_start, prev_end = get_previous_date_range(period, start_date, end_date)
+    period_revenue = 0.0
+    prev_period_revenue = 0.0
+    if my_case_ids:
+        period_revenue = float((await db.execute(
+            select(func.sum(Billing.paid_amount)).where(
+                Billing.case_id.in_(my_case_ids),
+                Billing.updated_at >= period_start,
+                Billing.updated_at < period_end,
+            )
+        )).scalar() or 0)
+        prev_period_revenue = float((await db.execute(
+            select(func.sum(Billing.paid_amount)).where(
+                Billing.case_id.in_(my_case_ids),
+                Billing.updated_at >= prev_start,
+                Billing.updated_at < prev_end,
+            )
+        )).scalar() or 0)
+    revenue_change = round(((period_revenue - prev_period_revenue) / prev_period_revenue * 100), 1) if prev_period_revenue > 0 else (100.0 if period_revenue > 0 else 0.0)
+
+    patients_seen_period = (await db.execute(
+        select(func.count(func.distinct(Appointment.patient_id))).where(
+            Appointment.doctor_id == doctor_id,
+            Appointment.appointment_date >= period_start.date(),
+            Appointment.appointment_date < period_end.date(),
+            Appointment.is_active == True,
+        )
+    )).scalar() or 0
+
+    appointments_period = (await db.execute(
+        select(func.count(Appointment.id)).where(
+            Appointment.doctor_id == doctor_id,
+            Appointment.appointment_date >= period_start.date(),
+            Appointment.appointment_date < period_end.date(),
+            Appointment.is_active == True,
+        )
+    )).scalar() or 0
+
+    completed_appointments_period = (await db.execute(
+        select(func.count(Appointment.id)).where(
+            Appointment.doctor_id == doctor_id,
+            Appointment.appointment_date >= period_start.date(),
+            Appointment.appointment_date < period_end.date(),
+            Appointment.status == AppointmentStatus.COMPLETED.value,
+        )
+    )).scalar() or 0
+
+    cases_created_period = 0
+    cases_completed_period = 0
+    if my_case_ids:
+        cases_created_period = (await db.execute(
+            select(func.count(Case.id)).where(
+                Case.id.in_(my_case_ids),
+                Case.created_at >= period_start,
+                Case.created_at < period_end,
+            )
+        )).scalar() or 0
+        cases_completed_period = (await db.execute(
+            select(func.count(Case.id)).where(
+                Case.id.in_(my_case_ids),
+                Case.status == CaseStatus.COMPLETED.value,
+                Case.completion_date >= period_start,
+                Case.completion_date < period_end,
+            )
+        )).scalar() or 0
+
+    # --- Enterprise BI aggregates (period-scoped to this doctor) ---
+    my_case_ids_list = list(my_case_ids) if my_case_ids else None
+    appointment_trend = await _appointment_trend(db, doctor_id=doctor_id, date_start=period_start, date_end=period_end)
+    appointment_heatmap = await _appointment_heatmap(db, doctor_id=doctor_id, date_start=period_start, date_end=period_end)
+    treatment_category_breakdown = await _treatment_category_breakdown(db, case_ids=my_case_ids_list, date_start=period_start, date_end=period_end)
+    lead_source_breakdown = await _lead_source_breakdown(db, doctor_id=doctor_id, date_start=period_start, date_end=period_end)
+    payment_method_breakdown = await _payment_method_breakdown(db, case_ids=my_case_ids_list, date_start=period_start, date_end=period_end)
+    gender_distribution = await _gender_distribution(db, doctor_id=doctor_id, date_start=period_start, date_end=period_end)
+    age_group_distribution = await _age_group_distribution(db, doctor_id=doctor_id, date_start=period_start, date_end=period_end)
+
     return {
+        "period": period,
         "my_patients": my_patients,
         "today_appointments": today_appointments,
         "active_cases": len(active_cases),
@@ -1180,6 +1669,21 @@ async def doctor_dashboard(db: AsyncSession = Depends(get_db), current_user: dic
         "today_appointments_scheduled": today_scheduled,
         "today_capacity_available": available_capacity,
         "today_capacity_utilization_pct": utilization_pct,
+        "period_revenue": period_revenue,
+        "prev_period_revenue": prev_period_revenue,
+        "revenue_change": revenue_change,
+        "patients_seen_period": patients_seen_period,
+        "appointments_period": appointments_period,
+        "completed_appointments_period": completed_appointments_period,
+        "cases_created_period": cases_created_period,
+        "cases_completed_period": cases_completed_period,
+        "appointment_trend": appointment_trend,
+        "appointment_heatmap": appointment_heatmap,
+        "treatment_category_breakdown": treatment_category_breakdown,
+        "lead_source_breakdown": lead_source_breakdown,
+        "payment_method_breakdown": payment_method_breakdown,
+        "gender_distribution": gender_distribution,
+        "age_group_distribution": age_group_distribution,
     }
 
 

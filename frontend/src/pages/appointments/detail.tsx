@@ -60,20 +60,20 @@ const STATUS_COLORS: Record<string, string> = {
   COMPLETED: "bg-green-50 text-green-700 border-green-200",
   CANCELLED: "bg-red-50 text-red-700 border-red-200",
   RESCHEDULED: "bg-orange-50 text-orange-700 border-orange-200",
-  IN_PROGRESS: "bg-purple-50 text-purple-700 border-purple-200",
-  PLANNED: "bg-gray-50 text-gray-700 border-gray-200",
+  IN_PROGRESS: "bg-[var(--ds-accent-50)] text-[var(--ds-accent-700)] border-[var(--ds-accent-200)]",
+  PLANNED: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)] border-[var(--ds-border)]",
   OPEN: "bg-blue-50 text-blue-700 border-blue-200",
   ON_HOLD: "bg-yellow-50 text-yellow-700 border-yellow-200",
   PAID: "bg-green-50 text-green-700 border-green-200",
   PARTIAL: "bg-yellow-50 text-yellow-700 border-yellow-200",
-  DRAFT: "bg-gray-50 text-gray-700 border-gray-200",
+  DRAFT: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)] border-[var(--ds-border)]",
   OVERDUE: "bg-red-50 text-red-700 border-red-200",
 }
 
 function StatusBadge({ status }: { status: string }) {
   return (
     <span
-      className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${STATUS_COLORS[status] || "bg-gray-50 text-gray-600 border-gray-200"}`}
+      className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${STATUS_COLORS[status] || "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)] border-[var(--ds-border)]"}`}
     >
       {status?.replace(/_/g, " ")}
     </span>

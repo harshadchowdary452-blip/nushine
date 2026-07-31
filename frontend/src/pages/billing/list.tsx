@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   useReactTable,
@@ -10,6 +10,7 @@ import {
   flexRender,
   type ColumnDef,
   type SortingState,
+  type ColumnFiltersState,
 } from "@tanstack/react-table"
 import { Plus, Search, Eye, Trash2, Receipt, DollarSign, CreditCard, AlertCircle, Download } from "lucide-react"
 import { format } from "date-fns"
@@ -65,6 +66,11 @@ export default function BillingList() {
   const { addToast } = useToast()
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState("")
+  const [searchParams] = useSearchParams()
+  const paymentStatusFromUrl = searchParams.get("payment_status") || ""
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(() =>
+    paymentStatusFromUrl ? [{ id: "payment_status", value: paymentStatusFromUrl }] : [],
+  )
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deletingBilling, setDeletingBilling] = useState<Billing | null>(null)
@@ -277,9 +283,10 @@ export default function BillingList() {
   const table = useReactTable({
     data: billings,
     columns,
-    state: { sorting, globalFilter },
+    state: { sorting, globalFilter, columnFilters },
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
+    onColumnFiltersChange: setColumnFilters,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
@@ -540,7 +547,7 @@ export default function BillingList() {
                 />
               </div>
             </div>
-            <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-gray-100">
+            <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-[var(--ds-border-light)]">
               <Button
                 type="button"
                 variant="outline"

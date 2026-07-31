@@ -1,13 +1,7 @@
 import { useState, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import {
-  useReactTable,
-  getCoreRowModel,
-  getSortedRowModel,
-  flexRender,
-  type ColumnDef,
-} from "@tanstack/react-table"
+import type { ColumnDef, SortingState } from "@tanstack/react-table"
 import { Plus, Eye, Edit, Trash2, Users, UserPlus, SlidersHorizontal } from "lucide-react"
 import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
@@ -28,7 +22,7 @@ import QuickExport from "@/components/ui/quick-export"
 import { useServerFilters } from "@/hooks/useServerFilters"
 import { FilterChips } from "@/components/ui/filter-bar"
 import PatientFilterBar from "./filter-bar"
-import { PageHeader, EmptyState, LoadingSkeleton, Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/design-system"
+import { PageHeader, DataTable } from "@/design-system"
 import type { Patient, PaginatedResponse, User } from "@/types"
 import { extractDetail } from "@/types"
 import { useAuthStore } from "@/store/authStore"
@@ -86,7 +80,7 @@ export default function PatientList() {
 
   const {
     filters, setFilter, resetFilters, queryKey, activeFilters, hasActiveFilters,
-    page, setPage, sortField, sortDir, toggleSort, activeChips,
+    page, setPage, sortField, sortDir, setSort, activeChips,
   } = useServerFilters({ defaultSort: "created_at", defaultSortDir: "desc" })
 
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -128,11 +122,6 @@ export default function PatientList() {
   const patients: Patient[] = useMemo(() => {
     if (Array.isArray(data)) return data
     return data?.items || []
-  }, [data])
-
-  const totalCount = useMemo(() => {
-    if (Array.isArray(data)) return data.length
-    return data?.total || 0
   }, [data])
 
   const totalPages = useMemo(() => {
@@ -179,55 +168,50 @@ export default function PatientList() {
     () => [
       {
         accessorKey: "full_name",
-        header: () => (
-          <button onClick={() => toggleSort("full_name")} className="flex items-center gap-1 hover:text-foreground">
-            Name {sortField === "full_name" ? (sortDir === "asc" ? "↑" : "↓") : ""}
-          </button>
-        ),
+        header: "Name",
+        enableSorting: true,
         cell: ({ row }) => <span className="font-medium">{row.getValue("full_name")}</span>,
       },
       {
         accessorKey: "gender",
         header: "Gender",
+        enableSorting: false,
         cell: ({ row }) => {
           const gender = row.getValue("gender") as string
-          return gender ? <Badge variant={genderBadgeVariant[gender] || "secondary"}>{gender}</Badge> : <span className="text-muted-foreground">—</span>
+          return gender ? <Badge variant={genderBadgeVariant[gender] || "secondary"}>{gender}</Badge> : <span className="text-[var(--ds-text-tertiary)]">—</span>
         },
       },
       {
         accessorKey: "status",
-        header: () => (
-          <button onClick={() => toggleSort("status")} className="flex items-center gap-1 hover:text-foreground">
-            Status {sortField === "status" ? (sortDir === "asc" ? "↑" : "↓") : ""}
-          </button>
-        ),
+        header: "Status",
+        enableSorting: true,
         cell: ({ row }) => {
           const status = row.getValue("status") as string
-          return status ? <StatusBadge status={status} /> : <span className="text-muted-foreground">—</span>
+          return status ? <StatusBadge status={status} /> : <span className="text-[var(--ds-text-tertiary)]">—</span>
         },
       },
       {
         accessorKey: "age",
         header: "Age",
+        enableSorting: false,
         cell: ({ row }) => row.getValue("age") ?? "—",
       },
       {
         accessorKey: "phone",
         header: "Phone",
+        enableSorting: false,
         cell: ({ row }) => row.getValue("phone") ?? "—",
       },
       {
         accessorKey: "email",
         header: "Email",
+        enableSorting: false,
         cell: ({ row }) => row.getValue("email") ?? "—",
       },
       {
         accessorKey: "created_at",
-        header: () => (
-          <button onClick={() => toggleSort("created_at")} className="flex items-center gap-1 hover:text-foreground">
-            Created {sortField === "created_at" ? (sortDir === "asc" ? "↑" : "↓") : ""}
-          </button>
-        ),
+        header: "Created",
+        enableSorting: true,
         cell: ({ row }) => {
           const val = row.getValue("created_at") as string
           return val ? format(new Date(val), "MMM dd, yyyy") : "—"
@@ -235,31 +219,31 @@ export default function PatientList() {
       },
       {
         id: "actions",
-        header: "Actions",
+        header: "",
+        enableSorting: false,
+        enableHiding: false,
         cell: ({ row }) => (
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" onClick={() => navigate(`/patients/${row.original.id}`)}>
+            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); navigate(`/patients/${row.original.id}`) }}>
               <Eye className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
               <Edit className="h-4 w-4" />
             </Button>
             <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); confirmDelete(row.original) }}>
-              <Trash2 className="h-4 w-4 text-danger" />
+              <Trash2 className="h-4 w-4 text-[var(--ds-danger)]" />
             </Button>
           </div>
         ),
       },
     ],
-    [navigate, sortField, sortDir, toggleSort]
+    [navigate]
   )
 
-  const table = useReactTable({
-    data: patients,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-  })
+  function handleSortingChange(sorting: SortingState) {
+    const f = sorting[0]
+    setSort(f?.id ?? "", f?.desc ? "desc" : "asc")
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -281,7 +265,7 @@ export default function PatientList() {
         </>}
       />
 
-      <Card>
+      <Card className="mb-6">
         <CardContent className="p-6">
           {/* Mobile filter trigger */}
           <div className="lg:hidden mb-4">
@@ -319,78 +303,42 @@ export default function PatientList() {
             <FilterChips chips={activeChips} onRemove={(k) => setFilter(k, "")} onClearAll={resetFilters} />
           </div>
 
-          {/* Results count */}
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-sm text-muted-foreground">
-              {totalCount} patient{totalCount !== 1 ? "s" : ""} found
-            </p>
-          </div>
-
-          {isLoading ? (
-            <LoadingSkeleton rows={5} />
-          ) : patients.length === 0 ? (
-            <EmptyState
-              icon={Users}
-              title={hasActiveFilters ? "No patients match your filters" : "No patients yet"}
-              description={hasActiveFilters ? "Try adjusting or clearing your filters." : "Begin your patient journey by registering the first patient in your dental practice."}
-              action={
-                hasActiveFilters ? (
-                  <Button variant="outline" onClick={resetFilters}>Clear Filters</Button>
-                ) : currentUser?.role !== "DOCTOR" ? (
-                  <Button onClick={openDialog}><UserPlus className="h-4 w-4" /> Add Patient</Button>
-                ) : undefined
-              }
-            />
-          ) : (
-            <>
-              <div className="mobile-card-view">
-                <Table>
-                  <TableHeader>
-                    {table.getHeaderGroups().map((hg) => (
-                      <TableRow key={hg.id}>
-                        {hg.headers.map((header) => (
-                          <TableHead key={header.id}>
-                            {flexRender(header.column.columnDef.header, header.getContext())}
-                          </TableHead>
-                        ))}
-                      </TableRow>
-                    ))}
-                  </TableHeader>
-                  <TableBody>
-                    {table.getRowModel().rows.map((row) => (
-                      <TableRow key={row.id}
-                        className="cursor-pointer"
-                        onClick={() => navigate(`/patients/${row.original.id}`)}>
-                        {row.getVisibleCells().map((cell) => {
-                          const header = cell.column.columnDef.header
-                          const label = typeof header === "string" ? header : cell.column.id
-                          return (
-                            <TableCell key={cell.id} data-label={label}>
-                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                            </TableCell>
-                          )
-                        })}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              <div className="flex items-center justify-between mt-4">
-                <p className="text-sm text-muted-foreground">
-                  Page {page} of {totalPages} ({totalCount} total)
-                </p>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setPage(page - 1)} disabled={page <= 1}>
-                    Previous
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setPage(page + 1)} disabled={page >= totalPages}>
-                    Next
-                  </Button>
+          <DataTable
+            key={queryKey}
+            columns={columns}
+            data={patients}
+            loading={isLoading}
+            pagination
+            pageSize={10}
+            manualPagination
+            pageCount={totalPages}
+            onPageChange={(pageIndex) => setPage(pageIndex + 1)}
+            manualSorting
+            initialSorting={sortField ? [{ id: sortField, desc: sortDir === "desc" }] : []}
+            onSortingChange={handleSortingChange}
+            emptyIcon={Users}
+            emptyTitle={hasActiveFilters ? "No patients match your filters" : "No patients yet"}
+            emptyDescription={hasActiveFilters ? "Try adjusting or clearing your filters." : "Begin your patient journey by registering the first patient in your dental practice."}
+            emptyAction={
+              hasActiveFilters ? (
+                <Button variant="outline" onClick={resetFilters}>Clear Filters</Button>
+              ) : currentUser?.role !== "DOCTOR" ? (
+                <Button onClick={openDialog}><UserPlus className="h-4 w-4" /> Add Patient</Button>
+              ) : undefined
+            }
+            mobileCard={(row) => (
+              <div className="flex items-center justify-between gap-3">
+                <div className="ds-min-w-0">
+                  <p className="ds-body font-medium text-[var(--ds-text)]">{row.full_name}</p>
+                  <p className="ds-caption text-[var(--ds-text-secondary)]">
+                    {row.gender ?? "—"} · {row.phone ?? "—"}
+                  </p>
                 </div>
+                <StatusBadge status={row.status} />
               </div>
-            </>
-          )}
+            )}
+            onRowClick={(row) => navigate(`/patients/${row.id}`)}
+          />
         </CardContent>
       </Card>
 
@@ -501,7 +449,7 @@ export default function PatientList() {
                 </div>
               </div>
             </div>
-            <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-gray-100">
+            <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-[var(--ds-border-light)]">
               <Button type="button" variant="outline" onClick={resetForm}>Cancel</Button>
               <Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? "Saving..." : "Save"}</Button>
             </DialogFooter>

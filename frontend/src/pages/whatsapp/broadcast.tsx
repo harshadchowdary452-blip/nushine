@@ -246,7 +246,7 @@ export default function WhatsAppBroadcast() {
               {(audienceType === "all_patients" || audienceType === "appointment_tomorrow") && (
                 <div>
                   <div className="relative mb-2">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[var(--ds-text-tertiary)]" />
                     <Input
                       placeholder="Search patients..."
                       value={searchTerm}
@@ -258,11 +258,11 @@ export default function WhatsAppBroadcast() {
                     {filteredPatients.slice(0, 20).map((p) => (
                       <label
                         key={p.id}
-                        className="flex items-center gap-2 text-sm p-1.5 rounded hover:bg-gray-50 cursor-pointer"
+                        className="flex items-center gap-2 text-sm p-1.5 rounded hover:bg-[var(--ds-surface-hover)] cursor-pointer"
                       >
                         <input type="checkbox" className="rounded" />
                         <span className="flex-1">{p.patient_name || "-"}</span>
-                        <span className="text-xs text-gray-400">{p.phone || "—"}</span>
+                        <span className="text-xs text-[var(--ds-text-tertiary)]">{p.phone || "—"}</span>
                       </label>
                     ))}
                   </div>
@@ -272,7 +272,7 @@ export default function WhatsAppBroadcast() {
               {audienceType === "all_leads" && (
                 <div>
                   <div className="relative mb-2">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[var(--ds-text-tertiary)]" />
                     <Input
                       placeholder="Search leads..."
                       value={searchTerm}
@@ -284,18 +284,18 @@ export default function WhatsAppBroadcast() {
                     {filteredLeads.slice(0, 20).map((l) => (
                       <label
                         key={l.id}
-                        className="flex items-center gap-2 text-sm p-1.5 rounded hover:bg-gray-50 cursor-pointer"
+                        className="flex items-center gap-2 text-sm p-1.5 rounded hover:bg-[var(--ds-surface-hover)] cursor-pointer"
                       >
                         <input type="checkbox" className="rounded" />
                         <span className="flex-1">{l.lead_name}</span>
-                        <span className="text-xs text-gray-400">{l.mobile}</span>
+                        <span className="text-xs text-[var(--ds-text-tertiary)]">{l.mobile}</span>
                       </label>
                     ))}
                   </div>
                 </div>
               )}
 
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-[var(--ds-text-tertiary)]">
                 {resolveAudience().length} recipients match this filter
               </p>
             </CardContent>
@@ -328,7 +328,7 @@ export default function WhatsAppBroadcast() {
                   rows={6}
                   placeholder="Type your message here..."
                 />
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-[var(--ds-text-tertiary)] mt-1">
                   Use {"{PatientName}"}, {"{HospitalName}"} as placeholders
                 </p>
               </div>
@@ -347,15 +347,15 @@ export default function WhatsAppBroadcast() {
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-400">Audience</span>
+                <span className="text-[var(--ds-text-tertiary)]">Audience</span>
                 <span className="font-medium">{audienceType.replace(/_/g, " ")}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-400">Recipients</span>
+                <span className="text-[var(--ds-text-tertiary)]">Recipients</span>
                 <span className="font-medium">{resolveAudience().length}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-400">Messages</span>
+                <span className="text-[var(--ds-text-tertiary)]">Messages</span>
                 <span className="font-medium">{generatedLinks.length || 0}</span>
               </div>
             </CardContent>
@@ -376,9 +376,9 @@ export default function WhatsAppBroadcast() {
               </CardHeader>
               <CardContent className="max-h-80 overflow-y-auto space-y-2">
                 {generatedLinks.slice(0, 50).map((l, i) => (
-                  <div key={i} className="rounded-lg border border-gray-100 p-2 text-xs">
+                  <div key={i} className="rounded-lg border border-[var(--ds-border-light)] p-2 text-xs">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="font-medium text-gray-700">{l.name}</span>
+                      <span className="font-medium text-[var(--ds-text-secondary)]">{l.name}</span>
                       <a
                         href={l.link}
                         target="_blank"
@@ -388,11 +388,11 @@ export default function WhatsAppBroadcast() {
                         Open <ExternalLink className="h-3 w-3" />
                       </a>
                     </div>
-                    <p className="text-gray-500 truncate">{l.phone}</p>
+                    <p className="text-[var(--ds-text-secondary)] truncate">{l.phone}</p>
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="h-auto p-0 text-xs text-gray-400 hover:text-gray-600 mt-1"
+                      className="h-auto p-0 text-xs text-[var(--ds-text-tertiary)] hover:text-[var(--ds-text-secondary)] mt-1"
                       onClick={() => {
                         navigator.clipboard.writeText(l.link)
                         addToast({ title: "Copied", variant: "success" })
@@ -403,7 +403,7 @@ export default function WhatsAppBroadcast() {
                   </div>
                 ))}
                 {generatedLinks.length > 50 && (
-                  <p className="text-xs text-gray-400 text-center pt-2">
+                  <p className="text-xs text-[var(--ds-text-tertiary)] text-center pt-2">
                     ...and {generatedLinks.length - 50} more
                   </p>
                 )}
@@ -422,11 +422,11 @@ export default function WhatsAppBroadcast() {
           </CardHeader>
           <CardContent className="space-y-3">
             {preview.map((p, i) => (
-              <div key={i} className="rounded-lg border border-gray-200 p-3">
+              <div key={i} className="rounded-lg border border-[var(--ds-border)] p-3">
                 <div className="flex items-center justify-between mb-2">
                   <div>
-                    <span className="text-sm font-medium text-gray-800">{p.name}</span>
-                    <span className="text-xs text-gray-400 ml-2">{p.phone}</span>
+                    <span className="text-sm font-medium text-[var(--ds-text)]">{p.name}</span>
+                    <span className="text-xs text-[var(--ds-text-tertiary)] ml-2">{p.phone}</span>
                   </div>
                   <a
                     href={p.link}
@@ -437,7 +437,7 @@ export default function WhatsAppBroadcast() {
                     <ExternalLink className="h-3 w-3" /> Open
                   </a>
                 </div>
-                <p className="text-xs text-gray-600 whitespace-pre-wrap">{p.message}</p>
+                <p className="text-xs text-[var(--ds-text-secondary)] whitespace-pre-wrap">{p.message}</p>
               </div>
             ))}
           </CardContent>

@@ -9,7 +9,7 @@ import {
   Settings, ChevronLeft, Building2, Shield, MessageSquare,
   Activity, IndianRupee, FileText,
   Clock, UserPlus, Search, Download, LayoutList, Kanban,
-  Sun, Moon, Star, ChevronDown, Hospital, History, Menu,
+  Sun, Moon, Star, ChevronDown, Hospital, Menu,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useSidebarStore } from "@/store/sidebarStore"
@@ -17,7 +17,6 @@ import { useAuthStore } from "@/store/authStore"
 import { useThemeStore } from "@/store/themeStore"
 import { useSearchStore } from "@/store/searchStore"
 import { useFavoriteStore } from "@/store/favoriteStore"
-import { useRecentlyOpenedStore } from "@/store/recentlyOpenedStore"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -314,7 +313,6 @@ export default function EnterpriseSidebar() {
   const setSearchOpen = useSearchStore((s) => s.setOpen)
   const favItems = useFavoriteStore((s) => s.items)
   const favToggle = useFavoriteStore((s) => s.toggle)
-  const recentOpened = useRecentlyOpenedStore((s) => s.items)
   const location = useLocation()
 
   const role = (user?.role as RoleKey) || "DOCTOR"
@@ -357,8 +355,6 @@ export default function EnterpriseSidebar() {
     () => allItems.filter((i) => favItems.includes(i.path)),
     [allItems, favItems]
   )
-
-  const recentItems = recentOpened
 
   const hospitalName = user?.hospital_name || null
 
@@ -491,35 +487,6 @@ export default function EnterpriseSidebar() {
         </div>
       )}
 
-      {/* ═══ RECENTLY OPENED ═══ */}
-      {isExpanded && recentItems.length > 0 && !searchQuery && (
-        <div className="pt-3 pb-1 shrink-0">
-          <div className="px-5 pb-1.5">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ds-sidebar-text)] flex items-center gap-1.5">
-              <History className="h-3 w-3" strokeWidth={1.5} />
-              Recent
-            </p>
-          </div>
-          <div className="px-2.5 space-y-[var(--ds-sidebar-item-gap)]">
-            {recentItems.slice(0, 3).map((recent) => {
-              const item = allItems.find((i) => i.path === recent.path)
-              if (!item) return null
-              return (
-                <NavItemInner
-                  key={recent.path}
-                  item={item}
-                  isActive={isActive(item.path)}
-                  isExpanded={isExpanded}
-                  isFavorite={favItems.includes(item.path)}
-                  onToggleFavorite={(path, e) => { e.preventDefault(); e.stopPropagation(); favToggle(path) }}
-                  onClick={() => setMobileOpen(false)}
-                />
-              )
-            })}
-          </div>
-        </div>
-      )}
-
       {/* ═══ PRIMARY NAVIGATION ═══ */}
       <nav aria-label="Main navigation" className={cn(
         "flex-1 overflow-y-auto scrollbar-none",
@@ -601,6 +568,7 @@ export default function EnterpriseSidebar() {
         <div className={cn(isExpanded ? "px-2" : "flex justify-center")}>
           <Link
             to="/settings"
+            onClick={() => setMobileOpen(false)}
             className={cn(
               "flex items-center gap-3 w-full rounded-[var(--ds-radius-lg)] py-2 transition-colors hover:bg-[var(--ds-sidebar-hover)] group/user",
               isExpanded ? "px-2" : "justify-center p-2"
@@ -646,7 +614,7 @@ export default function EnterpriseSidebar() {
       </aside>
 
       {/* ─── TABLET ICON ONLY ─── */}
-      <aside aria-label="Sidebar" className="hidden md:flex lg:hidden flex-col shrink-0 w-[72px] overflow-hidden bg-[var(--ds-sidebar-bg)]">
+      <aside aria-label="Sidebar" className="hidden md:flex lg:hidden flex-col shrink-0 w-[var(--ds-sidebar-collapsed-width)] overflow-hidden bg-[var(--ds-sidebar-bg)]">
         <div className="flex h-full flex-col bg-[var(--ds-sidebar-bg)]">
           <div className="flex h-[var(--ds-sidebar-brand-h)] items-center justify-center border-b border-[var(--ds-sidebar-border)]">
             <div className="flex items-center justify-center w-8 h-8 rounded-[var(--ds-radius-lg)] bg-[var(--ds-accent)]">
@@ -725,11 +693,11 @@ export default function EnterpriseSidebar() {
               role="dialog"
               aria-modal="true"
               aria-label="Mobile navigation"
-              initial={{ x: -320 }}
+              initial={{ x: "-100%" }}
               animate={{ x: 0 }}
-              exit={{ x: -320 }}
+              exit={{ x: "-100%" }}
               transition={{ type: "spring", stiffness: 350, damping: 30 }}
-              className="fixed inset-y-0 left-0 z-[var(--ds-z-sidebar)] w-[var(--ds-sidebar-width)] shadow-xl"
+              className="fixed inset-y-0 left-0 z-[var(--ds-z-dialog)] w-[var(--ds-sidebar-width)] shadow-xl"
             >
               {sidebarContent}
             </motion.aside>
@@ -787,7 +755,7 @@ export default function EnterpriseSidebar() {
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", stiffness: 350, damping: 30 }}
-              className="fixed bottom-0 left-0 right-0 z-[var(--ds-z-sidebar)] rounded-t-2xl bg-[var(--ds-sidebar-surface)] pb-8 shadow-[0_-4px_20px_rgba(0,0,0,0.2)] md:hidden safe-area-bottom"
+              className="fixed bottom-0 left-0 right-0 z-[var(--ds-z-dialog)] rounded-t-2xl bg-[var(--ds-sidebar-surface)] pb-8 shadow-[0_-4px_20px_rgba(0,0,0,0.2)] md:hidden safe-area-bottom"
             >
               <div className="mx-auto my-3 h-1 w-10 rounded-full bg-[var(--ds-sidebar-border)]" />
               <div className="grid grid-cols-4 gap-1 px-4">
@@ -804,7 +772,7 @@ export default function EnterpriseSidebar() {
                         active ? "bg-[var(--ds-sidebar-active-bg)] text-[var(--ds-accent)]" : "text-[var(--ds-sidebar-text)] hover:bg-[var(--ds-sidebar-hover)]"
                       )}
                     >
-                      <Icon className="h-[20px] w-[20px]" strokeWidth={1.5} />
+        <Icon className="h-[18px] w-[18px]" strokeWidth={1.5} />
                       <span className="text-[10px] font-medium text-center">{item.label}</span>
                     </Link>
                   )

@@ -14,7 +14,7 @@ interface BadgeProps {
 }
 
 export function ChannelBadge({ value, className = "" }: BadgeProps) {
-  const colors = channelColors[value] || "bg-gray-50 text-gray-600";
+  const colors = channelColors[value] || "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]";
   return (
     <Badge className={`text-[10px] font-medium ${colors} ${className}`}>
       {formatLabel(value)}
@@ -23,7 +23,7 @@ export function ChannelBadge({ value, className = "" }: BadgeProps) {
 }
 
 export function PriorityBadge({ value, className = "" }: BadgeProps) {
-  const colors = priorityColors[value] || "bg-gray-50 text-gray-600";
+  const colors = priorityColors[value] || "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]";
   return (
     <Badge className={`text-[10px] font-medium ${colors} ${className}`}>
       {formatLabel(value)}
@@ -32,7 +32,7 @@ export function PriorityBadge({ value, className = "" }: BadgeProps) {
 }
 
 export function FollowUpStatusBadge({ value, className = "" }: BadgeProps) {
-  const colors = followUpStatusColors[value] || "bg-gray-50 text-gray-600";
+  const colors = followUpStatusColors[value] || "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]";
   return (
     <Badge className={`text-[10px] font-medium ${colors} ${className}`}>
       {formatLabel(value)}
@@ -41,7 +41,7 @@ export function FollowUpStatusBadge({ value, className = "" }: BadgeProps) {
 }
 
 export function LeadStatusBadge({ value, className = "" }: BadgeProps) {
-  const colors = leadStatusColors[value] || "bg-gray-50 text-gray-600";
+  const colors = leadStatusColors[value] || "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]";
   return (
     <Badge className={`text-[10px] font-medium ${colors} ${className}`}>
       {formatLabel(value)}
@@ -50,7 +50,7 @@ export function LeadStatusBadge({ value, className = "" }: BadgeProps) {
 }
 
 export function CampaignStatusBadge({ value, className = "" }: BadgeProps) {
-  const colors = campaignStatusColors[value] || "bg-gray-50 text-gray-600";
+  const colors = campaignStatusColors[value] || "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]";
   return (
     <Badge className={`text-[10px] font-medium ${colors} ${className}`}>
       {formatLabel(value)}

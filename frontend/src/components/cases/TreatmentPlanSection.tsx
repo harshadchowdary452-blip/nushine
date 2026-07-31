@@ -137,17 +137,17 @@ export default function TreatmentPlanSection({
       <div className="relative">
         <div className="flex gap-2">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ds-text-tertiary)]" />
             <Input
               ref={triggerRef}
               placeholder="Search treatment procedure..."
               value={search}
               onChange={(e) => { setSearch(e.target.value); setShowDropdown(true); setCustomMode(false) }}
               onFocus={() => setShowDropdown(true)}
-              className="pl-9 h-10 text-sm bg-white border-gray-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              className="pl-9 h-10 text-sm bg-[var(--ds-surface)] border-[var(--ds-border-strong)] focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             />
           </div>
-          <Button type="button" variant="outline" size="sm" className="h-10 border-gray-300 text-gray-700 hover:bg-gray-50" onClick={() => { setCustomMode(!customMode); setShowDropdown(false) }}>
+          <Button type="button" variant="outline" size="sm" className="h-10 border-[var(--ds-border-strong)] text-[var(--ds-text-secondary)] hover:bg-[var(--ds-surface-hover)]" onClick={() => { setCustomMode(!customMode); setShowDropdown(false) }}>
             <Plus className="h-4 w-4 mr-1.5" /> Custom
           </Button>
         </div>
@@ -156,20 +156,20 @@ export default function TreatmentPlanSection({
             <div
               ref={popupRef}
               style={position ? { top: position.top, left: position.left, width: position.width } : undefined}
-              className={cn("fixed rounded-lg border border-gray-200 bg-white shadow-lg", layer)}
+              className={cn("fixed rounded-lg border border-[var(--ds-border)] bg-[var(--ds-surface)] shadow-lg", layer)}
             >
               <div className="max-h-56 overflow-y-auto p-1.5">
                 {filtered.length === 0 ? (
-                  <p className="py-3 text-center text-sm text-gray-500">No matching procedures</p>
+                  <p className="py-3 text-center text-sm text-[var(--ds-text-secondary)]">No matching procedures</p>
                 ) : (
                   filtered.map((name, idx) => (
                     <button
                       key={`${name}-${idx}`}
                       type="button"
                       onClick={() => addTreatment(name)}
-                      className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm text-gray-800 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                      className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm text-[var(--ds-text)] hover:bg-blue-50 hover:text-blue-700 transition-colors"
                     >
-                      <Plus className="h-4 w-4 text-gray-400 shrink-0" />
+                      <Plus className="h-4 w-4 text-[var(--ds-text-tertiary)] shrink-0" />
                       {name}
                     </button>
                   ))
@@ -184,14 +184,14 @@ export default function TreatmentPlanSection({
               placeholder="Enter custom procedure name..."
               value={customName}
               onChange={(e) => setCustomName(e.target.value)}
-              className="h-10 text-sm flex-1 bg-white border-gray-300"
+              className="h-10 text-sm flex-1 bg-[var(--ds-surface)] border-[var(--ds-border-strong)]"
               autoFocus
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleCustomAdd() } }}
             />
             <Button type="button" size="sm" variant="default" className="h-10 px-4" onClick={handleCustomAdd} disabled={!customName.trim()}>
               <Check className="h-4 w-4" />
             </Button>
-            <Button type="button" size="sm" variant="outline" className="h-10 px-4 border-gray-300" onClick={() => { setCustomMode(false); setCustomName("") }}>
+            <Button type="button" size="sm" variant="outline" className="h-10 px-4 border-[var(--ds-border-strong)]" onClick={() => { setCustomMode(false); setCustomName("") }}>
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -204,18 +204,18 @@ export default function TreatmentPlanSection({
           {treatments.map((t) => (
             <div
               key={t.id}
-              className="rounded-lg border border-gray-200 bg-white shadow-sm hover:shadow transition-shadow"
+              className="rounded-lg border border-[var(--ds-border)] bg-[var(--ds-surface)] shadow-sm hover:shadow transition-shadow"
             >
               {/* Card Header */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/50">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--ds-border-light)] bg-[var(--ds-background-subtle)]/50">
                 <div className="flex items-center gap-2 min-w-0">
                   <Stethoscope className="h-4 w-4 text-blue-600 shrink-0" />
-                  <span className="text-sm font-semibold text-gray-900 truncate">{t.name}</span>
+                  <span className="text-sm font-semibold text-[var(--ds-text)] truncate">{t.name}</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => removeTreatment(t.id)}
-                  className="inline-flex items-center justify-center rounded-md p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                  className="inline-flex items-center justify-center rounded-md p-1.5 text-[var(--ds-text-tertiary)] hover:text-red-600 hover:bg-red-50 transition-colors"
                   title="Remove treatment"
                 >
                   <X className="h-4 w-4" />
@@ -226,7 +226,7 @@ export default function TreatmentPlanSection({
               <div className="p-4 space-y-3">
                 {/* Tooth Selection */}
                 <div>
-                  <Label className="text-xs font-medium text-gray-500 mb-1.5 block">
+                  <Label className="text-xs font-medium text-[var(--ds-text-secondary)] mb-1.5 block">
                     Tooth Number <span className="text-red-500">*</span>
                   </Label>
                   <ToothNumberPicker
@@ -238,31 +238,31 @@ export default function TreatmentPlanSection({
                 {/* Visits + Cost + Remarks */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <Label className="text-xs font-medium text-gray-500 mb-1 block">Est. Visits <span className="text-red-500">*</span></Label>
+                    <Label className="text-xs font-medium text-[var(--ds-text-secondary)] mb-1 block">Est. Visits <span className="text-red-500">*</span></Label>
                     <NumericInput
                       mode="integer" min={1}
                       value={t.estimatedVisits}
                       onChange={(v) => updateTreatment(t.id, "estimatedVisits", v ? Number(v) : "")}
-                      className="h-9 text-sm bg-white border-gray-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                      className="h-9 text-sm bg-[var(--ds-surface)] border-[var(--ds-border-strong)] focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                       placeholder="1"
                     />
                   </div>
                   <div>
-                    <Label className="text-xs font-medium text-gray-500 mb-1 block">Est. Cost (₹) <span className="text-red-500">*</span></Label>
+                    <Label className="text-xs font-medium text-[var(--ds-text-secondary)] mb-1 block">Est. Cost (₹) <span className="text-red-500">*</span></Label>
                     <NumericInput
                       mode="currency" prefix="₹" min={0}
                       value={t.estimatedCost}
                       onChange={(v) => updateTreatment(t.id, "estimatedCost", v ? Number(v) : "")}
-                      className="h-9 text-sm bg-white border-gray-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                      className="h-9 text-sm bg-[var(--ds-surface)] border-[var(--ds-border-strong)] focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                       placeholder="0"
                     />
                   </div>
                   <div>
-                    <Label className="text-xs font-medium text-gray-500 mb-1 block">Remarks</Label>
+                    <Label className="text-xs font-medium text-[var(--ds-text-secondary)] mb-1 block">Remarks</Label>
                     <Input
                       value={t.remarks}
                       onChange={(e) => updateTreatment(t.id, "remarks", e.target.value)}
-                      className="h-9 text-sm bg-white border-gray-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                      className="h-9 text-sm bg-[var(--ds-surface)] border-[var(--ds-border-strong)] focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                       placeholder="Optional notes..."
                     />
                   </div>
@@ -274,8 +274,8 @@ export default function TreatmentPlanSection({
       )}
 
       {treatments.length === 0 && (
-        <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 py-8 text-center">
-          <p className="text-sm text-gray-500">No treatments added yet. Search or add a custom procedure above.</p>
+        <div className="rounded-lg border border-dashed border-[var(--ds-border-strong)] bg-[var(--ds-background-subtle)] py-8 text-center">
+          <p className="text-sm text-[var(--ds-text-secondary)]">No treatments added yet. Search or add a custom procedure above.</p>
         </div>
       )}
 
@@ -297,11 +297,11 @@ export default function TreatmentPlanSection({
 
 function SummaryItem({ icon, label, value }: { icon: React.ReactNode; label: string; value: number | string }) {
   return (
-    <div className="flex items-center gap-2.5 rounded-md bg-white border border-blue-100 px-3 py-2.5">
+    <div className="flex items-center gap-2.5 rounded-md bg-[var(--ds-surface)] border border-blue-100 px-3 py-2.5">
       <div className="text-blue-600 shrink-0">{icon}</div>
       <div className="min-w-0">
-        <div className="text-[10px] text-gray-500 uppercase tracking-wide leading-tight">{label}</div>
-        <div className="text-sm font-bold text-gray-900 leading-tight">{value}</div>
+        <div className="text-[10px] text-[var(--ds-text-secondary)] uppercase tracking-wide leading-tight">{label}</div>
+        <div className="text-sm font-bold text-[var(--ds-text)] leading-tight">{value}</div>
       </div>
     </div>
   )

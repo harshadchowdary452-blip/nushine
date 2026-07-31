@@ -9,7 +9,7 @@ import { leadsApi } from "@/services/endpoints"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 import { Skeleton } from "@/components/ui/skeleton"
-import KpiCard from "@/components/layout/kpi-card"
+import { KpiCard } from "@/design-system"
 import { PieChart as RePie, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts"
 
 import type { Lead } from "@/types"
@@ -118,7 +118,7 @@ export default function LeadAnalytics() {
                 </RePie>
               </ResponsiveContainer>
             ) : (
-              <div className="flex items-center justify-center h-[300px] text-gray-400 text-sm">No data</div>
+              <div className="flex items-center justify-center h-[300px] text-[var(--ds-text-tertiary)] text-sm">No data</div>
             )}
           </CardContent>
         </Card>
@@ -137,7 +137,7 @@ export default function LeadAnalytics() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex items-center justify-center h-[300px] text-gray-400 text-sm">No data</div>
+              <div className="flex items-center justify-center h-[300px] text-[var(--ds-text-tertiary)] text-sm">No data</div>
             )}
           </CardContent>
         </Card>
@@ -150,13 +150,13 @@ export default function LeadAnalytics() {
             {analytics.statusData.map((item, idx) => {
               const pct = analytics.total > 0 ? ((item.value / analytics.total) * 100).toFixed(1) : "0"
               return (
-                <div key={idx} className="rounded-lg border border-gray-200 p-3">
+                <div key={idx} className="rounded-lg border border-[var(--ds-border)] p-3">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="h-3 w-3 rounded-full" style={{ backgroundColor: item.fill }} />
-                    <span className="text-sm font-medium text-gray-800">{item.name}</span>
+                    <span className="text-sm font-medium text-[var(--ds-text)]">{item.name}</span>
                   </div>
-                  <p className="text-xl font-bold text-gray-900">{item.value}</p>
-                  <p className="text-xs text-gray-500">{pct}% of total</p>
+                  <p className="text-xl font-bold text-[var(--ds-text)]">{item.value}</p>
+                  <p className="text-xs text-[var(--ds-text-secondary)]">{pct}% of total</p>
                 </div>
               )
             })}

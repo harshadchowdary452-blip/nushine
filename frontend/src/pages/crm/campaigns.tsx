@@ -124,7 +124,7 @@ interface CampaignAnalyticsData {
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.04 } } }
 
 const statusBadge: Record<string, string> = {
-  DRAFT: "bg-gray-50 text-gray-600",
+  DRAFT: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
   ACTIVE: "bg-green-50 text-green-700",
   COMPLETED: "bg-blue-50 text-blue-700",
   CANCELLED: "bg-red-50 text-red-600",
@@ -179,7 +179,7 @@ const quickCampaigns = [
     label: "Dental Implants",
     type: "PROMOTIONAL",
     icon: Crown,
-    color: "bg-purple-50 text-purple-600",
+    color: "bg-[var(--ds-accent-50)] text-[var(--ds-accent-600)]",
   },
   {
     label: "Teeth Whitening",
@@ -191,7 +191,7 @@ const quickCampaigns = [
     label: "Braces Awareness",
     type: "DENTAL_AWARENESS",
     icon: Smile,
-    color: "bg-indigo-50 text-indigo-600",
+    color: "bg-[var(--ds-primary-50)] text-[var(--ds-primary-600)]",
   },
   {
     label: "Free Consultation",
@@ -199,7 +199,7 @@ const quickCampaigns = [
     icon: Stethoscope,
     color: "bg-green-50 text-green-600",
   },
-  { label: "Custom", type: "CUSTOM", icon: FileText, color: "bg-gray-50 text-gray-600" },
+  { label: "Custom", type: "CUSTOM", icon: FileText, color: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]" },
 ]
 
 export default function Campaigns() {
@@ -413,7 +413,7 @@ export default function Campaigns() {
                   <Loader2 className="h-8 w-8 animate-spin" />
                 </div>
               ) : items.length === 0 ? (
-                <div className="py-12 text-center text-gray-400">
+                <div className="py-12 text-center text-[var(--ds-text-tertiary)]">
                   <Send className="mx-auto h-8 w-8 mb-2 opacity-40" />
                   <p>
                     No campaigns yet. Click "New Campaign" or use a quick campaign button above.
@@ -489,7 +489,7 @@ function KpiCard({
     cyan: "bg-cyan-50 text-cyan-600",
     red: "bg-red-50 text-red-600",
     amber: "bg-amber-50 text-amber-600",
-    purple: "bg-purple-50 text-purple-600",
+    purple: "bg-[var(--ds-accent-50)] text-[var(--ds-accent-600)]",
   }
   return (
     <Card>
@@ -505,7 +505,7 @@ function KpiCard({
           </div>
           <div className="min-w-0">
             <p className="text-lg font-bold truncate">{value}</p>
-            <p className="text-xs text-gray-500 truncate">{title}</p>
+            <p className="text-xs text-[var(--ds-text-secondary)] truncate">{title}</p>
           </div>
         </div>
       </CardContent>
@@ -565,23 +565,23 @@ function CampaignRow({
   const displayTotal = p?.total_recipients ?? total
 
   return (
-    <div className="rounded-lg border p-4 transition-colors hover:bg-gray-50">
+    <div className="rounded-lg border p-4 transition-colors hover:bg-[var(--ds-surface-hover)]">
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
           <ChannelIcon className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold text-gray-900">{c.name}</span>
+            <span className="text-sm font-semibold text-[var(--ds-text)]">{c.name}</span>
             <Badge className={`text-xs ${statusBadge[c.status || ""] || ""}`}>{c.status}</Badge>
             {c.is_active === false && (
-              <Badge className="text-xs bg-gray-50 text-gray-500">Archived</Badge>
+              <Badge className="text-xs bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]">Archived</Badge>
             )}
-            <span className="text-xs text-gray-400 ml-auto">
+            <span className="text-xs text-[var(--ds-text-tertiary)] ml-auto">
               {c.created_at ? new Date(c.created_at).toLocaleDateString() : ""}
             </span>
           </div>
-          <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+          <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--ds-text-secondary)]">
             <span className="flex items-center gap-1">
               <Target className="h-3 w-3" />
               {targetLabels[c.target || ""] || c.target}
@@ -601,7 +601,7 @@ function CampaignRow({
               </span>
             )}
             {displayPending > 0 && (
-              <span className="flex items-center gap-1 text-gray-400">
+              <span className="flex items-center gap-1 text-[var(--ds-text-tertiary)]">
                 <Clock className="h-3 w-3" />
                 {displayPending} pending
               </span>
@@ -613,13 +613,13 @@ function CampaignRow({
           </div>
           {c.status === "ACTIVE" && (
             <div className="mt-2 space-y-1">
-              <div className="h-2 w-full rounded-full bg-gray-100">
+              <div className="h-2 w-full rounded-full bg-[var(--ds-background-subtle)]">
                 <div
                   className="h-full rounded-full bg-blue-500 transition-all duration-700"
                   style={{ width: `${pct}%` }}
                 />
               </div>
-              <p className="text-xs text-gray-400 flex items-center gap-1">
+              <p className="text-xs text-[var(--ds-text-tertiary)] flex items-center gap-1">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
@@ -633,7 +633,7 @@ function CampaignRow({
           <Button
             variant="ghost"
             size="icon-sm"
-            className="text-gray-500"
+            className="text-[var(--ds-text-secondary)]"
             title="View Recipients"
             onClick={onViewRecipients}
           >
@@ -669,7 +669,7 @@ function CampaignRow({
           <Button
             variant="ghost"
             size="icon-sm"
-            className="text-gray-500"
+            className="text-[var(--ds-text-secondary)]"
             title="Duplicate"
             onClick={onDuplicate}
           >
@@ -679,7 +679,7 @@ function CampaignRow({
             <Button
               variant="ghost"
               size="icon-sm"
-              className="text-gray-500"
+              className="text-[var(--ds-text-secondary)]"
               title="Archive"
               onClick={onArchive}
             >
@@ -717,7 +717,7 @@ function RecipientsList({ campaignId }: { campaignId: string }) {
       </div>
     )
   if (items.length === 0)
-    return <div className="py-8 text-center text-gray-400">No recipients yet</div>
+    return <div className="py-8 text-center text-[var(--ds-text-tertiary)]">No recipients yet</div>
   const grouped: Record<string, CampaignRecipient[]> = {}
   items.forEach((r: CampaignRecipient) => {
     const s = r.status || "UNKNOWN"
@@ -732,7 +732,7 @@ function RecipientsList({ campaignId }: { campaignId: string }) {
         if (!g?.length) return null
         return (
           <div key={s}>
-            <p className="text-xs font-medium text-gray-500 mb-1">
+            <p className="text-xs font-medium text-[var(--ds-text-secondary)] mb-1">
               {s} ({g.length})
             </p>
             <div className="space-y-1">
@@ -744,7 +744,7 @@ function RecipientsList({ campaignId }: { campaignId: string }) {
                   <span className="font-medium truncate">
                     {r.patient_name || r.recipient_name || `#${(r.patient_id || r.id).slice(-6)}`}
                   </span>
-                  {r.phone && <span className="text-xs text-gray-400 ml-2">{r.phone}</span>}
+                  {r.phone && <span className="text-xs text-[var(--ds-text-tertiary)] ml-2">{r.phone}</span>}
                   {r.error_message && (
                     <span className="text-xs text-red-500 ml-2">{r.error_message}</span>
                   )}
@@ -876,7 +876,7 @@ function CampaignWizard({ quickType, onDone }: { quickType: string | null; onDon
             key={s}
             className={cn(
               "flex-1 h-1.5 rounded-full transition-colors",
-              s <= step ? "bg-blue-500" : "bg-gray-200",
+              s <= step ? "bg-blue-500" : "bg-[var(--ds-surface-secondary)]",
             )}
           />
         ))}
@@ -1035,7 +1035,7 @@ function CampaignWizard({ quickType, onDone }: { quickType: string | null; onDon
             Preview Count
           </Button>
           {previewCount !== null && (
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-[var(--ds-text-secondary)]">
               Total recipients: <strong>{previewCount}</strong>
             </p>
           )}
@@ -1052,13 +1052,13 @@ function CampaignWizard({ quickType, onDone }: { quickType: string | null; onDon
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <Label className="text-sm">Template Source:</Label>
-            <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
+            <div className="flex gap-1 bg-[var(--ds-background-subtle)] rounded-lg p-0.5">
               <button
                 className={cn(
                   "px-3 py-1 text-xs rounded-md transition-colors",
                   templateSource === "campaign"
-                    ? "bg-white shadow-sm font-medium"
-                    : "text-gray-500",
+                    ? "bg-[var(--ds-surface)] shadow-sm font-medium"
+                    : "text-[var(--ds-text-secondary)]",
                 )}
                 onClick={() => setTemplateSource("campaign")}
               >
@@ -1068,8 +1068,8 @@ function CampaignWizard({ quickType, onDone }: { quickType: string | null; onDon
                 className={cn(
                   "px-3 py-1 text-xs rounded-md transition-colors",
                   templateSource === "whatsapp"
-                    ? "bg-white shadow-sm font-medium"
-                    : "text-gray-500",
+                    ? "bg-[var(--ds-surface)] shadow-sm font-medium"
+                    : "text-[var(--ds-text-secondary)]",
                 )}
                 onClick={() => setTemplateSource("whatsapp")}
               >
@@ -1103,7 +1103,7 @@ function CampaignWizard({ quickType, onDone }: { quickType: string | null; onDon
                     "w-full text-left px-3 py-2 rounded-md text-sm transition-colors",
                     selectedTemplate === t.id
                       ? "bg-blue-50 text-blue-700 font-medium"
-                      : "hover:bg-gray-50",
+                      : "hover:bg-[var(--ds-surface-hover)]",
                   )}
                 >
                   {t.name}
@@ -1112,7 +1112,7 @@ function CampaignWizard({ quickType, onDone }: { quickType: string | null; onDon
             </div>
           )}
           {templates.length === 0 && (
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-[var(--ds-text-tertiary)]">
               No templates available. Type a custom message below.
             </p>
           )}
@@ -1124,15 +1124,15 @@ function CampaignWizard({ quickType, onDone }: { quickType: string | null; onDon
               rows={5}
               placeholder="Hello {{patient_name}}, this is a message from {{hospital_name}}."
             />
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-[var(--ds-text-tertiary)]">
               Variables: {"{{patient_name}}"} {"{{doctor_name}}"} {"{{hospital_name}}"}{" "}
               {"{{appointment_date}}"} {"{{treatment_name}}"}
             </p>
           </div>
           {message && (
-            <div className="rounded-lg border bg-gray-50 p-3">
-              <p className="text-xs font-medium text-gray-500 mb-1">Preview:</p>
-              <p className="text-sm text-gray-700">
+            <div className="rounded-lg border bg-[var(--ds-background-subtle)] p-3">
+              <p className="text-xs font-medium text-[var(--ds-text-secondary)] mb-1">Preview:</p>
+              <p className="text-sm text-[var(--ds-text-secondary)]">
                 {message.replace(/\{\{(\w+)\}\}/g, (_, v) => `[${v}]`)}
               </p>
             </div>
@@ -1192,32 +1192,32 @@ function CampaignWizard({ quickType, onDone }: { quickType: string | null; onDon
 
       {step === 4 && (
         <div className="space-y-4">
-          <div className="rounded-lg border bg-gray-50 p-4 space-y-3">
+          <div className="rounded-lg border bg-[var(--ds-background-subtle)] p-4 space-y-3">
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
-                <span className="text-gray-500">Name:</span>{" "}
+                <span className="text-[var(--ds-text-secondary)]">Name:</span>{" "}
                 <span className="font-medium">{name}</span>
               </div>
               <div>
-                <span className="text-gray-500">Type:</span>{" "}
+                <span className="text-[var(--ds-text-secondary)]">Type:</span>{" "}
                 <span className="font-medium">{campaignType}</span>
               </div>
               <div>
-                <span className="text-gray-500">Channel:</span>{" "}
+                <span className="text-[var(--ds-text-secondary)]">Channel:</span>{" "}
                 <span className="font-medium">{channel}</span>
               </div>
               <div>
-                <span className="text-gray-500">Target:</span>{" "}
+                <span className="text-[var(--ds-text-secondary)]">Target:</span>{" "}
                 <span className="font-medium">{targetLabels[target] || target}</span>
               </div>
               <div>
-                <span className="text-gray-500">Recipients:</span>{" "}
+                <span className="text-[var(--ds-text-secondary)]">Recipients:</span>{" "}
                 <span className="font-medium">{previewCount ?? "—"}</span>
               </div>
             </div>
             <div className="border-t pt-2">
-              <p className="text-xs text-gray-500 mb-1">Message:</p>
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">{message}</p>
+              <p className="text-xs text-[var(--ds-text-secondary)] mb-1">Message:</p>
+              <p className="text-sm text-[var(--ds-text-secondary)] whitespace-pre-wrap">{message}</p>
             </div>
           </div>
           <div className="flex justify-between pt-2">
@@ -1290,7 +1290,7 @@ function AnalyticsSection({ data }: { data: CampaignAnalyticsData }) {
           </CardHeader>
           <CardContent>
             {topCampaigns.length === 0 ? (
-              <p className="text-sm text-gray-400 py-4 text-center">No campaign data yet</p>
+              <p className="text-sm text-[var(--ds-text-tertiary)] py-4 text-center">No campaign data yet</p>
             ) : (
               <div className="space-y-2">
                 {topCampaigns.map(
@@ -1313,7 +1313,7 @@ function AnalyticsSection({ data }: { data: CampaignAnalyticsData }) {
                     >
                       <div className="min-w-0 flex-1">
                         <p className="font-medium truncate">{c.name || `Campaign #${i + 1}`}</p>
-                        <p className="text-xs text-gray-400">
+                        <p className="text-xs text-[var(--ds-text-tertiary)]">
                           {c.sent || c.messages_sent || 0} sent ·{" "}
                           {c.delivered || c.messages_delivered || 0} delivered
                         </p>
@@ -1354,12 +1354,12 @@ function AnalyticsSection({ data }: { data: CampaignAnalyticsData }) {
                 {
                   label: "Appointments",
                   value: funnel.total_appointments || overview.total_appointments || 0,
-                  color: "bg-purple-500",
+                  color: "bg-[var(--ds-accent-500)]",
                 },
                 {
                   label: "Converted",
                   value: funnel.total_converted || overview.total_converted || 0,
-                  color: "bg-indigo-500",
+                  color: "bg-[var(--ds-primary-500)]",
                 },
               ].map((item) => {
                 const maxVal = Math.max(funnel.total_sent || overview.total_delivered || 1, 1)
@@ -1370,7 +1370,7 @@ function AnalyticsSection({ data }: { data: CampaignAnalyticsData }) {
                       <span>{item.label}</span>
                       <span className="font-medium">{item.value}</span>
                     </div>
-                    <div className="h-2 w-full rounded-full bg-gray-100">
+                    <div className="h-2 w-full rounded-full bg-[var(--ds-background-subtle)]">
                       <div
                         className={cn("h-full rounded-full transition-all", item.color)}
                         style={{ width: `${pct}%` }}
@@ -1393,7 +1393,7 @@ function AnalyticsSection({ data }: { data: CampaignAnalyticsData }) {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b text-left text-gray-500">
+                  <tr className="border-b text-left text-[var(--ds-text-secondary)]">
                     <th className="pb-2 pr-4">Campaign</th>
                     <th className="pb-2 pr-4">Cost</th>
                     <th className="pb-2 pr-4">Revenue</th>

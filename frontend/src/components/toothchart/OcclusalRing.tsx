@@ -94,7 +94,7 @@ export default React.memo(function OcclusalRing({
       style={{ cursor: 'pointer' }}
     >
       {SEGMENTS.map((seg) => {
-        const fill = getSegmentFill(findings, seg.surface, layer, '#F0E8D8')
+        const fill = getSegmentFill(findings, seg.surface, layer, 'var(--ds-clinical-tooth)')
         return (
           <path
             key={seg.surface}
@@ -105,13 +105,13 @@ export default React.memo(function OcclusalRing({
           />
         )
       })}
-      <circle cx={CENTER} cy={CENTER} r={INNER_R} fill="#E8E0D0" stroke="#C0B8A8" strokeWidth={0.5} />
+      <circle cx={CENTER} cy={CENTER} r={INNER_R} fill="var(--ds-clinical-tooth-mid)" stroke="var(--ds-clinical-outline-light)" strokeWidth={0.5} />
       <text
         x={CENTER}
         y={CENTER + 1.5}
         textAnchor="middle"
         fontSize={7}
-        fill="#888"
+        fill="var(--ds-clinical-toothnum)"
         style={{ userSelect: 'none' }}
       >
         {toothNumber}

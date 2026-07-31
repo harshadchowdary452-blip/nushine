@@ -132,12 +132,12 @@ export default function Sidebar() {
   }, [isExpanded])
 
   const sidebarClass = cn(
-    "hidden lg:flex flex-col shrink-0 transition-[width] duration-200 ease-out will-change-transform bg-white border-r border-sidebar-border",
+    "hidden lg:flex flex-col shrink-0 transition-[width] duration-200 ease-out will-change-transform bg-[var(--ds-surface)] border-r border-sidebar-border",
     isCollapsed && !hovered ? "w-[80px]" : "w-[280px]"
   )
 
   const sidebarContent = (
-    <div className="flex h-full flex-col bg-white font-['Poppins','Inter',sans-serif]">
+    <div className="flex h-full flex-col bg-[var(--ds-surface)] font-['Poppins','Inter',sans-serif]">
       {/* Logo area */}
       <div className={cn(
         "flex items-center border-b border-sidebar-border transition-all duration-200 overflow-hidden",
@@ -155,7 +155,7 @@ export default function Sidebar() {
           aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           className={cn(
-            "hidden lg:flex items-center justify-center h-7 w-7 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all duration-200",
+            "hidden lg:flex items-center justify-center h-7 w-7 rounded-lg text-[var(--ds-text-tertiary)] hover:text-[var(--ds-text-secondary)] hover:bg-[var(--ds-surface-hover)] transition-all duration-200",
             isExpanded ? "opacity-100" : "opacity-0 pointer-events-none"
           )}>
           <ChevronLeft className={cn("h-3.5 w-3.5 transition-transform duration-200", isCollapsed && "rotate-180")} strokeWidth={2} />
@@ -165,7 +165,7 @@ export default function Sidebar() {
       {/* Search */}
       <div className={cn("px-3 pt-3 transition-all duration-200 overflow-hidden", !isExpanded ? "opacity-0 h-0 py-0" : "opacity-100")}>
         <div className="relative mb-1">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" strokeWidth={2} />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--ds-text-tertiary)]" strokeWidth={2} />
           <input
             ref={searchRef}
             id="sidebar-search"
@@ -174,18 +174,18 @@ export default function Sidebar() {
             aria-label="Search navigation"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-8 w-full rounded-lg border border-gray-200 bg-gray-50 pl-8 pr-2 text-xs text-gray-900 outline-none placeholder:text-gray-400 focus:border-[var(--ds-primary)] focus:bg-white focus:ring-2 focus:ring-[var(--ds-primary)]/10 transition-all"
+            className="h-8 w-full rounded-lg border border-[var(--ds-border)] bg-[var(--ds-background-subtle)] pl-8 pr-2 text-xs text-[var(--ds-text)] outline-none placeholder:text-[var(--ds-input-placeholder)] focus:border-[var(--ds-primary)] focus:bg-[var(--ds-surface)] focus:ring-2 focus:ring-[var(--ds-primary)]/10 transition-all"
           />
-          <kbd className="absolute right-2 top-1/2 -translate-y-1/2 hidden sm:inline-flex h-4 items-center px-1.5 rounded border border-gray-200 bg-white text-[10px] font-medium text-gray-400">⌘K</kbd>
+          <kbd className="absolute right-2 top-1/2 -translate-y-1/2 hidden sm:inline-flex h-4 items-center px-1.5 rounded border border-[var(--ds-border)] bg-[var(--ds-surface)] text-[10px] font-medium text-[var(--ds-text-tertiary)]">⌘K</kbd>
         </div>
         {searchQuery && filteredItems.length > 0 && (
-          <div className="absolute left-3 right-3 z-50 mt-1 rounded-xl border border-gray-200 bg-white py-1 shadow-dropdown">
+          <div className="absolute left-3 right-3 z-50 mt-1 rounded-xl border border-[var(--ds-border)] bg-[var(--ds-surface)] py-1 shadow-dropdown">
             {filteredItems.slice(0, 8).map((item) => {
               const Icon = item.icon
               return (
                 <Link key={item.path} to={item.path} onClick={() => { setSearchQuery(""); setMobileOpen(false) }}
-                  className="flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-                  <Icon className="h-4 w-4 text-gray-400" strokeWidth={2} />
+                  className="flex items-center gap-2.5 px-3 py-2 text-sm text-[var(--ds-text-secondary)] hover:bg-[var(--ds-surface-hover)] transition-colors">
+                  <Icon className="h-4 w-4 text-[var(--ds-text-tertiary)]" strokeWidth={2} />
                   {item.label}
                 </Link>
               )
@@ -197,12 +197,12 @@ export default function Sidebar() {
       {/* Navigation */}
       <nav aria-label="Main navigation" className="min-h-0 flex-1 overflow-y-auto px-2.5 py-3 scrollbar-hide space-y-1">
         {searchQuery && filteredItems.length === 0 && (
-          <p className="px-2 text-xs text-gray-400 py-4 text-center">No results found</p>
+          <p className="px-2 text-xs text-[var(--ds-text-tertiary)] py-4 text-center">No results found</p>
         )}
         {!searchQuery && sections.map((section) => (
           <div key={section.label}>
             <p className={cn(
-              "px-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1 overflow-hidden transition-all duration-200",
+              "px-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--ds-text-tertiary)] mb-1 overflow-hidden transition-all duration-200",
               !isExpanded ? "max-h-0 opacity-0" : "max-h-5 opacity-100"
             )}>
               {section.label}
@@ -218,11 +218,11 @@ export default function Sidebar() {
                     "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 group relative",
                     active
                       ? "bg-gradient-to-r from-[var(--ds-primary-300)]/10 to-[var(--ds-primary-500)]/10 text-[var(--ds-sidebar-text-active)] font-semibold"
-                      : "text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+                      : "text-[var(--ds-text-secondary)] hover:bg-[var(--ds-surface-hover)] hover:text-[var(--ds-text-secondary)]"
                   )}
                   title={!isExpanded ? item.label : undefined}>
                   {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3.5px] h-5 rounded-r-full bg-gradient-to-b from-[var(--ds-primary-300)] to-[var(--ds-primary-500)]" />}
-                  <span className={cn("flex items-center justify-center shrink-0", active ? "text-[var(--ds-primary-300)]" : "text-gray-400 group-hover:text-gray-600")}>
+                  <span className={cn("flex items-center justify-center shrink-0", active ? "text-[var(--ds-primary-300)]" : "text-[var(--ds-text-tertiary)] group-hover:text-[var(--ds-text-secondary)]")}>
                     <Icon className="h-[22px] w-[22px]" strokeWidth={1.5} />
                   </span>
                   <span className={cn(
@@ -242,12 +242,12 @@ export default function Sidebar() {
           "flex items-center gap-3 rounded-xl px-3 py-2 overflow-hidden transition-all duration-200",
           !isExpanded ? "justify-center" : ""
         )}>
-          <Avatar className="h-8 w-8 shrink-0 ring-2 ring-gray-100">
+          <Avatar className="h-8 w-8 shrink-0 ring-2 ring-[var(--ds-border-light)]">
             <AvatarFallback className="bg-gradient-to-br from-[var(--ds-primary-300)]/20 to-[var(--ds-primary-500)]/20 text-xs font-semibold text-[var(--ds-primary-300)]">{initials}</AvatarFallback>
           </Avatar>
           <div className={cn("overflow-hidden transition-all duration-200", !isExpanded ? "max-w-0 opacity-0" : "max-w-36 opacity-100")}>
-            <p className="text-sm font-medium text-gray-900 truncate leading-tight">{user?.full_name ?? "User"}</p>
-            <p className="text-[11px] text-gray-400 truncate capitalize">{user?.role?.replace("_", " ").toLowerCase() ?? ""}</p>
+            <p className="text-sm font-medium text-[var(--ds-text)] truncate leading-tight">{user?.full_name ?? "User"}</p>
+            <p className="text-[11px] text-[var(--ds-text-tertiary)] truncate capitalize">{user?.role?.replace("_", " ").toLowerCase() ?? ""}</p>
           </div>
         </div>
       </div>
@@ -264,7 +264,7 @@ export default function Sidebar() {
 
       {/* Tablet icon-only sidebar */}
       <aside aria-label="Sidebar" className="hidden md:flex lg:hidden flex-col shrink-0 w-[80px]">
-        <div className="sticky top-0 h-screen flex flex-col bg-white border-r border-sidebar-border font-['Poppins','Inter',sans-serif]">
+        <div className="sticky top-0 h-screen flex flex-col bg-[var(--ds-surface)] border-r border-sidebar-border font-['Poppins','Inter',sans-serif]">
           <div className="flex h-[60px] items-center justify-center border-b border-sidebar-border">
             <ToothLogo size={24} showSparkle={false} />
           </div>
@@ -278,7 +278,7 @@ export default function Sidebar() {
                     aria-current={active ? "page" : undefined}
                     className={cn(
                       "flex items-center justify-center rounded-lg p-2.5 transition-all duration-150 relative",
-                      active ? "bg-gradient-to-r from-[var(--ds-primary-300)]/10 to-[var(--ds-primary-500)]/10 text-[var(--ds-primary-300)]" : "text-gray-400 hover:bg-gray-50 hover:text-gray-600"
+                      active ? "bg-gradient-to-r from-[var(--ds-primary-300)]/10 to-[var(--ds-primary-500)]/10 text-[var(--ds-primary-300)]" : "text-[var(--ds-text-tertiary)] hover:bg-[var(--ds-surface-hover)] hover:text-[var(--ds-text-secondary)]"
                     )}
                     title={item.label}>
                     {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3.5px] h-5 rounded-r-full bg-gradient-to-b from-[var(--ds-primary-300)] to-[var(--ds-primary-500)]" />}
@@ -289,7 +289,7 @@ export default function Sidebar() {
             )}
           </nav>
           <div className="border-t border-sidebar-border p-2 flex justify-center">
-            <Avatar className="h-8 w-8 shrink-0 ring-2 ring-gray-100">
+            <Avatar className="h-8 w-8 shrink-0 ring-2 ring-[var(--ds-border-light)]">
               <AvatarFallback className="bg-gradient-to-br from-[var(--ds-primary-300)]/20 to-[var(--ds-primary-500)]/20 text-xs font-semibold text-[var(--ds-primary-300)]">{initials}</AvatarFallback>
             </Avatar>
           </div>
@@ -319,7 +319,7 @@ export default function Sidebar() {
       </AnimatePresence>
 
       {/* Mobile bottom nav */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 flex h-14 items-center justify-around border-t border-gray-200 bg-white md:hidden safe-area-bottom font-['Poppins','Inter',sans-serif]">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 flex h-14 items-center justify-around border-t border-[var(--ds-border)] bg-[var(--ds-surface)] md:hidden safe-area-bottom font-['Poppins','Inter',sans-serif]">
         {mainItems.slice(0, 5).map((item) => {
           const Icon = item.icon
           const active = isActive(item.path)
@@ -327,7 +327,7 @@ export default function Sidebar() {
             <Link key={item.path} to={item.path}
               className={cn(
                 "flex flex-col items-center justify-center gap-0.5 min-w-[56px] py-1 px-2 transition-colors",
-                active ? "text-[var(--ds-primary-300)]" : "text-gray-400 hover:text-gray-600"
+                active ? "text-[var(--ds-primary-300)]" : "text-[var(--ds-text-tertiary)] hover:text-[var(--ds-text-secondary)]"
               )}>
               <Icon className={cn("h-[22px] w-[22px]", active && "scale-105")} strokeWidth={1.5} />
               <span className="text-[10px] font-medium leading-tight text-center truncate w-full">{item.label}</span>
@@ -337,7 +337,7 @@ export default function Sidebar() {
         <button onClick={() => setBottomNavOpen(!bottomNavOpen)}
           aria-label="More navigation items"
           aria-expanded={bottomNavOpen}
-          className="flex flex-col items-center justify-center gap-0.5 min-w-[56px] py-1 px-2 text-gray-400 hover:text-gray-600">
+          className="flex flex-col items-center justify-center gap-0.5 min-w-[56px] py-1 px-2 text-[var(--ds-text-tertiary)] hover:text-[var(--ds-text-secondary)]">
           <Menu className="h-[22px] w-[22px]" strokeWidth={1.5} />
           <span className="text-[10px] font-medium">More</span>
         </button>
@@ -357,8 +357,8 @@ export default function Sidebar() {
               aria-label="More navigation"
               initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl bg-white pb-8 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] md:hidden safe-area-bottom font-['Poppins','Inter',sans-serif]">
-              <div className="mx-auto my-3 h-1 w-10 rounded-full bg-gray-300" />
+              className="fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl bg-[var(--ds-surface)] pb-8 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] md:hidden safe-area-bottom font-['Poppins','Inter',sans-serif]">
+              <div className="mx-auto my-3 h-1 w-10 rounded-full bg-[var(--ds-surface-secondary)]" />
               <div className="grid grid-cols-4 gap-1 px-4">
                 {mainItems.slice(5).map((item) => {
                   const Icon = item.icon
@@ -367,7 +367,7 @@ export default function Sidebar() {
                     <Link key={item.path} to={item.path} onClick={() => setBottomNavOpen(false)}
                       className={cn(
                         "flex flex-col items-center justify-center gap-1 rounded-xl p-3 transition-colors",
-                        active ? "bg-gradient-to-r from-[var(--ds-primary-300)]/10 to-[var(--ds-primary-500)]/10 text-[var(--ds-primary-300)]" : "text-gray-500 hover:bg-gray-50"
+                        active ? "bg-gradient-to-r from-[var(--ds-primary-300)]/10 to-[var(--ds-primary-500)]/10 text-[var(--ds-primary-300)]" : "text-[var(--ds-text-secondary)] hover:bg-[var(--ds-surface-hover)]"
                       )}>
                       <Icon className="h-[22px] w-[22px]" strokeWidth={1.5} />
                       <span className="text-[10px] font-medium text-center">{item.label}</span>

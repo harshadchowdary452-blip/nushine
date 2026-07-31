@@ -8,7 +8,7 @@ import { leadsApi } from "@/services/endpoints"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 import { Skeleton } from "@/components/ui/skeleton"
-import KpiCard from "@/components/layout/kpi-card"
+import { KpiCard } from "@/design-system"
 import { PieChart as RePie, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts"
 import { formatIndianRupees } from "@/lib/currency"
 import type { Lead } from "@/types"
@@ -115,7 +115,7 @@ export default function RevenueAttribution() {
                 </RePie>
               </ResponsiveContainer>
             ) : (
-              <div className="flex items-center justify-center h-[300px] text-gray-400 text-sm">No data</div>
+              <div className="flex items-center justify-center h-[300px] text-[var(--ds-text-tertiary)] text-sm">No data</div>
             )}
           </CardContent>
         </Card>
@@ -134,7 +134,7 @@ export default function RevenueAttribution() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex items-center justify-center h-[300px] text-gray-400 text-sm">No data</div>
+              <div className="flex items-center justify-center h-[300px] text-[var(--ds-text-tertiary)] text-sm">No data</div>
             )}
           </CardContent>
         </Card>
@@ -143,36 +143,36 @@ export default function RevenueAttribution() {
       <Card>
         <CardHeader><CardTitle className="text-sm font-medium">Source Performance</CardTitle></CardHeader>
         <CardContent>
-          <div className="rounded-lg border border-gray-200 overflow-hidden">
+          <div className="rounded-lg border border-[var(--ds-border)] overflow-hidden">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase">Source</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-500 text-xs uppercase">Leads</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-500 text-xs uppercase">Converted</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-500 text-xs uppercase">Conversion %</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-500 text-xs uppercase">Potential Revenue</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-500 text-xs uppercase">Revenue per Lead</th>
+                <tr className="bg-[var(--ds-background-subtle)] border-b border-[var(--ds-border)]">
+                  <th className="text-left px-4 py-3 font-medium text-[var(--ds-text-secondary)] text-xs uppercase">Source</th>
+                  <th className="text-right px-4 py-3 font-medium text-[var(--ds-text-secondary)] text-xs uppercase">Leads</th>
+                  <th className="text-right px-4 py-3 font-medium text-[var(--ds-text-secondary)] text-xs uppercase">Converted</th>
+                  <th className="text-right px-4 py-3 font-medium text-[var(--ds-text-secondary)] text-xs uppercase">Conversion %</th>
+                  <th className="text-right px-4 py-3 font-medium text-[var(--ds-text-secondary)] text-xs uppercase">Potential Revenue</th>
+                  <th className="text-right px-4 py-3 font-medium text-[var(--ds-text-secondary)] text-xs uppercase">Revenue per Lead</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-[var(--ds-border-light)]">
                 {revenueData.bySource.map((row, idx) => (
-                  <tr key={idx} className="hover:bg-gray-50/50">
+                  <tr key={idx} className="hover:bg-[var(--ds-background-subtle)]/50">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: row.fill }} />
-                        <span className="font-medium text-gray-800">{row.source}</span>
+                        <span className="font-medium text-[var(--ds-text)]">{row.source}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right text-gray-700">{row.leads}</td>
-                    <td className="px-4 py-3 text-right text-gray-700">{row.convertedLeads}</td>
+                    <td className="px-4 py-3 text-right text-[var(--ds-text-secondary)]">{row.leads}</td>
+                    <td className="px-4 py-3 text-right text-[var(--ds-text-secondary)]">{row.convertedLeads}</td>
                     <td className="px-4 py-3 text-right font-medium">
-                      <span className={row.leads > 0 ? "text-green-600" : "text-gray-400"}>
+                      <span className={row.leads > 0 ? "text-green-600" : "text-[var(--ds-text-tertiary)]"}>
                         {row.leads > 0 ? ((row.convertedLeads / row.leads) * 100).toFixed(1) : "0.0"}%
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right font-medium text-gray-900">{formatIndianRupees(row.potentialRevenue)}</td>
-                    <td className="px-4 py-3 text-right text-gray-600">{row.leads > 0 ? formatIndianRupees(row.potentialRevenue / row.leads) : "—"}</td>
+                    <td className="px-4 py-3 text-right font-medium text-[var(--ds-text)]">{formatIndianRupees(row.potentialRevenue)}</td>
+                    <td className="px-4 py-3 text-right text-[var(--ds-text-secondary)]">{row.leads > 0 ? formatIndianRupees(row.potentialRevenue / row.leads) : "—"}</td>
                   </tr>
                 ))}
               </tbody>

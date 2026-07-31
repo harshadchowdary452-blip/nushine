@@ -37,31 +37,31 @@ export default function FindingsLogTable({ findings, onHighlightTooth }: Finding
 
   if (findings.length === 0) {
     return (
-      <div className="px-3 py-4 text-xs text-gray-400 text-center border-t border-gray-200 bg-white">
+      <div className="px-3 py-4 text-xs text-[var(--ds-text-tertiary)] text-center border-t border-[var(--ds-border)] bg-[var(--ds-surface)]">
         No findings recorded. Click a tooth to add your first finding.
       </div>
     )
   }
 
   return (
-    <div className="border-t border-gray-200 bg-white">
-      <div className="px-3 py-1.5 text-xs font-semibold text-gray-600 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+    <div className="border-t border-[var(--ds-border)] bg-[var(--ds-surface)]">
+      <div className="px-3 py-1.5 text-xs font-semibold text-[var(--ds-text-secondary)] bg-[var(--ds-background-subtle)] border-b border-[var(--ds-border)] flex items-center justify-between">
         <span>Findings Log</span>
-        <span className="text-gray-400 font-normal">{findings.length} entries</span>
+        <span className="text-[var(--ds-text-tertiary)] font-normal">{findings.length} entries</span>
       </div>
       <div className="overflow-x-auto" style={{ maxHeight: 200 }}>
         <table className="w-full text-xs border-collapse">
           <thead>
-            <tr className="bg-gray-50 text-gray-500 sticky top-0">
+            <tr className="bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)] sticky top-0">
               <th
-                className="px-2 py-1.5 text-left font-medium cursor-pointer hover:text-gray-700 whitespace-nowrap"
+                className="px-2 py-1.5 text-left font-medium cursor-pointer hover:text-[var(--ds-text-secondary)] whitespace-nowrap"
                 onClick={() => toggleSort('date')}
               >
                 Date {sortKey === 'date' ? (sortAsc ? '↑' : '↓') : ''}
               </th>
               <th className="px-2 py-1.5 text-left font-medium whitespace-nowrap">Condition</th>
               <th
-                className="px-2 py-1.5 text-left font-medium cursor-pointer hover:text-gray-700 whitespace-nowrap"
+                className="px-2 py-1.5 text-left font-medium cursor-pointer hover:text-[var(--ds-text-secondary)] whitespace-nowrap"
                 onClick={() => toggleSort('toothNumber')}
               >
                 Tooth # {sortKey === 'toothNumber' ? (sortAsc ? '↑' : '↓') : ''}
@@ -76,16 +76,16 @@ export default function FindingsLogTable({ findings, onHighlightTooth }: Finding
             {sorted.map((f) => (
               <tr
                 key={f.id}
-                className="border-t border-gray-100 hover:bg-blue-50 cursor-pointer transition-colors"
+                className="border-t border-[var(--ds-border-light)] hover:bg-blue-50 cursor-pointer transition-colors"
                 onClick={() => onHighlightTooth(f.toothNumber)}
                 onMouseLeave={() => onHighlightTooth(null)}
               >
-                <td className="px-2 py-1.5 text-gray-500 whitespace-nowrap">{f.date}</td>
+                <td className="px-2 py-1.5 text-[var(--ds-text-secondary)] whitespace-nowrap">{f.date}</td>
                 <td className="px-2 py-1.5 whitespace-nowrap">
                   <span className="font-medium">{f.condition}</span>
                 </td>
                 <td className="px-2 py-1.5 whitespace-nowrap">#{f.toothNumber}</td>
-                <td className="px-2 py-1.5 whitespace-nowrap text-gray-500">
+                <td className="px-2 py-1.5 whitespace-nowrap text-[var(--ds-text-secondary)]">
                   {TOOTH_NAMES[f.toothNumber]?.includes('Upper') ? 'Upper' : 'Lower'}
                 </td>
                 <td className="px-2 py-1.5 whitespace-nowrap">
@@ -93,8 +93,8 @@ export default function FindingsLogTable({ findings, onHighlightTooth }: Finding
                     ? f.surfaces.map((s) => SURFACE_LABELS[s]).join(', ')
                     : '-'}
                 </td>
-                <td className="px-2 py-1.5 whitespace-nowrap text-gray-500">{f.material || '-'}</td>
-                <td className="px-2 py-1.5 text-gray-500 truncate max-w-[200px]">{f.description || '-'}</td>
+                <td className="px-2 py-1.5 whitespace-nowrap text-[var(--ds-text-secondary)]">{f.material || '-'}</td>
+                <td className="px-2 py-1.5 text-[var(--ds-text-secondary)] truncate max-w-[200px]">{f.description || '-'}</td>
               </tr>
             ))}
           </tbody>

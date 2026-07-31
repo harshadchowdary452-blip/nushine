@@ -81,8 +81,8 @@ export default function Settings() {
   return (
     <motion.div className="space-y-8" variants={container} initial="hidden" animate="show">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Settings</h1>
-        <p className="mt-1 text-gray-500">Manage your profile and account security.</p>
+        <h1 className="text-3xl font-bold tracking-tight text-[var(--ds-text)]">Settings</h1>
+        <p className="mt-1 text-[var(--ds-text-secondary)]">Manage your profile and account security.</p>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-3">
@@ -95,7 +95,7 @@ export default function Settings() {
                 </Avatar>
                 <h2 className="text-xl font-bold">{user?.full_name}</h2>
                 <p className="mt-1 text-sm text-blue-100">{user?.email}</p>
-                <Badge variant="secondary" className="mt-3 bg-white/20 text-white hover:bg-white/30">
+                <Badge variant="secondary" className="mt-3 bg-white/20 text-white hover:bg-[var(--ds-surface)]/30">
                   {user?.role?.replace("_", " ")}
                 </Badge>
                 <div className="mt-6 grid w-full grid-cols-2 gap-3 rounded-xl bg-white/20 p-4">
@@ -121,7 +121,7 @@ export default function Settings() {
                   className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
                     item.active
                       ? "bg-blue-50 text-blue-700"
-                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                      : "text-[var(--ds-text-secondary)] hover:bg-[var(--ds-surface-hover)] hover:text-[var(--ds-text)]"
                   }`}
                 >
                   <item.icon className="h-4 w-4" />
@@ -151,7 +151,7 @@ export default function Settings() {
                   <div className="space-y-2 sm:col-span-2">
                     <Label>Full Name</Label>
                     <div className="relative">
-                      <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                      <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ds-text-tertiary)]" />
                       <Input
                         value={profile.full_name}
                         onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
@@ -163,14 +163,14 @@ export default function Settings() {
                   <div className="space-y-2">
                     <Label>Email</Label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                      <Input value={user?.email || ""} className="pl-10 bg-gray-50" disabled />
+                      <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ds-text-tertiary)]" />
+                      <Input value={user?.email || ""} className="pl-10 bg-[var(--ds-background-subtle)]" disabled />
                     </div>
                   </div>
                   <div className="space-y-2">
                     <Label>Phone</Label>
                     <div className="relative">
-                      <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                      <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ds-text-tertiary)]" />
                       <Input
                         value={profile.phone}
                         onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
@@ -182,7 +182,7 @@ export default function Settings() {
                   <div className="space-y-2">
                     <Label>Specialization</Label>
                     <div className="relative">
-                      <Stethoscope className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                      <Stethoscope className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ds-text-tertiary)]" />
                       <Input
                         value={profile.specialization}
                         onChange={(e) => setProfile({ ...profile, specialization: e.target.value })}
@@ -194,7 +194,7 @@ export default function Settings() {
                   <div className="space-y-2">
                     <Label>License Number</Label>
                     <div className="relative">
-                      <BadgeCheck className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                      <BadgeCheck className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ds-text-tertiary)]" />
                       <Input
                         value={profile.license_number}
                         onChange={(e) => setProfile({ ...profile, license_number: e.target.value })}

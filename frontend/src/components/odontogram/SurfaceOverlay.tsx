@@ -23,9 +23,9 @@ function surfaceFindingColor(findings: Finding[], surface: string, toothNum: num
     (f) => f.toothNumber === String(toothNum) && f.surface?.toLowerCase() === surface.toLowerCase()
   )
   if (!f) return null
-  if (findingTypesCarries.includes(f.type)) return '#8B4513'
-  if (findingTypesFilling.includes(f.type)) return '#a0a0a0'
-  if (findingTypesRCT.includes(f.type)) return '#7B2D8E'
+  if (findingTypesCarries.includes(f.type)) return 'var(--ds-clinical-caries)'
+  if (findingTypesFilling.includes(f.type)) return 'var(--ds-clinical-amalgam-fill)'
+  if (findingTypesRCT.includes(f.type)) return 'var(--ds-clinical-rct)'
   return null
 }
 

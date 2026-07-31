@@ -309,7 +309,7 @@ export default function PatientDetail() {
       <div className="relative pl-8 border-l-2 border-border space-y-6">
         {timelineEntries.map((ev) => (
           <div key={ev.id} className="relative">
-            <div className="absolute -left-[25px] p-1 rounded-full border-2 border-gray-200 bg-gray-50 text-gray-600">
+            <div className="absolute -left-[25px] p-1 rounded-full border-2 border-[var(--ds-border)] bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]">
               <div className="h-2 w-2 rounded-full bg-current" />
             </div>
             <div className="bg-card rounded-lg border border-border p-4 shadow-sm">
@@ -562,7 +562,7 @@ export default function PatientDetail() {
             {patient.phone && (
               <>
                 <a href={`tel:${patient.phone}`}>
-                  <Button size="sm" variant="outline" className="border-gray-300 ">
+                  <Button size="sm" variant="outline" className="border-[var(--ds-border-strong)] ">
                     <Phone className="h-4 w-4 mr-1.5" />
                     Call
                   </Button>
@@ -570,7 +570,7 @@ export default function PatientDetail() {
                 <a href={`https://wa.me/${patient.phone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(
                   `Hello ${patient.patient_name},\n\nThank you for visiting ${patient.hospital_name || "our clinic"}.\nPlease let us know if you need any assistance.\n\nRegards,\n${patient.hospital_name || "Our Clinic"}`
                 )}`} target="_blank" rel="noopener noreferrer">
-                  <Button size="sm" variant="outline" className="border-gray-300 ">
+                  <Button size="sm" variant="outline" className="border-[var(--ds-border-strong)] ">
                     <MessageSquare className="h-4 w-4 mr-1.5" />
                     WhatsApp
                   </Button>
@@ -593,7 +593,7 @@ export default function PatientDetail() {
                 </DialogHeader>
                 <DialogBody>
                   {/* Personal Details */}
-                  <div className="rounded-xl border border-gray-100  p-4 mb-4">
+                  <div className="rounded-xl border border-[var(--ds-border-light)]  p-4 mb-4">
                     <h4 className="text-sm font-semibold text-primary flex items-center gap-2 mb-3">
                       <User className="h-4 w-4" />
                       Personal Details
@@ -652,7 +652,7 @@ export default function PatientDetail() {
                   </div>
 
                   {/* Contact Information */}
-                  <div className="rounded-xl border border-gray-100  p-4 mb-4">
+                  <div className="rounded-xl border border-[var(--ds-border-light)]  p-4 mb-4">
                     <h4 className="text-sm font-semibold text-primary flex items-center gap-2 mb-3">
                       <Phone className="h-4 w-4" />
                       Contact Information
@@ -719,7 +719,7 @@ export default function PatientDetail() {
                   </div>
 
                   {/* Medical Information */}
-                  <div className="rounded-xl border border-gray-100  p-4 mb-4">
+                  <div className="rounded-xl border border-[var(--ds-border-light)]  p-4 mb-4">
                     <h4 className="text-sm font-semibold text-primary flex items-center gap-2 mb-3">
                       <Activity className="h-4 w-4" />
                       Medical Information
@@ -737,7 +737,7 @@ export default function PatientDetail() {
                   </div>
 
                   {/* Vitals */}
-                  <div className="rounded-xl border border-gray-100  p-4 mb-4">
+                  <div className="rounded-xl border border-[var(--ds-border-light)]  p-4 mb-4">
                     <h4 className="text-sm font-semibold text-primary flex items-center gap-2 mb-3">
                       <Activity className="h-4 w-4" />
                       Vitals
@@ -767,7 +767,7 @@ export default function PatientDetail() {
                   </div>
 
                   {/* Status */}
-                  <div className="rounded-xl border border-gray-100  p-4">
+                  <div className="rounded-xl border border-[var(--ds-border-light)]  p-4">
                     <h4 className="text-sm font-semibold text-primary flex items-center gap-2 mb-3">
                       <Activity className="h-4 w-4" />
                       Status
@@ -839,7 +839,7 @@ export default function PatientDetail() {
       </Card>
 
       {/* Sticky Responsive Tab Navigation */}
-      <div className="sticky top-0 z-[var(--ds-z-sticky)] bg-white border-b border-gray-200 -mx-6 px-6 mb-6 shadow-sm">
+      <div className="sticky top-0 z-[var(--ds-z-sticky)] bg-[var(--ds-surface)] border-b border-[var(--ds-border)] -mx-6 px-6 mb-6 shadow-sm">
         <div
           ref={tabBarRef}
           className="flex items-center gap-1 overflow-x-auto scrollbar-hide scroll-smooth py-2"
@@ -870,7 +870,7 @@ export default function PatientDetail() {
                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2
                   ${isActive
                     ? "bg-blue-600 text-white shadow-sm"
-                    : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                    : "text-[var(--ds-text-secondary)] hover:bg-[var(--ds-surface-hover)] hover:text-[var(--ds-text-secondary)]"
                   }
                 `}
               >
@@ -881,7 +881,7 @@ export default function PatientDetail() {
                     className={`
                       inline-flex items-center justify-center rounded-full text-xs font-semibold
                       px-1.5 py-0.5 min-w-[20px] h-5 leading-none
-                      ${isActive ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"}
+                      ${isActive ? "bg-white/20 text-white" : "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]"}
                     `}
                   >
                     {count}
@@ -1095,7 +1095,7 @@ export default function PatientDetail() {
                     </div>
                     {t.total_sittings > 0 && (
                       <div className="mt-2 flex items-center gap-2">
-                        <div className="flex-1 bg-gray-200 rounded-full h-1.5">
+                        <div className="flex-1 bg-[var(--ds-surface-secondary)] rounded-full h-1.5">
                           <div className="bg-primary h-1.5 rounded-full" style={{ width: `${t.progress}%` }} />
                         </div>
                         <span className="text-xs text-text-muted">{t.progress}%</span>
@@ -1217,13 +1217,13 @@ export default function PatientDetail() {
                         NEEDS_ATTENTION: "bg-yellow-100 text-yellow-700",
                         COMPLAINT: "bg-orange-100 text-orange-700",
                         EMERGENCY: "bg-red-100 text-red-700",
-                        NO_RESPONSE: "bg-gray-100 text-gray-500",
-                        NOT_INTERESTED: "bg-gray-100 text-gray-600",
+                        NO_RESPONSE: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
+                        NOT_INTERESTED: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
                       }
                       const fbColor: Record<string, string> = {
                         POSITIVE: "text-green-600",
                         NEGATIVE: "text-red-600",
-                        NEUTRAL: "text-gray-500",
+                        NEUTRAL: "text-[var(--ds-text-secondary)]",
                       }
                       const typeLabel: Record<string, string> = {
                         "1_DAY_POST_TREATMENT": "1-Day Post Treatment",
@@ -1242,7 +1242,7 @@ export default function PatientDetail() {
                             {r.response_message || <span className="text-muted-foreground italic">No message</span>}
                           </td>
                           <td className="px-3 py-2.5">
-                            <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${respColor[r.response_status || ""] || "bg-gray-100 text-gray-600"}`}>
+                            <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${respColor[r.response_status || ""] || "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]"}`}>
                               {r.response_status}
                             </span>
                           </td>
@@ -1478,7 +1478,7 @@ function CaseImages({ caseId, caseName }: { caseId: string; caseName: string }) 
           </DialogHeader>
           {previewUrl && (
             <div
-              className="flex items-center justify-center overflow-auto max-h-[70vh] bg-gray-100 rounded-lg cursor-grab active:cursor-grabbing select-none"
+              className="flex items-center justify-center overflow-auto max-h-[70vh] bg-[var(--ds-background-subtle)] rounded-lg cursor-grab active:cursor-grabbing select-none"
               onWheel={(e) => {
                 e.preventDefault()
                 setZoom(z => {

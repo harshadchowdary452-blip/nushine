@@ -309,7 +309,7 @@ export default function WhatsAppMessaging() {
       />
 
       <Tabs value={tab} onValueChange={(v: string) => setTab(v)} className="w-full">
-        <TabsList className="bg-white border border-border rounded-xl p-1">
+        <TabsList className="bg-[var(--ds-surface)] border border-border rounded-xl p-1">
           <TabsTrigger value="send">
             <Send className="h-4 w-4 mr-1" /> Send
           </TabsTrigger>
@@ -382,7 +382,7 @@ export default function WhatsAppMessaging() {
                           key={v.variable}
                           type="button"
                           onClick={() => insertVariable(v.variable)}
-                          className="rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                          className="rounded-md bg-[var(--ds-background-subtle)] px-2 py-1 text-xs text-[var(--ds-text-secondary)] hover:bg-blue-50 hover:text-blue-600 transition-colors"
                         >
                           {v.label}
                         </button>
@@ -444,8 +444,8 @@ export default function WhatsAppMessaging() {
                           <Icon className="h-4 w-4" />
                         </div>
                         <div>
-                          <p className="font-medium text-gray-900">{p.label}</p>
-                          <p className="text-xs text-gray-500">
+                          <p className="font-medium text-[var(--ds-text)]">{p.label}</p>
+                          <p className="text-xs text-[var(--ds-text-secondary)]">
                             {p.message ? "Has template" : "Custom message"}
                           </p>
                         </div>
@@ -456,9 +456,9 @@ export default function WhatsAppMessaging() {
 
                 <Separator className="my-4" />
 
-                <div className="rounded-lg border bg-gray-50 p-3">
-                  <p className="text-xs font-medium text-gray-500 mb-1">Raw Preview</p>
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                <div className="rounded-lg border bg-[var(--ds-background-subtle)] p-3">
+                  <p className="text-xs font-medium text-[var(--ds-text-secondary)] mb-1">Raw Preview</p>
+                  <p className="text-sm text-[var(--ds-text-secondary)] whitespace-pre-wrap">
                     {message || "Your message will appear here..."}
                   </p>
                 </div>
@@ -528,7 +528,7 @@ export default function WhatsAppMessaging() {
                           key={v.variable}
                           type="button"
                           onClick={() => insertVariable(v.variable)}
-                          className="rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                          className="rounded-md bg-[var(--ds-background-subtle)] px-2 py-1 text-xs text-[var(--ds-text-secondary)] hover:bg-blue-50 hover:text-blue-600 transition-colors"
                         >
                           {v.label}
                         </button>
@@ -536,8 +536,8 @@ export default function WhatsAppMessaging() {
                     </div>
                   </div>
 
-                  <div className="space-y-3 rounded-lg border bg-gray-50 p-3">
-                    <Label className="font-semibold text-gray-700">
+                  <div className="space-y-3 rounded-lg border bg-[var(--ds-background-subtle)] p-3">
+                    <Label className="font-semibold text-[var(--ds-text-secondary)]">
                       <Filter className="h-4 w-4 inline mr-1" />
                       Recipients
                     </Label>
@@ -589,7 +589,7 @@ export default function WhatsAppMessaging() {
                   </CardHeader>
                   <CardContent>
                     <div className="relative mb-4">
-                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ds-text-tertiary)]" />
                       <Input placeholder="Search patients..." className="pl-10" />
                     </div>
                     <div className="mb-2">
@@ -611,17 +611,17 @@ export default function WhatsAppMessaging() {
                             className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
                               selectedPatients.includes(p.id)
                                 ? "bg-blue-50 text-blue-700"
-                                : "hover:bg-gray-50"
+                                : "hover:bg-[var(--ds-surface-hover)]"
                             }`}
                           >
                             {selectedPatients.includes(p.id) ? (
                               <CheckCircle2 className="h-4 w-4 shrink-0 text-blue-600" />
                             ) : (
-                              <div className="h-4 w-4 shrink-0 rounded-full border-2 border-gray-300" />
+                              <div className="h-4 w-4 shrink-0 rounded-full border-2 border-[var(--ds-border-strong)]" />
                             )}
                             <div className="min-w-0 flex-1">
                               <p className="truncate font-medium">{p.full_name}</p>
-                              <p className="truncate text-xs text-gray-500">
+                              <p className="truncate text-xs text-[var(--ds-text-secondary)]">
                                 {p.phone || "No phone"}
                               </p>
                             </div>
@@ -643,7 +643,7 @@ export default function WhatsAppMessaging() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
-                <History className="h-5 w-5 text-purple-500" />
+                <History className="h-5 w-5 text-[var(--ds-accent-500)]" />
                 Message History
               </CardTitle>
             </CardHeader>
@@ -656,11 +656,11 @@ export default function WhatsAppMessaging() {
                     </p>
                     <p className="text-xs text-blue-600/70">Today</p>
                   </div>
-                  <div className="rounded-lg bg-purple-50 p-3 text-center">
-                    <p className="text-xl font-bold text-purple-600">
+                  <div className="rounded-lg bg-[var(--ds-accent-50)] p-3 text-center">
+                    <p className="text-xl font-bold text-[var(--ds-accent-600)]">
                       {historyData.stats.this_week || 0}
                     </p>
-                    <p className="text-xs text-purple-600/70">This Week</p>
+                    <p className="text-xs text-[var(--ds-accent-600)]">This Week</p>
                   </div>
                   <div className="rounded-lg bg-red-50 p-3 text-center">
                     <p className="text-xl font-bold text-red-600">
@@ -709,31 +709,31 @@ export default function WhatsAppMessaging() {
               <div className="rounded-lg border">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b bg-gray-50 text-left">
-                      <th className="px-4 py-2.5 font-medium text-gray-600">Patient</th>
-                      <th className="px-4 py-2.5 font-medium text-gray-600">Type</th>
-                      <th className="px-4 py-2.5 font-medium text-gray-600">Status</th>
-                      <th className="px-4 py-2.5 font-medium text-gray-600">Via</th>
-                      <th className="px-4 py-2.5 font-medium text-gray-600">Template</th>
-                      <th className="px-4 py-2.5 font-medium text-gray-600">Sent At</th>
+                    <tr className="border-b bg-[var(--ds-background-subtle)] text-left">
+                      <th className="px-4 py-2.5 font-medium text-[var(--ds-text-secondary)]">Patient</th>
+                      <th className="px-4 py-2.5 font-medium text-[var(--ds-text-secondary)]">Type</th>
+                      <th className="px-4 py-2.5 font-medium text-[var(--ds-text-secondary)]">Status</th>
+                      <th className="px-4 py-2.5 font-medium text-[var(--ds-text-secondary)]">Via</th>
+                      <th className="px-4 py-2.5 font-medium text-[var(--ds-text-secondary)]">Template</th>
+                      <th className="px-4 py-2.5 font-medium text-[var(--ds-text-secondary)]">Sent At</th>
                     </tr>
                   </thead>
                   <tbody>
                     {historyData?.items?.length === 0 && (
                       <tr>
-                        <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                        <td colSpan={6} className="px-4 py-8 text-center text-[var(--ds-text-tertiary)]">
                           No messages sent yet
                         </td>
                       </tr>
                     )}
                     {historyData?.items?.map((item: Record<string, unknown>) => (
-                      <tr key={String(item.id)} className="border-b last:border-0 hover:bg-gray-50">
+                      <tr key={String(item.id)} className="border-b last:border-0 hover:bg-[var(--ds-surface-hover)]">
                         <td className="px-4 py-2.5">
                           <div>
-                            <p className="font-medium text-gray-900">
+                            <p className="font-medium text-[var(--ds-text)]">
                               {item.patient_name as string}
                             </p>
-                            <p className="text-xs text-gray-500">{item.patient_phone as string}</p>
+                            <p className="text-xs text-[var(--ds-text-secondary)]">{item.patient_phone as string}</p>
                           </div>
                         </td>
                         <td className="px-4 py-2.5">
@@ -752,7 +752,7 @@ export default function WhatsAppMessaging() {
                             {item.status as string}
                           </Badge>
                         </td>
-                        <td className="px-4 py-2.5 text-gray-600">
+                        <td className="px-4 py-2.5 text-[var(--ds-text-secondary)]">
                           {item.sent_via === "api" ? (
                             <>
                               <Smartphone className="h-3.5 w-3.5 inline mr-1" />
@@ -765,10 +765,10 @@ export default function WhatsAppMessaging() {
                             </>
                           )}
                         </td>
-                        <td className="px-4 py-2.5 text-gray-600">
+                        <td className="px-4 py-2.5 text-[var(--ds-text-secondary)]">
                           {(item.template_name as string) || "-"}
                         </td>
-                        <td className="px-4 py-2.5 text-gray-500 text-xs">
+                        <td className="px-4 py-2.5 text-[var(--ds-text-secondary)] text-xs">
                           {item.sent_at ? new Date(item.sent_at as string).toLocaleString() : "-"}
                         </td>
                       </tr>
@@ -779,7 +779,7 @@ export default function WhatsAppMessaging() {
 
               {historyData && historyData.total > historyData.page_size && (
                 <div className="flex items-center justify-between mt-4">
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-[var(--ds-text-secondary)]">
                     Page {historyData.page} of{" "}
                     {Math.ceil(historyData.total / historyData.page_size)}
                   </p>

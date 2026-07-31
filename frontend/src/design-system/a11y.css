@@ -1,0 +1,297 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   DESIGN SYSTEM · ACCESSIBILITY  (WCAG 2.2 AA)
+   NuShine Enterprise Dental Platform
+
+   Clinical software is used all day, by people with a wide range of vision and
+   motor ability, frequently under time pressure and often entirely by keyboard
+   because a mouse is slower at a chairside terminal. Accessibility here is an
+   operational requirement, not a compliance checkbox.
+
+   Covered
+   ───────
+     2.1.1  Keyboard              — no focus traps, everything reachable
+     2.4.7  Focus Visible         — always-visible indicator
+     2.4.11 Focus Not Obscured    — scroll margin under sticky chrome
+     2.4.13 Focus Appearance      — ≥2px, ≥3:1 against adjacent colour
+     2.5.5  Target Size           — 44px touch targets on coarse pointers
+     2.5.8  Target Size (Minimum) — 24px absolute floor
+     1.4.12 Text Spacing          — layout survives user-imposed spacing
+     4.1.2  Name, Role, Value     — sr-only helpers for accessible names
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer base {
+  /* ─────────────────────────────────────────────────────────────────────────
+     FOCUS VISIBILITY  (2.4.7 / 2.4.13)
+
+     `:focus-visible` rather than `:focus` so pointer users never see a ring
+     they did not ask for, while keyboard users always do.
+
+     The default UA outline is replaced globally with the token ring so that
+     every interactive element — including third-party and legacy markup that
+     never opted in — is covered by default. This is deliberately a blanket
+     rule: an allow-list would silently miss elements as the app grows.
+     ───────────────────────────────────────────────────────────────────────── */
+
+  :focus-visible {
+    outline: var(--ds-focus-ring-width) solid var(--ds-focus-ring-color);
+    outline-offset: var(--ds-focus-ring-offset);
+    border-radius: var(--ds-radius-sm);
+  }
+
+  /* Suppress the ring for pointer interaction only. */
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  /* Focus must never be hidden behind the sticky header or a sticky action
+     bar when the browser scrolls it into view (2.4.11). */
+  :target,
+  :focus-visible {
+    scroll-margin-top: calc(var(--ds-header-h) + var(--ds-spacing-4));
+    scroll-margin-bottom: var(--ds-spacing-16);
+  }
+
+  /* Windows High Contrast / forced-colors: the custom ring is discarded by the
+     OS, so restore a system-coloured one. */
+  @media (forced-colors: active) {
+    :focus-visible {
+      outline: 2px solid Highlight;
+      outline-offset: 2px;
+    }
+  }
+}
+
+@layer components {
+  /* ─────────────────────────────────────────────────────────────────────────
+     FOCUS HELPERS
+     ───────────────────────────────────────────────────────────────────────── */
+
+  /* Ring drawn as a box-shadow instead of an outline. Use where an outline
+     would be clipped by `overflow: hidden` — table cells, scroll containers,
+     rounded surfaces. */
+  .ds-focus-ring:focus-visible {
+    outline: none;
+    box-shadow: var(--ds-focus-ring-shadow);
+  }
+
+  /* For controls on a dark surface (sidebar), where the light ring offset
+     would otherwise read as a halo. */
+  .ds-focus-ring-inverse:focus-visible {
+    outline: var(--ds-focus-ring-width) solid var(--ds-sidebar-text-active);
+    outline-offset: var(--ds-focus-ring-offset);
+  }
+
+  /* Focus applied to a container when one of its descendants is focused —
+     used by table rows and list items. */
+  .ds-focus-within:focus-within {
+    outline: var(--ds-focus-ring-width) solid var(--ds-focus-ring-color);
+    outline-offset: calc(var(--ds-focus-ring-offset) * -1);
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     TARGET SIZE  (2.5.5 / 2.5.8)
+
+     Applied via `pointer: coarse` rather than a width breakpoint: a touch
+     laptop needs large targets at 1440px, and a mouse on a small window does
+     not. Enlargement uses a centred pseudo-element so the hit area grows
+     without disturbing layout.
+     ───────────────────────────────────────────────────────────────────────── */
+
+  .ds-target {
+    position: relative;
+    min-height: var(--ds-target-comfortable);
+    min-width: var(--ds-target-comfortable);
+  }
+
+  .ds-target-touch {
+    min-height: var(--ds-target-touch);
+    min-width: var(--ds-target-touch);
+  }
+
+  @media (pointer: coarse) {
+    .ds-target,
+    button,
+    [role="button"],
+    [role="tab"],
+    [role="menuitem"],
+    [role="option"],
+    a[href],
+    summary,
+    input[type="checkbox"],
+    input[type="radio"] {
+      position: relative;
+    }
+
+    .ds-target::after,
+    button::after,
+    [role="button"]::after,
+    [role="tab"]::after,
+    [role="menuitem"]::after,
+    [role="option"]::after,
+    a[href]::after,
+    summary::after {
+      content: "";
+      position: absolute;
+      inset: 50% auto auto 50%;
+      translate: -50% -50%;
+      min-width: var(--ds-target-touch);
+      min-height: var(--ds-target-touch);
+      width: 100%;
+      height: 100%;
+      /* The pseudo-element IS the hit area: clicks on the enlarged zone must
+         land on the control, so pointer events are intentionally captured
+         (never set pointer-events: none here — that makes taps fall through
+         to whatever is beneath and the 44px target silently stops working).
+         It paints nothing, so it cannot obscure the UI. */
+    }
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     SCREEN READER UTILITIES  (4.1.2)
+     ───────────────────────────────────────────────────────────────────────── */
+
+  .ds-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  /* Hidden until focused — skip links, "jump to results". */
+  .ds-sr-only-focusable:not(:focus):not(:focus-within) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  .ds-skip-link {
+    position: fixed;
+    top: var(--ds-spacing-2);
+    left: var(--ds-spacing-2);
+    z-index: var(--ds-z-tooltip);
+    padding: var(--ds-spacing-2) var(--ds-spacing-4);
+    background: var(--ds-primary);
+    color: var(--ds-primary-foreground);
+    border-radius: var(--ds-radius-lg);
+    box-shadow: var(--ds-shadow-lg);
+    font-size: var(--ds-font-size-sm);
+    font-weight: var(--ds-weight-medium);
+    text-decoration: none;
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     NON-COLOUR STATUS ENCODING  (1.4.1 Use of Colour)
+
+     Status must never be conveyed by hue alone — roughly 1 in 12 men has a
+     colour vision deficiency, and clinical status drives real decisions. Every
+     status badge carries a shape/glyph in addition to its colour.
+     ───────────────────────────────────────────────────────────────────────── */
+
+  .ds-status-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: var(--ds-radius-full);
+    flex-shrink: 0;
+    /* Ring keeps the dot distinguishable in forced-colors mode, where the
+       background colour is discarded. */
+    box-shadow: 0 0 0 1px currentColor inset;
+  }
+
+  @media (forced-colors: active) {
+    .ds-status-dot {
+      forced-color-adjust: none;
+      background: currentColor;
+    }
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     LIVE REGIONS
+     Wrapper for polite announcements (row counts, save confirmations).
+     Visually inert, never affects layout.
+     ───────────────────────────────────────────────────────────────────────── */
+
+  .ds-live-region {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TEXT SPACING OVERRIDES  (1.4.12)
+   The layout must not break when a user forces their own line height, word or
+   letter spacing via an extension or user stylesheet. Fixed-height text
+   containers are the usual failure; these guards let them grow.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer base {
+  p, li, dd, dt, blockquote, figcaption, label, td, th {
+    overflow-wrap: break-word;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FORCED COLORS  (Windows High Contrast)
+   Surfaces defined purely by background colour vanish; restore their edges so
+   cards, tables and inputs remain distinguishable.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (forced-colors: active) {
+  .ds-skeleton {
+    forced-color-adjust: none;
+    background: GrayText !important;
+    opacity: 0.3;
+  }
+
+  [data-ds-surface],
+  .ds-card,
+  table,
+  dialog {
+    border: 1px solid CanvasText;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PRINT
+   Clinical records get printed constantly — charts, consent forms, invoices.
+   Chrome is stripped so the record itself owns the page.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media print {
+  .ds-no-print,
+  header[role="banner"],
+  nav[aria-label="Main"],
+  aside {
+    display: none !important;
+  }
+
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  /* Never split a card, table row or figure across a page boundary. */
+  .ds-card,
+  tr,
+  figure,
+  .ds-avoid-break {
+    break-inside: avoid;
+  }
+
+  thead { display: table-header-group; }
+}

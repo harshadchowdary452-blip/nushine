@@ -56,7 +56,7 @@ function RatingField({ label, value, onChange }: { label: string; value: number 
             type="button"
             onClick={() => onChange(value === n ? undefined : n)}
             className={`h-8 w-8 rounded-full flex items-center justify-center text-xs transition-colors
-              ${value && n <= value ? "bg-yellow-400 text-yellow-900" : "bg-gray-100 text-gray-400 hover:bg-gray-200"}`}
+              ${value && n <= value ? "bg-yellow-400 text-yellow-900" : "bg-[var(--ds-background-subtle)] text-[var(--ds-text-tertiary)] hover:bg-[var(--ds-surface-hover)]"}`}
           >
             <Star className={`h-3.5 w-3.5 ${value && n <= value ? "fill-current" : ""}`} />
           </button>

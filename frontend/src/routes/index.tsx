@@ -49,6 +49,8 @@ const ConsentFormList = lazy(() => import("@/pages/consent-forms/list"))
 const ConsentFormView = lazy(() => import("@/pages/consent-forms/view"))
 const ExportCenter = lazy(() => import("@/pages/exports/export-center"))
 const ClinicalSettings = lazy(() => import("@/pages/clinical-settings"))
+const NotFoundPage = lazy(() => import("@/pages/errors/not-found"))
+const RouteErrorPage = lazy(() => import("@/pages/errors/route-error"))
 
 const dashboardByRole: Record<Role, string> = {
   SUPER_ADMIN: "/super-admin",
@@ -131,10 +133,22 @@ const CARE_ROLES: Role[] = ["HOSPITAL_ADMIN", "DOCTOR"]
 export const router = createBrowserRouter([
   {
     element: <PublicRoute />,
+    errorElement: (
+      <Suspense fallback={<PageLoader />}>
+        <RouteErrorPage />
+      </Suspense>
+    ),
     children: [{ path: "/login", element: <Login /> }],
   },
   {
     element: <ProtectedLayout />,
+    // Route-level crashes (render errors, failed lazy chunks after a deploy)
+    // degrade to a classified, recoverable error screen — never a white page.
+    errorElement: (
+      <Suspense fallback={<PageLoader />}>
+        <RouteErrorPage />
+      </Suspense>
+    ),
     children: [
       { index: true, element: <DashboardRedirect /> },
       { path: "/super-admin", element: withRoles(<SuperAdminDashboard />, ["SUPER_ADMIN"]) },
@@ -206,7 +220,9 @@ export const router = createBrowserRouter([
       { path: "/settings/whatsapp", element: withRoles(<WhatsAppConfigPage />, ADMIN_ROLES) },
       { path: "/whatsapp/templates", element: withRoles(<WhatsAppTemplates />, ADMIN_ROLES) },
       { path: "/whatsapp/broadcast", element: withRoles(<WhatsAppBroadcast />, ADMIN_ROLES) },
-      { path: "*", element: <Navigate to="/" replace /> },
+      // Unmatched routes render an explanatory 404 rather than silently
+      // redirecting — a redirect hides broken links from users and telemetry.
+      { path: "*", element: <NotFoundPage /> },
     ],
   },
 ])

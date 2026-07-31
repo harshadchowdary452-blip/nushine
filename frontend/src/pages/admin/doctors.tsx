@@ -244,18 +244,18 @@ export default function AdminDoctors() {
               }
             />
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-gray-100 mobile-card-view">
+            <div className="overflow-x-auto rounded-xl border border-[var(--ds-border-light)] mobile-card-view">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50/50">
-                    <th className="px-4 py-3 text-left font-medium text-gray-500">Name</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500">Email</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500">
+                  <tr className="border-b border-[var(--ds-border-light)] bg-[var(--ds-background-subtle)]/50">
+                    <th className="px-4 py-3 text-left font-medium text-[var(--ds-text-secondary)]">Name</th>
+                    <th className="px-4 py-3 text-left font-medium text-[var(--ds-text-secondary)]">Email</th>
+                    <th className="px-4 py-3 text-left font-medium text-[var(--ds-text-secondary)]">
                       Specialization
                     </th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500">Status</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500">Created</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500">Actions</th>
+                    <th className="px-4 py-3 text-left font-medium text-[var(--ds-text-secondary)]">Status</th>
+                    <th className="px-4 py-3 text-left font-medium text-[var(--ds-text-secondary)]">Created</th>
+                    <th className="px-4 py-3 text-left font-medium text-[var(--ds-text-secondary)]">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -264,15 +264,15 @@ export default function AdminDoctors() {
                       key={doctor.id}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      className="border-b border-gray-50 transition-colors hover:bg-gray-50/50"
+                      className="border-b border-[var(--ds-border-light)] transition-colors hover:bg-[var(--ds-background-subtle)]/50"
                     >
-                      <td className="px-4 py-3 font-medium text-gray-900" data-label="Name">
+                      <td className="px-4 py-3 font-medium text-[var(--ds-text)]" data-label="Name">
                         {doctor.full_name}
                       </td>
-                      <td className="px-4 py-3 text-gray-500" data-label="Email">
+                      <td className="px-4 py-3 text-[var(--ds-text-secondary)]" data-label="Email">
                         {doctor.email}
                       </td>
-                      <td className="px-4 py-3 text-gray-500" data-label="Specialization">
+                      <td className="px-4 py-3 text-[var(--ds-text-secondary)]" data-label="Specialization">
                         {doctor.specialization || "—"}
                       </td>
                       <td className="px-4 py-3" data-label="Status">
@@ -280,7 +280,7 @@ export default function AdminDoctors() {
                           {doctor.is_active ? "Active" : "Inactive"}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3 text-gray-400" data-label="Created">
+                      <td className="px-4 py-3 text-[var(--ds-text-tertiary)]" data-label="Created">
                         {format(new Date(doctor.created_at), "MMM dd, yyyy")}
                       </td>
                       <td className="px-4 py-3" data-label="Actions">
@@ -438,7 +438,7 @@ export default function AdminDoctors() {
                 </>
               )}
             </div>
-            <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-gray-100">
+            <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-[var(--ds-border-light)]">
               <Button type="button" variant="outline" onClick={closeDialog}>
                 Cancel
               </Button>

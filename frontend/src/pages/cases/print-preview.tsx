@@ -49,7 +49,7 @@ export default function CasePrintPreview() {
 
   return (
     <div className="min-h-full bg-[var(--ds-background-subtle)]">
-      <div className="nop sticky top-0 z-[var(--ds-z-sticky)] bg-white border-b shadow-sm px-4 py-2 flex items-center justify-between">
+      <div className="nop sticky top-0 z-[var(--ds-z-sticky)] bg-[var(--ds-surface)] border-b shadow-sm px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => navigate(`/cases/${id}`)}>
             <ArrowLeft className="h-4 w-4 mr-1" /> Back

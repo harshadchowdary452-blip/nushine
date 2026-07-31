@@ -406,8 +406,8 @@ export default function AdminExpenses() {
         </Card>
         <Card>
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-purple-100">
-              <DollarSign className="h-5 w-5 text-purple-600" />
+            <div className="p-2 rounded-lg bg-[var(--ds-accent-100)]">
+              <DollarSign className="h-5 w-5 text-[var(--ds-accent-600)]" />
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Year to Date</p>
@@ -842,7 +842,7 @@ export default function AdminExpenses() {
                     return (
                       <SelectItem key={cat} value={cat}>
                         <div className="flex items-center gap-2">
-                          <Icon className="h-4 w-4 text-gray-400" />
+                          <Icon className="h-4 w-4 text-[var(--ds-text-tertiary)]" />
                           {cat}
                         </div>
                       </SelectItem>
@@ -861,7 +861,7 @@ export default function AdminExpenses() {
               />
               <label
                 htmlFor="expense-name"
-                className="absolute left-3 top-1 text-[11px] font-medium text-gray-400 transition-all pointer-events-none peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-placeholder-shown:text-gray-400 peer-focus:top-1 peer-focus:text-[11px] peer-focus:text-primary"
+                className="absolute left-3 top-1 text-[11px] font-medium text-[var(--ds-text-tertiary)] transition-all pointer-events-none peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-placeholder-shown:text-[var(--ds-input-placeholder)] peer-focus:top-1 peer-focus:text-[11px] peer-focus:text-primary"
               >
                 Expense Name *
               </label>
@@ -876,13 +876,13 @@ export default function AdminExpenses() {
               />
               <label
                 htmlFor="expense-desc"
-                className="absolute left-3 top-1.5 text-[11px] font-medium text-gray-400 transition-all pointer-events-none peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-placeholder-shown:text-gray-400 peer-focus:top-1.5 peer-focus:text-[11px] peer-focus:text-primary"
+                className="absolute left-3 top-1.5 text-[11px] font-medium text-[var(--ds-text-tertiary)] transition-all pointer-events-none peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-placeholder-shown:text-[var(--ds-input-placeholder)] peer-focus:top-1.5 peer-focus:text-[11px] peer-focus:text-primary"
               >
                 Description (optional)
               </label>
             </div>
             <div className="relative mt-4">
-              <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none z-10 peer-focus:text-primary" />
+              <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ds-text-tertiary)] pointer-events-none z-10 peer-focus:text-primary" />
               <NumericInput
                 id="amount"
                 mode="currency"
@@ -894,7 +894,7 @@ export default function AdminExpenses() {
               />
               <label
                 htmlFor="amount"
-                className="absolute left-9 top-1 text-[11px] font-medium text-gray-400 transition-all pointer-events-none peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-placeholder-shown:text-gray-400 peer-focus:top-1 peer-focus:text-[11px] peer-focus:text-primary"
+                className="absolute left-9 top-1 text-[11px] font-medium text-[var(--ds-text-tertiary)] transition-all pointer-events-none peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-placeholder-shown:text-[var(--ds-input-placeholder)] peer-focus:top-1 peer-focus:text-[11px] peer-focus:text-primary"
               >
                 Amount *
               </label>
@@ -928,7 +928,7 @@ export default function AdminExpenses() {
                 />
                 <label
                   htmlFor="vendor"
-                  className="absolute left-3 top-1 text-[11px] font-medium text-gray-400 transition-all pointer-events-none peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-placeholder-shown:text-gray-400 peer-focus:top-1 peer-focus:text-[11px] peer-focus:text-primary"
+                  className="absolute left-3 top-1 text-[11px] font-medium text-[var(--ds-text-tertiary)] transition-all pointer-events-none peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-placeholder-shown:text-[var(--ds-input-placeholder)] peer-focus:top-1 peer-focus:text-[11px] peer-focus:text-primary"
                 >
                   Vendor (optional)
                 </label>
@@ -944,7 +944,7 @@ export default function AdminExpenses() {
               />
               <label
                 htmlFor="invoice-number"
-                className="absolute left-3 top-1 text-[11px] font-medium text-gray-400 transition-all pointer-events-none peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-placeholder-shown:text-gray-400 peer-focus:top-1 peer-focus:text-[11px] peer-focus:text-primary"
+                className="absolute left-3 top-1 text-[11px] font-medium text-[var(--ds-text-tertiary)] transition-all pointer-events-none peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-placeholder-shown:text-[var(--ds-input-placeholder)] peer-focus:top-1 peer-focus:text-[11px] peer-focus:text-primary"
               >
                 Invoice/Bill Number (optional)
               </label>
@@ -959,7 +959,7 @@ export default function AdminExpenses() {
               />
               <label
                 htmlFor="expense-notes"
-                className="absolute left-3 top-1.5 text-[11px] font-medium text-gray-400 transition-all pointer-events-none peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-placeholder-shown:text-gray-400 peer-focus:top-1.5 peer-focus:text-[11px] peer-focus:text-primary"
+                className="absolute left-3 top-1.5 text-[11px] font-medium text-[var(--ds-text-tertiary)] transition-all pointer-events-none peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-placeholder-shown:text-[var(--ds-input-placeholder)] peer-focus:top-1.5 peer-focus:text-[11px] peer-focus:text-primary"
               >
                 Notes (optional)
               </label>

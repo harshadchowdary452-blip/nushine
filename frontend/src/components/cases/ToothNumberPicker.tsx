@@ -69,15 +69,15 @@ export default function ToothNumberPicker({ selected, onChange, dentitionType = 
       </button>
 
       {expanded && (
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-2">
-          <div className="text-[10px] text-gray-500 font-medium uppercase tracking-wide">Upper Arch</div>
+        <div className="rounded-lg border border-[var(--ds-border)] bg-[var(--ds-background-subtle)] p-3 space-y-2">
+          <div className="text-[10px] text-[var(--ds-text-secondary)] font-medium uppercase tracking-wide">Upper Arch</div>
           <div className="flex gap-1">
             <div className="flex gap-0.5">
               {teeth.upperLeft.map((t) => (
                 <ToothButton key={t} tooth={t} selected={selected.includes(t)} onClick={() => toggle(t)} />
               ))}
             </div>
-            <div className="w-px bg-gray-300 mx-1" />
+            <div className="w-px bg-[var(--ds-surface-secondary)] mx-1" />
             <div className="flex gap-0.5">
               {teeth.upperRight.map((t) => (
                 <ToothButton key={t} tooth={t} selected={selected.includes(t)} onClick={() => toggle(t)} />
@@ -85,14 +85,14 @@ export default function ToothNumberPicker({ selected, onChange, dentitionType = 
             </div>
           </div>
 
-          <div className="text-[10px] text-gray-500 font-medium uppercase tracking-wide">Lower Arch</div>
+          <div className="text-[10px] text-[var(--ds-text-secondary)] font-medium uppercase tracking-wide">Lower Arch</div>
           <div className="flex gap-1">
             <div className="flex gap-0.5">
               {teeth.lowerLeft.map((t) => (
                 <ToothButton key={t} tooth={t} selected={selected.includes(t)} onClick={() => toggle(t)} />
               ))}
             </div>
-            <div className="w-px bg-gray-300 mx-1" />
+            <div className="w-px bg-[var(--ds-surface-secondary)] mx-1" />
             <div className="flex gap-0.5">
               {teeth.lowerRight.map((t) => (
                 <ToothButton key={t} tooth={t} selected={selected.includes(t)} onClick={() => toggle(t)} />
@@ -123,7 +123,7 @@ function ToothButton({ tooth, selected, onClick }: { tooth: string; selected: bo
       className={`h-7 min-w-[28px] px-1 rounded text-[11px] font-semibold border transition-all ${
         selected
           ? "bg-blue-600 text-white border-blue-600 shadow-sm"
-          : "bg-white text-gray-700 border-gray-300 hover:border-blue-400 hover:bg-blue-50"
+          : "bg-[var(--ds-surface)] text-[var(--ds-text-secondary)] border-[var(--ds-border-strong)] hover:border-blue-400 hover:bg-blue-50"
       }`}
     >
       {tooth}

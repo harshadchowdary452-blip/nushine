@@ -187,7 +187,7 @@ export default function Recalls() {
         <select
           value={typeFilter}
           onChange={(e) => setTypeFilter(e.target.value)}
-          className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-xs outline-none focus:border-primary ml-2"
+          className="h-9 rounded-lg border border-[var(--ds-border)] bg-[var(--ds-surface)] px-3 text-xs outline-none focus:border-primary ml-2"
         >
           <option value="">All Types</option>
           <option value="6_MONTH_RECALL">6-Month Recall</option>
@@ -209,7 +209,7 @@ export default function Recalls() {
               {items.map((r) => (
                 <div
                   key={r.id}
-                  className="rounded-lg border p-4 hover:bg-gray-50 transition-colors"
+                  className="rounded-lg border p-4 hover:bg-[var(--ds-surface-hover)] transition-colors"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">

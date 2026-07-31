@@ -11,7 +11,7 @@ import type { TreatmentPlan } from "@/types"
 
 const COLUMNS = [
   { key: "ASSIGNED", label: "Assigned", color: "bg-blue-500" },
-  { key: "SCHEDULED", label: "Scheduled", color: "bg-indigo-500" },
+  { key: "SCHEDULED", label: "Scheduled", color: "bg-[var(--ds-primary-500)]" },
   { key: "IN_PROGRESS", label: "In Progress", color: "bg-green-500" },
   { key: "WAITING_PATIENT", label: "Waiting Patient", color: "bg-yellow-500" },
   { key: "WAITING_LAB", label: "Waiting Lab", color: "bg-orange-500" },
@@ -72,7 +72,7 @@ export default function TreatmentWorkflowBoard() {
               {col.items.map((plan: TreatmentPlan) => (
                 <div
                   key={plan.id}
-                  className="rounded-lg border bg-white p-3 hover:shadow-sm transition-shadow cursor-pointer"
+                  className="rounded-lg border bg-[var(--ds-surface)] p-3 hover:shadow-sm transition-shadow cursor-pointer"
                   onClick={() => navigate(`/treatments/${plan.id}`)}
                 >
                   <p className="text-sm font-semibold mb-1">{plan.treatment_name}</p>

@@ -18,7 +18,7 @@ interface KpiCardProps {
 }
 
 const colorMap = {
-  primary: { bg: "bg-indigo-50", text: "text-indigo-600", icon: "text-indigo-600" },
+  primary: { bg: "bg-[var(--ds-primary-50)]", text: "text-[var(--ds-primary-600)]", icon: "text-[var(--ds-primary-600)]" },
   success: { bg: "bg-emerald-50", text: "text-emerald-600", icon: "text-emerald-600" },
   warning: { bg: "bg-amber-50", text: "text-amber-600", icon: "text-amber-600" },
   info: { bg: "bg-cyan-50", text: "text-cyan-600", icon: "text-cyan-600" },
@@ -30,7 +30,7 @@ function KpiCard({ title, value, icon: Icon, trend, description, className, load
 
   if (loading) {
     return (
-      <div className={cn("rounded-xl border border-gray-200 bg-white p-3.5 shadow-card", className)}>
+      <div className={cn("rounded-xl border border-[var(--ds-border)] bg-[var(--ds-surface)] p-3.5 shadow-card", className)}>
         <div className="flex items-center gap-3">
           <div className="skeleton h-9 w-9 rounded-lg" />
           <div className="flex-1 space-y-1.5">
@@ -50,7 +50,7 @@ function KpiCard({ title, value, icon: Icon, trend, description, className, load
       whileHover={{ y: -1 }}
       onClick={onClick}
       className={cn(
-        "group rounded-xl border border-gray-200 bg-white p-3.5 shadow-card transition-all duration-200 hover:shadow-card-hover",
+        "group rounded-xl border border-[var(--ds-border)] bg-[var(--ds-surface)] p-3.5 shadow-card transition-all duration-200 hover:shadow-card-hover",
         onClick && "cursor-pointer",
         className
       )}

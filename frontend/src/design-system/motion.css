@@ -1,0 +1,309 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   DESIGN SYSTEM · MOTION
+   NuShine Enterprise Dental Platform
+
+   Motion exists to explain causality — where a surface came from, what an
+   action affected, what is still loading. It is never decorative.
+
+   Rules
+   ─────
+   1. Animate only `transform` and `opacity`. Both are composited off the main
+      thread; animating `width`, `height`, `top` or `left` forces layout on
+      every frame and is what makes an interface feel cheap under load.
+   2. Nothing that gates input runs longer than 200ms.
+   3. Durations and easings come from tokens, never literals.
+   4. Motion is suppressed wholesale under `prefers-reduced-motion: reduce`.
+
+   Reduced motion
+   ──────────────
+   The block at the bottom of this file neutralises CSS animation and
+   transition globally. JS-driven motion (Framer Motion) cannot be reached by
+   CSS, so it is handled separately by `<MotionConfig reducedMotion="user">` in
+   App.tsx. Both halves are required for actual WCAG 2.3.3 compliance —
+   shipping only the CSS half leaves every page transition and layout animation
+   still moving.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ───────────────────────────────────────────────────────────────────────────
+   KEYFRAMES
+   ─────────────────────────────────────────────────────────────────────────── */
+
+@keyframes ds-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes ds-fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+@keyframes ds-scale-in {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes ds-scale-out {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.97); }
+}
+
+@keyframes ds-slide-up {
+  from { opacity: 0; transform: translate3d(0, var(--ds-motion-distance-md), 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes ds-slide-down {
+  from { opacity: 0; transform: translate3d(0, calc(var(--ds-motion-distance-md) * -1), 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes ds-slide-in-right {
+  from { transform: translate3d(100%, 0, 0); }
+  to   { transform: translate3d(0, 0, 0); }
+}
+
+@keyframes ds-slide-out-right {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(100%, 0, 0); }
+}
+
+@keyframes ds-slide-in-left {
+  from { transform: translate3d(-100%, 0, 0); }
+  to   { transform: translate3d(0, 0, 0); }
+}
+
+@keyframes ds-slide-out-left {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-100%, 0, 0); }
+}
+
+@keyframes ds-slide-in-bottom {
+  from { transform: translate3d(0, 100%, 0); }
+  to   { transform: translate3d(0, 0, 0); }
+}
+
+@keyframes ds-slide-out-bottom {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(0, 100%, 0); }
+}
+
+@keyframes ds-slide-in-top {
+  from { transform: translate3d(0, -100%, 0); }
+  to   { transform: translate3d(0, 0, 0); }
+}
+
+@keyframes ds-slide-out-top {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(0, -100%, 0); }
+}
+
+/* Radix reports the resolved panel height via --radix-*-content-height, which
+   lets an accordion animate to its natural size without measuring in JS. */
+@keyframes ds-accordion-down {
+  from { height: 0; opacity: 0; }
+  to   { height: var(--radix-accordion-content-height, auto); opacity: 1; }
+}
+
+@keyframes ds-accordion-up {
+  from { height: var(--radix-accordion-content-height, auto); opacity: 1; }
+  to   { height: 0; opacity: 0; }
+}
+
+@keyframes ds-shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+@keyframes ds-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes ds-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+
+/* Indeterminate progress — a bar that traverses its track. */
+@keyframes ds-indeterminate {
+  from { transform: translate3d(-100%, 0, 0); }
+  to   { transform: translate3d(400%, 0, 0); }
+}
+
+@layer components {
+  /* ─────────────────────────────────────────────────────────────────────────
+     SURFACE ENTRANCES
+     ───────────────────────────────────────────────────────────────────────── */
+
+  .ds-animate-page       { animation: ds-slide-up var(--ds-motion-page) both; }
+  .ds-animate-fade-in    { animation: ds-fade-in var(--ds-transition-base) both; }
+  .ds-animate-fade-out   { animation: ds-fade-out var(--ds-transition-fast) both; }
+  .ds-animate-dialog-in  { animation: ds-scale-in var(--ds-motion-dialog) both; }
+  .ds-animate-dialog-out { animation: ds-scale-out var(--ds-motion-dialog) both; }
+  .ds-animate-drawer-in  { animation: ds-slide-in-right var(--ds-motion-drawer) both; }
+  .ds-animate-drawer-out { animation: ds-slide-out-right var(--ds-motion-drawer) both; }
+  .ds-animate-dropdown   { animation: ds-slide-down var(--ds-motion-dropdown) both; }
+  .ds-animate-toast      { animation: ds-slide-in-right var(--ds-motion-toast) both; }
+  .ds-animate-sheet      { animation: ds-slide-in-bottom var(--ds-motion-drawer) both; }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     INTERACTION FEEDBACK
+     ───────────────────────────────────────────────────────────────────────── */
+
+  /* Cards lift on hover to signal actionability. `will-change` is deliberately
+     omitted — on a dashboard of 40 cards it would promote 40 layers and cost
+     more than the animation saves. */
+  .ds-hover-lift {
+    transition: transform var(--ds-motion-hover), box-shadow var(--ds-motion-hover);
+  }
+
+  .ds-hover-lift:hover {
+    transform: translate3d(0, -2px, 0);
+    box-shadow: var(--ds-shadow-card-hover);
+  }
+
+  /* Press feedback. Confirms the tap landed before the network responds. */
+  .ds-press {
+    transition: transform var(--ds-motion-press);
+  }
+
+  .ds-press:active { transform: scale(0.98); }
+
+  .ds-transition-colors {
+    transition: color var(--ds-motion-hover),
+                background-color var(--ds-motion-hover),
+                border-color var(--ds-motion-hover);
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     LOADING
+     ───────────────────────────────────────────────────────────────────────── */
+
+  .ds-animate-spin    { animation: ds-spin 0.7s linear infinite; }
+  .ds-animate-pulse   { animation: ds-pulse 1.6s var(--ds-ease-standard) infinite; }
+  .ds-animate-shimmer { animation: ds-shimmer var(--ds-motion-shimmer-duration) linear infinite; }
+
+  .ds-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--ds-border);
+    border-top-color: var(--ds-primary);
+    border-radius: var(--ds-radius-full);
+    animation: ds-spin 0.7s linear infinite;
+  }
+
+  .ds-spinner-sm { width: 14px; height: 14px; border-width: 1.5px; }
+  .ds-spinner-lg { width: 28px; height: 28px; border-width: 2.5px; }
+
+  /* Indeterminate progress bar. */
+  .ds-progress-indeterminate {
+    position: relative;
+    overflow: hidden;
+    height: 3px;
+    background: var(--ds-surface-secondary);
+    border-radius: var(--ds-radius-full);
+  }
+
+  .ds-progress-indeterminate::after {
+    content: "";
+    position: absolute;
+    inset-block: 0;
+    inline-size: 25%;
+    background: var(--ds-primary);
+    border-radius: var(--ds-radius-full);
+    animation: ds-indeterminate 1.2s var(--ds-ease-standard) infinite;
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     RADIX STATE BINDINGS
+     Radix drives `data-state` on its primitives; binding animation to those
+     attributes keeps exit animations working (React would otherwise unmount
+     the node before it could animate out).
+     ───────────────────────────────────────────────────────────────────────── */
+
+  .ds-motion-overlay[data-state="open"]   { animation: ds-fade-in var(--ds-motion-dialog) both; }
+  .ds-motion-overlay[data-state="closed"] { animation: ds-fade-out var(--ds-motion-dialog) both; }
+
+  .ds-motion-dialog[data-state="open"]    { animation: ds-scale-in var(--ds-motion-dialog) both; }
+  .ds-motion-dialog[data-state="closed"]  { animation: ds-scale-out var(--ds-motion-dialog) both; }
+
+  .ds-motion-drawer-right[data-state="open"]   { animation: ds-slide-in-right var(--ds-motion-drawer) both; }
+  .ds-motion-drawer-right[data-state="closed"] { animation: ds-slide-out-right var(--ds-motion-drawer) both; }
+
+  .ds-motion-drawer-left[data-state="open"]    { animation: ds-slide-in-left var(--ds-motion-drawer) both; }
+  .ds-motion-drawer-left[data-state="closed"]  { animation: ds-slide-out-left var(--ds-motion-drawer) both; }
+
+  .ds-motion-sheet[data-state="open"]     { animation: ds-slide-in-bottom var(--ds-motion-drawer) both; }
+  .ds-motion-sheet[data-state="closed"]   { animation: ds-slide-out-bottom var(--ds-motion-drawer) both; }
+
+  .ds-motion-sheet-top[data-state="open"]   { animation: ds-slide-in-top var(--ds-motion-drawer) both; }
+  .ds-motion-sheet-top[data-state="closed"] { animation: ds-slide-out-top var(--ds-motion-drawer) both; }
+
+  .ds-motion-popover[data-state="open"]   { animation: ds-scale-in var(--ds-motion-dropdown) both; }
+  .ds-motion-popover[data-state="closed"] { animation: ds-fade-out var(--ds-motion-dropdown) both; }
+
+  .ds-motion-accordion[data-state="open"]   { animation: ds-accordion-down var(--ds-motion-accordion) both; }
+  .ds-motion-accordion[data-state="closed"] { animation: ds-accordion-up var(--ds-motion-accordion) both; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   REDUCED MOTION  —  WCAG 2.3.3 (Animation from Interactions)
+
+   Motion is removed, not merely shortened. Durations collapse to 0.01ms rather
+   than 0 so that `animationend` / `transitionend` listeners still fire and no
+   component stalls waiting for a callback that never arrives.
+
+   `!important` is required: these declarations must defeat utility classes,
+   inline styles and third-party rules regardless of source order.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ds-duration-instant: 0.01ms;
+    --ds-duration-fast: 0.01ms;
+    --ds-duration-base: 0.01ms;
+    --ds-duration-slow: 0.01ms;
+    --ds-duration-slower: 0.01ms;
+    --ds-motion-distance-sm: 0px;
+    --ds-motion-distance-md: 0px;
+    --ds-motion-distance-lg: 0px;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Transform-based entrances must not leave elements displaced once their
+     animation is cut short. */
+  .ds-hover-lift:hover,
+  .ds-press:active {
+    transform: none !important;
+  }
+
+  /* Progress feedback still needs to communicate "work is happening", so
+     spinners keep rotating — just slowly enough not to trigger vestibular
+     discomfort. Reduced motion means less motion, not zero information. */
+  .ds-spinner,
+  .ds-animate-spin,
+  .animate-spin {
+    animation: ds-spin 1.6s linear infinite !important;
+  }
+
+  .ds-animate-shimmer,
+  .ds-skeleton {
+    animation: ds-pulse 2s ease-in-out infinite !important;
+  }
+
+  .ds-progress-indeterminate::after {
+    animation: ds-pulse 2s ease-in-out infinite !important;
+    inline-size: 100%;
+  }
+}

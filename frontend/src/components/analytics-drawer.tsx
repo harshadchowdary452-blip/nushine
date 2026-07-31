@@ -61,8 +61,8 @@ const ChartTooltip = ({ active, payload, label, valueType }: ChartTooltipProps) 
   if (active && payload && payload.length) {
     const fmt = valueType === "number" ? formatIndianNumber : formatIndianRupees
     return (
-      <div className="rounded-xl border border-gray-100 bg-white p-3 shadow-lg">
-        <p className="text-sm font-semibold text-gray-900 mb-1">{label}</p>
+      <div className="rounded-xl border border-[var(--ds-border-light)] bg-[var(--ds-surface)] p-3 shadow-lg">
+        <p className="text-sm font-semibold text-[var(--ds-text)] mb-1">{label}</p>
         {payload.map((p: ChartTooltipPayloadItem, i: number) => (
           <p key={i} className="text-xs" style={{ color: p.color }}>
             {p.name}: {fmt(p.value != null ? p.value : 0)}
@@ -123,14 +123,14 @@ export default function AnalyticsDrawer({
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="fixed right-0 top-0 bottom-0 z-[var(--ds-z-dialog)] w-full max-w-lg bg-white shadow-2xl md:max-w-md lg:max-w-lg overflow-y-auto"
+            className="fixed right-0 top-0 bottom-0 z-[var(--ds-z-dialog)] w-full max-w-lg bg-[var(--ds-surface)] shadow-2xl md:max-w-md lg:max-w-lg overflow-y-auto"
           >
-            <div className="sticky top-0 z-[var(--ds-z-sticky)] bg-white border-b border-gray-100">
+            <div className="sticky top-0 z-[var(--ds-z-sticky)] bg-[var(--ds-surface)] border-b border-[var(--ds-border-light)]">
               <div className="flex items-center justify-between p-6 pb-4">
                 <div className="flex items-center gap-3">
                   {icon && <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: `${color}15`, color }}>{icon}</div>}
                   <div>
-                    <h2 className="text-lg font-bold text-gray-900">{title}</h2>
+                    <h2 className="text-lg font-bold text-[var(--ds-text)]">{title}</h2>
                     {trend && (
                       <span className={cn("inline-flex items-center gap-1 text-xs font-semibold", trend.positive ? "text-success" : "text-danger")}>
                         {trend.positive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
@@ -139,7 +139,7 @@ export default function AnalyticsDrawer({
                     )}
                   </div>
                 </div>
-                <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
+                <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-xl text-[var(--ds-text-tertiary)] hover:bg-[var(--ds-surface-hover)] hover:text-[var(--ds-text-secondary)] transition-colors">
                   <X className="h-4 w-4" />
                 </button>
               </div>
@@ -152,7 +152,7 @@ export default function AnalyticsDrawer({
                     <button key={p} onClick={() => onPeriodChange(reversePeriodMap[p])}
                       className={cn(
                         "shrink-0 rounded-lg px-4 py-1.5 text-sm font-medium transition-all",
-                        displayPeriod === p ? "bg-primary text-primary-foreground shadow-sm" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                        displayPeriod === p ? "bg-primary text-primary-foreground shadow-sm" : "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)] hover:bg-[var(--ds-surface-hover)]"
                       )}>
                       {p}
                     </button>
@@ -163,29 +163,29 @@ export default function AnalyticsDrawer({
               {metrics.length > 0 && (
                 <div className="grid grid-cols-2 gap-3">
                   {metrics.map((m, i) => (
-                    <div key={i} className="rounded-xl border bg-white p-4">
-                      <p className="text-xs text-gray-500 font-medium">{m.label}</p>
+                    <div key={i} className="rounded-xl border bg-[var(--ds-surface)] p-4">
+                      <p className="text-xs text-[var(--ds-text-secondary)] font-medium">{m.label}</p>
                       <p className="text-xl font-bold mt-1" style={{ color: m.color || "var(--ds-text)" }}>{m.value}</p>
                     </div>
                   ))}
                 </div>
               )}
 
-              <div className="rounded-xl border bg-white p-4">
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Trend</h3>
+              <div className="rounded-xl border bg-[var(--ds-surface)] p-4">
+                <h3 className="text-sm font-semibold text-[var(--ds-text-secondary)] uppercase tracking-wider mb-4">Trend</h3>
                 {renderChart()}
               </div>
 
-              <div className="rounded-xl border bg-white p-4">
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Insights</h3>
+              <div className="rounded-xl border bg-[var(--ds-surface)] p-4">
+                <h3 className="text-sm font-semibold text-[var(--ds-text-secondary)] uppercase tracking-wider mb-3">Insights</h3>
                 <ul className="space-y-2">
                   {chartData.length > 0 && (
                     <>
-                      <li className="flex items-start gap-2 text-sm text-gray-600">
+                      <li className="flex items-start gap-2 text-sm text-[var(--ds-text-secondary)]">
                         <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-success" />
                         Peak value: {dataKeys[0] ? `${dataKeys[0].name}: ${fmt(Math.max(...chartData.map(d => Number(d[dataKeys[0]?.key || "value"]) || 0)))}` : "N/A"}
                       </li>
-                      <li className="flex items-start gap-2 text-sm text-gray-600">
+                      <li className="flex items-start gap-2 text-sm text-[var(--ds-text-secondary)]">
                         <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-warning" />
                         Average: {dataKeys[0] ? fmt(chartData.reduce((s, d) => s + (Number(d[dataKeys[0]?.key || "value"]) || 0), 0) / chartData.length) : "N/A"}
                       </li>

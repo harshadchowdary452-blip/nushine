@@ -19,8 +19,8 @@ interface ExpensesVsRevenueQuickViewProps {
 const MiniTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ color: string; name: string; value: number }>; label?: string }) => {
   if (active && payload && payload.length) {
     return (
-      <div className="rounded-lg border border-gray-100 bg-white p-2 shadow-md">
-        <p className="text-xs font-semibold text-gray-700 mb-0.5">{label}</p>
+      <div className="rounded-lg border border-[var(--ds-border-light)] bg-[var(--ds-surface)] p-2 shadow-md">
+        <p className="text-xs font-semibold text-[var(--ds-text-secondary)] mb-0.5">{label}</p>
         {payload.map((p: { color: string; name: string; value: number }, i: number) => (
           <p key={i} className="text-xs font-medium" style={{ color: p.color }}>
             {p.name}: {formatIndianRupees(p.value ?? 0)}
@@ -73,8 +73,8 @@ function ExpensesVsRevenueQuickView({ className }: ExpensesVsRevenueQuickViewPro
   return (
     <div className={cn("space-y-3", className)}>
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
-          <DollarSign className="h-3.5 w-3.5 text-indigo-500" />
+        <h3 className="text-xs font-semibold text-[var(--ds-text-secondary)] uppercase tracking-wider flex items-center gap-1.5">
+          <DollarSign className="h-3.5 w-3.5 text-[var(--ds-primary-500)]" />
           Revenue vs Expenses
         </h3>
         <DateFilterBar
@@ -107,16 +107,16 @@ function ExpensesVsRevenueQuickView({ className }: ExpensesVsRevenueQuickViewPro
                 <p className="text-sm font-bold text-red-900">{formatIndianRupees(totalExpenses)}</p>
               </CardContent>
             </Card>
-            <Card className={cn("border", netProfit >= 0 ? "border-indigo-100 bg-indigo-50/40" : "border-orange-100 bg-orange-50/40")}>
+            <Card className={cn("border", netProfit >= 0 ? "border-[var(--ds-primary-100)] bg-[var(--ds-primary-50)]" : "border-orange-100 bg-orange-50/40")}>
               <CardContent className="p-3">
                 <div className="flex items-center gap-1 mb-0.5">
-                  {netProfit >= 0 ? <TrendingUp className="h-3 w-3 text-indigo-600" /> : <TrendingDown className="h-3 w-3 text-orange-600" />}
-                  <p className="text-xs font-medium text-gray-600">Net Profit</p>
+                  {netProfit >= 0 ? <TrendingUp className="h-3 w-3 text-[var(--ds-primary-600)]" /> : <TrendingDown className="h-3 w-3 text-orange-600" />}
+                  <p className="text-xs font-medium text-[var(--ds-text-secondary)]">Net Profit</p>
                 </div>
-                <p className={cn("text-sm font-bold", netProfit >= 0 ? "text-indigo-900" : "text-orange-900")}>
+                <p className={cn("text-sm font-bold", netProfit >= 0 ? "text-[var(--ds-primary-900)]" : "text-orange-900")}>
                   {formatIndianRupees(netProfit)}
                 </p>
-                <p className={cn("text-[10px] mt-0.5", netProfit >= 0 ? "text-indigo-500" : "text-orange-500")}>
+                <p className={cn("text-[10px] mt-0.5", netProfit >= 0 ? "text-[var(--ds-primary-500)]" : "text-orange-500")}>
                   {profitMargin.toFixed(1)}% margin
                 </p>
               </CardContent>
@@ -135,7 +135,7 @@ function ExpensesVsRevenueQuickView({ className }: ExpensesVsRevenueQuickViewPro
               </ResponsiveContainer>
             </div>
           ) : (
-            <p className="text-center text-xs text-gray-400 py-3">No data for this period</p>
+            <p className="text-center text-xs text-[var(--ds-text-tertiary)] py-3">No data for this period</p>
           )}
         </>
       )}

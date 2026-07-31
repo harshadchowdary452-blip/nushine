@@ -1,5 +1,14 @@
 @import "tailwindcss";
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   DESIGN SYSTEM FOUNDATION
+   Order matters: tokens define the variables every later file consumes.
+   ───────────────────────────────────────────────────────────────────────────── */
 @import "./design-system/tokens.css";
+@import "./design-system/typography.css";
+@import "./design-system/layout.css";
+@import "./design-system/motion.css";
+@import "./design-system/a11y.css";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    LEGACY THEME ALIASES  —  kept for backward compat until all pages migrated.
@@ -75,6 +84,15 @@
   --shadow-dropdown: var(--ds-shadow-dropdown);
   --shadow-modal: var(--ds-shadow-dialog);
   --shadow-sidebar: 0 0 0 1px var(--ds-sidebar-border);
+
+  /* Global density lever. Legacy pages still use plain Tailwind spacing
+     utilities (p-4, gap-2, h-9 …); those compile to calc(var(--spacing) * N).
+     Pulling the base from 0.25rem to 0.225rem scales every legacy control
+     down ~10% in one place so no module is resized independently. The
+     design-system's own --ds-spacing-* scale is adjusted separately in
+     tokens.css and is not affected by this value. Touch targets (44px),
+     focus rings and body text are independent tokens and are untouched. */
+  --spacing: 0.225rem;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -116,14 +134,48 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   TYPOGRAPHY UTILITIES
+   LEGACY TYPOGRAPHY ALIASES
+
+   Superseded by the role classes in design-system/typography.css. Kept so
+   pages that still reference them stay visually identical to their `.ds-*`
+   equivalents — every value below is delegated to a token, so the two systems
+   cannot drift apart while the remaining call sites are migrated.
+
+   Do not add new usages. Prefer .ds-page-title / .ds-section-title / etc.
    ═══════════════════════════════════════════════════════════════════════════ */
-.text-page-title { font-size: 28px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em; }
-.text-section-title { font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: -0.01em; }
-.text-card-title { font-size: 15px; line-height: 1.4; font-weight: 600; }
-.text-body { font-size: 14px; line-height: 1.5; }
-.text-table { font-size: 13px; line-height: 1.5; }
-.text-caption { font-size: 12px; line-height: 1.5; }
+.text-page-title {
+  font-family: var(--ds-page-title-family);
+  font-size: var(--ds-page-title-size);
+  line-height: var(--ds-page-title-leading);
+  font-weight: var(--ds-page-title-weight);
+  letter-spacing: var(--ds-page-title-tracking);
+}
+.text-section-title {
+  font-family: var(--ds-section-title-family);
+  font-size: var(--ds-section-title-size);
+  line-height: var(--ds-section-title-leading);
+  font-weight: var(--ds-section-title-weight);
+  letter-spacing: var(--ds-section-title-tracking);
+}
+.text-card-title {
+  font-family: var(--ds-card-title-family);
+  font-size: var(--ds-card-title-size);
+  line-height: var(--ds-card-title-leading);
+  font-weight: var(--ds-card-title-weight);
+  letter-spacing: var(--ds-card-title-tracking);
+}
+.text-body {
+  font-size: var(--ds-body-size);
+  line-height: var(--ds-body-leading);
+}
+.text-table {
+  font-size: var(--ds-table-cell-size);
+  line-height: var(--ds-table-cell-leading);
+}
+.text-caption {
+  font-size: var(--ds-caption-size);
+  line-height: var(--ds-caption-leading);
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    ANIMATIONS
@@ -140,16 +192,29 @@ body {
 @keyframes scaleIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.animate-fade-in { animation: fadeIn 0.3s ease-out; }
-.animate-fade-out { animation: fadeOut 0.2s ease-out; }
-.animate-slide-up { animation: slideUp 0.4s ease-out; }
-.animate-slide-down { animation: slideDown 0.3s ease-out; }
-.animate-slide-in-right { animation: slideInRight 0.3s ease-out; }
-.animate-slide-in-left { animation: slideInLeft 0.3s ease-out; }
+/* Durations delegate to motion tokens so these legacy utilities collapse
+   automatically under prefers-reduced-motion along with the .ds-* system. */
+.animate-fade-in { animation: fadeIn var(--ds-transition-base) both; }
+.animate-fade-out { animation: fadeOut var(--ds-transition-fast) both; }
+.animate-slide-up { animation: slideUp var(--ds-motion-page) both; }
+.animate-slide-down { animation: slideDown var(--ds-motion-dropdown) both; }
+.animate-slide-in-right { animation: slideInRight var(--ds-motion-drawer) both; }
+.animate-slide-in-left { animation: slideInLeft var(--ds-motion-drawer) both; }
 .animate-float { animation: float 6s ease-in-out infinite; }
 .animate-float-delayed { animation: float-delayed 8s ease-in-out infinite 1s; }
-.animate-scale-in { animation: scaleIn 0.2s ease-out; }
-.animate-spin { animation: spin 1s linear infinite; }
+.animate-scale-in { animation: scaleIn var(--ds-motion-dialog) both; }
+.animate-spin { animation: spin 0.7s linear infinite; }
+
+/* Legacy spinner referenced by route-level Suspense fallbacks. */
+.spinner {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--ds-border);
+  border-top-color: var(--ds-primary);
+  border-radius: var(--ds-radius-full);
+  animation: spin 0.7s linear infinite;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    SKELETON LOADER (legacy)
@@ -192,17 +257,15 @@ body {
 
 /* Legacy gradients */
 .gradient-hero {
-  background: linear-gradient(135deg, var(--ds-primary-500) 0%, var(--ds-primary-700) 55%, var(--ds-accent-600) 100%);
+  background: var(--ds-hero-gradient-accent);
 }
 
 .gradient-hero-subtle {
-  background: linear-gradient(135deg, var(--ds-primary-50) 0%, var(--ds-info-100) 55%, var(--ds-accent-50) 100%);
+  background: var(--ds-hero-gradient-subtle);
 }
 
 .bg-grid-pattern {
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-image: var(--ds-hero-grid);
   background-size: 40px 40px;
 }
 
@@ -212,8 +275,12 @@ body {
 .ds-skeleton {
   background: linear-gradient(90deg, var(--ds-surface-secondary) 25%, var(--ds-border-light) 50%, var(--ds-surface-secondary) 75%);
   background-size: 200% 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
+  animation: shimmer var(--ds-motion-shimmer-duration) linear infinite;
   border-radius: var(--ds-radius-md);
+  /* Skeletons stand in for content that has not arrived; they must never be
+     announced or reachable. */
+  pointer-events: none;
+  user-select: none;
 }
 
 .ds-skeleton-text {
@@ -245,14 +312,15 @@ body {
 .ds-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 10px;
+  gap: var(--ds-spacing-1);
+  padding: var(--ds-spacing-0_5) var(--ds-spacing-2_5);
   border-radius: var(--ds-radius-full);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.4;
+  font-family: var(--ds-badge-family);
+  font-size: var(--ds-badge-size);
+  font-weight: var(--ds-badge-weight);
+  line-height: var(--ds-badge-leading);
+  letter-spacing: var(--ds-badge-tracking);
   white-space: nowrap;
-  letter-spacing: 0.01em;
 }
 
 .ds-badge-dot {
@@ -321,18 +389,8 @@ body {
 .ds-badge-default { background-color: var(--ds-status-draft-bg); color: var(--ds-status-draft-text); }
 .ds-badge-default .ds-badge-dot { background-color: var(--ds-status-draft-text); }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   FOCUS RING UTILITY
-   ═══════════════════════════════════════════════════════════════════════════ */
-.ds-focus-ring {
-  outline: none;
-}
-
-.ds-focus-ring:focus-visible {
-  outline: 2px solid var(--ds-primary);
-  outline-offset: 2px;
-  border-radius: var(--ds-radius-md);
-}
+/* Focus ring utilities now live in design-system/a11y.css, where `.ds-focus-ring`
+   is implemented as a box-shadow so it survives `overflow: hidden` containers. */
 
 /* ═══════════════════════════════════════════════════════════════════════════
    RESPONSIVE

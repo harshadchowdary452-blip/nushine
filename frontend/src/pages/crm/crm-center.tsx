@@ -61,17 +61,17 @@ const statusColors: Record<string, string> = {
   SCHEDULED: "bg-blue-50 text-blue-700",
   COMPLETED: "bg-green-50 text-green-700",
   OVERDUE: "bg-red-50 text-red-700",
-  SKIPPED: "bg-gray-50 text-gray-600",
-  IN_PROGRESS: "bg-indigo-50 text-indigo-700",
+  SKIPPED: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
+  IN_PROGRESS: "bg-[var(--ds-primary-50)] text-[var(--ds-primary-700)]",
 }
 
 const channelColors: Record<string, string> = {
   WHATSAPP: "bg-green-50 text-green-600",
   SMS: "bg-blue-50 text-blue-600",
-  EMAIL: "bg-purple-50 text-purple-600",
+  EMAIL: "bg-[var(--ds-accent-50)] text-[var(--ds-accent-600)]",
   PHONE: "bg-amber-50 text-amber-600",
-  TASK: "bg-gray-50 text-gray-600",
-  NOTIFICATION: "bg-indigo-50 text-indigo-600",
+  TASK: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
+  NOTIFICATION: "bg-[var(--ds-primary-50)] text-[var(--ds-primary-600)]",
 }
 
 const priorityColors: Record<string, string> = {
@@ -85,17 +85,17 @@ const statusBarColors: Record<string, string> = {
   SCHEDULED: "bg-blue-400",
   COMPLETED: "bg-green-400",
   OVERDUE: "bg-red-400",
-  SKIPPED: "bg-gray-400",
-  IN_PROGRESS: "bg-indigo-400",
+  SKIPPED: "bg-[var(--ds-text-tertiary)]",
+  IN_PROGRESS: "bg-[var(--ds-primary-400)]",
 }
 
 const channelBarColors: Record<string, string> = {
   WHATSAPP: "bg-green-400",
   SMS: "bg-blue-400",
-  EMAIL: "bg-purple-400",
+  EMAIL: "bg-[var(--ds-accent-400)]",
   PHONE: "bg-amber-400",
-  TASK: "bg-gray-400",
-  NOTIFICATION: "bg-indigo-400",
+  TASK: "bg-[var(--ds-text-tertiary)]",
+  NOTIFICATION: "bg-[var(--ds-primary-400)]",
 }
 
 const channelIcons: Record<string, React.ElementType> = {
@@ -126,7 +126,7 @@ function MiniBar({
   return (
     <div className="flex items-center gap-3 text-sm">
       <span className="w-28 text-muted-foreground text-xs">{formatLabel(label)}</span>
-      <div className="flex-1 h-5 bg-gray-100 rounded-full overflow-hidden">
+      <div className="flex-1 h-5 bg-[var(--ds-background-subtle)] rounded-full overflow-hidden">
         <div
           className={`h-full rounded-full ${color} transition-all duration-500`}
           style={{ width: `${pct}%` }}
@@ -224,9 +224,9 @@ export default function CrmCenter() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-purple-100">
+        <Card className="border-[var(--ds-accent-100)]">
           <CardContent className="p-5 flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--ds-accent-50)] text-[var(--ds-accent-600)]">
               <Mail className="h-6 w-6" />
             </div>
             <div>
@@ -359,7 +359,7 @@ export default function CrmCenter() {
                   label={s.status}
                   count={s.count}
                   max={statusMax}
-                  color={statusBarColors[s.status] || "bg-gray-400"}
+                  color={statusBarColors[s.status] || "bg-[var(--ds-text-tertiary)]"}
                 />
               ))
             ) : (
@@ -379,7 +379,7 @@ export default function CrmCenter() {
                   label={c.channel}
                   count={c.count}
                   max={channelMax}
-                  color={channelBarColors[c.channel] || "bg-gray-400"}
+                  color={channelBarColors[c.channel] || "bg-[var(--ds-text-tertiary)]"}
                 />
               ))
             ) : (

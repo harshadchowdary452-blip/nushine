@@ -71,7 +71,7 @@ export default function WhatsAppConfigPage() {
     })
   }
 
-  if (!hospitalId) return <div className="p-4 text-gray-500">No hospital selected</div>
+  if (!hospitalId) return <div className="p-4 text-[var(--ds-text-secondary)]">No hospital selected</div>
   if (isLoading)
     return (
       <div className="space-y-4 p-4">
@@ -100,23 +100,23 @@ export default function WhatsAppConfigPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
+          <div className="flex items-center justify-between rounded-lg border border-[var(--ds-border)] p-4">
             <div>
-              <p className="font-medium text-gray-900">Enable WhatsApp</p>
-              <p className="text-sm text-gray-500">Turn on WhatsApp messaging for this clinic</p>
+              <p className="font-medium text-[var(--ds-text)]">Enable WhatsApp</p>
+              <p className="text-sm text-[var(--ds-text-secondary)]">Turn on WhatsApp messaging for this clinic</p>
             </div>
             <Switch checked={enabled} onCheckedChange={setEnabled} />
           </div>
 
-          <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
+          <div className="flex items-center justify-between rounded-lg border border-[var(--ds-border)] p-4">
             <div>
-              <p className="font-medium text-gray-900">WhatsApp Mode</p>
-              <p className="text-sm text-gray-500">LIVE for production, SANDBOX for testing</p>
+              <p className="font-medium text-[var(--ds-text)]">WhatsApp Mode</p>
+              <p className="text-sm text-[var(--ds-text-secondary)]">LIVE for production, SANDBOX for testing</p>
             </div>
             <select
               value={whatsappMode}
               onChange={(e) => setWhatsappMode(e.target.value)}
-              className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none focus:border-primary"
+              className="h-9 rounded-lg border border-[var(--ds-border)] bg-[var(--ds-surface)] px-3 text-sm outline-none focus:border-primary"
             >
               <option value="LIVE">Live</option>
               <option value="SANDBOX">Sandbox</option>
@@ -127,7 +127,7 @@ export default function WhatsAppConfigPage() {
             <div className="space-y-2">
               <Label>Country Code</Label>
               <div className="relative">
-                <Globe className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                <Globe className="absolute left-3 top-2.5 h-4 w-4 text-[var(--ds-text-tertiary)]" />
                 <Input
                   value={countryCode}
                   onChange={(e) => setCountryCode(e.target.value)}
@@ -139,7 +139,7 @@ export default function WhatsAppConfigPage() {
             <div className="md:col-span-2 space-y-2">
               <Label>Clinic WhatsApp Number</Label>
               <div className="relative">
-                <Smartphone className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                <Smartphone className="absolute left-3 top-2.5 h-4 w-4 text-[var(--ds-text-tertiary)]" />
                 <Input
                   value={clinicNumber}
                   onChange={(e) => setClinicNumber(e.target.value)}
@@ -147,7 +147,7 @@ export default function WhatsAppConfigPage() {
                   placeholder="9876543210"
                 />
               </div>
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-[var(--ds-text-tertiary)]">
                 Enter number without country code (e.g. 9876543210)
               </p>
             </div>
@@ -162,28 +162,28 @@ export default function WhatsAppConfigPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
+          <div className="flex items-center justify-between rounded-lg border border-[var(--ds-border)] p-4">
             <div>
-              <p className="font-medium text-gray-900">Default Message Templates</p>
-              <p className="text-sm text-gray-500">
+              <p className="font-medium text-[var(--ds-text)]">Default Message Templates</p>
+              <p className="text-sm text-[var(--ds-text-secondary)]">
                 Enable pre-built message templates for common scenarios
               </p>
             </div>
             <Switch checked={defaultTemplates} onCheckedChange={setDefaultTemplates} />
           </div>
-          <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
+          <div className="flex items-center justify-between rounded-lg border border-[var(--ds-border)] p-4">
             <div>
-              <p className="font-medium text-gray-900">Broadcast Messaging</p>
-              <p className="text-sm text-gray-500">
+              <p className="font-medium text-[var(--ds-text)]">Broadcast Messaging</p>
+              <p className="text-sm text-[var(--ds-text-secondary)]">
                 Allow sending bulk WhatsApp messages to patients
               </p>
             </div>
             <Switch checked={broadcastEnabled} onCheckedChange={setBroadcastEnabled} />
           </div>
-          <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
+          <div className="flex items-center justify-between rounded-lg border border-[var(--ds-border)] p-4">
             <div>
-              <p className="font-medium text-gray-900">Campaign Messaging</p>
-              <p className="text-sm text-gray-500">
+              <p className="font-medium text-[var(--ds-text)]">Campaign Messaging</p>
+              <p className="text-sm text-[var(--ds-text-secondary)]">
                 Allow WhatsApp campaigns (promotions, awareness)
               </p>
             </div>

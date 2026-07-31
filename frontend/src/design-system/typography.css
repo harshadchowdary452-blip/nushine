@@ -1,0 +1,393 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   DESIGN SYSTEM · TYPOGRAPHY
+   NuShine Enterprise Dental Platform
+
+   The role classes below are the ONLY sanctioned way to apply type in the
+   product. Each one materialises a role defined in tokens.css into real CSS
+   properties.
+
+   Why classes and not Tailwind arbitrary values
+   ─────────────────────────────────────────────
+   Tailwind resolves `font-[var(--x)]` to `font-weight` and `text-[var(--x)]`
+   to `color`. Feeding either a CSS `font` shorthand produces invalid CSS that
+   browsers drop silently — the declaration disappears with no build error and
+   no console warning. Roles are therefore applied as discrete properties here,
+   where every one of them is guaranteed to land.
+
+   Cascade contract
+   ────────────────
+   These live in `@layer components`, which Tailwind orders BEFORE `utilities`.
+   That means a role class sets the baseline and any Tailwind utility still
+   wins, so `class="ds-card-title text-[var(--ds-danger)]"` recolours a title
+   without forking the type scale. Escape hatches stay open; defaults stay
+   correct.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer components {
+  /* ─────────────────────────────────────────────────────────────────────────
+     TITLES
+     ───────────────────────────────────────────────────────────────────────── */
+
+  .ds-display {
+    font-family: var(--ds-display-family);
+    font-size: var(--ds-display-size);
+    font-weight: var(--ds-display-weight);
+    line-height: var(--ds-display-leading);
+    letter-spacing: var(--ds-display-tracking);
+    text-wrap: balance;
+  }
+
+  .ds-page-title {
+    font-family: var(--ds-page-title-family);
+    font-size: var(--ds-page-title-size);
+    font-weight: var(--ds-page-title-weight);
+    line-height: var(--ds-page-title-leading);
+    letter-spacing: var(--ds-page-title-tracking);
+    text-wrap: balance;
+  }
+
+  .ds-section-title {
+    font-family: var(--ds-section-title-family);
+    font-size: var(--ds-section-title-size);
+    font-weight: var(--ds-section-title-weight);
+    line-height: var(--ds-section-title-leading);
+    letter-spacing: var(--ds-section-title-tracking);
+  }
+
+  .ds-card-title {
+    font-family: var(--ds-card-title-family);
+    font-size: var(--ds-card-title-size);
+    font-weight: var(--ds-card-title-weight);
+    line-height: var(--ds-card-title-leading);
+    letter-spacing: var(--ds-card-title-tracking);
+  }
+
+  .ds-widget-title {
+    font-family: var(--ds-widget-title-family);
+    font-size: var(--ds-widget-title-size);
+    font-weight: var(--ds-widget-title-weight);
+    line-height: var(--ds-widget-title-leading);
+    letter-spacing: var(--ds-widget-title-tracking);
+  }
+
+  .ds-form-title {
+    font-family: var(--ds-form-title-family);
+    font-size: var(--ds-form-title-size);
+    font-weight: var(--ds-form-title-weight);
+    line-height: var(--ds-form-title-leading);
+    letter-spacing: var(--ds-form-title-tracking);
+  }
+
+  .ds-dialog-title {
+    font-family: var(--ds-dialog-title-family);
+    font-size: var(--ds-dialog-title-size);
+    font-weight: var(--ds-dialog-title-weight);
+    line-height: var(--ds-dialog-title-leading);
+    letter-spacing: var(--ds-dialog-title-tracking);
+  }
+
+  .ds-drawer-title {
+    font-family: var(--ds-drawer-title-family);
+    font-size: var(--ds-drawer-title-size);
+    font-weight: var(--ds-drawer-title-weight);
+    line-height: var(--ds-drawer-title-leading);
+    letter-spacing: var(--ds-drawer-title-tracking);
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     TABLES
+     ───────────────────────────────────────────────────────────────────────── */
+
+  .ds-table-header {
+    font-family: var(--ds-table-header-family);
+    font-size: var(--ds-table-header-size);
+    font-weight: var(--ds-table-header-weight);
+    line-height: var(--ds-table-header-leading);
+    letter-spacing: var(--ds-table-header-tracking);
+    text-transform: var(--ds-table-header-transform);
+  }
+
+  .ds-table-cell {
+    font-family: var(--ds-table-cell-family);
+    font-size: var(--ds-table-cell-size);
+    font-weight: var(--ds-table-cell-weight);
+    line-height: var(--ds-table-cell-leading);
+    letter-spacing: var(--ds-table-cell-tracking);
+  }
+
+  /* Tabular figures — mandatory for any column of numbers, currency or IDs so
+     digits align vertically and columns stay scannable. */
+  .ds-numeric {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     NAVIGATION
+     ───────────────────────────────────────────────────────────────────────── */
+
+  .ds-nav-label {
+    font-family: var(--ds-nav-label-family);
+    font-size: var(--ds-nav-label-size);
+    font-weight: var(--ds-nav-label-weight);
+    line-height: var(--ds-nav-label-leading);
+    letter-spacing: var(--ds-nav-label-tracking);
+  }
+
+  .ds-sidebar-label {
+    font-family: var(--ds-sidebar-label-family);
+    font-size: var(--ds-sidebar-label-size);
+    font-weight: var(--ds-sidebar-label-weight);
+    line-height: var(--ds-sidebar-label-leading);
+    letter-spacing: var(--ds-sidebar-label-tracking);
+  }
+
+  .ds-sidebar-section {
+    font-family: var(--ds-sidebar-section-family);
+    font-size: var(--ds-sidebar-section-size);
+    font-weight: var(--ds-sidebar-section-weight);
+    line-height: var(--ds-sidebar-section-leading);
+    letter-spacing: var(--ds-sidebar-section-tracking);
+    text-transform: var(--ds-sidebar-section-transform);
+  }
+
+  .ds-breadcrumb {
+    font-family: var(--ds-breadcrumb-family);
+    font-size: var(--ds-breadcrumb-size);
+    font-weight: var(--ds-breadcrumb-weight);
+    line-height: var(--ds-breadcrumb-leading);
+    letter-spacing: var(--ds-breadcrumb-tracking);
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     FORMS
+     ───────────────────────────────────────────────────────────────────────── */
+
+  .ds-form-label {
+    font-family: var(--ds-form-label-family);
+    font-size: var(--ds-form-label-size);
+    font-weight: var(--ds-form-label-weight);
+    line-height: var(--ds-form-label-leading);
+    letter-spacing: var(--ds-form-label-tracking);
+  }
+
+  .ds-input-text {
+    font-family: var(--ds-input-text-family);
+    font-size: var(--ds-input-text-size);
+    font-weight: var(--ds-input-text-weight);
+    line-height: var(--ds-input-text-leading);
+    letter-spacing: var(--ds-input-text-tracking);
+  }
+
+  /* Applied to the field itself; styles its ::placeholder pseudo-element. */
+  .ds-input-text::placeholder,
+  .ds-placeholder::placeholder {
+    font-family: var(--ds-placeholder-family);
+    font-size: var(--ds-placeholder-size);
+    font-weight: var(--ds-placeholder-weight);
+    line-height: var(--ds-placeholder-leading);
+    letter-spacing: var(--ds-placeholder-tracking);
+    color: var(--ds-text-placeholder);
+    /* Firefox dims placeholders by default, which breaks the contrast we
+       deliberately tuned into --ds-text-placeholder. */
+    opacity: 1;
+  }
+
+  .ds-helper-text {
+    font-family: var(--ds-helper-family);
+    font-size: var(--ds-helper-size);
+    font-weight: var(--ds-helper-weight);
+    line-height: var(--ds-helper-leading);
+    letter-spacing: var(--ds-helper-tracking);
+    color: var(--ds-text-tertiary);
+  }
+
+  .ds-error-text {
+    font-family: var(--ds-error-text-family);
+    font-size: var(--ds-error-text-size);
+    font-weight: var(--ds-error-text-weight);
+    line-height: var(--ds-error-text-leading);
+    letter-spacing: var(--ds-error-text-tracking);
+    color: var(--ds-danger);
+  }
+
+  .ds-success-text {
+    font-family: var(--ds-success-text-family);
+    font-size: var(--ds-success-text-size);
+    font-weight: var(--ds-success-text-weight);
+    line-height: var(--ds-success-text-leading);
+    letter-spacing: var(--ds-success-text-tracking);
+    color: var(--ds-success);
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     CONTENT
+     ───────────────────────────────────────────────────────────────────────── */
+
+  .ds-body {
+    font-family: var(--ds-body-family);
+    font-size: var(--ds-body-size);
+    font-weight: var(--ds-body-weight);
+    line-height: var(--ds-body-leading);
+    letter-spacing: var(--ds-body-tracking);
+  }
+
+  /* Long-form prose only. Caps the measure so lines stay readable on
+     ultra-wide displays. */
+  .ds-prose {
+    max-width: var(--ds-measure);
+  }
+
+  .ds-secondary-text {
+    font-family: var(--ds-secondary-text-family);
+    font-size: var(--ds-secondary-text-size);
+    font-weight: var(--ds-secondary-text-weight);
+    line-height: var(--ds-secondary-text-leading);
+    letter-spacing: var(--ds-secondary-text-tracking);
+    color: var(--ds-text-secondary);
+  }
+
+  .ds-caption {
+    font-family: var(--ds-caption-family);
+    font-size: var(--ds-caption-size);
+    font-weight: var(--ds-caption-weight);
+    line-height: var(--ds-caption-leading);
+    letter-spacing: var(--ds-caption-tracking);
+    color: var(--ds-text-tertiary);
+  }
+
+  .ds-overline {
+    font-family: var(--ds-overline-family);
+    font-size: var(--ds-overline-size);
+    font-weight: var(--ds-overline-weight);
+    line-height: var(--ds-overline-leading);
+    letter-spacing: var(--ds-overline-tracking);
+    text-transform: var(--ds-overline-transform);
+    color: var(--ds-text-tertiary);
+  }
+
+  .ds-code {
+    font-family: var(--ds-code-family);
+    font-size: var(--ds-code-size);
+    font-weight: var(--ds-code-weight);
+    line-height: var(--ds-code-leading);
+    letter-spacing: var(--ds-code-tracking);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     COMPONENT TYPE
+     ───────────────────────────────────────────────────────────────────────── */
+
+  .ds-button-text {
+    font-family: var(--ds-button-family);
+    font-size: var(--ds-button-size);
+    font-weight: var(--ds-button-weight);
+    line-height: var(--ds-button-leading);
+    letter-spacing: var(--ds-button-tracking);
+  }
+
+  .ds-button-text-sm { font-size: var(--ds-button-sm-size); }
+  .ds-button-text-lg { font-size: var(--ds-button-lg-size); }
+
+  .ds-badge-text {
+    font-family: var(--ds-badge-family);
+    font-size: var(--ds-badge-size);
+    font-weight: var(--ds-badge-weight);
+    line-height: var(--ds-badge-leading);
+    letter-spacing: var(--ds-badge-tracking);
+  }
+
+  .ds-status-label {
+    font-family: var(--ds-status-label-family);
+    font-size: var(--ds-status-label-size);
+    font-weight: var(--ds-status-label-weight);
+    line-height: var(--ds-status-label-leading);
+    letter-spacing: var(--ds-status-label-tracking);
+  }
+
+  .ds-tooltip-text {
+    font-family: var(--ds-tooltip-family);
+    font-size: var(--ds-tooltip-size);
+    font-weight: var(--ds-tooltip-weight);
+    line-height: var(--ds-tooltip-leading);
+    letter-spacing: var(--ds-tooltip-tracking);
+  }
+
+  .ds-notification-text {
+    font-family: var(--ds-notification-family);
+    font-size: var(--ds-notification-size);
+    font-weight: var(--ds-notification-weight);
+    line-height: var(--ds-notification-leading);
+    letter-spacing: var(--ds-notification-tracking);
+  }
+
+  .ds-notification-title {
+    font-family: var(--ds-notification-family);
+    font-size: var(--ds-notification-size);
+    font-weight: var(--ds-notification-title-weight);
+    line-height: var(--ds-notification-leading);
+    letter-spacing: var(--ds-notification-tracking);
+  }
+
+  .ds-metric {
+    font-family: var(--ds-metric-family);
+    font-size: var(--ds-metric-size);
+    font-weight: var(--ds-metric-weight);
+    line-height: var(--ds-metric-leading);
+    letter-spacing: var(--ds-metric-tracking);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ds-metric-lg { font-size: var(--ds-metric-lg-size); }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     TRUNCATION
+     Titles and labels in a dense ERP must degrade predictably rather than
+     reflow the layout they sit in.
+     ───────────────────────────────────────────────────────────────────────── */
+
+  .ds-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+
+  .ds-clamp-2,
+  .ds-clamp-3 {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .ds-clamp-2 { -webkit-line-clamp: 2; line-clamp: 2; }
+  .ds-clamp-3 { -webkit-line-clamp: 3; line-clamp: 3; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE TYPOGRAPHY
+   Only the largest roles rescale. Body, table, form and label type is already
+   at its comfortable floor — shrinking it further would cost legibility for no
+   layout gain, and enlarging it on wide screens would cost information density.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 1023px) {
+  :root {
+    --ds-display-size: var(--ds-font-size-5xl);
+    --ds-page-title-size: var(--ds-font-size-3xl);
+    --ds-metric-size: var(--ds-font-size-3xl);
+    --ds-metric-lg-size: var(--ds-font-size-4xl);
+  }
+}
+
+@media (max-width: 639px) {
+  :root {
+    --ds-display-size: var(--ds-font-size-4xl);
+    --ds-page-title-size: var(--ds-font-size-2xl);
+    --ds-section-title-size: var(--ds-font-size-xl);
+    --ds-dialog-title-size: var(--ds-font-size-xl);
+    --ds-drawer-title-size: var(--ds-font-size-xl);
+    --ds-metric-size: var(--ds-font-size-3xl);
+  }
+}

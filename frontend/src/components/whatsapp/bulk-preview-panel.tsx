@@ -53,9 +53,9 @@ export default function BulkPreviewPanel({ preview, onSendAll, onBack, sending }
           <p className="text-2xl font-bold text-red-600">{totals.invalid}</p>
           <p className="text-xs text-red-600/70">Invalid</p>
         </div>
-        <div className="rounded-lg bg-purple-50 p-3 text-center">
-          <p className="text-2xl font-bold text-purple-600">{totals.with_phone}</p>
-          <p className="text-xs text-purple-600/70">With Phone</p>
+        <div className="rounded-lg bg-[var(--ds-accent-50)] p-3 text-center">
+          <p className="text-2xl font-bold text-[var(--ds-accent-600)]">{totals.with_phone}</p>
+          <p className="text-xs text-[var(--ds-accent-600)]">With Phone</p>
         </div>
       </div>
 
@@ -75,7 +75,7 @@ export default function BulkPreviewPanel({ preview, onSendAll, onBack, sending }
               <button
                 onClick={() => setExpanded(expanded === item.patient_id ? null : item.patient_id)}
                 className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left text-sm transition-colors ${
-                  item.is_valid ? "hover:bg-gray-50" : "bg-red-50/50"
+                  item.is_valid ? "hover:bg-[var(--ds-surface-hover)]" : "bg-red-50/50"
                 } ${expanded === item.patient_id ? "ring-1 ring-green-300" : ""}`}
               >
                 {item.is_valid ? (
@@ -84,8 +84,8 @@ export default function BulkPreviewPanel({ preview, onSendAll, onBack, sending }
                   <XCircle className="h-4 w-4 shrink-0 text-red-400" />
                 )}
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium text-gray-900 truncate">{item.patient_name}</p>
-                  <p className="text-xs text-gray-500">{item.patient_phone || "No phone"}</p>
+                  <p className="font-medium text-[var(--ds-text)] truncate">{item.patient_name}</p>
+                  <p className="text-xs text-[var(--ds-text-secondary)]">{item.patient_phone || "No phone"}</p>
                 </div>
                 <div className="flex gap-1">
                   {item.has_phone && <Smartphone className="h-3.5 w-3.5 text-green-400" />}
@@ -93,9 +93,9 @@ export default function BulkPreviewPanel({ preview, onSendAll, onBack, sending }
                 </div>
               </button>
               {expanded === item.patient_id && (
-                <div className="ml-7 rounded-lg border border-gray-100 bg-gray-50 p-3 mt-1">
-                  <p className="text-xs text-gray-500 mb-1">Message:</p>
-                  <p className="text-sm text-gray-800 whitespace-pre-wrap">{item.rendered_message}</p>
+                <div className="ml-7 rounded-lg border border-[var(--ds-border-light)] bg-[var(--ds-background-subtle)] p-3 mt-1">
+                  <p className="text-xs text-[var(--ds-text-secondary)] mb-1">Message:</p>
+                  <p className="text-sm text-[var(--ds-text)] whitespace-pre-wrap">{item.rendered_message}</p>
                   {item.unresolved_variables.length > 0 && (
                     <p className="mt-1 text-xs text-amber-600">
                       Unresolved: {item.unresolved_variables.join(", ")}

@@ -29,7 +29,7 @@ export function SettingsSection({
             <span className="text-[var(--ds-primary)]">{icon}</span>
           )}
           <div>
-            <h3 className="font-[var(--ds-text-h3)] text-[var(--ds-text)]">{title}</h3>
+            <h3 className="ds-card-title text-[var(--ds-text)]">{title}</h3>
             {description && (
               <p className="text-xs text-[var(--ds-text-tertiary)] mt-0.5">{description}</p>
             )}

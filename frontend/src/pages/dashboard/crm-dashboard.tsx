@@ -39,7 +39,7 @@ const COLORS = [
   "var(--ds-chart-1)",
   "var(--ds-chart-14)",
 ]
-const GLASS = "bg-white/80 backdrop-blur-xl border border-white/20 shadow-lg"
+const GLASS = "bg-white/80 backdrop-blur-xl border border-white/20 shadow-[var(--ds-shadow-card)]"
 
 const fuTypeLabels: Record<string, string> = {
   "1_DAY_FOLLOW_UP": "1-Day FU", "7_DAY_FOLLOW_UP": "7-Day FU",
@@ -47,36 +47,36 @@ const fuTypeLabels: Record<string, string> = {
   CUSTOM_FOLLOW_UP: "Custom FU", ENQUIRY: "Enquiry", MANUAL: "Manual",
 }
 const fuTypeColors: Record<string, string> = {
-  "1_DAY_FOLLOW_UP": "bg-blue-50 text-blue-700 border-blue-200",
-  "7_DAY_FOLLOW_UP": "bg-purple-50 text-purple-700 border-purple-200",
-  "6_MONTH_RECALL": "bg-amber-50 text-amber-700 border-amber-200",
-  "12_MONTH_RECALL": "bg-green-50 text-green-700 border-green-200",
-  CUSTOM_FOLLOW_UP: "bg-gray-50 text-gray-700 border-gray-200",
-  ENQUIRY: "bg-indigo-50 text-indigo-700 border-indigo-200",
-  MANUAL: "bg-rose-50 text-rose-700 border-rose-200",
+  "1_DAY_FOLLOW_UP": "bg-[var(--ds-info-subtle)] text-[var(--ds-info)] border-[var(--ds-info)]",
+  "7_DAY_FOLLOW_UP": "bg-[var(--ds-accent-subtle)] text-[var(--ds-accent)] border-[var(--ds-accent)]",
+  "6_MONTH_RECALL": "bg-[var(--ds-warning-subtle)] text-[var(--ds-warning)] border-[var(--ds-warning)]",
+  "12_MONTH_RECALL": "bg-[var(--ds-success-subtle)] text-[var(--ds-success)] border-[var(--ds-success)]",
+  CUSTOM_FOLLOW_UP: "bg-[var(--ds-surface-secondary)] text-[var(--ds-text-secondary)] border-[var(--ds-border)]",
+  ENQUIRY: "bg-[var(--ds-primary-subtle)] text-[var(--ds-primary)] border-[var(--ds-primary-subtle)]",
+  MANUAL: "bg-[var(--ds-danger-subtle)] text-[var(--ds-danger)] border-[var(--ds-danger)]",
 }
 const statusColors: Record<string, string> = {
-  PENDING: "bg-amber-100 text-amber-800", CONTACTED: "bg-blue-100 text-blue-800",
-  INTERESTED: "bg-emerald-100 text-emerald-800", APPOINTMENT_BOOKED: "bg-indigo-100 text-indigo-800",
-  COMPLETED: "bg-green-100 text-green-800", NO_RESPONSE: "bg-gray-100 text-gray-500",
-  LOST: "bg-red-100 text-red-700", APPOINTMENT_REQUIRED: "bg-purple-100 text-purple-800",
+  PENDING: "bg-[var(--ds-warning-subtle)] text-[var(--ds-warning)]", CONTACTED: "bg-[var(--ds-info-subtle)] text-[var(--ds-info)]",
+  INTERESTED: "bg-[var(--ds-success-subtle)] text-[var(--ds-success)]", APPOINTMENT_BOOKED: "bg-[var(--ds-primary-subtle)] text-[var(--ds-primary)]",
+  COMPLETED: "bg-[var(--ds-success-subtle)] text-[var(--ds-success)]", NO_RESPONSE: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
+  LOST: "bg-[var(--ds-danger-subtle)] text-[var(--ds-danger)]", APPOINTMENT_REQUIRED: "bg-[var(--ds-accent-subtle)] text-[var(--ds-accent)]",
 }
 
 function KpiCard({ title, value, icon: Icon, color, onClick }: { title: string; value: string | number; icon: React.ComponentType<{ className?: string }>; color: string; onClick?: () => void }) {
   const colorMap: Record<string, string> = {
-    primary: "from-indigo-500 to-blue-600", info: "from-blue-500 to-cyan-600",
+    primary: "from-[var(--ds-primary-500)] to-[var(--ds-primary-700)]", info: "from-blue-500 to-cyan-600",
     success: "from-emerald-500 to-green-600", warning: "from-amber-500 to-yellow-600",
-    danger: "from-red-500 to-rose-600", purple: "from-purple-500 to-violet-600",
+    danger: "from-red-500 to-rose-600", purple: "from-[var(--ds-accent-500)] to-[var(--ds-accent-600)]",
     pink: "from-pink-500 to-rose-600", teal: "from-teal-500 to-cyan-600",
   }
   return (
     <div onClick={onClick} className={cn(GLASS, "rounded-2xl p-4 cursor-pointer hover:shadow-xl transition-all duration-300 group border", onClick ? "cursor-pointer" : "")}>
       <div className="flex items-start justify-between">
         <div className="space-y-1">
-          <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">{title}</p>
-          <p className="text-2xl font-bold text-gray-900">{value}</p>
+          <p className="text-[11px] font-medium text-[var(--ds-text-secondary)] uppercase tracking-wider">{title}</p>
+          <p className="text-2xl font-bold text-[var(--ds-text)]">{value}</p>
         </div>
-        <div className={cn("rounded-xl p-2.5 text-white bg-gradient-to-br shadow-sm", colorMap[color] || colorMap.primary)}>
+        <div className={cn("rounded-xl p-2.5 text-white bg-gradient-to-br shadow-[var(--ds-shadow-card)]", colorMap[color] || colorMap.primary)}>
           <Icon className="h-4 w-4" />
         </div>
       </div>
@@ -89,10 +89,10 @@ function FunnelStep({ label, value, total, color, isLast }: { label: string; val
   return (
     <div className="flex flex-col items-center gap-1.5 min-w-0 flex-1">
       <div className={cn("w-full h-2 rounded-full", color)} style={{ opacity: Math.max(0.15, pct / 100) }} />
-      <p className="text-lg font-bold text-gray-900">{value}</p>
-      <p className="text-[10px] text-gray-500 text-center leading-tight">{label}</p>
-      <p className="text-[10px] font-semibold text-gray-400">{pct}%</p>
-      {!isLast && <ChevronRight className="h-3.5 w-3.5 text-gray-300 mt-0.5" />}
+      <p className="text-lg font-bold text-[var(--ds-text)]">{value}</p>
+      <p className="text-[10px] text-[var(--ds-text-secondary)] text-center leading-tight">{label}</p>
+      <p className="text-[10px] font-semibold text-[var(--ds-text-tertiary)]">{pct}%</p>
+      {!isLast && <ChevronRight className="h-3.5 w-3.5 text-[var(--ds-text-tertiary)] mt-0.5" />}
     </div>
   )
 }
@@ -208,8 +208,8 @@ export default function CrmDashboardPage() {
       {/* ── HEADER ── */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">CRM Dashboard</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Patient Engagement & Retention · Real-time operational view</p>
+          <h1 className="text-2xl font-bold text-[var(--ds-text)] tracking-tight">CRM Dashboard</h1>
+          <p className="text-sm text-[var(--ds-text-secondary)] mt-0.5">Patient Engagement & Retention · Real-time operational view</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <DashboardDateFilter value={period} onChange={setPeriod} />
@@ -232,7 +232,7 @@ export default function CrmDashboardPage() {
       {showFilters && (
         <div className={cn(GLASS, "rounded-2xl p-4 flex flex-wrap gap-3 items-end")}>
           <div className="space-y-1">
-            <label className="text-[10px] font-semibold text-gray-500 uppercase">Doctor</label>
+            <label className="text-[10px] font-semibold text-[var(--ds-text-secondary)] uppercase">Doctor</label>
             <Select value={doctorFilter} onValueChange={(v) => setDoctorFilter(v === "__all__" ? "" : v)}>
               <SelectTrigger className="h-8 w-40 text-xs rounded-xl"><SelectValue placeholder="All Doctors" /></SelectTrigger>
               <SelectContent className="max-h-[200px]">
@@ -244,7 +244,7 @@ export default function CrmDashboardPage() {
             </Select>
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] font-semibold text-gray-500 uppercase">Follow-Up Type</label>
+            <label className="text-[10px] font-semibold text-[var(--ds-text-secondary)] uppercase">Follow-Up Type</label>
             <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v === "__all__" ? "" : v)}>
               <SelectTrigger className="h-8 w-36 text-xs rounded-xl"><SelectValue placeholder="All Types" /></SelectTrigger>
               <SelectContent className="max-h-[200px]">
@@ -256,7 +256,7 @@ export default function CrmDashboardPage() {
             </Select>
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] font-semibold text-gray-500 uppercase">Status</label>
+            <label className="text-[10px] font-semibold text-[var(--ds-text-secondary)] uppercase">Status</label>
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
               <SelectTrigger className="h-8 w-36 text-xs rounded-xl"><SelectValue placeholder="All Status" /></SelectTrigger>
               <SelectContent className="max-h-[200px]">
@@ -274,7 +274,7 @@ export default function CrmDashboardPage() {
 
       {/* ── QUICK ACTIONS ── */}
       <div className={cn(GLASS, "rounded-2xl p-3 flex flex-wrap items-center gap-2")}>
-        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mr-1">Quick</span>
+        <span className="text-[10px] font-bold text-[var(--ds-text-tertiary)] uppercase tracking-wider mr-1">Quick</span>
         {[
           { label: "Enquiry Calendar", icon: CalendarDays, path: "/crm/enquiry-calendar" },
           { label: "Add Lead", icon: UserPlus, path: "/leads?action=create" },
@@ -291,8 +291,8 @@ export default function CrmDashboardPage() {
          SECTION 1: TODAY'S CRM OVERVIEW
          ════════════════════════════════════ */}
       <div>
-        <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-          <Activity className="h-4 w-4 text-indigo-500" /> Today's CRM Overview
+        <h2 className="text-sm font-bold text-[var(--ds-text)] mb-3 flex items-center gap-2">
+          <Activity className="h-4 w-4 text-[var(--ds-primary)]" /> Today's CRM Overview
         </h2>
         <div className="grid gap-3 grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-8">
           <KpiCard title="CRM Tasks" value={formatIndianNumber(overview.crm_tasks ?? 0)} icon={Target} color="primary" onClick={navToCalendar} />
@@ -310,8 +310,8 @@ export default function CrmDashboardPage() {
          SECTION 2: OPERATIONAL WIDGETS
          ════════════════════════════════════ */}
       <div>
-        <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-          <Activity className="h-4 w-4 text-indigo-500" /> Operations
+        <h2 className="text-sm font-bold text-[var(--ds-text)] mb-3 flex items-center gap-2">
+          <Activity className="h-4 w-4 text-[var(--ds-primary)]" /> Operations
         </h2>
         <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
           <KpiCard
@@ -356,8 +356,8 @@ export default function CrmDashboardPage() {
          SECTION 3: TODAY'S WORK QUEUE
          ════════════════════════════════════ */}
       <div className={cn(GLASS, "rounded-2xl overflow-hidden")}>
-        <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+        <div className="px-5 py-3 border-b border-[var(--ds-border-light)] flex items-center justify-between">
+          <h2 className="text-sm font-bold text-[var(--ds-text)] flex items-center gap-2">
             <Clock className="h-4 w-4 text-amber-500" /> Today's Work Queue
             <Badge variant="secondary" className="ml-2 text-[10px]">{workQueue.length}</Badge>
           </h2>
@@ -381,18 +381,18 @@ export default function CrmDashboardPage() {
               </TableHeader>
               <TableBody>
                 {workQueue.map((item: Record<string, string>) => (
-                  <TableRow key={item.id} className="group hover:bg-gray-50/50">
+                  <TableRow key={item.id} className="group hover:bg-[var(--ds-surface-secondary)]/50">
                     <TableCell className="font-medium text-xs">{item.patient_name}</TableCell>
-                    <TableCell className="text-xs text-gray-500">{item.op_number || "-"}</TableCell>
-                    <TableCell className="text-xs text-gray-500">{item.doctor_name || "-"}</TableCell>
+                    <TableCell className="text-xs text-[var(--ds-text-secondary)]">{item.op_number || "-"}</TableCell>
+                    <TableCell className="text-xs text-[var(--ds-text-secondary)]">{item.doctor_name || "-"}</TableCell>
                     <TableCell>
-                      <Badge className={cn("text-[10px] font-medium", fuTypeColors[item.follow_up_type] || "bg-gray-50 text-gray-600")}>
+                      <Badge className={cn("text-[10px] font-medium", fuTypeColors[item.follow_up_type] || "bg-[var(--ds-surface-secondary)] text-[var(--ds-text-secondary)]")}>
                         {fuTypeLabels[item.follow_up_type] || item.follow_up_type}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-xs text-gray-500">{item.due_time || "-"}</TableCell>
+                    <TableCell className="text-xs text-[var(--ds-text-secondary)]">{item.due_time || "-"}</TableCell>
                     <TableCell>
-                      <Badge className={cn("text-[10px]", statusColors[item.status] || "bg-gray-100 text-gray-600")}>{item.status}</Badge>
+                      <Badge className={cn("text-[10px]", statusColors[item.status] || "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]")}>{item.status}</Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1 justify-end opacity-60 group-hover:opacity-100 transition-opacity">
@@ -414,11 +414,11 @@ export default function CrmDashboardPage() {
                         </Button>
                         <Button variant="ghost" size="sm" className="h-7 w-7 p-0 rounded-lg"
                           onClick={() => navigate(`/crm/enquiry-calendar?focus=${item.id}`)} title="Create Appointment">
-                          <BookOpen className="h-3.5 w-3.5 text-indigo-600" />
+                          <BookOpen className="h-3.5 w-3.5 text-[var(--ds-primary)]" />
                         </Button>
                         <Button variant="ghost" size="sm" className="h-7 w-7 p-0 rounded-lg"
                           onClick={() => navigate(`/crm/enquiry-calendar?focus=${item.id}`)} title="View Timeline">
-                          <History className="h-3.5 w-3.5 text-purple-600" />
+                          <History className="h-3.5 w-3.5 text-[var(--ds-accent-600)]" />
                         </Button>
                         <Button variant="ghost" size="sm" className="h-7 w-7 p-0 rounded-lg"
                           onClick={() => navigate(`/crm/enquiry-calendar?focus=${item.id}`)} title="Mark Completed">
@@ -432,8 +432,8 @@ export default function CrmDashboardPage() {
             </Table>
           </div>
         ) : (
-          <div className="text-center py-10 text-sm text-gray-400">
-            <CheckCircle className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+          <div className="text-center py-10 text-sm text-[var(--ds-text-tertiary)]">
+            <CheckCircle className="h-8 w-8 mx-auto mb-2 text-[var(--ds-text-tertiary)]" />
             All caught up! No pending tasks for today.
           </div>
         )}
@@ -445,21 +445,21 @@ export default function CrmDashboardPage() {
       <div className="grid gap-4 md:grid-cols-2">
         {/* SECTION 3: Follow-Up Summary */}
         <div className={cn(GLASS, "rounded-2xl p-5")}>
-          <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-            <BarChart3 className="h-4 w-4 text-indigo-500" /> Follow-Up Summary
+          <h2 className="text-sm font-bold text-[var(--ds-text)] mb-3 flex items-center gap-2">
+            <BarChart3 className="h-4 w-4 text-[var(--ds-primary)]" /> Follow-Up Summary
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {[
               { label: "1-Day FU", value: fuSummary["1_day_due"] ?? 0, color: "text-blue-600", bg: "bg-blue-50" },
-              { label: "7-Day FU", value: fuSummary["7_day_due"] ?? 0, color: "text-purple-600", bg: "bg-purple-50" },
+              { label: "7-Day FU", value: fuSummary["7_day_due"] ?? 0, color: "text-[var(--ds-accent-600)]", bg: "bg-[var(--ds-accent-50)]" },
               { label: "6-Month Recall", value: fuSummary["6_month_due"] ?? 0, color: "text-amber-600", bg: "bg-amber-50" },
               { label: "12-Month Recall", value: fuSummary["12_month_due"] ?? 0, color: "text-green-600", bg: "bg-green-50" },
-              { label: "Custom FU", value: fuSummary["custom_due"] ?? 0, color: "text-gray-600", bg: "bg-gray-50" },
+              { label: "Custom FU", value: fuSummary["custom_due"] ?? 0, color: "text-[var(--ds-text-secondary)]", bg: "bg-[var(--ds-surface-secondary)]" },
               { label: "Completed Today", value: fuSummary["completed_today"] ?? 0, color: "text-emerald-600", bg: "bg-emerald-50" },
               { label: "Overdue", value: fuSummary["overdue"] ?? 0, color: "text-red-600", bg: "bg-red-50" },
             ].map((s) => (
               <div key={s.label} className={cn("rounded-xl p-3 text-center", s.bg)}>
-                <p className="text-[10px] text-gray-500">{s.label}</p>
+                <p className="text-[10px] text-[var(--ds-text-secondary)]">{s.label}</p>
                 <p className={cn("text-lg font-bold", s.color)}>{s.value}</p>
               </div>
             ))}
@@ -468,21 +468,21 @@ export default function CrmDashboardPage() {
 
         {/* SECTION 4: Appointment Conversion Funnel */}
         <div className={cn(GLASS, "rounded-2xl p-5")}>
-          <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+          <h2 className="text-sm font-bold text-[var(--ds-text)] mb-3 flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-emerald-500" /> Appointment Conversion
           </h2>
           <div className="flex items-start gap-1">
-            <FunnelStep label="CRM Tasks" value={funnel.total_due ?? 0} total={funnel.total_due || 1} color="bg-indigo-400" />
-            <FunnelStep label="Contacted" value={funnel.contacted ?? 0} total={funnel.total_due || 1} color="bg-blue-400" />
-            <FunnelStep label="Positive" value={funnel.positive ?? 0} total={funnel.total_due || 1} color="bg-emerald-400" />
-            <FunnelStep label="Booked" value={funnel.appointments_booked ?? 0} total={funnel.total_due || 1} color="bg-amber-400" />
-            <FunnelStep label="Completed" value={funnel.appointments_completed ?? 0} total={funnel.total_due || 1} color="bg-green-400" isLast />
+        <FunnelStep label="CRM Tasks" value={funnel.total_due ?? 0} total={funnel.total_due || 1} color="bg-[var(--ds-primary)]" />
+        <FunnelStep label="Contacted" value={funnel.contacted ?? 0} total={funnel.total_due || 1} color="bg-[var(--ds-info)]" />
+        <FunnelStep label="Positive" value={funnel.positive ?? 0} total={funnel.total_due || 1} color="bg-[var(--ds-success)]" />
+        <FunnelStep label="Booked" value={funnel.appointments_booked ?? 0} total={funnel.total_due || 1} color="bg-[var(--ds-warning)]" />
+        <FunnelStep label="Completed" value={funnel.appointments_completed ?? 0} total={funnel.total_due || 1} color="bg-[var(--ds-success)]" isLast />
           </div>
           <div className="grid grid-cols-4 gap-2 mt-3">
-            <div className="text-center"><p className="text-[10px] text-gray-400">Contact Rate</p><p className="text-sm font-bold text-blue-600">{funnel.contact_rate ?? 0}%</p></div>
-            <div className="text-center"><p className="text-[10px] text-gray-400">Positive Rate</p><p className="text-sm font-bold text-emerald-600">{funnel.positive_rate ?? 0}%</p></div>
-            <div className="text-center"><p className="text-[10px] text-gray-400">Booking Rate</p><p className="text-sm font-bold text-amber-600">{funnel.booking_rate ?? 0}%</p></div>
-            <div className="text-center"><p className="text-[10px] text-gray-400">Completion Rate</p><p className="text-sm font-bold text-green-600">{funnel.completion_rate ?? 0}%</p></div>
+            <div className="text-center"><p className="text-[10px] text-[var(--ds-text-tertiary)]">Contact Rate</p><p className="text-sm font-bold text-blue-600">{funnel.contact_rate ?? 0}%</p></div>
+            <div className="text-center"><p className="text-[10px] text-[var(--ds-text-tertiary)]">Positive Rate</p><p className="text-sm font-bold text-emerald-600">{funnel.positive_rate ?? 0}%</p></div>
+            <div className="text-center"><p className="text-[10px] text-[var(--ds-text-tertiary)]">Booking Rate</p><p className="text-sm font-bold text-amber-600">{funnel.booking_rate ?? 0}%</p></div>
+            <div className="text-center"><p className="text-[10px] text-[var(--ds-text-tertiary)]">Completion Rate</p><p className="text-sm font-bold text-green-600">{funnel.completion_rate ?? 0}%</p></div>
           </div>
         </div>
       </div>
@@ -493,39 +493,39 @@ export default function CrmDashboardPage() {
       <div className="grid gap-4 md:grid-cols-2">
         {/* SECTION 5: Recent WhatsApp Activity */}
         <div className={cn(GLASS, "rounded-2xl p-5")}>
-          <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+          <h2 className="text-sm font-bold text-[var(--ds-text)] mb-3 flex items-center gap-2">
             <MessageSquare className="h-4 w-4 text-emerald-500" /> Recent WhatsApp Activity
             <Badge variant="secondary" className="ml-1 text-[10px]">{whatsappHistory?.items?.length ?? 0}</Badge>
           </h2>
           {whatsappHistory?.items?.length > 0 ? (
             <div className="space-y-1.5 max-h-[260px] overflow-y-auto">
               {whatsappHistory.items.slice(0, 10).map((msg: Record<string, string>) => (
-                <div key={msg.id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 transition-colors">
+                <div key={msg.id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-[var(--ds-surface-secondary)] transition-colors">
                   <div className={cn("rounded-lg p-1.5",
                     msg.status === "SENT" ? "bg-green-50 text-green-600" :
                     msg.status === "FAILED" ? "bg-red-50 text-red-600" :
                     msg.status === "DELIVERED" ? "bg-blue-50 text-blue-600" :
-                    "bg-gray-50 text-gray-500"
+                    "bg-[var(--ds-surface-secondary)] text-[var(--ds-text-secondary)]"
                   )}>
                     <MessageSquare className="h-3.5 w-3.5" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-gray-800 truncate">{msg.patient_name || msg.recipient || "-"}</p>
-                    <p className="text-[10px] text-gray-500 truncate">{msg.message_type || "Message"}</p>
+                    <p className="text-xs font-medium text-[var(--ds-text)] truncate">{msg.patient_name || msg.recipient || "-"}</p>
+                    <p className="text-[10px] text-[var(--ds-text-secondary)] truncate">{msg.message_type || "Message"}</p>
                   </div>
                   <div className="text-right shrink-0">
                     <Badge className={cn("text-[9px]",
                       msg.status === "SENT" ? "bg-green-100 text-green-700" :
                       msg.status === "FAILED" ? "bg-red-100 text-red-700" :
                       msg.status === "DELIVERED" ? "bg-blue-100 text-blue-700" :
-                      "bg-gray-100 text-gray-600"
+                      "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]"
                     )}>{msg.status || "—"}</Badge>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-sm text-gray-400 text-center py-12">No recent WhatsApp activity</p>
+            <p className="text-sm text-[var(--ds-text-tertiary)] text-center py-12">No recent WhatsApp activity</p>
           )}
           <Button variant="ghost" size="sm" className="w-full mt-2 h-7 text-xs gap-1" onClick={() => navigate("/whatsapp")}>
             View All <ChevronRight className="h-3 w-3" />
@@ -534,7 +534,7 @@ export default function CrmDashboardPage() {
 
         {/* SECTION 6: Patient Condition Analytics */}
         <div className={cn(GLASS, "rounded-2xl p-5")}>
-          <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+          <h2 className="text-sm font-bold text-[var(--ds-text)] mb-3 flex items-center gap-2">
             <HeartPulse className="h-4 w-4 text-rose-500" /> Patient Condition Analytics
           </h2>
           {conditions.length > 0 ? (
@@ -548,7 +548,7 @@ export default function CrmDashboardPage() {
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <p className="text-sm text-gray-400 text-center py-12">No condition data for this period</p>
+            <p className="text-sm text-[var(--ds-text-tertiary)] text-center py-12">No condition data for this period</p>
           )}
         </div>
       </div>
@@ -559,8 +559,8 @@ export default function CrmDashboardPage() {
       <div className="grid gap-4 md:grid-cols-2">
         {/* SECTION 7: Treatment Type Performance */}
         <div className={cn(GLASS, "rounded-2xl p-5")}>
-          <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-            <Activity className="h-4 w-4 text-indigo-500" /> Treatment Type Performance
+          <h2 className="text-sm font-bold text-[var(--ds-text)] mb-3 flex items-center gap-2">
+            <Activity className="h-4 w-4 text-[var(--ds-primary)]" /> Treatment Type Performance
           </h2>
           {treatmentPerf.length > 0 ? (
             <div className="space-y-3">
@@ -573,52 +573,52 @@ export default function CrmDashboardPage() {
                 return (
                   <div key={i}>
                     <div className="flex justify-between text-xs mb-1">
-                      <span className="font-medium text-gray-700">{t.name}</span>
-                      <span className="text-gray-400">{t.follow_ups} FU · {t.appointments} Appts</span>
+                      <span className="font-medium text-[var(--ds-text-secondary)]">{t.name}</span>
+                      <span className="text-[var(--ds-text-tertiary)]">{t.follow_ups} FU · {t.appointments} Appts</span>
                     </div>
-                    <div className="flex gap-0.5 h-2 rounded-full overflow-hidden bg-gray-100">
-                      <div style={{ width: `${fw}%` }} className="bg-indigo-400 transition-all" />
-                      <div style={{ width: `${aw}%` }} className="bg-emerald-400 transition-all" />
+                    <div className="flex gap-0.5 h-2 rounded-full overflow-hidden bg-[var(--ds-background-subtle)]">
+                      <div style={{ width: `${fw}%` }} className="bg-[var(--ds-primary)] transition-all" />
+                      <div style={{ width: `${aw}%` }} className="bg-[var(--ds-success)] transition-all" />
                     </div>
                   </div>
                 )
               })}
             </div>
           ) : (
-            <p className="text-sm text-gray-400 text-center py-12">No treatment data</p>
+            <p className="text-sm text-[var(--ds-text-tertiary)] text-center py-12">No treatment data</p>
           )}
         </div>
 
         {/* SECTION 8: Doctor Engagement Leaderboard */}
         <div className={cn(GLASS, "rounded-2xl p-5")}>
-          <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+          <h2 className="text-sm font-bold text-[var(--ds-text)] mb-3 flex items-center gap-2">
             <Award className="h-4 w-4 text-amber-500" /> Doctor Engagement Leaderboard
           </h2>
           {doctorEngagement.length > 0 ? (
             <div className="space-y-2 max-h-[300px] overflow-y-auto">
               {doctorEngagement.map((d: Record<string, string | number>, i: number) => (
-                <div key={d.doctor_id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 transition-colors">
+                <div key={d.doctor_id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-[var(--ds-surface-secondary)] transition-colors">
                   <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white",
-                    i === 0 ? "bg-amber-400" : i === 1 ? "bg-gray-400" : i === 2 ? "bg-amber-700" : "bg-gray-200 text-gray-500")}>
+                    i === 0 ? "bg-[var(--ds-warning)]" : i === 1 ? "bg-[var(--ds-text-tertiary)]" : i === 2 ? "bg-[var(--ds-danger)]" : "bg-[var(--ds-border)] text-[var(--ds-text-secondary)]")}>
                     {i + 1}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-gray-800 truncate">{d.doctor_name}</p>
-                    <div className="flex gap-3 text-[10px] text-gray-400">
+                    <p className="text-xs font-semibold text-[var(--ds-text)] truncate">{d.doctor_name}</p>
+                    <div className="flex gap-3 text-[10px] text-[var(--ds-text-tertiary)]">
                       <span>{d.patients_contacted} contacted</span>
                       <span>{d.appointments_generated} appts</span>
                       <span>{d.follow_ups_completed} done</span>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs font-bold text-indigo-600">{d.positive_feedback}</p>
-                    <p className="text-[9px] text-gray-400">positive</p>
+                    <p className="text-xs font-bold text-[var(--ds-primary)]">{d.positive_feedback}</p>
+                    <p className="text-[9px] text-[var(--ds-text-tertiary)]">positive</p>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-sm text-gray-400 text-center py-12">No doctor engagement data</p>
+            <p className="text-sm text-[var(--ds-text-tertiary)] text-center py-12">No doctor engagement data</p>
           )}
         </div>
       </div>
@@ -632,12 +632,12 @@ export default function CrmDashboardPage() {
          SECTION 11: PATIENT ACQUISITION & REVENUE
          ════════════════════════════════════ */}
       <div className={cn(GLASS, "rounded-2xl p-5")}>
-        <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-          <Users className="h-4 w-4 text-indigo-500" /> Patient Acquisition & Revenue by Source
+        <h2 className="text-sm font-bold text-[var(--ds-text)] mb-3 flex items-center gap-2">
+          <Users className="h-4 w-4 text-[var(--ds-primary)]" /> Patient Acquisition & Revenue by Source
         </h2>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <p className="text-[10px] font-semibold text-gray-500 uppercase mb-2">Acquisition Source</p>
+            <p className="text-[10px] font-semibold text-[var(--ds-text-secondary)] uppercase mb-2">Acquisition Source</p>
             {acquisition.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
                 <RePieChart>
@@ -647,10 +647,10 @@ export default function CrmDashboardPage() {
                   <Tooltip />
                 </RePieChart>
               </ResponsiveContainer>
-            ) : <p className="text-sm text-gray-400 text-center py-10">No acquisition data</p>}
+            ) : <p className="text-sm text-[var(--ds-text-tertiary)] text-center py-10">No acquisition data</p>}
           </div>
           <div>
-            <p className="text-[10px] font-semibold text-gray-500 uppercase mb-2">Revenue by Source</p>
+            <p className="text-[10px] font-semibold text-[var(--ds-text-secondary)] uppercase mb-2">Revenue by Source</p>
             {revenueBySource.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={revenueBySource}>
@@ -661,7 +661,7 @@ export default function CrmDashboardPage() {
                   <Bar dataKey="revenue" fill="var(--ds-chart-5)" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
-            ) : <p className="text-sm text-gray-400 text-center py-10">No revenue data</p>}
+            ) : <p className="text-sm text-[var(--ds-text-tertiary)] text-center py-10">No revenue data</p>}
           </div>
         </div>
         {acquisition.length > 0 && (
@@ -697,35 +697,35 @@ export default function CrmDashboardPage() {
          ════════════════════════════════════ */}
       {leadAnalytics && (
         <div className={cn(GLASS, "rounded-2xl p-5")}>
-          <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-            <Users className="h-4 w-4 text-indigo-500" /> Lead Analytics
+          <h2 className="text-sm font-bold text-[var(--ds-text)] mb-3 flex items-center gap-2">
+            <Users className="h-4 w-4 text-[var(--ds-primary)]" /> Lead Analytics
             <Badge variant="secondary" className="ml-1 text-[10px]">{leadAnalytics.total ?? 0} total</Badge>
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4">
-            <div className="rounded-xl bg-indigo-50 p-3 text-center">
-              <p className="text-[10px] text-gray-500">Total Leads</p>
-              <p className="text-xl font-bold text-indigo-600">{leadAnalytics.total ?? 0}</p>
+            <div className="rounded-xl bg-[var(--ds-primary-subtle)] p-3 text-center">
+              <p className="text-[10px] text-[var(--ds-text-secondary)]">Total Leads</p>
+              <p className="text-xl font-bold text-[var(--ds-primary)]">{leadAnalytics.total ?? 0}</p>
             </div>
             <div className="rounded-xl bg-emerald-50 p-3 text-center">
-              <p className="text-[10px] text-gray-500">Converted</p>
+              <p className="text-[10px] text-[var(--ds-text-secondary)]">Converted</p>
               <p className="text-xl font-bold text-emerald-600">{leadAnalytics.converted ?? 0}</p>
             </div>
             <div className="rounded-xl bg-red-50 p-3 text-center">
-              <p className="text-[10px] text-gray-500">Lost</p>
+              <p className="text-[10px] text-[var(--ds-text-secondary)]">Lost</p>
               <p className="text-xl font-bold text-red-600">{leadAnalytics.lost ?? 0}</p>
             </div>
             <div className="rounded-xl bg-amber-50 p-3 text-center">
-              <p className="text-[10px] text-gray-500">Conversion Rate</p>
+              <p className="text-[10px] text-[var(--ds-text-secondary)]">Conversion Rate</p>
               <p className="text-xl font-bold text-amber-600">{leadAnalytics.conversion_rate ?? 0}%</p>
             </div>
-            <div className="rounded-xl bg-purple-50 p-3 text-center">
-              <p className="text-[10px] text-gray-500">Avg Score</p>
-              <p className="text-xl font-bold text-purple-600">{leadAnalytics.avg_score ?? 0}</p>
+            <div className="rounded-xl bg-[var(--ds-accent-50)] p-3 text-center">
+              <p className="text-[10px] text-[var(--ds-text-secondary)]">Avg Score</p>
+              <p className="text-xl font-bold text-[var(--ds-accent-600)]">{leadAnalytics.avg_score ?? 0}</p>
             </div>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <p className="text-[10px] font-semibold text-gray-500 uppercase mb-2">Leads by Source</p>
+              <p className="text-[10px] font-semibold text-[var(--ds-text-secondary)] uppercase mb-2">Leads by Source</p>
               {leadAnalytics.by_source && Object.keys(leadAnalytics.by_source).length > 0 ? (
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={Object.entries(leadAnalytics.by_source).map(([name, count]) => ({ name: name.replace(/_/g, " "), count }))}>
@@ -736,10 +736,10 @@ export default function CrmDashboardPage() {
                     <Bar dataKey="count" fill="var(--ds-chart-5)" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
-              ) : <p className="text-sm text-gray-400 text-center py-10">No source data</p>}
+              ) : <p className="text-sm text-[var(--ds-text-tertiary)] text-center py-10">No source data</p>}
             </div>
             <div>
-              <p className="text-[10px] font-semibold text-gray-500 uppercase mb-2">Leads by Status</p>
+              <p className="text-[10px] font-semibold text-[var(--ds-text-secondary)] uppercase mb-2">Leads by Status</p>
               {leadAnalytics.by_status && Object.keys(leadAnalytics.by_status).length > 0 ? (
                 <ResponsiveContainer width="100%" height={220}>
                   <RePieChart>
@@ -751,7 +751,7 @@ export default function CrmDashboardPage() {
                     <Tooltip />
                   </RePieChart>
                 </ResponsiveContainer>
-              ) : <p className="text-sm text-gray-400 text-center py-10">No status data</p>}
+              ) : <p className="text-sm text-[var(--ds-text-tertiary)] text-center py-10">No status data</p>}
             </div>
           </div>
           {leadAnalytics.high_priority > 0 && (
@@ -768,7 +768,7 @@ export default function CrmDashboardPage() {
          SECTION 13: CRM TIMELINE
          ════════════════════════════════════ */}
       <div className={cn(GLASS, "rounded-2xl p-5")}>
-        <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+        <h2 className="text-sm font-bold text-[var(--ds-text)] mb-3 flex items-center gap-2">
           <Activity className="h-4 w-4 text-blue-500" /> CRM Activity Timeline
           <Badge variant="secondary" className="ml-1 text-[10px]">{timeline.length}</Badge>
         </h2>
@@ -779,26 +779,26 @@ export default function CrmDashboardPage() {
                 CALL: { icon: Phone, color: "text-green-500 bg-green-50" },
                 WHATSAPP: { icon: MessageCircle, color: "text-emerald-500 bg-emerald-50" },
                 SMS: { icon: MessageCircle, color: "text-blue-500 bg-blue-50" },
-                EMAIL: { icon: Send, color: "text-purple-500 bg-purple-50" },
+                EMAIL: { icon: Send, color: "text-[var(--ds-accent-500)] bg-[var(--ds-accent-50)]" },
                 IN_PERSON: { icon: User, color: "text-amber-500 bg-amber-50" },
-                STATUS_UPDATE: { icon: Activity, color: "text-gray-500 bg-gray-50" },
-                APPOINTMENT_BOOKED: { icon: CalendarDays, color: "text-indigo-500 bg-indigo-50" },
+                STATUS_UPDATE: { icon: Activity, color: "text-[var(--ds-text-secondary)] bg-[var(--ds-surface-secondary)]" },
+                APPOINTMENT_BOOKED: { icon: CalendarDays, color: "text-[var(--ds-primary)] bg-[var(--ds-primary-subtle)]" },
                 COMPLETED: { icon: CheckCircle, color: "text-green-500 bg-green-50" },
               }
               const meta = iconMap[entry.activity] || iconMap.STATUS_UPDATE
               const Icon = meta.icon
               return (
-                <div key={entry.id} className="flex items-start gap-3 p-2 rounded-xl hover:bg-gray-50 transition-colors">
+                <div key={entry.id} className="flex items-start gap-3 p-2 rounded-xl hover:bg-[var(--ds-surface-secondary)] transition-colors">
                   <div className={cn("rounded-lg p-1.5 mt-0.5", meta.color)}>
                     <Icon className="h-3.5 w-3.5" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-gray-800">{entry.patient_name}</p>
-                    <p className="text-[10px] text-gray-500">{entry.description}</p>
+                    <p className="text-xs font-medium text-[var(--ds-text)]">{entry.patient_name}</p>
+                    <p className="text-[10px] text-[var(--ds-text-secondary)]">{entry.description}</p>
                   </div>
                   <div className="text-right shrink-0">
-                    <Badge className={cn("text-[9px]", statusColors[entry.status] || "bg-gray-100")}>{entry.status}</Badge>
-                    <p className="text-[9px] text-gray-400 mt-0.5">
+                    <Badge className={cn("text-[9px]", statusColors[entry.status] || "bg-[var(--ds-background-subtle)]")}>{entry.status}</Badge>
+                    <p className="text-[9px] text-[var(--ds-text-tertiary)] mt-0.5">
                       {entry.timestamp ? new Date(entry.timestamp).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}
                     </p>
                   </div>
@@ -807,7 +807,7 @@ export default function CrmDashboardPage() {
             })}
           </div>
         ) : (
-          <p className="text-sm text-gray-400 text-center py-10">No activity for this period</p>
+          <p className="text-sm text-[var(--ds-text-tertiary)] text-center py-10">No activity for this period</p>
         )}
       </div>
 
@@ -815,7 +815,7 @@ export default function CrmDashboardPage() {
          SECTION 14: UPCOMING WORK
          ════════════════════════════════════ */}
       <div className={cn(GLASS, "rounded-2xl p-5")}>
-        <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+        <h2 className="text-sm font-bold text-[var(--ds-text)] mb-3 flex items-center gap-2">
           <Clock className="h-4 w-4 text-amber-500" /> Upcoming Work
         </h2>
         <Tabs value={upcomingTab} onValueChange={setUpcomingTab}>
@@ -829,24 +829,24 @@ export default function CrmDashboardPage() {
             return (
               <TabsContent key={tab} value={tab}>
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                  <div className="rounded-xl bg-indigo-50 p-3 text-center">
-                    <p className="text-[10px] text-gray-500">Total</p>
-                    <p className="text-xl font-bold text-indigo-600">{uw.total ?? 0}</p>
+                  <div className="rounded-xl bg-[var(--ds-primary-subtle)] p-3 text-center">
+                    <p className="text-[10px] text-[var(--ds-text-secondary)]">Total</p>
+                    <p className="text-xl font-bold text-[var(--ds-primary)]">{uw.total ?? 0}</p>
                   </div>
                   <div className="rounded-xl bg-blue-50 p-3 text-center">
-                    <p className="text-[10px] text-gray-500">1-Day FU</p>
+                    <p className="text-[10px] text-[var(--ds-text-secondary)]">1-Day FU</p>
                     <p className="text-xl font-bold text-blue-600">{uw["1_day"] ?? 0}</p>
                   </div>
-                  <div className="rounded-xl bg-purple-50 p-3 text-center">
-                    <p className="text-[10px] text-gray-500">7-Day FU</p>
-                    <p className="text-xl font-bold text-purple-600">{uw["7_day"] ?? 0}</p>
+                  <div className="rounded-xl bg-[var(--ds-accent-50)] p-3 text-center">
+                    <p className="text-[10px] text-[var(--ds-text-secondary)]">7-Day FU</p>
+                    <p className="text-xl font-bold text-[var(--ds-accent-600)]">{uw["7_day"] ?? 0}</p>
                   </div>
                   <div className="rounded-xl bg-amber-50 p-3 text-center">
-                    <p className="text-[10px] text-gray-500">6-Month Recall</p>
+                    <p className="text-[10px] text-[var(--ds-text-secondary)]">6-Month Recall</p>
                     <p className="text-xl font-bold text-amber-600">{uw["6_month"] ?? 0}</p>
                   </div>
                   <div className="rounded-xl bg-green-50 p-3 text-center">
-                    <p className="text-[10px] text-gray-500">12-Month Recall</p>
+                    <p className="text-[10px] text-[var(--ds-text-secondary)]">12-Month Recall</p>
                     <p className="text-xl font-bold text-green-600">{uw["12_month"] ?? 0}</p>
                   </div>
                 </div>

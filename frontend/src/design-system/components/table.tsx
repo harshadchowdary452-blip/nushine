@@ -3,7 +3,16 @@ import { cn } from "@/lib/utils"
 
 const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
   ({ className, ...props }, ref) => (
-    <div className="relative w-full overflow-auto rounded-[var(--ds-table-radius)] border border-[var(--ds-border)] shadow-[var(--ds-shadow-xs)]">
+    // The wrapper owns horizontal overflow so a wide table scrolls inside its
+    // own frame instead of dragging the whole page sideways. It is focusable
+    // and labelled as a region so keyboard users can scroll it (WCAG 2.1.1) —
+    // a plain overflow div is unreachable without a pointer.
+    <div
+      tabIndex={0}
+      role="region"
+      aria-label="Table"
+      className="ds-table-scroll ds-focus-ring relative w-full rounded-[var(--ds-table-radius)] border border-[var(--ds-border)] shadow-[var(--ds-shadow-xs)]"
+    >
       <table ref={ref} className={cn("w-full caption-bottom", className)} {...props} />
     </div>
   )
@@ -29,7 +38,7 @@ const TableBody = React.forwardRef<HTMLTableSectionElement, React.HTMLAttributes
     <tbody
       ref={ref}
       className={cn(
-        "[&_tr:last-child]:border-0",
+        "[&_tr:last-child]:border-0 [&_tr:nth-child(even)]:bg-[var(--ds-table-row-zebra-bg)]",
         className
       )}
       {...props}
@@ -57,7 +66,7 @@ const TableHead = React.forwardRef<HTMLTableCellElement, React.ThHTMLAttributes<
     <th
       ref={ref}
       className={cn(
-        "h-11 px-4 text-left align-middle font-[var(--ds-text-table-header)] text-[var(--ds-text-secondary)] uppercase tracking-wider",
+        "ds-table-header h-11 px-[var(--ds-spacing-4)] text-left align-middle text-[var(--ds-text-secondary)]",
         className
       )}
       {...props}
@@ -71,7 +80,7 @@ const TableCell = React.forwardRef<HTMLTableCellElement, React.TdHTMLAttributes<
     <td
       ref={ref}
       className={cn(
-        "p-4 align-middle font-[var(--ds-text-table)] text-[var(--ds-text)]",
+        "ds-table-cell px-[var(--ds-spacing-4)] py-[var(--ds-spacing-3)] align-middle text-[var(--ds-text)]",
         className
       )}
       {...props}
@@ -85,7 +94,7 @@ const TableCaption = React.forwardRef<HTMLTableCaptionElement, React.HTMLAttribu
     <caption
       ref={ref}
       className={cn(
-        "mt-3 text-[var(--ds-text-caption)] text-[var(--ds-text-tertiary)]",
+        "ds-caption mt-[var(--ds-spacing-3)]",
         className
       )}
       {...props}

@@ -18,9 +18,9 @@ import { extractDetail } from "@/types"
 const SLOT_COLORS: Record<string, string> = {
   available: "bg-green-100 text-green-800 border-green-300 hover:bg-green-200 cursor-pointer",
   booked: "bg-red-100 text-red-800 border-red-300 cursor-not-allowed opacity-60",
-  leave: "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed opacity-50",
+  leave: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-tertiary)] border-[var(--ds-border)] cursor-not-allowed opacity-50",
   blocked: "bg-orange-100 text-orange-700 border-orange-300 cursor-not-allowed opacity-60",
-  past: "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed opacity-40",
+  past: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-tertiary)] border-[var(--ds-border-light)] cursor-not-allowed opacity-40",
   selected: "bg-blue-500 text-white border-blue-600 cursor-pointer",
   "consecutive-selected": "bg-blue-400 text-white border-blue-500 cursor-pointer",
 }
@@ -174,7 +174,7 @@ export default function AppointmentScheduler({
   const today = format(new Date(), "yyyy-MM-dd")
 
   return (
-    <div className={cn("rounded-xl border border-[var(--ds-border)] bg-white p-4 space-y-4", className)}>
+    <div className={cn("rounded-xl border border-[var(--ds-border)] bg-[var(--ds-surface)] p-4 space-y-4", className)}>
       <div className="flex items-center gap-2">
         <Calendar className="h-4 w-4 text-[var(--ds-text-muted)]" />
         <h4 className="text-sm font-semibold text-[var(--ds-text)]">Schedule Appointment</h4>
@@ -318,7 +318,7 @@ export default function AppointmentScheduler({
                 Booked
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-3 h-3 rounded border border-gray-200 bg-gray-100" />
+                <span className="w-3 h-3 rounded border border-[var(--ds-border)] bg-[var(--ds-background-subtle)]" />
                 Unavailable
               </span>
               <span className="flex items-center gap-1">

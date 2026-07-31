@@ -56,20 +56,20 @@ import type {
 } from "@/types"
 
 const STATUS_COLORS: Record<string, string> = {
-  GENERATED: "bg-gray-100 text-gray-600",
+  GENERATED: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
   ASSIGNED: "bg-blue-100 text-blue-700",
-  SCHEDULED: "bg-indigo-100 text-indigo-700",
+  SCHEDULED: "bg-[var(--ds-primary-100)] text-[var(--ds-primary-700)]",
   IN_PROGRESS: "bg-green-100 text-green-700",
   WAITING_PATIENT: "bg-yellow-100 text-yellow-700",
   WAITING_LAB: "bg-orange-100 text-orange-700",
-  ON_HOLD: "bg-gray-100 text-gray-700",
+  ON_HOLD: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
   COMPLETED: "bg-emerald-100 text-emerald-700",
   CANCELLED: "bg-red-100 text-red-700",
   OVERDUE: "bg-red-200 text-red-800",
 }
 
 const SITTING_STATUS_COLORS: Record<string, string> = {
-  PLANNED: "bg-gray-100 text-gray-600",
+  PLANNED: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
   IN_PROGRESS: "bg-blue-100 text-blue-700",
   COMPLETED: "bg-green-100 text-green-700",
   CANCELLED: "bg-red-100 text-red-600",
@@ -255,7 +255,7 @@ export default function TreatmentDetail() {
         description={`Visit ${p.completed_sittings || 0} of ${p.total_sittings || 0}`}
         actions={
           <div className="flex items-center gap-2">
-            <Badge className={cn("text-xs", STATUS_COLORS[p.status] || "bg-gray-100")}>
+            <Badge className={cn("text-xs", STATUS_COLORS[p.status] || "bg-[var(--ds-background-subtle)]")}>
               {p.status?.replace(/_/g, " ")}
             </Badge>
             <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
@@ -267,7 +267,7 @@ export default function TreatmentDetail() {
 
       {/* Progress Bar */}
       <div className="flex items-center gap-4 px-1">
-        <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+        <div className="flex-1 h-2 bg-[var(--ds-background-subtle)] rounded-full overflow-hidden">
           <div
             className="h-full bg-green-500 rounded-full transition-all"
             style={{ width: `${progress}%` }}
@@ -462,7 +462,7 @@ export default function TreatmentDetail() {
                   {sittings.map((s) => (
                     <div
                       key={s.id}
-                      className="flex items-center gap-3 rounded-lg border p-3 hover:bg-gray-50 cursor-pointer"
+                      className="flex items-center gap-3 rounded-lg border p-3 hover:bg-[var(--ds-surface-hover)] cursor-pointer"
                       onClick={() => setViewSitting(s)}
                     >
                       <div
@@ -470,7 +470,7 @@ export default function TreatmentDetail() {
                           "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0",
                           s.status === "COMPLETED"
                             ? "bg-green-100 text-green-700"
-                            : "bg-gray-100 text-gray-600",
+                            : "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
                         )}
                       >
                         {s.sitting_number}
@@ -483,7 +483,7 @@ export default function TreatmentDetail() {
                           <Badge
                             className={cn(
                               "text-[10px] px-1.5 py-0",
-                              SITTING_STATUS_COLORS[s.status] || "bg-gray-100",
+                              SITTING_STATUS_COLORS[s.status] || "bg-[var(--ds-background-subtle)]",
                             )}
                           >
                             {s.status}

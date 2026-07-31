@@ -15,7 +15,7 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-[var(--ds-z-dialog)] bg-black/50 data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out backdrop-blur-sm",
+      "ds-motion-overlay fixed inset-0 z-[var(--ds-z-dialog)] bg-[var(--ds-background-overlay)] backdrop-blur-sm",
       className
     )}
     {...props}
@@ -25,8 +25,8 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { showCloseButton?: boolean }
+>(({ className, children, showCloseButton = true, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
@@ -34,18 +34,26 @@ const DialogContent = React.forwardRef<
       aria-describedby={undefined}
       onCloseAutoFocus={(e) => e.preventDefault()}
       className={cn(
-        "fixed left-[50%] top-[50%] z-[var(--ds-z-dialog)] w-full translate-x-[-50%] translate-y-[-50%] border border-[var(--ds-border)] bg-[var(--ds-surface)] shadow-[var(--ds-shadow-dialog)]",
-        "rounded-[var(--ds-radius-2xl)] max-h-[90vh] flex flex-col",
-        "data-[state=open]:animate-scale-in data-[state=closed]:animate-fade-out",
+        "ds-motion-dialog fixed left-[50%] top-[50%] z-[var(--ds-z-dialog)] translate-x-[-50%] translate-y-[-50%]",
+        "flex flex-col border border-[var(--ds-border)] bg-[var(--ds-surface)] shadow-[var(--ds-shadow-dialog)]",
+        // Width is capped by the viewport minus a gutter so the dialog never
+        // touches the screen edge or forces horizontal scroll on small phones.
+        "w-[calc(100vw-var(--ds-spacing-8))] sm:w-full",
+        // `dvh` accounts for mobile browser chrome; `vh` alone leaves the
+        // footer under the address bar on iOS.
+        "max-h-[calc(100dvh-var(--ds-spacing-8))] sm:max-h-[90dvh]",
+        "rounded-[var(--ds-radius-2xl)]",
         className
       )}
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-5 top-5 rounded-[var(--ds-radius-lg)] p-1.5 text-[var(--ds-text-tertiary)] hover:text-[var(--ds-text)] hover:bg-[var(--ds-surface-hover)] transition-all opacity-70 focus:outline-none focus:ring-2 focus:ring-[var(--ds-primary)]/20">
-        <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
-      </DialogPrimitive.Close>
+      {showCloseButton && (
+        <DialogPrimitive.Close className="absolute right-5 top-5 rounded-[var(--ds-radius-lg)] p-1.5 text-[var(--ds-text-tertiary)] hover:text-[var(--ds-text)] hover:bg-[var(--ds-surface-hover)] transition-all opacity-70 focus:outline-none focus:ring-2 focus:ring-[var(--ds-primary)]/20">
+          <X className="h-4 w-4" />
+          <span className="sr-only">Close</span>
+        </DialogPrimitive.Close>
+      )}
     </DialogPrimitive.Content>
   </DialogPortal>
 ))
@@ -91,7 +99,7 @@ const DialogTitle = React.forwardRef<
   <DialogPrimitive.Title
     ref={ref}
     className={cn(
-      "font-[var(--ds-text-h3)] text-[var(--ds-text)]",
+      "ds-dialog-title text-[var(--ds-text)]",
       className
     )}
     {...props}
@@ -106,7 +114,7 @@ const DialogDescription = React.forwardRef<
   <DialogPrimitive.Description
     ref={ref}
     className={cn(
-      "text-[var(--ds-text-body-sm)] text-[var(--ds-text-secondary)]",
+      "ds-secondary-text",
       className
     )}
     {...props}

@@ -16,11 +16,11 @@ import { cn } from "@/lib/utils"
 
 const STATUS_COLORS: Record<string, string> = {
   ASSIGNED: "bg-blue-100 text-blue-700",
-  SCHEDULED: "bg-indigo-100 text-indigo-700",
+  SCHEDULED: "bg-[var(--ds-primary-100)] text-[var(--ds-primary-700)]",
   IN_PROGRESS: "bg-green-100 text-green-700",
   WAITING_PATIENT: "bg-yellow-100 text-yellow-700",
   WAITING_LAB: "bg-orange-100 text-orange-700",
-  ON_HOLD: "bg-gray-100 text-gray-700",
+  ON_HOLD: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
   OVERDUE: "bg-red-200 text-red-800",
   COMPLETED: "bg-emerald-100 text-emerald-700",
 }
@@ -145,7 +145,7 @@ export default function DoctorQueue() {
                   <div
                     key={plan.id}
                     className={cn(
-                      "flex items-center gap-4 rounded-lg border bg-white p-4 hover:shadow-sm transition-shadow",
+                      "flex items-center gap-4 rounded-lg border bg-[var(--ds-surface)] p-4 hover:shadow-sm transition-shadow",
                       key === "overdue" && "border-red-200 bg-red-50",
                       plan.status === "IN_PROGRESS" && "border-green-200 bg-green-50",
                     )}

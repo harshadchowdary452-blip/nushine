@@ -50,8 +50,15 @@ export default function EnterpriseHeader() {
   return (
     <header
       role="banner"
-      className="sticky top-0 z-[var(--ds-z-header)] flex shrink-0 flex-col bg-[var(--ds-header-bg)] transition-all"
+      className="sticky top-0 z-[var(--ds-z-header)] flex shrink-0 flex-col bg-[var(--ds-header-bg)] shadow-[var(--ds-header-shadow)] transition-all"
     >
+      {/* Brand accent edge — a thin Marine Teal → Gold strip that separates
+          the header from content and anchors the NuShine identity. */}
+      <div
+        aria-hidden="true"
+        className="h-[2px] w-full shrink-0"
+        style={{ background: "var(--ds-header-accent)" }}
+      />
       <div className="flex h-[var(--ds-header-h)] items-center gap-3 border-b border-[var(--ds-header-border)] px-3 lg:px-5">
         {/* Left zone: toggle + title/breadcrumb */}
         <div className="flex min-w-0 flex-1 items-center gap-2.5 lg:flex-none">

@@ -46,12 +46,12 @@ export default function WhatsAppPreviewModal({ open, onClose, preview, loading, 
         </DialogHeader>
         <DialogBody className="space-y-4">
           {loading ? (
-            <div className="flex items-center justify-center py-12 text-sm text-gray-400">Loading preview...</div>
+            <div className="flex items-center justify-center py-12 text-sm text-[var(--ds-text-tertiary)]">Loading preview...</div>
           ) : (
             <>
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-lg border border-gray-100 bg-gray-50/50 p-3">
-                  <div className="flex items-center gap-2 text-xs font-medium text-gray-500 mb-2">
+                <div className="rounded-lg border border-[var(--ds-border-light)] bg-[var(--ds-background-subtle)]/50 p-3">
+                  <div className="flex items-center gap-2 text-xs font-medium text-[var(--ds-text-secondary)] mb-2">
                     <User className="h-3.5 w-3.5" /> Patient
                   </div>
                   <div className="flex items-center gap-2">
@@ -59,30 +59,30 @@ export default function WhatsAppPreviewModal({ open, onClose, preview, loading, 
                       {preview.patient_name.charAt(0).toUpperCase()}
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{preview.patient_name}</p>
-                      <p className="text-xs text-gray-500 flex items-center gap-1">
+                      <p className="text-sm font-medium text-[var(--ds-text)]">{preview.patient_name}</p>
+                      <p className="text-xs text-[var(--ds-text-secondary)] flex items-center gap-1">
                         <Phone className="h-3 w-3" /> {preview.patient_phone || "No phone"}
                       </p>
                     </div>
                   </div>
                 </div>
-                <div className="rounded-lg border border-gray-100 bg-gray-50/50 p-3">
-                  <div className="flex items-center gap-2 text-xs font-medium text-gray-500 mb-2">
+                <div className="rounded-lg border border-[var(--ds-border-light)] bg-[var(--ds-background-subtle)]/50 p-3">
+                  <div className="flex items-center gap-2 text-xs font-medium text-[var(--ds-text-secondary)] mb-2">
                     <Stethoscope className="h-3.5 w-3.5" /> Doctor
                   </div>
-                  <p className="text-sm font-medium text-gray-900">{preview.doctor_name || "Not assigned"}</p>
+                  <p className="text-sm font-medium text-[var(--ds-text)]">{preview.doctor_name || "Not assigned"}</p>
                 </div>
-                <div className="rounded-lg border border-gray-100 bg-gray-50/50 p-3">
-                  <div className="flex items-center gap-2 text-xs font-medium text-gray-500 mb-2">
+                <div className="rounded-lg border border-[var(--ds-border-light)] bg-[var(--ds-background-subtle)]/50 p-3">
+                  <div className="flex items-center gap-2 text-xs font-medium text-[var(--ds-text-secondary)] mb-2">
                     <Building2 className="h-3.5 w-3.5" /> Hospital
                   </div>
-                  <p className="text-sm font-medium text-gray-900">{preview.hospital_name || "Not set"}</p>
+                  <p className="text-sm font-medium text-[var(--ds-text)]">{preview.hospital_name || "Not set"}</p>
                 </div>
-                <div className="rounded-lg border border-gray-100 bg-gray-50/50 p-3">
-                  <div className="flex items-center gap-2 text-xs font-medium text-gray-500 mb-2">
+                <div className="rounded-lg border border-[var(--ds-border-light)] bg-[var(--ds-background-subtle)]/50 p-3">
+                  <div className="flex items-center gap-2 text-xs font-medium text-[var(--ds-text-secondary)] mb-2">
                     <CalendarDays className="h-3.5 w-3.5" /> Appointment
                   </div>
-                  <p className="text-sm font-medium text-gray-900">
+                  <p className="text-sm font-medium text-[var(--ds-text)]">
                     {preview.variables_panel?.appointment?.date
                       ? `${preview.variables_panel.appointment.date} ${preview.variables_panel.appointment.time || ""}`
                       : "No upcoming"}
@@ -93,7 +93,7 @@ export default function WhatsAppPreviewModal({ open, onClose, preview, loading, 
               <Separator />
 
               <div>
-                <div className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                <div className="flex items-center gap-2 text-sm font-medium text-[var(--ds-text-secondary)] mb-2">
                   Validation
                   {isValid ? (
                     <Badge variant="success" className="text-xs">Ready to Send</Badge>
@@ -105,7 +105,7 @@ export default function WhatsAppPreviewModal({ open, onClose, preview, loading, 
                   {Object.entries(preview.validation).map(([key, val]) => (
                     <div key={key} className="flex items-center gap-1.5 text-xs">
                       {statusIcon(val)}
-                      <span className={val ? "text-gray-700" : "text-red-500"}>
+                      <span className={val ? "text-[var(--ds-text-secondary)]" : "text-red-500"}>
                         {key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
                       </span>
                     </div>
@@ -122,32 +122,32 @@ export default function WhatsAppPreviewModal({ open, onClose, preview, loading, 
               <Separator />
 
               <div>
-                <div className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                <div className="flex items-center gap-2 text-sm font-medium text-[var(--ds-text-secondary)] mb-2">
                   <Heart className="h-4 w-4 text-green-500" />
                   Rendered Message
                 </div>
-                <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                <div className="rounded-xl border border-[var(--ds-border)] bg-[var(--ds-surface)] p-4 shadow-sm">
                   <div className="relative">
                     <div className="absolute -left-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-green-500 text-white text-xs font-bold shadow-sm">N</div>
                     <div className="ml-3 space-y-2">
-                      <p className="text-sm text-gray-400">NuShine Dental</p>
-                      <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{preview.rendered_message}</p>
-                      <p className="text-xs text-gray-400 pt-1">{preview.hospital_name || "NuShine Dental"}</p>
+                      <p className="text-sm text-[var(--ds-text-tertiary)]">NuShine Dental</p>
+                      <p className="text-sm text-[var(--ds-text)] whitespace-pre-wrap leading-relaxed">{preview.rendered_message}</p>
+                      <p className="text-xs text-[var(--ds-text-tertiary)] pt-1">{preview.hospital_name || "NuShine Dental"}</p>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="rounded-lg bg-gray-50 border border-gray-100 p-3">
-                <div className="flex items-center gap-2 text-xs font-medium text-gray-500 mb-2">
+              <div className="rounded-lg bg-[var(--ds-background-subtle)] border border-[var(--ds-border-light)] p-3">
+                <div className="flex items-center gap-2 text-xs font-medium text-[var(--ds-text-secondary)] mb-2">
                   <Pill className="h-3.5 w-3.5" /> Resolved Variables
                 </div>
                 <div className="grid grid-cols-2 gap-1">
                   {Object.entries(preview.resolved_variables).map(([key, val]) => (
                     <div key={key} className="flex items-center gap-1.5 text-xs">
-                      <span className="text-gray-400 font-mono">{key.replace(/[{}]/g, "")}</span>
-                      <span className="text-gray-600">→</span>
-                      <span className="text-gray-800 font-medium truncate">{val || "(empty)"}</span>
+                      <span className="text-[var(--ds-text-tertiary)] font-mono">{key.replace(/[{}]/g, "")}</span>
+                      <span className="text-[var(--ds-text-secondary)]">→</span>
+                      <span className="text-[var(--ds-text)] font-medium truncate">{val || "(empty)"}</span>
                     </div>
                   ))}
                 </div>

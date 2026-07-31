@@ -73,25 +73,25 @@ interface FindingVisual {
 }
 
 const FINDING_VISUALS: Record<FindingType, FindingVisual> = {
-  DentalCaries:     { priority: 6,  badge: "Ca", color: "#8B4513",     fillColor: "#d4a574",   darkFill: "#8B4513", description: "Dental caries / decay" },
-  FillingAmalgam:   { priority: 4,  badge: "Am", color: "#808080",     fillColor: "#a0a0a0",   darkFill: "#808080", description: "Silver amalgam filling" },
-  FillingComposite: { priority: 4,  badge: "Co", color: "#deb887",     fillColor: "#f0d9b5",   darkFill: "#c4a265", description: "Tooth-colored composite filling" },
-  RootCanalTreated: { priority: 9,  badge: "RC", color: "#7B2D8E",     fillColor: "#d4a0e0",   darkFill: "#7B2D8E", description: "Root canal treatment completed" },
-  RootCanalRequired:{ priority: 8,  badge: "RR", color: "#DC2626",     fillColor: "#fca5a5",   darkFill: "#DC2626", description: "Root canal treatment required" },
-  Crown:            { priority: 8,  badge: "C",  color: "#e8e0d8",     fillColor: "#e8e0d8",   darkFill: "#c4b8a8", description: "Crown (cap)" },
-  Bridge:           { priority: 8,  badge: "B",  color: "#c8b8a0",     fillColor: "#c8b8a0",   darkFill: "#a08868", description: "Bridge" },
-  Implant:          { priority: 14, badge: "I",  color: "#4A90D9",     fillColor: "#a0c8f0",   darkFill: "#4A90D9", description: "Dental implant" },
-  Calculus:         { priority: 3,  badge: "Ca", color: "#C49A3C",     fillColor: "#e8d090",   darkFill: "#C49A3C", description: "Calculus / tartar deposits" },
-  Gingivitis:       { priority: 1,  badge: "G",  color: "#e04040",     fillColor: "transparent", darkFill: "#e04040", description: "Gingival inflammation" },
-  Periodontitis:    { priority: 2,  badge: "P",  color: "#8B0000",     fillColor: "transparent", darkFill: "#8B0000", description: "Periodontal disease" },
-  Mobility:         { priority: 2,  badge: "M",  color: "#FFA500",     fillColor: "transparent", darkFill: "#FFA500", description: "Tooth mobility" },
-  Fracture:         { priority: 10, badge: "F",  color: "#FF4444",     fillColor: "#ff8888",   darkFill: "#FF4444", description: "Tooth fracture / crack" },
-  Stains:           { priority: 3,  badge: "St", color: "#a0522d",     fillColor: "#d4a574",   darkFill: "#a0522d", description: "Stains / discoloration" },
-  Attrition:        { priority: 3,  badge: "A",  color: "#e8dcc8",     fillColor: "#e8dcc8",   darkFill: "#c4b498", description: "Wear from tooth-to-tooth contact" },
-  Abrasion:         { priority: 3,  badge: "Ab", color: "#d8c8b0",     fillColor: "#d8c8b0",   darkFill: "#b8a488", description: "Wear from external factors" },
-  Erosion:          { priority: 3,  badge: "Er", color: "#c8d8e0",     fillColor: "#c8d8e0",   darkFill: "#90a8b8", description: "Chemical wear / erosion" },
-  MissingTooth:     { priority: 15, badge: "M",  color: "#e0e0e0",     fillColor: "#e0e0e0",   darkFill: "#e0e0e0", description: "Missing tooth" },
-  Impaction:        { priority: 12, badge: "Im", color: "#6C3483",     fillColor: "#d2b4de",   darkFill: "#6C3483", description: "Impacted tooth" },
+  DentalCaries:     { priority: 6,  badge: "Ca", color: "var(--ds-clinical-caries)",     fillColor: "var(--ds-clinical-caries-fill)",   darkFill: "var(--ds-clinical-caries)", description: "Dental caries / decay" },
+  FillingAmalgam:   { priority: 4,  badge: "Am", color: "var(--ds-clinical-amalgam)",     fillColor: "var(--ds-clinical-amalgam-fill)",   darkFill: "var(--ds-clinical-amalgam)", description: "Silver amalgam filling" },
+  FillingComposite: { priority: 4,  badge: "Co", color: "var(--ds-clinical-composite)",     fillColor: "var(--ds-clinical-composite-fill)",   darkFill: "var(--ds-clinical-composite-dark)", description: "Tooth-colored composite filling" },
+  RootCanalTreated: { priority: 9,  badge: "RC", color: "var(--ds-clinical-rct)",     fillColor: "var(--ds-clinical-rct-fill)",   darkFill: "var(--ds-clinical-rct)", description: "Root canal treatment completed" },
+  RootCanalRequired:{ priority: 8,  badge: "RR", color: "var(--ds-clinical-rc-required)",     fillColor: "var(--ds-clinical-rc-required-fill)",   darkFill: "var(--ds-clinical-rc-required)", description: "Root canal treatment required" },
+  Crown:            { priority: 8,  badge: "C",  color: "var(--ds-clinical-crown)",     fillColor: "var(--ds-clinical-crown)",   darkFill: "var(--ds-clinical-crown-dark)", description: "Crown (cap)" },
+  Bridge:           { priority: 8,  badge: "B",  color: "var(--ds-clinical-bridge)",     fillColor: "var(--ds-clinical-bridge)",   darkFill: "var(--ds-clinical-bridge-dark)", description: "Bridge" },
+  Implant:          { priority: 14, badge: "I",  color: "var(--ds-clinical-implant)",     fillColor: "var(--ds-clinical-implant-fill)",   darkFill: "var(--ds-clinical-implant)", description: "Dental implant" },
+  Calculus:         { priority: 3,  badge: "Ca", color: "var(--ds-clinical-calculus)",     fillColor: "var(--ds-clinical-calculus-fill)",   darkFill: "var(--ds-clinical-calculus)", description: "Calculus / tartar deposits" },
+  Gingivitis:       { priority: 1,  badge: "G",  color: "var(--ds-clinical-gingivitis)",     fillColor: "transparent", darkFill: "var(--ds-clinical-gingivitis)", description: "Gingival inflammation" },
+  Periodontitis:    { priority: 2,  badge: "P",  color: "var(--ds-clinical-periodontitis)",     fillColor: "transparent", darkFill: "var(--ds-clinical-periodontitis)", description: "Periodontal disease" },
+  Mobility:         { priority: 2,  badge: "M",  color: "var(--ds-clinical-mobility)",     fillColor: "transparent", darkFill: "var(--ds-clinical-mobility)", description: "Tooth mobility" },
+  Fracture:         { priority: 10, badge: "F",  color: "var(--ds-clinical-fracture)",     fillColor: "var(--ds-clinical-fracture-fill)",   darkFill: "var(--ds-clinical-fracture)", description: "Tooth fracture / crack" },
+  Stains:           { priority: 3,  badge: "St", color: "var(--ds-clinical-stains)",     fillColor: "var(--ds-clinical-caries-fill)",   darkFill: "var(--ds-clinical-stains)", description: "Stains / discoloration" },
+  Attrition:        { priority: 3,  badge: "A",  color: "var(--ds-clinical-attrition)",     fillColor: "var(--ds-clinical-attrition)",   darkFill: "var(--ds-clinical-attrition-dark)", description: "Wear from tooth-to-tooth contact" },
+  Abrasion:         { priority: 3,  badge: "Ab", color: "var(--ds-clinical-abrasion)",     fillColor: "var(--ds-clinical-abrasion)",   darkFill: "var(--ds-clinical-abrasion-dark)", description: "Wear from external factors" },
+  Erosion:          { priority: 3,  badge: "Er", color: "var(--ds-clinical-erosion)",     fillColor: "var(--ds-clinical-erosion)",   darkFill: "var(--ds-clinical-erosion-dark)", description: "Chemical wear / erosion" },
+  MissingTooth:     { priority: 15, badge: "M",  color: "var(--ds-clinical-missing)",     fillColor: "var(--ds-clinical-missing)",   darkFill: "var(--ds-clinical-missing)", description: "Missing tooth" },
+  Impaction:        { priority: 12, badge: "Im", color: "var(--ds-clinical-impaction)",     fillColor: "var(--ds-clinical-impaction-fill)",   darkFill: "var(--ds-clinical-impaction)", description: "Impacted tooth" },
 }
 
 const FINDING_TYPES: FindingType[] = [
@@ -105,6 +105,9 @@ const FINDING_TYPES: FindingType[] = [
 ]
 
 // ─── Enamel Gradients ─────────────────────────────────────────────
+// Anatomical tooth-shading ramps (enamel / cervical / root / gingiva /
+// tongue). Cohesive SVG art used only inside this chart; finding-legend
+// and UI colors below are token-driven (--ds-clinical-* / --ds-*).
 
 const ENAMEL_GRADIENT = [
   { offset: "0%",  color: "#FDFCF8" },
@@ -131,7 +134,7 @@ const ROOT_GRADIENT = [
 ]
 
 const CROWN_SHADOW = "rgba(0,0,0,0.06)"
-const SELECTION_GLOW = "#2E7785"
+const SELECTION_GLOW = 'var(--ds-primary-500)'
 
 // ─── Helpers ──────────────────────────────────────────────────────
 
@@ -237,20 +240,20 @@ const ToothSVG = memo(function ToothSVG({
   const isWear = hasType(toothFindings, "Attrition") || hasType(toothFindings, "Abrasion") || hasType(toothFindings, "Erosion")
 
   let fillColor = "url(#enamel-grad)"
-  let strokeColor = "#b0a898"
+  let strokeColor = "var(--ds-clinical-outline)"
   let strokeW = 1.2
   let opacity = 1
 
-  if (isMissing) { fillColor = "#f0f0f0"; strokeColor = "#ccc"; strokeW = 1.5; opacity = 0.4 }
-  else if (isRootStump) { fillColor = "#c4a882"; strokeColor = "#8B7355" }
-  else if (isImplant) { fillColor = "#d0e4f0"; strokeColor = "#4A90D9" }
+  if (isMissing) { fillColor = "var(--ds-clinical-missing)"; strokeColor = "var(--ds-clinical-inactive)"; strokeW = 1.5; opacity = 0.4 }
+  else if (isRootStump) { fillColor = "var(--ds-clinical-root-stump)"; strokeColor = "var(--ds-clinical-root-stump-stroke)" }
+  else if (isImplant) { fillColor = "var(--ds-clinical-implant-fill)"; strokeColor = "var(--ds-clinical-implant)" }
   else if (isCaries) {
     const c = toothFindings.find((f) => f.type === "DentalCaries")
     const fv = c ? FINDING_VISUALS[c.type] : null
     if (fv && fv.fillColor !== "transparent") fillColor = fv.fillColor
   }
-  else if (isCrown) { strokeColor = "#c0b8a8"; strokeW = 1.5 }
-  else if (isWear) fillColor = "#e8dcc8"
+  else if (isCrown) { strokeColor = "var(--ds-clinical-outline-light)"; strokeW = 1.5 }
+  else if (isWear) fillColor = "var(--ds-clinical-attrition)"
 
   const baseOpacity = opacity
   const scale = animScale * (isHovered ? 1.03 : 1)
@@ -302,79 +305,79 @@ const ToothSVG = memo(function ToothSVG({
 
       {/* Grooves and fissures */}
       {toothData.grooves.map((g, i) => (
-        <path key={i} d={g} fill="none" stroke="#b0a898" strokeWidth={0.8} opacity={0.5} />
+        <path key={i} d={g} fill="none" stroke="var(--ds-clinical-outline)" strokeWidth={0.8} opacity={0.5} />
       ))}
 
       {/* Root lines */}
       {toothData.rootLines?.map((l, i) => (
-        <path key={i} d={l} fill="none" stroke="#c0b8a8" strokeWidth={0.6} opacity={0.4} />
+        <path key={i} d={l} fill="none" stroke="var(--ds-clinical-outline-light)" strokeWidth={0.6} opacity={0.4} />
       ))}
 
       {/* ── Finding Visuals ── */}
 
       {/* Missing */}
       {isMissing && (
-        <path d={toothData.outline} fill="none" stroke="#999" strokeWidth={1.5} strokeDasharray="4,3" opacity={0.5} />
+        <path d={toothData.outline} fill="none" stroke="var(--ds-clinical-toothnum)" strokeWidth={1.5} strokeDasharray="4,3" opacity={0.5} />
       )}
 
       {/* Implant screw */}
       {isImplant && !isMissing && (
         <>
           {[0.25, 0.35, 0.45].map((p) => (
-            <line key={p} x1={42} y1={p * 100} x2={58} y2={p * 100} stroke="#4A90D9" strokeWidth={2} />
+            <line key={p} x1={42} y1={p * 100} x2={58} y2={p * 100} stroke="var(--ds-clinical-implant)" strokeWidth={2} />
           ))}
-          <line x1={50} y1={20} x2={50} y2={50} stroke="#4A90D9" strokeWidth={2} />
+          <line x1={50} y1={20} x2={50} y2={50} stroke="var(--ds-clinical-implant)" strokeWidth={2} />
         </>
       )}
 
       {/* RCT canal lines */}
       {isRCT && !isMissing && (
         <>
-          <line x1={44} y1={45} x2={46} y2={95} stroke="#7B2D8E" strokeWidth={1.8} strokeLinecap="round" />
-          <line x1={56} y1={45} x2={54} y2={95} stroke="#7B2D8E" strokeWidth={1.8} strokeLinecap="round" />
-          <path d="M 44,45 Q 48,52 46,58 Q 50,62 50,58 Q 50,62 54,58 Q 52,52 56,45" fill="none" stroke="#7B2D8E" strokeWidth={1.5} opacity={0.6} />
+          <line x1={44} y1={45} x2={46} y2={95} stroke="var(--ds-clinical-rct)" strokeWidth={1.8} strokeLinecap="round" />
+          <line x1={56} y1={45} x2={54} y2={95} stroke="var(--ds-clinical-rct)" strokeWidth={1.8} strokeLinecap="round" />
+          <path d="M 44,45 Q 48,52 46,58 Q 50,62 50,58 Q 50,62 54,58 Q 52,52 56,45" fill="none" stroke="var(--ds-clinical-rct)" strokeWidth={1.5} opacity={0.6} />
         </>
       )}
 
       {/* Fracture crack */}
       {isFracture && (
-        <path d={`M ${isMirror ? 55 : 45},22 L ${isMirror ? 52 : 48},75`} fill="none" stroke="#FF4444" strokeWidth={1.2} strokeDasharray="2,1.5" opacity={0.9} />
+        <path d={`M ${isMirror ? 55 : 45},22 L ${isMirror ? 52 : 48},75`} fill="none" stroke="var(--ds-clinical-fracture)" strokeWidth={1.2} strokeDasharray="2,1.5" opacity={0.9} />
       )}
 
       {/* Crown overlay */}
       {isCrown && !isMissing && !isRootStump && (
         <path
           d={`M 25,18 Q 28,8 38,6 L 62,6 Q 72,8 75,18 L 72,48 C 70,52 65,56 62,48 L 58,44 L 42,44 L 38,48 C 35,56 30,52 28,48 Z`}
-          fill="rgba(200,190,180,0.2)" stroke="#b0a898" strokeWidth={0.8} strokeDasharray="2,1.5"
+          fill="rgba(200,190,180,0.2)" stroke="var(--ds-clinical-outline)" strokeWidth={0.8} strokeDasharray="2,1.5"
         />
       )}
 
       {/* Calculus deposits */}
       {isCalculus && !isMissing && (
-        <path d={`M 28,68 Q 50,62 72,68 Q 74,76 68,72 Q 50,78 32,72 Q 26,76 28,68`} fill="#C49A3C" opacity={0.6} />
+        <path d={`M 28,68 Q 50,62 72,68 Q 74,76 68,72 Q 50,78 32,72 Q 26,76 28,68`} fill="var(--ds-clinical-calculus)" opacity={0.6} />
       )}
 
       {/* Gingivitis line */}
       {isGingivitis && !isMissing && (
-        <path d={`M 26,70 Q 50,64 74,70 Q 76,76 68,74 Q 50,78 32,74 Q 24,76 26,70`} fill="#e04040" opacity={0.5} />
+        <path d={`M 26,70 Q 50,64 74,70 Q 76,76 68,74 Q 50,78 32,74 Q 24,76 26,70`} fill="var(--ds-clinical-gingivitis)" opacity={0.5} />
       )}
 
       {/* Periodontitis pockets */}
       {isPeriodontitis && !isMissing && (
         <>
-          <path d={`M 28,72 Q 30,80 34,74`} fill="none" stroke="#8B0000" strokeWidth={1.2} />
-          <path d={`M 72,72 Q 70,80 66,74`} fill="none" stroke="#8B0000" strokeWidth={1.2} />
+          <path d={`M 28,72 Q 30,80 34,74`} fill="none" stroke="var(--ds-clinical-periodontitis)" strokeWidth={1.2} />
+          <path d={`M 72,72 Q 70,80 66,74`} fill="none" stroke="var(--ds-clinical-periodontitis)" strokeWidth={1.2} />
         </>
       )}
 
       {/* Periapical lesion */}
       {isPeriapical && !isMissing && (
-        <circle cx={50} cy={105} r={8} fill="none" stroke="#FF69B4" strokeWidth={1.5} opacity={0.7} />
+        <circle cx={50} cy={105} r={8} fill="none" stroke="var(--ds-clinical-mobility-pink)" strokeWidth={1.5} opacity={0.7} />
       )}
 
       {/* Wear facets */}
       {isWear && !isMissing && (
-        <ellipse cx={50} cy={14} rx={18} ry={3} fill="#d8c8b0" opacity={0.4} />
+        <ellipse cx={50} cy={14} rx={18} ry={3} fill="var(--ds-clinical-abrasion)" opacity={0.4} />
       )}
 
       {/* Caries cavity patches - surface-specific */}
@@ -388,17 +391,17 @@ const ToothSVG = memo(function ToothSVG({
             else if (surf === "Distal") { cx2 = isMirror ? 32 : 68; cy2 = 40 }
             else if (surf === "Buccal") { cx2 = 50; cy2 = 48 }
             else if (surf === "Lingual") { cx2 = isMirror ? 55 : 45; cy2 = 30 }
-            return <circle key={cf.id || "car"} cx={cx2} cy={cy2} r={3.5} fill="#5C2E00" opacity={0.8} />
+            return <circle key={cf.id || "car"} cx={cx2} cy={cy2} r={3.5} fill="var(--ds-clinical-caries-dark)" opacity={0.8} />
           })}
           {/* Legacy position-based caries */}
           {hasType(toothFindings, "Caries – Enamel") && (
-            <circle cx={isMirror ? 55 : 45} cy={36} r={3.5} fill="#8B4513" opacity={0.6} />
+            <circle cx={isMirror ? 55 : 45} cy={36} r={3.5} fill="var(--ds-clinical-caries)" opacity={0.6} />
           )}
           {hasType(toothFindings, "Caries – Dentin") && (
-            <circle cx={isMirror ? 52 : 48} cy={44} r={3} fill="#5C2E00" opacity={0.75} />
+            <circle cx={isMirror ? 52 : 48} cy={44} r={3} fill="var(--ds-clinical-caries-dark)" opacity={0.75} />
           )}
           {hasType(toothFindings, "Caries – Pulp") && (
-            <circle cx={50} cy={52} r={2.5} fill="#3A1A00" opacity={0.9} />
+            <circle cx={50} cy={52} r={2.5} fill="var(--ds-clinical-caries-dark)" opacity={0.9} />
           )}
         </>
       )}
@@ -409,9 +412,9 @@ const ToothSVG = memo(function ToothSVG({
         const isAmalgam = f.type === "FillingAmalgam"
         return (
           <g key={f.id || f.type}>
-            <ellipse cx={isMirror ? 56 : 44} cy={42} rx={8} ry={6} fill={fv?.darkFill || "#a0a0a0"} opacity={0.5} />
+            <ellipse cx={isMirror ? 56 : 44} cy={42} rx={8} ry={6} fill={fv?.darkFill || "var(--ds-clinical-amalgam-fill)"} opacity={0.5} />
             {isAmalgam && (
-              <ellipse cx={isMirror ? 56 : 44} cy={42} rx={6} ry={4.5} fill="#C0C0C0" opacity={0.4} />
+              <ellipse cx={isMirror ? 56 : 44} cy={42} rx={6} ry={4.5} fill="var(--ds-clinical-amalgam-mid)" opacity={0.4} />
             )}
           </g>
         )
@@ -419,10 +422,10 @@ const ToothSVG = memo(function ToothSVG({
 
       {/* Bridge connectors */}
       {isBridgePontic && (
-        <line x1={2} y1={50} x2={98} y2={50} stroke="#a08868" strokeWidth={2.5} opacity={0.4} />
+        <line x1={2} y1={50} x2={98} y2={50} stroke="var(--ds-clinical-bridge-dark)" strokeWidth={2.5} opacity={0.4} />
       )}
       {isBridgeAbut && (
-        <line x1={2} y1={50} x2={98} y2={50} stroke="#887868" strokeWidth={2} opacity={0.3} />
+        <line x1={2} y1={50} x2={98} y2={50} stroke="var(--ds-clinical-bridge-dark)" strokeWidth={2} opacity={0.3} />
       )}
 
       {/* Surface overlay (clickable surfaces) */}
@@ -445,7 +448,7 @@ const ToothSVG = memo(function ToothSVG({
       <text
         x={50} y={isUpper ? 108 : 112}
         textAnchor="middle"
-        fill={isMissing ? "#bbb" : "#888"}
+        fill={isMissing ? "var(--ds-clinical-inactive)" : "var(--ds-clinical-toothnum)"}
         fontSize={9}
         fontFamily="Inter, system-ui, sans-serif"
         fontWeight={500}
@@ -458,9 +461,9 @@ const ToothSVG = memo(function ToothSVG({
       {/* Mobility badge */}
       {isMobility && (
         <>
-          {hasType(toothFindings, "Mobility Grade I") && <text x={14} y={28} fill="#FFA500" fontSize={11} fontWeight={700}>↕</text>}
-          {hasType(toothFindings, "Mobility Grade II") && <text x={14} y={28} fill="#FF6600" fontSize={11} fontWeight={700}>↕</text>}
-          {hasType(toothFindings, "Mobility Grade III") && <text x={14} y={28} fill="#FF0000" fontSize={11} fontWeight={700}>↕</text>}
+          {hasType(toothFindings, "Mobility Grade I") && <text x={14} y={28} fill="var(--ds-clinical-mobility)" fontSize={11} fontWeight={700}>↕</text>}
+          {hasType(toothFindings, "Mobility Grade II") && <text x={14} y={28} fill="var(--ds-clinical-mobility-high)" fontSize={11} fontWeight={700}>↕</text>}
+          {hasType(toothFindings, "Mobility Grade III") && <text x={14} y={28} fill="var(--ds-clinical-mobility-severe)" fontSize={11} fontWeight={700}>↕</text>}
         </>
       )}
 
@@ -485,7 +488,7 @@ function ToothTooltip({ toothNum, findings, isPrimary: _isPrimary, mouseX, mouse
     <div
       style={{
         position: "fixed", left: mouseX + 12, top: mouseY - 10, zIndex: 1000,
-        background: "#1e293b", color: "#f1f5f9", borderRadius: 8, padding: "8px 12px",
+        background: "var(--ds-tooltip-bg)", color: "var(--ds-tooltip-fg)", borderRadius: 8, padding: "8px 12px",
         fontSize: 11, lineHeight: 1.5, maxWidth: 220,
         boxShadow: "0 8px 32px rgba(0,0,0,0.25)",
         pointerEvents: "none", transition: "opacity 0.15s",
@@ -494,15 +497,15 @@ function ToothTooltip({ toothNum, findings, isPrimary: _isPrimary, mouseX, mouse
       <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 2 }}>
         Tooth #{toothNum} — {name}
       </div>
-      <div style={{ color: "#94a3b8", fontSize: 10, marginBottom: tf.length ? 4 : 0 }}>
+      <div style={{ color: "var(--ds-text-tertiary)", fontSize: 10, marginBottom: tf.length ? 4 : 0 }}>
         {quadrant}
       </div>
-      {tf.length === 0 && <div style={{ color: "#64748b", fontStyle: "italic" }}>Healthy / No findings</div>}
+      {tf.length === 0 && <div style={{ color: "var(--ds-text-secondary)", fontStyle: "italic" }}>Healthy / No findings</div>}
       {tf.map((f) => {
         const fv = FINDING_VISUALS[f.type]
         return (
           <div key={f.id || f.type} style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 1 }}>
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: fv?.color || "#666", flexShrink: 0 }} />
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: fv?.color || "var(--ds-text-tertiary)", flexShrink: 0 }} />
             <span>{f.type}{f.surface ? ` (${f.surface})` : ""}</span>
           </div>
         )
@@ -518,10 +521,10 @@ function Legend({ findings }: { findings: Finding[] }) {
   const items = FINDING_TYPES
 
   return (
-    <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e5e7eb", padding: "10px 14px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+    <div style={{ background: "var(--ds-surface)", borderRadius: 10, border: "1px solid var(--ds-border)", padding: "10px 14px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: "#374151", letterSpacing: "0.02em" }}>LEGEND</span>
-        <span style={{ fontSize: 10, color: "#9CA3AF" }}>({activeTypes.size} finding types active)</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--ds-text)", letterSpacing: "0.02em" }}>LEGEND</span>
+        <span style={{ fontSize: 10, color: "var(--ds-text-tertiary)" }}>({activeTypes.size} finding types active)</span>
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
         {items.map((ft) => {
@@ -533,10 +536,10 @@ function Legend({ findings }: { findings: Finding[] }) {
               style={{
                 display: "inline-flex", alignItems: "center", gap: 4,
                 padding: "2px 8px", borderRadius: 5,
-                background: active ? `${v.color}12` : "#f8f9fa",
-                border: `1px solid ${active ? v.color : "#e5e7eb"}`,
+                background: active ? `color-mix(in srgb, ${v.color} 7%, transparent)` : "var(--ds-background-subtle)",
+                border: `1px solid ${active ? v.color : "var(--ds-border)"}`,
                 opacity: active ? 1 : 0.4,
-                fontSize: 10, fontWeight: 500, color: "#4b5563",
+                fontSize: 10, fontWeight: 500, color: "var(--ds-text-secondary)",
                 transition: "all 0.15s",
               }}
             >
@@ -599,34 +602,34 @@ function RightPanel({
 
   return (
     <div style={{
-      width: 320, flexShrink: 0, background: "#fff", borderRadius: 12,
-      border: "1px solid #e5e7eb", boxShadow: "0 4px 24px rgba(0,0,0,0.06)",
+      width: 320, flexShrink: 0, background: "var(--ds-surface)", borderRadius: 12,
+      border: "1px solid var(--ds-border)", boxShadow: "0 4px 24px rgba(0,0,0,0.06)",
       display: "flex", flexDirection: "column", overflow: "hidden",
       height: "fit-content", position: "sticky", top: 16,
     }}>
       {/* Header */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "14px 16px", borderBottom: "1px solid #e5e7eb",
-        background: "linear-gradient(135deg, #f8f9fb 0%, #f1f3f6 100%)",
+        padding: "14px 16px", borderBottom: "1px solid var(--ds-border)",
+        background: "linear-gradient(135deg, var(--ds-background-subtle) 0%, var(--ds-surface-secondary) 100%)",
       }}>
         <div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: "#111827", lineHeight: 1.2 }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: "var(--ds-text)", lineHeight: 1.2 }}>
             #{toothNum}
-            <span style={{ fontSize: 12, fontWeight: 400, color: "#6B7280", marginLeft: 6 }}>{toothName}</span>
+            <span style={{ fontSize: 12, fontWeight: 400, color: "var(--ds-text-secondary)", marginLeft: 6 }}>{toothName}</span>
           </div>
-          <div style={{ fontSize: 11, color: "#6B7280", marginTop: 1 }}>{quadrant}</div>
+          <div style={{ fontSize: 11, color: "var(--ds-text-secondary)", marginTop: 1 }}>{quadrant}</div>
         </div>
         <button onClick={onClose} style={{
-          width: 28, height: 28, borderRadius: "50%", border: "1px solid #e5e7eb",
-          background: "#fff", cursor: "pointer", display: "flex", alignItems: "center",
-          justifyContent: "center", color: "#6B7280", fontSize: 13, fontWeight: 500,
+          width: 28, height: 28, borderRadius: "50%", border: "1px solid var(--ds-border)",
+          background: "var(--ds-surface)", cursor: "pointer", display: "flex", alignItems: "center",
+          justifyContent: "center", color: "var(--ds-text-secondary)", fontSize: 13, fontWeight: 500,
           transition: "all 0.15s",
         }} title="Close">✕</button>
       </div>
 
       {/* Tooth Preview */}
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: "16px 0", background: "#f8f9fb" }}>
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: "16px 0", background: "var(--ds-background-subtle)" }}>
         <svg width={90} height={108} viewBox="0 0 100 120" style={{ display: "block" }}>
           <defs>
             <linearGradient id="pv-enamel" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -636,23 +639,23 @@ function RightPanel({
               {CERVICAL_GRADIENT.map((s) => <stop key={s.offset} offset={s.offset} stopColor={s.color} />)}
             </linearGradient>
           </defs>
-          <path d={anatomy.outline} fill="url(#pv-enamel)" stroke="#b0a898" strokeWidth={1} />
+          <path d={anatomy.outline} fill="url(#pv-enamel)" stroke="var(--ds-clinical-outline)" strokeWidth={1} />
           <path d={anatomy.outline} fill="url(#pv-cervical)" opacity={0.4} />
           <ellipse cx={50} cy={26} rx={14} ry={16} fill="rgba(255,255,255,0.3)" />
           <ellipse cx={50} cy={30} rx={6} ry={10} fill="rgba(255,255,255,0.18)" />
           {anatomy.grooves.map((g, i) => (
-            <path key={i} d={g} fill="none" stroke="#b0a898" strokeWidth={0.6} opacity={0.4} />
+            <path key={i} d={g} fill="none" stroke="var(--ds-clinical-outline)" strokeWidth={0.6} opacity={0.4} />
           ))}
         </svg>
       </div>
 
       {/* Current Findings */}
-      <div style={{ padding: "10px 16px", borderBottom: "1px solid #e5e7eb" }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: "#374151", marginBottom: 6, letterSpacing: "0.02em" }}>
+      <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--ds-border)" }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-text)", marginBottom: 6, letterSpacing: "0.02em" }}>
           CURRENT FINDINGS ({tf.length})
         </div>
         {tf.length === 0 ? (
-          <div style={{ fontSize: 11, color: "#9CA3AF", fontStyle: "italic" }}>No findings recorded for this tooth</div>
+          <div style={{ fontSize: 11, color: "var(--ds-text-tertiary)", fontStyle: "italic" }}>No findings recorded for this tooth</div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 3, maxHeight: 140, overflowY: "auto" }}>
             {tf.map((f) => {
@@ -660,18 +663,18 @@ function RightPanel({
               return (
                 <div key={f.id || f.type} style={{
                   display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "3px 8px", borderRadius: 5, background: `${fv?.color}10` || "#f9fafb",
-                  borderLeft: `3px solid ${fv?.color || "#ccc"}`,
+                  padding: "3px 8px", borderRadius: 5, background: `color-mix(in srgb, ${fv?.color} 6%, transparent)` || "var(--ds-background-subtle)",
+                  borderLeft: `3px solid ${fv?.color || "var(--ds-clinical-inactive)"}`,
                 }}>
-                  <div style={{ fontSize: 11, color: "#374151" }}>
+                  <div style={{ fontSize: 11, color: "var(--ds-text)" }}>
                     <span style={{ fontWeight: 600 }}>{f.type}</span>
-                    {f.surface && <span style={{ color: "#6B7280" }}> ({f.surface})</span>}
-                    {f.note && <span style={{ color: "#9CA3AF" }}> — {f.note}</span>}
+                    {f.surface && <span style={{ color: "var(--ds-text-secondary)" }}> ({f.surface})</span>}
+                    {f.note && <span style={{ color: "var(--ds-text-tertiary)" }}> — {f.note}</span>}
                   </div>
                   {!readonly && (
                     <button onClick={() => removeFinding(f)} style={{
                       background: "none", border: "none", cursor: "pointer",
-                      color: "#EF4444", fontSize: 12, padding: "0 4px", lineHeight: 1,
+                      color: "var(--ds-danger)", fontSize: 12, padding: "0 4px", lineHeight: 1,
                     }} title="Remove">✕</button>
                   )}
                 </div>
@@ -684,7 +687,7 @@ function RightPanel({
       {/* Add Finding Form */}
       {!readonly && (
         <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 6 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "#374151", letterSpacing: "0.02em" }}>ADD FINDING</div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-text)", letterSpacing: "0.02em" }}>ADD FINDING</div>
 
           <select value={ftype} onChange={(e) => setFtype(e.target.value)} style={inputStyle}>
             {FINDING_TYPES.map((ft) => <option key={ft} value={ft}>{ft}</option>)}
@@ -702,12 +705,12 @@ function RightPanel({
           <div style={{ display: "flex", gap: 6 }}>
             <button onClick={addFinding} style={{
               flex: 1, padding: "7px", borderRadius: 6, border: "none",
-              background: "var(--ds-primary)", color: "#fff", fontSize: 12, fontWeight: 600,
+              background: "var(--ds-primary)", color: "var(--ds-surface)", fontSize: 12, fontWeight: 600,
               cursor: "pointer", transition: "background 0.15s",
             }}>+ Add Finding</button>
             <button onClick={resetTooth} style={{
-              padding: "7px 10px", borderRadius: 6, border: "1px solid #e5e7eb",
-              background: "#fff", color: "#EF4444", fontSize: 11, cursor: "pointer",
+              padding: "7px 10px", borderRadius: 6, border: "1px solid var(--ds-border)",
+              background: "var(--ds-surface)", color: "var(--ds-danger)", fontSize: 11, cursor: "pointer",
             }} title="Reset tooth">Reset</button>
           </div>
         </div>
@@ -715,11 +718,11 @@ function RightPanel({
 
       {/* Quick Summary */}
       {tf.length > 0 && (
-        <div style={{ padding: "8px 16px 12px", borderTop: "1px solid #e5e7eb", background: "#f8f9fb" }}>
-          <div style={{ fontSize: 10, fontWeight: 600, color: "#6B7280", letterSpacing: "0.02em", marginBottom: 4 }}>
+        <div style={{ padding: "8px 16px 12px", borderTop: "1px solid var(--ds-border)", background: "var(--ds-background-subtle)" }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: "var(--ds-text-secondary)", letterSpacing: "0.02em", marginBottom: 4 }}>
             TREATMENT NEEDED
           </div>
-          <div style={{ fontSize: 11, color: "#374151" }}>
+          <div style={{ fontSize: 11, color: "var(--ds-text)" }}>
             {tf.some((f) => f.type.startsWith("Caries")) && "Restoration required. "}
             {hasType(tf, "Root Canal Treated") && "Endodontically treated. "}
             {hasType(tf, "Fracture") && "Evaluate for crown/cusp protection. "}
@@ -734,8 +737,8 @@ function RightPanel({
 }
 
 const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid #d1d5db",
-  fontSize: 12, color: "#374151", background: "#fff", outline: "none",
+  width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid var(--ds-border-hover)",
+  fontSize: 12, color: "var(--ds-text)", background: "var(--ds-surface)", outline: "none",
 }
 
 // ─── Clinical Summary ─────────────────────────────────────────────
@@ -754,19 +757,19 @@ function ClinicalSummary({ findings, isPrimary: _isPrimary }: { findings: Findin
   const sorted = [...grouped.entries()].sort(([a], [b]) => Number(a) - Number(b))
 
   return (
-    <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e5e7eb", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-      <div style={{ padding: "10px 14px", borderBottom: "1px solid #e5e7eb", background: "#f8f9fb", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>
+    <div style={{ background: "var(--ds-surface)", borderRadius: 10, border: "1px solid var(--ds-border)", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+      <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--ds-border)", background: "var(--ds-background-subtle)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ds-text)" }}>
           Clinical Findings Summary
         </span>
-        <span style={{ fontSize: 10, color: "#9CA3AF" }}>
+        <span style={{ fontSize: 10, color: "var(--ds-text-tertiary)" }}>
           {findings.length} finding{findings.length !== 1 ? "s" : ""} · {sorted.length} tooth{ sorted.length !== 1 ? "ren" : ""}
         </span>
       </div>
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
           <thead>
-            <tr style={{ background: "#f1f3f6", color: "#374151" }}>
+            <tr style={{ background: "var(--ds-background-subtle)", color: "var(--ds-text)" }}>
               <th style={thStyle}>Tooth</th>
               <th style={thStyle}>Name</th>
               <th style={thStyle}>Finding</th>
@@ -776,21 +779,21 @@ function ClinicalSummary({ findings, isPrimary: _isPrimary }: { findings: Findin
           </thead>
           <tbody>
             {sorted.length === 0 && (
-              <tr><td colSpan={5} style={{ textAlign: "center", padding: 20, color: "#9CA3AF", fontStyle: "italic" }}>No clinical findings recorded</td></tr>
+              <tr><td colSpan={5} style={{ textAlign: "center", padding: 20, color: "var(--ds-text-tertiary)", fontStyle: "italic" }}>No clinical findings recorded</td></tr>
             )}
             {sorted.map(([toothNum, tfs]) => (
               tfs.map((f, idx) => (
-                <tr key={`${toothNum}-${idx}`} style={{ borderBottom: "1px solid #f1f3f6" }}>
-                  {idx === 0 && <td rowSpan={tfs.length} style={{ ...tdStyle, fontWeight: 600, color: "#111827", verticalAlign: "top" }}>#{toothNum}</td>}
-                  {idx === 0 && <td rowSpan={tfs.length} style={{ ...tdStyle, color: "#6B7280", verticalAlign: "top" }}>{TOOTH_NAMES[Number(toothNum)] || "—"}</td>}
+                <tr key={`${toothNum}-${idx}`} style={{ borderBottom: "1px solid var(--ds-border-light)" }}>
+                  {idx === 0 && <td rowSpan={tfs.length} style={{ ...tdStyle, fontWeight: 600, color: "var(--ds-text)", verticalAlign: "top" }}>#{toothNum}</td>}
+                  {idx === 0 && <td rowSpan={tfs.length} style={{ ...tdStyle, color: "var(--ds-text-secondary)", verticalAlign: "top" }}>{TOOTH_NAMES[Number(toothNum)] || "—"}</td>}
                   <td style={tdStyle}>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
-                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: FINDING_VISUALS[f.type]?.color || "#ccc", flexShrink: 0 }} />
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: FINDING_VISUALS[f.type]?.color || "var(--ds-clinical-inactive)", flexShrink: 0 }} />
                       {f.type}
                     </span>
                   </td>
                   <td style={tdStyle}>{f.surface || "—"}</td>
-                  <td style={{ ...tdStyle, color: "#9CA3AF" }}>{f.note || "—"}</td>
+                  <td style={{ ...tdStyle, color: "var(--ds-text-tertiary)" }}>{f.note || "—"}</td>
                 </tr>
               ))
             ))}
@@ -801,7 +804,7 @@ function ClinicalSummary({ findings, isPrimary: _isPrimary }: { findings: Findin
   )
 }
 
-const thStyle: React.CSSProperties = { textAlign: "left", padding: "6px 10px", fontWeight: 600, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.04em", borderBottom: "2px solid #e5e7eb" }
+const thStyle: React.CSSProperties = { textAlign: "left", padding: "6px 10px", fontWeight: 600, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.04em", borderBottom: "2px solid var(--ds-border)" }
 const tdStyle: React.CSSProperties = { padding: "5px 10px", fontSize: 11 }
 
 // ─── Occlusal View ────────────────────────────────────────────────
@@ -809,16 +812,16 @@ const tdStyle: React.CSSProperties = { padding: "5px 10px", fontSize: 11 }
 function OcclusalView({ findings, isPrimary }: { findings: Finding[]; isPrimary: boolean }) {
   const teeth = isPrimary ? CHILD_TEETH.upper : ADULT_TEETH.upper
   return (
-    <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e5e7eb", padding: "12px 16px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 8, letterSpacing: "0.02em" }}>
+    <div style={{ background: "var(--ds-surface)", borderRadius: 10, border: "1px solid var(--ds-border)", padding: "12px 16px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ds-text)", marginBottom: 8, letterSpacing: "0.02em" }}>
         Occlusal Views
       </div>
       <div style={{ display: "flex", gap: 20, justifyContent: "center" }}>
         {/* Upper occlusal */}
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 10, color: "#6B7280", marginBottom: 4 }}>Upper (Maxillary)</div>
+          <div style={{ fontSize: 10, color: "var(--ds-text-secondary)", marginBottom: 4 }}>Upper (Maxillary)</div>
           <svg width={280} height={80} viewBox="-160 -10 320 80">
-            <ellipse cx={0} cy={30} rx={140} ry={30} fill="#f8f0e0" stroke="#ddd" strokeWidth={1} />
+            <ellipse cx={0} cy={30} rx={140} ry={30} fill="var(--ds-clinical-tooth)" stroke="var(--ds-border-light)" strokeWidth={1} />
             {teeth.map((t) => {
               const tf = findings.filter((f) => f.toothNumber === S(t.num))
               const hasCaries = tf.some((f) => f.type.startsWith("Caries"))
@@ -833,11 +836,11 @@ function OcclusalView({ findings, isPrimary }: { findings: Finding[]; isPrimary:
               return (
                 <g key={t.num} transform={`translate(${ax},${ay}) rotate(${ang})`}>
                   {/* Occlusal outline (oval) */}
-                  <ellipse cx={0} cy={0} rx={12} ry={8} fill={hasCaries ? "#d4a574" : hasFilling ? "#a0a0a0" : "#f5f0e8"} stroke="#b0a898" strokeWidth={0.8} />
-                  {hasFilling && <ellipse cx={0} cy={0} rx={6} ry={4} fill="#a0a0a0" opacity={0.6} />}
-                  {hasFracture && <line x1={-6} y1={0} x2={6} y2={0} stroke="#FF4444" strokeWidth={0.8} />}
-                  {hasCaries && <circle cx={3} cy={-2} r={2.5} fill="#8B4513" opacity={0.7} />}
-                  <text x={0} y={2.5} textAnchor="middle" fill="#888" fontSize={6} style={{ pointerEvents: "none" }}>{t.num}</text>
+                  <ellipse cx={0} cy={0} rx={12} ry={8} fill={hasCaries ? "var(--ds-clinical-caries-fill)" : hasFilling ? "var(--ds-clinical-amalgam-fill)" : "var(--ds-clinical-tooth)"} stroke="var(--ds-clinical-outline)" strokeWidth={0.8} />
+                  {hasFilling && <ellipse cx={0} cy={0} rx={6} ry={4} fill="var(--ds-clinical-amalgam-fill)" opacity={0.6} />}
+                  {hasFracture && <line x1={-6} y1={0} x2={6} y2={0} stroke="var(--ds-clinical-fracture)" strokeWidth={0.8} />}
+                  {hasCaries && <circle cx={3} cy={-2} r={2.5} fill="var(--ds-clinical-caries)" opacity={0.7} />}
+                  <text x={0} y={2.5} textAnchor="middle" fill="var(--ds-clinical-toothnum)" fontSize={6} style={{ pointerEvents: "none" }}>{t.num}</text>
                 </g>
               )
             })}
@@ -845,9 +848,9 @@ function OcclusalView({ findings, isPrimary }: { findings: Finding[]; isPrimary:
         </div>
         {/* Lower occlusal */}
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 10, color: "#6B7280", marginBottom: 4 }}>Lower (Mandibular)</div>
+          <div style={{ fontSize: 10, color: "var(--ds-text-secondary)", marginBottom: 4 }}>Lower (Mandibular)</div>
           <svg width={280} height={80} viewBox="-160 -10 320 80">
-            <ellipse cx={0} cy={30} rx={130} ry={28} fill="#f0e8d8" stroke="#ddd" strokeWidth={1} />
+            <ellipse cx={0} cy={30} rx={130} ry={28} fill="var(--ds-clinical-tooth-mid)" stroke="var(--ds-border-light)" strokeWidth={1} />
             {(isPrimary ? CHILD_TEETH.lower : ADULT_TEETH.lower).map((t) => {
               const tf = findings.filter((f) => f.toothNumber === S(t.num))
               const hasCaries = tf.some((f) => f.type.startsWith("Caries"))
@@ -860,10 +863,10 @@ function OcclusalView({ findings, isPrimary }: { findings: Finding[]; isPrimary:
               if (isMissing) return null
               return (
                 <g key={t.num} transform={`translate(${ax},${ay}) rotate(${ang})`}>
-                  <ellipse cx={0} cy={0} rx={11} ry={7} fill={hasCaries ? "#d4a574" : hasFilling ? "#a0a0a0" : "#ede5d8"} stroke="#b0a898" strokeWidth={0.8} />
-                  {hasFilling && <ellipse cx={0} cy={0} rx={5} ry={3.5} fill="#a0a0a0" opacity={0.6} />}
-                  {hasCaries && <circle cx={-2} cy={1} r={2} fill="#8B4513" opacity={0.7} />}
-                  <text x={0} y={2.5} textAnchor="middle" fill="#888" fontSize={6} style={{ pointerEvents: "none" }}>{t.num}</text>
+                  <ellipse cx={0} cy={0} rx={11} ry={7} fill={hasCaries ? "var(--ds-clinical-caries-fill)" : hasFilling ? "var(--ds-clinical-amalgam-fill)" : "var(--ds-clinical-tooth-mid)"} stroke="var(--ds-clinical-outline)" strokeWidth={0.8} />
+                  {hasFilling && <ellipse cx={0} cy={0} rx={5} ry={3.5} fill="var(--ds-clinical-amalgam-fill)" opacity={0.6} />}
+                  {hasCaries && <circle cx={-2} cy={1} r={2} fill="var(--ds-clinical-caries)" opacity={0.7} />}
+                  <text x={0} y={2.5} textAnchor="middle" fill="var(--ds-clinical-toothnum)" fontSize={6} style={{ pointerEvents: "none" }}>{t.num}</text>
                 </g>
               )
             })}
@@ -959,15 +962,15 @@ export default function Odontogram({
       {/* ── Header ── */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "12px 16px", background: "#fff", borderRadius: 12,
-        border: "1px solid #e5e7eb", boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+        padding: "12px 16px", background: "var(--ds-surface)", borderRadius: 12,
+        border: "1px solid var(--ds-border)", boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
         marginBottom: 12, flexWrap: "wrap", gap: 8,
       }}>
         <div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", letterSpacing: "-0.01em" }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "var(--ds-text)", letterSpacing: "-0.01em" }}>
             Clinical Findings — Interactive Odontogram
           </div>
-          <div style={{ fontSize: 11, color: "#6B7280", marginTop: 1 }}>
+          <div style={{ fontSize: 11, color: "var(--ds-text-secondary)", marginTop: 1 }}>
             {patientName && `Patient: ${patientName}`}{patientName && doctorName && " · "}
             {doctorName && `Doctor: ${doctorName}`}{visitDate && ` · Visit: ${visitDate}`}
           </div>
@@ -976,9 +979,9 @@ export default function Odontogram({
           {/* Dentition badge */}
           <span style={{
             padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600,
-            background: isPrimary ? "#FEF3C7" : "var(--ds-info-100)",
-            color: isPrimary ? "#92400E" : "var(--ds-info-800)",
-            border: `1px solid ${isPrimary ? "#FDE68A" : "var(--ds-info-300)"}`,
+            background: isPrimary ? "var(--ds-warning-subtle)" : "var(--ds-info-100)",
+            color: isPrimary ? "var(--ds-warning)" : "var(--ds-info-800)",
+            border: `1px solid ${isPrimary ? "var(--ds-warning-200)" : "var(--ds-info-300)"}`,
           }}>
             {dentitionLabel} Dentition
           </span>
@@ -1002,7 +1005,7 @@ export default function Odontogram({
             ref={chartRef}
             onMouseMove={handleMouseMove}
             style={{
-              background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb",
+              background: "var(--ds-surface)", borderRadius: 12, border: "1px solid var(--ds-border)",
               padding: "12px 8px 8px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
               position: "relative", overflow: "hidden",
             }}
@@ -1020,7 +1023,7 @@ export default function Odontogram({
               <path d={getGingivaPath(false)} fill="url(#gingiva-margin)" opacity={0.25} transform="translate(0, -4)" />
 
               {/* Tongue */}
-              <path d={getTonguePath()} fill="#e8b8a0" opacity={0.25} />
+              <path d={getTonguePath()} fill="var(--ds-clinical-tongue)" opacity={0.25} />
 
               {/* Upper teeth */}
               {upperTeeth.map((t) => (
@@ -1065,13 +1068,13 @@ export default function Odontogram({
               ))}
 
               {/* Arch labels */}
-              <text x={0} y={-48} textAnchor="middle" fill="#b0a898" fontSize={9} fontWeight={500} letterSpacing="0.06em">MAXILLARY</text>
-              <text x={0} y={210} textAnchor="middle" fill="#b0a898" fontSize={9} fontWeight={500} letterSpacing="0.06em">MANDIBULAR</text>
+              <text x={0} y={-48} textAnchor="middle" fill="var(--ds-clinical-outline)" fontSize={9} fontWeight={500} letterSpacing="0.06em">MAXILLARY</text>
+              <text x={0} y={210} textAnchor="middle" fill="var(--ds-clinical-outline)" fontSize={9} fontWeight={500} letterSpacing="0.06em">MANDIBULAR</text>
             </svg>
           </div>
 
           {/* Tooth count */}
-          <div style={{ textAlign: "center", fontSize: 10, color: "#9CA3AF", marginTop: 6, marginBottom: 12 }}>
+          <div style={{ textAlign: "center", fontSize: 10, color: "var(--ds-text-tertiary)", marginTop: 6, marginBottom: 12 }}>
             {findings.length} finding{findings.length !== 1 ? "s" : ""} across {new Set(findings.map((f) => f.toothNumber)).size} teeth
           </div>
 

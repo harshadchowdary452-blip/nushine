@@ -667,13 +667,13 @@ export default function TreatmentPlanApproval() {
                     )}
 
                     <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground">
-                      <div className="rounded-md bg-slate-50 p-2">
-                        <span className="font-medium text-slate-700">Active Cases</span>
-                        <p className="text-lg font-semibold text-slate-900">{activeCases.length}</p>
+                      <div className="rounded-md bg-[var(--ds-background-subtle)] p-2">
+                        <span className="font-medium text-[var(--ds-text-secondary)]">Active Cases</span>
+                        <p className="text-lg font-semibold text-[var(--ds-text)]">{activeCases.length}</p>
                       </div>
-                      <div className="rounded-md bg-slate-50 p-2">
-                        <span className="font-medium text-slate-700">Completed Cases</span>
-                        <p className="text-lg font-semibold text-slate-900">
+                      <div className="rounded-md bg-[var(--ds-background-subtle)] p-2">
+                        <span className="font-medium text-[var(--ds-text-secondary)]">Completed Cases</span>
+                        <p className="text-lg font-semibold text-[var(--ds-text)]">
                           {completedCases.length}
                         </p>
                       </div>
@@ -957,7 +957,7 @@ export default function TreatmentPlanApproval() {
                                       )}
                                       <select
                                         className={cn(
-                                          "mt-1 flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm",
+                                          "mt-1 flex h-9 w-full rounded-md border border-input bg-[var(--ds-surface)] px-3 py-1 text-sm shadow-sm",
                                           "focus:outline-none focus:ring-1 focus:ring-ring",
                                           !edit.primary && "border-yellow-300",
                                         )}
@@ -994,7 +994,7 @@ export default function TreatmentPlanApproval() {
                                   Assistant (Optional)
                                 </Label>
                                 <select
-                                  className="mt-1 flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                                  className="mt-1 flex h-9 w-full rounded-md border border-input bg-[var(--ds-surface)] px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                                   value={edit.assistant}
                                   onChange={(e) => setRowEdit(item.id, "assistant", e.target.value)}
                                   onBlur={() => triggerAutoSave(item.id)}
@@ -1013,7 +1013,7 @@ export default function TreatmentPlanApproval() {
                               <div>
                                 <Label className="text-xs text-muted-foreground">Priority</Label>
                                 <select
-                                  className="mt-1 flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                                  className="mt-1 flex h-9 w-full rounded-md border border-input bg-[var(--ds-surface)] px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                                   value={edit.priority}
                                   onChange={(e) => setRowEdit(item.id, "priority", e.target.value)}
                                   onBlur={() => triggerAutoSave(item.id)}
@@ -1088,7 +1088,7 @@ export default function TreatmentPlanApproval() {
                     <div>
                       <Label className="text-xs text-muted-foreground">Treatment</Label>
                       <select
-                        className="mt-1 flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                        className="mt-1 flex h-9 w-full rounded-md border border-input bg-[var(--ds-surface)] px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                         value={firstAppointment?.treatment_item_id || ""}
                         onChange={(e) => {
                           setFirstAppointment((prev) => ({
@@ -1118,7 +1118,7 @@ export default function TreatmentPlanApproval() {
                     <div>
                       <Label className="text-xs text-muted-foreground">Doctor *</Label>
                       <select
-                        className="mt-1 flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                        className="mt-1 flex h-9 w-full rounded-md border border-input bg-[var(--ds-surface)] px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                         value={firstAppointment?.doctor_id || ""}
                         onChange={(e) =>
                           setFirstAppointment((prev) => ({
@@ -1211,7 +1211,7 @@ export default function TreatmentPlanApproval() {
                         <Label className="text-xs text-muted-foreground">Chair</Label>
                         <input
                           type="text"
-                          className="mt-1 flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                          className="mt-1 flex h-9 w-full rounded-md border border-input bg-[var(--ds-surface)] px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                           value={firstAppointment?.chair || ""}
                           onChange={(e) =>
                             setFirstAppointment((prev) => ({
@@ -1232,7 +1232,7 @@ export default function TreatmentPlanApproval() {
                         <Label className="text-xs text-muted-foreground">Room</Label>
                         <input
                           type="text"
-                          className="mt-1 flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                          className="mt-1 flex h-9 w-full rounded-md border border-input bg-[var(--ds-surface)] px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                           value={firstAppointment?.room || ""}
                           onChange={(e) =>
                             setFirstAppointment((prev) => ({
@@ -1380,7 +1380,7 @@ export default function TreatmentPlanApproval() {
       </div>
 
       {/* ─── STICKY APPROVAL FOOTER ─── */}
-      <div className="sticky bottom-0 z-[var(--ds-z-sticky)] border-t bg-white shadow-lg">
+      <div className="sticky bottom-0 z-[var(--ds-z-sticky)] border-t bg-[var(--ds-surface)] shadow-lg">
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-3">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex-1 min-w-0">

@@ -55,7 +55,7 @@ interface CrmTemplate {
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.05 } } }
 
 const statusBadge: Record<string, string> = {
-  DRAFT: "bg-gray-50 text-gray-600",
+  DRAFT: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
   ACTIVE: "bg-green-50 text-green-700",
   PAUSED: "bg-yellow-50 text-yellow-700",
   COMPLETED: "bg-blue-50 text-blue-700",
@@ -93,7 +93,7 @@ export default function CrmPage() {
       />
 
       <Tabs defaultValue="dashboard" className="w-full">
-        <TabsList className="bg-white border border-border rounded-xl p-1 flex-wrap">
+        <TabsList className="bg-[var(--ds-surface)] border border-border rounded-xl p-1 flex-wrap">
           <TabsTrigger value="dashboard">
             <LayoutDashboard className="h-4 w-4 mr-1.5" />
             Dashboard
@@ -156,7 +156,7 @@ export default function CrmPage() {
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-text-primary truncate">{c.name}</span>
                         <Badge
-                          className={`text-xs ${statusBadge[c.status] || "bg-gray-50 text-gray-600"}`}
+                          className={`text-xs ${statusBadge[c.status] || "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]"}`}
                         >
                           {c.status || "DRAFT"}
                         </Badge>
@@ -209,7 +209,7 @@ export default function CrmPage() {
                     <FileText className="h-4 w-4 text-primary" />
                     <span className="font-medium text-text-primary">{t.name}</span>
                     <Badge
-                      className={`text-xs ${t.is_active ? "bg-green-50 text-green-700" : "bg-gray-50 text-gray-500"}`}
+                      className={`text-xs ${t.is_active ? "bg-green-50 text-green-700" : "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]"}`}
                     >
                       {t.is_active ? "Active" : "Inactive"}
                     </Badge>
@@ -257,7 +257,7 @@ export default function CrmPage() {
                 className="justify-start"
                 onClick={() => navigate("/whatsapp")}
               >
-                <BarChart3 className="h-4 w-4 mr-2 text-purple-600" />
+                <BarChart3 className="h-4 w-4 mr-2 text-[var(--ds-accent-600)]" />
                 Analytics
               </Button>
             </div>

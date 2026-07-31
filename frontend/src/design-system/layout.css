@@ -1,0 +1,315 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   DESIGN SYSTEM · GRID & LAYOUT
+   NuShine Enterprise Dental Platform
+
+   One grid, inherited by every page. The primitives here exist so that no
+   module ever hand-authors a `grid-template-columns` or a gap, which is what
+   causes cards to misalign and gutters to drift between screens.
+
+   Composition model
+   ─────────────────
+     .ds-page      vertical rhythm between major page regions
+     .ds-section   vertical rhythm inside a region
+     .ds-stack     generic vertical flow
+     .ds-cluster   horizontal flow that wraps
+     .ds-grid      explicit 12-column grid
+     .ds-auto-*    content-derived grids (cards/metrics) — preferred
+
+   Prefer the `.ds-auto-*` grids. They derive their track count from available
+   width, so a collection cannot orphan a card or produce a ragged final row at
+   an untested viewport — the failure mode hand-written breakpoints always hit.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer components {
+  /* ─────────────────────────────────────────────────────────────────────────
+     PAGE SHELL
+     ───────────────────────────────────────────────────────────────────────── */
+
+  /* Root wrapper for page content. Owns the rhythm between page regions
+     (header → toolbar → content → footer). */
+  .ds-page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ds-section-gap);
+    min-width: 0;
+  }
+
+  .ds-page-tight { gap: var(--ds-section-gap-sm); }
+  .ds-page-loose { gap: var(--ds-section-gap-lg); }
+
+  /* A region within a page. */
+  .ds-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ds-element-gap);
+    min-width: 0;
+  }
+
+  .ds-section-tight { gap: var(--ds-element-gap-sm); }
+
+  /* Constrains long-form/settings content on ultra-wide displays. Without
+     this, forms stretch to 1600px and the label→field association breaks
+     down at a glance. */
+  .ds-container-narrow {
+    width: 100%;
+    max-width: var(--ds-container-narrow);
+    margin-inline: auto;
+    min-width: 0;
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     FLOW PRIMITIVES
+     ───────────────────────────────────────────────────────────────────────── */
+
+  .ds-stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ds-stack-gap);
+    min-width: 0;
+  }
+
+  .ds-stack-sm { gap: var(--ds-spacing-2); }
+  .ds-stack-lg { gap: var(--ds-spacing-5); }
+
+  /* Horizontal group that wraps instead of overflowing — the correct default
+     for toolbars, filter rows and action groups. */
+  .ds-cluster {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--ds-inline-gap);
+    min-width: 0;
+  }
+
+  .ds-cluster-sm { gap: var(--ds-spacing-2); }
+
+  /* Pushes trailing content to the far edge without margin hacks. */
+  .ds-cluster-split {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--ds-inline-gap);
+    min-width: 0;
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     12-COLUMN GRID
+     For layouts that genuinely need explicit column spans. Collapses to a
+     single column below `md` so spans never produce slivers on phones.
+     ───────────────────────────────────────────────────────────────────────── */
+
+  .ds-grid {
+    display: grid;
+    grid-template-columns: repeat(var(--ds-grid-columns), minmax(0, 1fr));
+    gap: var(--ds-grid-gutter);
+    min-width: 0;
+  }
+
+  .ds-grid-tight { gap: var(--ds-grid-gutter-sm); }
+  .ds-grid-loose { gap: var(--ds-grid-gutter-lg); }
+
+  .ds-col-1  { grid-column: span 1;  }
+  .ds-col-2  { grid-column: span 2;  }
+  .ds-col-3  { grid-column: span 3;  }
+  .ds-col-4  { grid-column: span 4;  }
+  .ds-col-5  { grid-column: span 5;  }
+  .ds-col-6  { grid-column: span 6;  }
+  .ds-col-7  { grid-column: span 7;  }
+  .ds-col-8  { grid-column: span 8;  }
+  .ds-col-9  { grid-column: span 9;  }
+  .ds-col-10 { grid-column: span 10; }
+  .ds-col-11 { grid-column: span 11; }
+  .ds-col-12 { grid-column: span 12; }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     AUTO-FIT COLLECTIONS  — the workhorse
+     Track count follows available width, so cards align at every viewport
+     including ones nobody tested. `minmax(min(<floor>, 100%), 1fr)` is what
+     stops the floor from forcing horizontal overflow inside narrow parents.
+     ───────────────────────────────────────────────────────────────────────── */
+
+  .ds-auto-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(var(--ds-grid-min-card), 100%), 1fr));
+    gap: var(--ds-grid-gutter);
+    min-width: 0;
+  }
+
+  /* KPI / metric strips — denser floor. */
+  .ds-auto-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(var(--ds-grid-min-metric), 100%), 1fr));
+    gap: var(--ds-grid-gutter);
+    min-width: 0;
+  }
+
+  /* Charts, tables, wide panels. */
+  .ds-auto-wide {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(var(--ds-grid-min-wide), 100%), 1fr));
+    gap: var(--ds-grid-gutter);
+    min-width: 0;
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     FORM GRID
+     Fields auto-fit to a comfortable floor and collapse to one column on
+     phones. `.ds-field-full` spans the row for textareas and full-width
+     controls.
+     ───────────────────────────────────────────────────────────────────────── */
+
+  .ds-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(var(--ds-grid-min-form), 100%), 1fr));
+    gap: var(--ds-spacing-4) var(--ds-grid-gutter);
+    min-width: 0;
+  }
+
+  .ds-form-grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--ds-spacing-4) var(--ds-grid-gutter);
+    min-width: 0;
+  }
+
+  .ds-field-full { grid-column: 1 / -1; }
+
+  /* A single field: label → control → helper/error. */
+  .ds-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ds-spacing-1_5);
+    min-width: 0;
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     SPLIT LAYOUTS  (detail pages: primary content + aside)
+     Stacks below `lg`, where a sidebar would be too narrow to be useful.
+     ───────────────────────────────────────────────────────────────────────── */
+
+  .ds-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--ds-grid-gutter-lg);
+    align-items: start;
+    min-width: 0;
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     OVERFLOW GUARDS
+     Grid and flex children default to `min-width: auto`, which lets wide
+     content (tables, long unbroken strings) force the whole page wider than
+     the viewport. This is the single most common cause of unwanted horizontal
+     scrolling; these guards neutralise it.
+     ───────────────────────────────────────────────────────────────────────── */
+
+  .ds-min-w-0 { min-width: 0; }
+
+  /* Horizontally scrollable region — the scroll is contained HERE rather than
+     escaping to the document. */
+  .ds-scroll-x {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    min-width: 0;
+  }
+
+  /* Wraps a wide table so only the table scrolls, never the page. */
+  .ds-table-scroll {
+    width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Forces long unbroken tokens (emails, URLs, IDs) to wrap instead of
+     stretching their container. */
+  .ds-break-anywhere {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE BEHAVIOUR
+   Breakpoints mirror --ds-breakpoint-* in tokens.css. Media query preludes
+   cannot read custom properties, so these literals must stay in sync with
+   those tokens.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── ≥ 1024px (lg) — asides become viable ── */
+@media (min-width: 1024px) {
+  .ds-split { grid-template-columns: minmax(0, 1fr) minmax(0, 340px); }
+  .ds-split-wide-aside { grid-template-columns: minmax(0, 1fr) minmax(0, 420px); }
+  .ds-split-reverse { grid-template-columns: minmax(0, 340px) minmax(0, 1fr); }
+}
+
+/* ── < 768px (md) — column spans collapse ──
+   Below tablet a 12-column grid produces unreadable slivers, so every span
+   becomes full width. Layouts reorganise rather than merely shrink. */
+@media (max-width: 767px) {
+  .ds-grid { grid-template-columns: minmax(0, 1fr); }
+
+  .ds-col-1, .ds-col-2, .ds-col-3, .ds-col-4,
+  .ds-col-5, .ds-col-6, .ds-col-7, .ds-col-8,
+  .ds-col-9, .ds-col-10, .ds-col-11, .ds-col-12 {
+    grid-column: span 1;
+  }
+
+  .ds-form-grid,
+  .ds-form-grid-2 { grid-template-columns: minmax(0, 1fr); }
+
+  /* Toolbars and action groups go full-width so tap targets stay reachable
+     with one thumb instead of crowding onto a single row. */
+  .ds-cluster-stack-mobile {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ds-cluster-stack-mobile > * { width: 100%; }
+}
+
+/* ── < 480px (xs) — tighten gutters to buy back content width ── */
+@media (max-width: 479px) {
+  :root {
+    --ds-grid-gutter: var(--ds-spacing-3);
+    --ds-card-padding: var(--ds-spacing-4);
+    --ds-container-padding-sm: var(--ds-spacing-3);
+  }
+}
+
+/* ── ≥ 1920px (3xl) — ultra-wide ──
+   Content stops growing at --ds-container-max and the surplus becomes gutter.
+   Line lengths stay readable and metric cards stay a scannable size rather
+   than stretching into banners. */
+@media (min-width: 1920px) {
+  :root {
+    --ds-grid-min-metric: 240px;
+    --ds-grid-min-card: 320px;
+    --ds-grid-gutter: var(--ds-spacing-5);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   GLOBAL OVERFLOW SAFETY NET
+   A last line of defence against horizontal scrolling. Media/embeds are
+   constrained to their container, and the document itself refuses to scroll
+   sideways.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer base {
+  html { overflow-x: hidden; }
+
+  img, svg, video, canvas, iframe {
+    max-width: 100%;
+  }
+
+  img, svg, video, canvas {
+    height: auto;
+  }
+
+  /* Tables carry an intrinsic minimum width; without this they push the page
+     wider rather than scrolling inside their own wrapper. */
+  table { max-width: 100%; }
+}

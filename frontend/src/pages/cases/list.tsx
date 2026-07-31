@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Link, useNavigate } from "react-router-dom"
+import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import {
   Search, Plus, ArrowUpDown, Loader2, Eye, Trash2,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FolderOpen
@@ -44,14 +44,19 @@ export default function CaseReportsList() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { addToast } = useToast()
+  const [searchParams] = useSearchParams()
+
+  const statusFromUrl = searchParams.get("status") || ""
+  const dateFromFromUrl = searchParams.get("date_from") || ""
+  const dateToFromUrl = searchParams.get("date_to") || ""
 
   const [page, setPage] = useState(0)
   const [pageSize] = useState(20)
   const [search, setSearch] = useState("")
-  const [statusFilter, setStatusFilter] = useState("")
+  const [statusFilter, setStatusFilter] = useState(statusFromUrl)
   const [doctorFilter, setDoctorFilter] = useState("")
-  const [dateFrom, setDateFrom] = useState("")
-  const [dateTo, setDateTo] = useState("")
+  const [dateFrom, setDateFrom] = useState(dateFromFromUrl)
+  const [dateTo, setDateTo] = useState(dateToFromUrl)
   const [sortBy, setSortBy] = useState("created_at")
   const [sortDesc, setSortDesc] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)

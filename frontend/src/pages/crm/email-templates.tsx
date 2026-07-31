@@ -136,7 +136,7 @@ export default function EmailTemplates() {
                     rows={8}
                     placeholder="Email body content..."
                   />
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-[var(--ds-text-tertiary)]">
                     Use {`{name}`}, {`{doctor}`} as placeholders.
                   </p>
                 </div>
@@ -157,10 +157,10 @@ export default function EmailTemplates() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {isLoading ? (
           <div className="col-span-full flex items-center justify-center py-12">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600" />
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--ds-border)] border-t-blue-600" />
           </div>
         ) : !templates || templates.length === 0 ? (
-          <div className="col-span-full py-12 text-center text-gray-400">
+          <div className="col-span-full py-12 text-center text-[var(--ds-text-tertiary)]">
             No templates yet. Create your first template.
           </div>
         ) : (
@@ -189,8 +189,8 @@ export default function EmailTemplates() {
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="mb-1 text-sm font-medium text-gray-700">{t.subject}</p>
-                <p className="line-clamp-3 text-sm text-gray-500">{t.body}</p>
+                <p className="mb-1 text-sm font-medium text-[var(--ds-text-secondary)]">{t.subject}</p>
+                <p className="line-clamp-3 text-sm text-[var(--ds-text-secondary)]">{t.body}</p>
               </CardContent>
             </Card>
           ))

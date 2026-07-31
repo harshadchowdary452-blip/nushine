@@ -22,13 +22,13 @@ interface FindingPanelProps {
 const ALL_SURFACES: ToothSurface[] = ['Mesial', 'Distal', 'Buccal', 'Lingual', 'Occlusal', 'Incisal', 'Labial']
 
 const SURFACE_COLORS: Record<ToothSurface, string> = {
-  Mesial: '#F59E0B',
-  Distal: '#8B5CF6',
-  Buccal: '#3B82F6',
-  Lingual: '#10B981',
-  Occlusal: '#EF4444',
-  Incisal: '#EC4899',
-  Labial: '#6366F1',
+  Mesial: 'var(--ds-toothchart-surface-mesial)',
+  Distal: 'var(--ds-toothchart-surface-distal)',
+  Buccal: 'var(--ds-toothchart-surface-buccal)',
+  Lingual: 'var(--ds-toothchart-surface-lingual)',
+  Occlusal: 'var(--ds-toothchart-surface-occlusal)',
+  Incisal: 'var(--ds-toothchart-surface-incisal)',
+  Labial: 'var(--ds-toothchart-surface-labial)',
 }
 
 export default function FindingPanel({
@@ -69,24 +69,24 @@ export default function FindingPanel({
   const showSurfaces = !isWholeTooth && ['Decayed', 'Restored', 'Defective'].includes(condition)
 
   return (
-    <div className="w-72 bg-white border-l border-gray-200 shadow-lg overflow-y-auto" style={{ maxHeight: '80vh' }}>
-      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100">
-        <span className="text-sm font-semibold text-gray-800">
+    <div className="w-72 bg-[var(--ds-surface)] border-l border-[var(--ds-border)] shadow-lg overflow-y-auto" style={{ maxHeight: '80vh' }}>
+      <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--ds-border-light)]">
+        <span className="text-sm font-semibold text-[var(--ds-text)]">
           Tooth #{toothNumber}
         </span>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
+        <button onClick={onClose} className="text-[var(--ds-text-tertiary)] hover:text-[var(--ds-text-secondary)] text-lg leading-none">&times;</button>
       </div>
-      <div className="px-3 py-2 text-xs text-gray-500 border-b border-gray-50">
+      <div className="px-3 py-2 text-xs text-[var(--ds-text-secondary)] border-b border-[var(--ds-border-light)]">
         {TOOTH_NAMES[toothNumber]}
       </div>
 
       <div className="p-3 space-y-3">
         <div>
-          <label className="text-xs font-medium text-gray-600 block mb-1">Condition</label>
+          <label className="text-xs font-medium text-[var(--ds-text-secondary)] block mb-1">Condition</label>
           <select
             value={condition}
             onChange={(e) => setCondition(e.target.value as ToothCondition)}
-            className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+            className="w-full text-xs border border-[var(--ds-border-strong)] rounded px-2 py-1.5 bg-[var(--ds-surface)] focus:outline-none focus:ring-1 focus:ring-blue-400"
           >
             {ALL_CONDITIONS.map((c) => (
               <option key={c} value={c}>{CONDITION_LABELS[c]}</option>
@@ -96,7 +96,7 @@ export default function FindingPanel({
 
         {showSurfaces && (
           <div>
-            <label className="text-xs font-medium text-gray-600 block mb-1">Surfaces</label>
+            <label className="text-xs font-medium text-[var(--ds-text-secondary)] block mb-1">Surfaces</label>
             <div className="flex gap-1.5 flex-wrap">
               {ALL_SURFACES.map((s) => (
                 <button
@@ -105,7 +105,7 @@ export default function FindingPanel({
                   className={`w-8 h-8 text-xs rounded border font-medium transition-all ${
                     selectedSurfaces.includes(s)
                       ? 'text-white border-transparent shadow-sm'
-                      : 'text-gray-500 border-gray-300 hover:bg-gray-50'
+                      : 'text-[var(--ds-text-secondary)] border-[var(--ds-border-strong)] hover:bg-[var(--ds-surface-hover)]'
                   }`}
                   style={selectedSurfaces.includes(s) ? { backgroundColor: SURFACE_COLORS[s] } : {}}
                   title={s}
@@ -119,11 +119,11 @@ export default function FindingPanel({
 
         {showSurfaces && (
           <div>
-            <label className="text-xs font-medium text-gray-600 block mb-1">Material</label>
+            <label className="text-xs font-medium text-[var(--ds-text-secondary)] block mb-1">Material</label>
             <select
               value={material}
               onChange={(e) => setMaterial(e.target.value)}
-              className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+              className="w-full text-xs border border-[var(--ds-border-strong)] rounded px-2 py-1.5 bg-[var(--ds-surface)] focus:outline-none focus:ring-1 focus:ring-blue-400"
             >
               <option value="">None</option>
               {MATERIAL_OPTIONS.map((m) => (
@@ -134,13 +134,13 @@ export default function FindingPanel({
         )}
 
         <div>
-          <label className="text-xs font-medium text-gray-600 block mb-1">Description</label>
+          <label className="text-xs font-medium text-[var(--ds-text-secondary)] block mb-1">Description</label>
           <input
             type="text"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="e.g., MOD amalgam"
-            className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+            className="w-full text-xs border border-[var(--ds-border-strong)] rounded px-2 py-1.5 bg-[var(--ds-surface)] focus:outline-none focus:ring-1 focus:ring-blue-400"
           />
         </div>
 
@@ -153,21 +153,21 @@ export default function FindingPanel({
 
         {toothFindings.length > 0 && (
           <div>
-            <label className="text-xs font-medium text-gray-600 block mb-1">Current Findings</label>
+            <label className="text-xs font-medium text-[var(--ds-text-secondary)] block mb-1">Current Findings</label>
             <div className="space-y-1 max-h-40 overflow-y-auto">
               {toothFindings.map((f) => (
                 <div
                   key={f.id}
-                  className="flex items-center justify-between text-xs bg-gray-50 rounded px-2 py-1"
+                  className="flex items-center justify-between text-xs bg-[var(--ds-background-subtle)] rounded px-2 py-1"
                 >
                   <span>
                     <span className="font-medium">{f.condition}</span>
                     {f.surfaces && f.surfaces.length > 0 && (
-                      <span className="text-gray-500 ml-1">
+                      <span className="text-[var(--ds-text-secondary)] ml-1">
                         ({f.surfaces.map((s) => SURFACE_LABELS[s]).join(',')})
                       </span>
                     )}
-                    {f.description && <span className="text-gray-400 ml-1">- {f.description}</span>}
+                    {f.description && <span className="text-[var(--ds-text-tertiary)] ml-1">- {f.description}</span>}
                   </span>
                   <button
                     onClick={() => onRemove(f.id)}

@@ -299,7 +299,7 @@ export default function DoctorAvailability() {
         description="Manage your working hours, leaves, and blocked slots"
       />
 
-      <div className="flex gap-1 p-1 bg-gray-100 rounded-lg w-fit">
+      <div className="flex gap-1 p-1 bg-[var(--ds-background-subtle)] rounded-lg w-fit">
         {tabs.map((tab) => {
           const Icon = tab.icon
           return (
@@ -308,8 +308,8 @@ export default function DoctorAvailability() {
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
                 activeTab === tab.id
-                  ? "bg-white text-indigo-700 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
+                  ? "bg-[var(--ds-surface)] text-[var(--ds-primary-700)] shadow-sm"
+                  : "text-[var(--ds-text-secondary)] hover:text-[var(--ds-text-secondary)]"
               }`}
             >
               <Icon className="h-4 w-4" />
@@ -345,7 +345,7 @@ export default function DoctorAvailability() {
                 return (
                   <div
                     key={i}
-                    className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg border border-gray-200"
+                    className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg border border-[var(--ds-border)]"
                   >
                     <div className="flex items-center gap-3 sm:w-40">
                       <Switch
@@ -353,7 +353,7 @@ export default function DoctorAvailability() {
                         onCheckedChange={(v) => handleDayToggle(i, v)}
                       />
                       <span
-                        className={`text-sm font-medium ${s && !s.is_available ? "text-gray-400 line-through" : "text-gray-900"}`}
+                        className={`text-sm font-medium ${s && !s.is_available ? "text-[var(--ds-text-tertiary)] line-through" : "text-[var(--ds-text)]"}`}
                       >
                         {name}
                       </span>
@@ -361,7 +361,7 @@ export default function DoctorAvailability() {
                     {(s ? s.is_available : i < 5) && (
                       <div className="flex flex-wrap items-center gap-2 flex-1">
                         <div className="flex items-center gap-1">
-                          <Label className="text-xs text-gray-500">From</Label>
+                          <Label className="text-xs text-[var(--ds-text-secondary)]">From</Label>
                           <Input
                             type="time"
                             value={s?.start_time || "09:00"}
@@ -370,7 +370,7 @@ export default function DoctorAvailability() {
                           />
                         </div>
                         <div className="flex items-center gap-1">
-                          <Label className="text-xs text-gray-500">To</Label>
+                          <Label className="text-xs text-[var(--ds-text-secondary)]">To</Label>
                           <Input
                             type="time"
                             value={s?.end_time || "21:00"}
@@ -380,14 +380,14 @@ export default function DoctorAvailability() {
                         </div>
                         <Separator orientation="vertical" className="h-6 hidden sm:block" />
                         <div className="flex items-center gap-1">
-                          <Label className="text-xs text-gray-500">Lunch</Label>
+                          <Label className="text-xs text-[var(--ds-text-secondary)]">Lunch</Label>
                           <Input
                             type="time"
                             value={s?.lunch_start || "13:00"}
                             onChange={(e) => handleTimeChange(i, "lunch_start", e.target.value)}
                             className="h-8 w-24 text-xs"
                           />
-                          <span className="text-xs text-gray-400">to</span>
+                          <span className="text-xs text-[var(--ds-text-tertiary)]">to</span>
                           <Input
                             type="time"
                             value={s?.lunch_end || "14:00"}
@@ -433,16 +433,16 @@ export default function DoctorAvailability() {
           <CardContent>
             {overridesQuery.isLoading ? (
               <div className="flex justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                <Loader2 className="h-6 w-6 animate-spin text-[var(--ds-text-tertiary)]" />
               </div>
             ) : overridesQuery.data?.length === 0 ? (
-              <p className="text-center text-gray-400 py-8 text-sm">No date overrides set</p>
+              <p className="text-center text-[var(--ds-text-tertiary)] py-8 text-sm">No date overrides set</p>
             ) : (
               <div className="space-y-2">
                 {overridesQuery.data?.map((ov) => (
                   <div
                     key={ov.id}
-                    className="flex items-center justify-between p-3 rounded-lg border border-gray-200"
+                    className="flex items-center justify-between p-3 rounded-lg border border-[var(--ds-border)]"
                   >
                     <div className="flex items-center gap-3">
                       <Badge
@@ -452,17 +452,17 @@ export default function DoctorAvailability() {
                         {ov.is_available ? "Available" : "Unavailable"}
                       </Badge>
                       <div>
-                        <p className="text-sm font-medium text-gray-900">
+                        <p className="text-sm font-medium text-[var(--ds-text)]">
                           {format(new Date(ov.date), "MMM dd, yyyy")}
                         </p>
                         {ov.is_available && (
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-[var(--ds-text-secondary)]">
                             {ov.start_time?.slice(0, 5)} - {ov.end_time?.slice(0, 5)}
                             {ov.lunch_start &&
                               ` | Lunch: ${ov.lunch_start.slice(0, 5)}-${ov.lunch_end?.slice(0, 5)}`}
                           </p>
                         )}
-                        {ov.reason && <p className="text-xs text-gray-400 mt-0.5">{ov.reason}</p>}
+                        {ov.reason && <p className="text-xs text-[var(--ds-text-tertiary)] mt-0.5">{ov.reason}</p>}
                       </div>
                     </div>
                     <div className="flex gap-1">
@@ -504,16 +504,16 @@ export default function DoctorAvailability() {
           <CardContent>
             {leavesQuery.isLoading ? (
               <div className="flex justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                <Loader2 className="h-6 w-6 animate-spin text-[var(--ds-text-tertiary)]" />
               </div>
             ) : leavesQuery.data?.length === 0 ? (
-              <p className="text-center text-gray-400 py-8 text-sm">No leave requests</p>
+              <p className="text-center text-[var(--ds-text-tertiary)] py-8 text-sm">No leave requests</p>
             ) : (
               <div className="space-y-2">
                 {leavesQuery.data?.map((leave) => (
                   <div
                     key={leave.id}
-                    className="flex items-center justify-between p-3 rounded-lg border border-gray-200"
+                    className="flex items-center justify-between p-3 rounded-lg border border-[var(--ds-border)]"
                   >
                     <div className="flex items-center gap-3">
                       <Badge
@@ -523,11 +523,11 @@ export default function DoctorAvailability() {
                         {leave.status}
                       </Badge>
                       <div>
-                        <p className="text-sm font-medium text-gray-900">
+                        <p className="text-sm font-medium text-[var(--ds-text)]">
                           {format(new Date(leave.start_date), "MMM dd")} -{" "}
                           {format(new Date(leave.end_date), "MMM dd, yyyy")}
                         </p>
-                        {leave.reason && <p className="text-xs text-gray-500">{leave.reason}</p>}
+                        {leave.reason && <p className="text-xs text-[var(--ds-text-secondary)]">{leave.reason}</p>}
                       </div>
                     </div>
                     {leave.status === "PENDING" && (
@@ -561,26 +561,26 @@ export default function DoctorAvailability() {
           <CardContent>
             {blockedSlotsQuery.isLoading ? (
               <div className="flex justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                <Loader2 className="h-6 w-6 animate-spin text-[var(--ds-text-tertiary)]" />
               </div>
             ) : blockedSlotsQuery.data?.length === 0 ? (
-              <p className="text-center text-gray-400 py-8 text-sm">No blocked slots</p>
+              <p className="text-center text-[var(--ds-text-tertiary)] py-8 text-sm">No blocked slots</p>
             ) : (
               <div className="space-y-2">
                 {blockedSlotsQuery.data?.map((block) => (
                   <div
                     key={block.id}
-                    className="flex items-center justify-between p-3 rounded-lg border border-gray-200"
+                    className="flex items-center justify-between p-3 rounded-lg border border-[var(--ds-border)]"
                   >
                     <div className="flex items-center gap-3">
                       <Badge variant="destructive" className="w-16 justify-center">
                         Blocked
                       </Badge>
                       <div>
-                        <p className="text-sm font-medium text-gray-900">
+                        <p className="text-sm font-medium text-[var(--ds-text)]">
                           {format(new Date(block.date), "MMM dd, yyyy")}
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-[var(--ds-text-secondary)]">
                           {block.start_time.slice(0, 5)} - {block.end_time.slice(0, 5)}
                           {block.reason ? ` - ${block.reason}` : ""}
                         </p>
