@@ -2,12 +2,30 @@ import { useState, useMemo, useCallback, useEffect, useRef } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
-  ArrowLeft, CheckCircle2, XCircle, Loader2, AlertTriangle, User, Stethoscope,
-  Send, Phone, Mail, Heart, MapPin, Shield, Calendar,
-  AlertCircle, Check, Loader, FileText, Eye,
-  Activity, UserPlus, RefreshCw,
+  ArrowLeft,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  AlertTriangle,
+  User,
+  Stethoscope,
+  Send,
+  Phone,
+  Mail,
+  Heart,
+  MapPin,
+  Shield,
+  Calendar,
+  AlertCircle,
+  Check,
+  Loader,
+  FileText,
+  Eye,
+  Activity,
+  UserPlus,
+  RefreshCw,
 } from "lucide-react"
-import PageHeader from "@/components/layout/page-header"
+import { PageHeader } from "@/design-system"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -15,14 +33,29 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
 import { casesApi, treatmentPlanItemsApi, doctorsApi, appointmentsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
 import { useAuthStore } from "@/store/authStore"
 import { formatIndianRupees } from "@/lib/currency"
 import { cn } from "@/lib/utils"
 import AppointmentScheduler from "@/components/appointments/AppointmentScheduler"
-import type { Case, Patient, TreatmentPlanItem, DoctorListItem, AppointmentCreatePayload, ClinicalFinding, ClinicalProgressNote, DoctorOption } from "@/types"
+import type {
+  Case,
+  Patient,
+  TreatmentPlanItem,
+  DoctorListItem,
+  AppointmentCreatePayload,
+  ClinicalFinding,
+  ClinicalProgressNote,
+  DoctorOption,
+} from "@/types"
 import { extractDetail } from "@/types"
 
 function calcAge(dob: string | null | undefined): number | null {
@@ -37,17 +70,17 @@ function calcAge(dob: string | null | undefined): number | null {
 
 const PROCEDURE_SPECIALIZATION_MAP: Record<string, string[]> = {
   "root canal": ["Endodontist", "Endodontics", "Conservative Dentistry"],
-  "extraction": ["Oral Surgeon", "Oral and Maxillofacial Surgery", "Oral Surgery"],
-  "bridge": ["Prosthodontist", "Prosthodontics", "Crown and Bridge"],
-  "crown": ["Prosthodontist", "Prosthodontics", "Crown and Bridge"],
-  "scaling": ["Periodontist", "Periodontics", "Periodontology"],
-  "implant": ["Oral Surgeon", "Implantologist", "Prosthodontist"],
-  "orthodont": ["Orthodontist", "Orthodontics"],
-  "braces": ["Orthodontist", "Orthodontics"],
-  "whitening": ["Cosmetic Dentist", "Cosmetic Dentistry", "Conservative Dentistry"],
-  "filling": ["Conservative Dentist", "Conservative Dentistry", "Endodontist"],
-  "rct": ["Endodontist", "Endodontics", "Conservative Dentistry"],
-  "RCT": ["Endodontist", "Endodontics", "Conservative Dentistry"],
+  extraction: ["Oral Surgeon", "Oral and Maxillofacial Surgery", "Oral Surgery"],
+  bridge: ["Prosthodontist", "Prosthodontics", "Crown and Bridge"],
+  crown: ["Prosthodontist", "Prosthodontics", "Crown and Bridge"],
+  scaling: ["Periodontist", "Periodontics", "Periodontology"],
+  implant: ["Oral Surgeon", "Implantologist", "Prosthodontist"],
+  orthodont: ["Orthodontist", "Orthodontics"],
+  braces: ["Orthodontist", "Orthodontics"],
+  whitening: ["Cosmetic Dentist", "Cosmetic Dentistry", "Conservative Dentistry"],
+  filling: ["Conservative Dentist", "Conservative Dentistry", "Endodontist"],
+  rct: ["Endodontist", "Endodontics", "Conservative Dentistry"],
+  RCT: ["Endodontist", "Endodontics", "Conservative Dentistry"],
 }
 
 function getRecommendedSpecializations(procedureName: string): string[] {
@@ -59,14 +92,17 @@ function getRecommendedSpecializations(procedureName: string): string[] {
   return []
 }
 
-function sortDoctorsByRelevance(doctors: { id: string; name: string; specialization: string | null }[], procedureName: string) {
+function sortDoctorsByRelevance(
+  doctors: { id: string; name: string; specialization: string | null }[],
+  procedureName: string,
+) {
   const specs = getRecommendedSpecializations(procedureName)
   if (specs.length === 0) return doctors
   const recommended: typeof doctors = []
   const others: typeof doctors = []
   for (const doc of doctors) {
     const spec = (doc.specialization || "").toLowerCase()
-    if (specs.some(s => spec.includes(s.toLowerCase()))) {
+    if (specs.some((s) => spec.includes(s.toLowerCase()))) {
       recommended.push(doc)
     } else {
       others.push(doc)
@@ -152,49 +188,73 @@ export default function TreatmentPlanApproval() {
   })
 
   const doctorList: DoctorOption[] = useMemo(() => {
-    const raw = Array.isArray(doctorsData) ? doctorsData : (doctorsData?.items || [])
-    return raw.filter((d: DoctorListItem) => d.is_active !== false).map((d: DoctorListItem): DoctorOption => ({
-      id: d.id,
-      name: d.full_name || d.name || d.email || "",
-      specialization: d.specialization || null,
-    }))
+    const raw = Array.isArray(doctorsData) ? doctorsData : doctorsData?.items || []
+    return raw
+      .filter((d: DoctorListItem) => d.is_active !== false)
+      .map((d: DoctorListItem): DoctorOption => ({
+        id: d.id,
+        name: d.full_name || d.name || d.email || "",
+        specialization: d.specialization || null,
+      }))
   }, [doctorsData])
 
-  const itemList = useMemo(() => (Array.isArray(items) ? items : (items?.items || [])), [items])
-  const totalCost = itemList.reduce((sum: number, item: TreatmentPlanItem) => sum + (item.estimated_cost || 0), 0)
-  const totalVisits = itemList.reduce((sum: number, item: TreatmentPlanItem) => sum + (item.estimated_visits || 0), 0)
+  const itemList = useMemo(() => (Array.isArray(items) ? items : items?.items || []), [items])
+  const totalCost = itemList.reduce(
+    (sum: number, item: TreatmentPlanItem) => sum + (item.estimated_cost || 0),
+    0,
+  )
+  const totalVisits = itemList.reduce(
+    (sum: number, item: TreatmentPlanItem) => sum + (item.estimated_visits || 0),
+    0,
+  )
   const user = useAuthStore((s) => s.user)
   const isAdmin = user?.role === "HOSPITAL_ADMIN" || user?.role === "SUPER_ADMIN"
 
-  const getEdit = useCallback((itemId: string): RowEdit => {
-    const item = itemList.find((i: TreatmentPlanItem) => i.id === itemId)
-    return rowEdits[itemId] || {
-      primary: item?.assigned_doctor_id || "",
-      assistant: item?.assistant_doctor_id || "",
-      priority: item?.priority || "",
-    }
-  }, [rowEdits, itemList])
+  const getEdit = useCallback(
+    (itemId: string): RowEdit => {
+      const item = itemList.find((i: TreatmentPlanItem) => i.id === itemId)
+      return (
+        rowEdits[itemId] || {
+          primary: item?.assigned_doctor_id || "",
+          assistant: item?.assistant_doctor_id || "",
+          priority: item?.priority || "",
+        }
+      )
+    },
+    [rowEdits, itemList],
+  )
 
-  const getPrimaryDoctor = useCallback((item: TreatmentPlanItem) => getEdit(item.id).primary, [getEdit])
+  const getPrimaryDoctor = useCallback(
+    (item: TreatmentPlanItem) => getEdit(item.id).primary,
+    [getEdit],
+  )
 
-  const isItemModified = useCallback((itemId: string) => {
-    const item = itemList.find((i: TreatmentPlanItem) => i.id === itemId)
-    if (!item) return false
-    const edit = getEdit(itemId)
-    return edit.primary !== (item.assigned_doctor_id || "") ||
-      edit.assistant !== (item.assistant_doctor_id || "") ||
-      edit.priority !== (item.priority || "")
-  }, [itemList, getEdit])
+  const isItemModified = useCallback(
+    (itemId: string) => {
+      const item = itemList.find((i: TreatmentPlanItem) => i.id === itemId)
+      if (!item) return false
+      const edit = getEdit(itemId)
+      return (
+        edit.primary !== (item.assigned_doctor_id || "") ||
+        edit.assistant !== (item.assistant_doctor_id || "") ||
+        edit.priority !== (item.priority || "")
+      )
+    },
+    [itemList, getEdit],
+  )
 
   const hasAnyModifications = useMemo(() => {
     return itemList.some((item: TreatmentPlanItem) => isItemModified(item.id))
   }, [itemList, isItemModified])
 
   const allItemsHaveDoctor = useMemo(() => {
-    return itemList.length > 0 && itemList.every((item: TreatmentPlanItem) => {
-      const edit = getEdit(item.id)
-      return edit.primary
-    })
+    return (
+      itemList.length > 0 &&
+      itemList.every((item: TreatmentPlanItem) => {
+        const edit = getEdit(item.id)
+        return edit.primary
+      })
+    )
   }, [itemList, getEdit])
 
   const allItemsSaved = useMemo(() => {
@@ -208,63 +268,93 @@ export default function TreatmentPlanApproval() {
   }, [itemList, rowStatuses, isItemModified])
 
   const assignMutation = useMutation({
-    mutationFn: async (assignments: { item_id: string; assigned_doctor_id?: string; assistant_doctor_id?: string; priority?: string }[]) => {
+    mutationFn: async (
+      assignments: {
+        item_id: string
+        assigned_doctor_id?: string
+        assistant_doctor_id?: string
+        priority?: string
+      }[],
+    ) => {
       if (assignments.length === 0) return []
       return treatmentPlanItemsApi.assignDoctors(assignments)
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["treatment-plan-items", caseId] })
       variables.forEach((a) => {
-        setRowStatuses(prev => ({ ...prev, [a.item_id]: "saved" }))
+        setRowStatuses((prev) => ({ ...prev, [a.item_id]: "saved" }))
       })
       setTimeout(() => {
         variables.forEach((a) => {
-          setRowStatuses(prev => {
+          setRowStatuses((prev) => {
             if (prev[a.item_id] === "saved") return { ...prev, [a.item_id]: "idle" }
             return prev
           })
         })
       }, 2000)
     },
-    onError: (_err: Error, variables: { item_id: string; assigned_doctor_id?: string; assistant_doctor_id?: string; priority?: string }[]) => {
+    onError: (
+      _err: Error,
+      variables: {
+        item_id: string
+        assigned_doctor_id?: string
+        assistant_doctor_id?: string
+        priority?: string
+      }[],
+    ) => {
       variables.forEach((a) => {
-        setRowStatuses(prev => ({ ...prev, [a.item_id]: "error" }))
+        setRowStatuses((prev) => ({ ...prev, [a.item_id]: "error" }))
       })
-      addToast({ title: "Save Failed", description: "Could not save doctor assignment. Click to retry.", variant: "destructive" })
+      addToast({
+        title: "Save Failed",
+        description: "Could not save doctor assignment. Click to retry.",
+        variant: "destructive",
+      })
     },
   })
 
-  const triggerAutoSave = useCallback((itemId: string) => {
-    const item = itemList.find((i: TreatmentPlanItem) => i.id === itemId)
-    if (!item) return
-    const edit = getEdit(itemId)
-    if (!isItemModified(itemId)) return
+  const triggerAutoSave = useCallback(
+    (itemId: string) => {
+      const item = itemList.find((i: TreatmentPlanItem) => i.id === itemId)
+      if (!item) return
+      const edit = getEdit(itemId)
+      if (!isItemModified(itemId)) return
 
-    setRowStatuses(prev => ({ ...prev, [itemId]: "saving" }))
-    assignMutation.mutate([{
-      item_id: itemId,
-      assigned_doctor_id: edit.primary || undefined,
-      assistant_doctor_id: edit.assistant || undefined,
-      priority: edit.priority || undefined,
-    }])
-  }, [itemList, getEdit, isItemModified, assignMutation])
+      setRowStatuses((prev) => ({ ...prev, [itemId]: "saving" }))
+      assignMutation.mutate([
+        {
+          item_id: itemId,
+          assigned_doctor_id: edit.primary || undefined,
+          assistant_doctor_id: edit.assistant || undefined,
+          priority: edit.priority || undefined,
+        },
+      ])
+    },
+    [itemList, getEdit, isItemModified, assignMutation],
+  )
 
-  const setRowEdit = useCallback((itemId: string, field: keyof RowEdit, value: string) => {
-    setRowEdits(prev => {
-      const current = prev[itemId] || { primary: "", assistant: "", priority: "" }
-      return { ...prev, [itemId]: { ...current, [field]: value } }
-    })
-    setRowStatuses(prev => ({ ...prev, [itemId]: "idle" as SaveStatus }))
+  const setRowEdit = useCallback(
+    (itemId: string, field: keyof RowEdit, value: string) => {
+      setRowEdits((prev) => {
+        const current = prev[itemId] || { primary: "", assistant: "", priority: "" }
+        return { ...prev, [itemId]: { ...current, [field]: value } }
+      })
+      setRowStatuses((prev) => ({ ...prev, [itemId]: "idle" as SaveStatus }))
 
-    if (debounceTimers.current[itemId]) clearTimeout(debounceTimers.current[itemId])
-    debounceTimers.current[itemId] = setTimeout(() => {
+      if (debounceTimers.current[itemId]) clearTimeout(debounceTimers.current[itemId])
+      debounceTimers.current[itemId] = setTimeout(() => {
+        triggerAutoSave(itemId)
+      }, 500)
+    },
+    [triggerAutoSave],
+  )
+
+  const retrySave = useCallback(
+    (itemId: string) => {
       triggerAutoSave(itemId)
-    }, 500)
-  }, [triggerAutoSave])
-
-  const retrySave = useCallback((itemId: string) => {
-    triggerAutoSave(itemId)
-  }, [triggerAutoSave])
+    },
+    [triggerAutoSave],
+  )
 
   const submitMutation = useMutation({
     mutationFn: async () => {
@@ -290,7 +380,15 @@ export default function TreatmentPlanApproval() {
       setRowStatuses({})
       addToast({ title: "Submitted for Approval", variant: "success" })
     },
-    onError: (err: Error) => addToast({ title: "Error", description: (err as unknown as Record<string, unknown>)?.response ? ((err as unknown as { response: { data: { detail?: string } } }).response?.data?.detail) || "Failed to submit" : "Failed to submit", variant: "destructive" }),
+    onError: (err: Error) =>
+      addToast({
+        title: "Error",
+        description: (err as unknown as Record<string, unknown>)?.response
+          ? (err as unknown as { response: { data: { detail?: string } } }).response?.data
+              ?.detail || "Failed to submit"
+          : "Failed to submit",
+        variant: "destructive",
+      }),
   })
 
   const approveMutation = useMutation({
@@ -328,10 +426,19 @@ export default function TreatmentPlanApproval() {
       setRowEdits({})
       setRowStatuses({})
       setFirstAppointment(null)
-      addToast({ title: "Treatment Plan Approved", description: "Treatments generated. Redirecting to Treatment Workspace.", variant: "success" })
+      addToast({
+        title: "Treatment Plan Approved",
+        description: "Treatments generated. Redirecting to Treatment Workspace.",
+        variant: "success",
+      })
       navigate("/treatments")
     },
-    onError: (err: Error) => addToast({ title: "Error", description: extractDetail(err) || "Failed to approve", variant: "destructive" }),
+    onError: (err: Error) =>
+      addToast({
+        title: "Error",
+        description: extractDetail(err) || "Failed to approve",
+        variant: "destructive",
+      }),
   })
 
   const rejectMutation = useMutation({
@@ -347,7 +454,12 @@ export default function TreatmentPlanApproval() {
       addToast({ title: "Treatment Plan Rejected", variant: "success" })
       navigate(`/cases/${caseId}`)
     },
-    onError: (err: Error) => addToast({ title: "Error", description: extractDetail(err) || "Failed to reject", variant: "destructive" }),
+    onError: (err: Error) =>
+      addToast({
+        title: "Error",
+        description: extractDetail(err) || "Failed to reject",
+        variant: "destructive",
+      }),
   })
 
   const requestChangesMutation = useMutation({
@@ -362,7 +474,12 @@ export default function TreatmentPlanApproval() {
       addToast({ title: "Changes Requested", variant: "success" })
       navigate(`/cases/${caseId}`)
     },
-    onError: (err: Error) => addToast({ title: "Error", description: extractDetail(err) || "Failed to request changes", variant: "destructive" }),
+    onError: (err: Error) =>
+      addToast({
+        title: "Error",
+        description: extractDetail(err) || "Failed to request changes",
+        variant: "destructive",
+      }),
   })
 
   useEffect(() => {
@@ -373,15 +490,24 @@ export default function TreatmentPlanApproval() {
   }, [])
 
   const isLoading = caseLoading || itemsLoading
-  if (isLoading) return (
-    <div className="p-6 space-y-4">
-      <Skeleton className="h-8 w-64" />
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="space-y-4">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 w-full" />)}</div>
-        <div className="space-y-4">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)}</div>
+  if (isLoading)
+    return (
+      <div className="p-6 space-y-4">
+        <Skeleton className="h-8 w-64" />
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="space-y-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-32 w-full" />
+            ))}
+          </div>
+          <div className="space-y-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-24 w-full" />
+            ))}
+          </div>
+        </div>
       </div>
-    </div>
-  )
+    )
   if (!c) return <div className="py-20 text-center text-muted-foreground">Case not found</div>
 
   const planStatus = c.treatment_plan_status
@@ -392,31 +518,61 @@ export default function TreatmentPlanApproval() {
   const isEditable = isDraft || isRejected
 
   const patientAge = patient?.age ?? calcAge(patient?.date_of_birth)
-  const patientCases = Array.isArray(patientCasesData) ? patientCasesData : (patientCasesData?.items || [])
-  const activeCases = patientCases.filter((pc: Case) => pc.status !== "COMPLETED" && pc.status !== "CANCELLED")
+  const patientCases = Array.isArray(patientCasesData)
+    ? patientCasesData
+    : patientCasesData?.items || []
+  const activeCases = patientCases.filter(
+    (pc: Case) => pc.status !== "COMPLETED" && pc.status !== "CANCELLED",
+  )
   const completedCases = patientCases.filter((pc: Case) => pc.status === "COMPLETED")
 
   const findings = c.findings || []
   const diagnoses = [c.provisional_diagnosis, c.final_diagnosis, c.diagnosis].filter(Boolean)
 
   const readinessChecks = [
-    { label: "Doctors Assigned", done: allItemsHaveDoctor, detail: `${itemList.filter((_: TreatmentPlanItem, i: number) => getPrimaryDoctor(itemList[i])).length} / ${itemList.length}` },
-    { label: "Treatment Items Saved", done: allItemsSaved, detail: allItemsSaved ? "All saved" : "Some unsaved" },
-    { label: "Estimated Visits Complete", done: itemList.every((item: TreatmentPlanItem) => item.estimated_visits > 0), detail: `${totalVisits} total visits` },
-    { label: "Estimated Costs Complete", done: itemList.every((item: TreatmentPlanItem) => item.estimated_cost > 0), detail: formatIndianRupees(totalCost) },
-    { label: "First Appointment Configured", done: !!firstAppointment?.doctor_id && !!firstAppointment?.date && !!firstAppointment?.time },
-    { label: "Validation Passed", done: allItemsHaveDoctor && allItemsSaved && itemList.length > 0 },
+    {
+      label: "Doctors Assigned",
+      done: allItemsHaveDoctor,
+      detail: `${itemList.filter((_: TreatmentPlanItem, i: number) => getPrimaryDoctor(itemList[i])).length} / ${itemList.length}`,
+    },
+    {
+      label: "Treatment Items Saved",
+      done: allItemsSaved,
+      detail: allItemsSaved ? "All saved" : "Some unsaved",
+    },
+    {
+      label: "Estimated Visits Complete",
+      done: itemList.every((item: TreatmentPlanItem) => item.estimated_visits > 0),
+      detail: `${totalVisits} total visits`,
+    },
+    {
+      label: "Estimated Costs Complete",
+      done: itemList.every((item: TreatmentPlanItem) => item.estimated_cost > 0),
+      detail: formatIndianRupees(totalCost),
+    },
+    {
+      label: "First Appointment Configured",
+      done: !!firstAppointment?.doctor_id && !!firstAppointment?.date && !!firstAppointment?.time,
+    },
+    {
+      label: "Validation Passed",
+      done: allItemsHaveDoctor && allItemsSaved && itemList.length > 0,
+    },
   ]
-  const allChecksPassed = readinessChecks.every(c => c.done)
+  const allChecksPassed = readinessChecks.every((c) => c.done)
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-full">
       <div className="flex-1 pb-32">
-        <PageHeader title="Clinical Treatment Approval" description={`Case ${c.case_number || caseId!.slice(0, 8)}`}>
-          <Button variant="outline" size="sm" onClick={() => navigate(`/cases/${caseId}`)}>
-            <ArrowLeft className="h-4 w-4 mr-1" /> Back to Case
-          </Button>
-        </PageHeader>
+        <PageHeader
+          title="Clinical Treatment Approval"
+          description={`Case ${c.case_number || caseId!.slice(0, 8)}`}
+          actions={
+            <Button variant="outline" size="sm" onClick={() => navigate(`/cases/${caseId}`)}>
+              <ArrowLeft className="h-4 w-4 mr-1" /> Back to Case
+            </Button>
+          }
+        />
 
         <div className="grid gap-6 lg:grid-cols-2">
           {/* ─── LEFT PANEL: Patient Clinical Snapshot ─── */}
@@ -442,11 +598,17 @@ export default function TreatmentPlanApproval() {
                       </div>
                       <div>
                         <span className="text-muted-foreground text-xs">Age</span>
-                        <p className="font-medium">{patientAge != null ? `${patientAge} years` : "—"}</p>
+                        <p className="font-medium">
+                          {patientAge != null ? `${patientAge} years` : "—"}
+                        </p>
                       </div>
                       <div>
                         <span className="text-muted-foreground text-xs">Gender</span>
-                        <p className="font-medium">{patient.gender ? patient.gender.charAt(0) + patient.gender.slice(1).toLowerCase() : "—"}</p>
+                        <p className="font-medium">
+                          {patient.gender
+                            ? patient.gender.charAt(0) + patient.gender.slice(1).toLowerCase()
+                            : "—"}
+                        </p>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <Phone className="h-3 w-3 text-muted-foreground" />
@@ -511,7 +673,9 @@ export default function TreatmentPlanApproval() {
                       </div>
                       <div className="rounded-md bg-slate-50 p-2">
                         <span className="font-medium text-slate-700">Completed Cases</span>
-                        <p className="text-lg font-semibold text-slate-900">{completedCases.length}</p>
+                        <p className="text-lg font-semibold text-slate-900">
+                          {completedCases.length}
+                        </p>
                       </div>
                     </div>
                   </>
@@ -531,13 +695,19 @@ export default function TreatmentPlanApproval() {
               <CardContent className="py-2 text-sm space-y-2">
                 <p className="font-medium">{c.chief_complaint || "—"}</p>
                 {c.chief_complaint_duration && (
-                  <p className="text-muted-foreground text-xs">Duration: {c.chief_complaint_duration}</p>
+                  <p className="text-muted-foreground text-xs">
+                    Duration: {c.chief_complaint_duration}
+                  </p>
                 )}
                 {c.chief_complaint_severity && (
-                  <p className="text-muted-foreground text-xs">Severity: {c.chief_complaint_severity}</p>
+                  <p className="text-muted-foreground text-xs">
+                    Severity: {c.chief_complaint_severity}
+                  </p>
                 )}
                 {c.chief_complaint_associated_symptoms && (
-                  <p className="text-muted-foreground text-xs">Associated: {c.chief_complaint_associated_symptoms}</p>
+                  <p className="text-muted-foreground text-xs">
+                    Associated: {c.chief_complaint_associated_symptoms}
+                  </p>
                 )}
               </CardContent>
             </Card>
@@ -567,8 +737,20 @@ export default function TreatmentPlanApproval() {
                 <CardContent className="py-2">
                   <div className="space-y-2">
                     {findings.map((f: ClinicalFinding) => (
-                      <div key={f.id} className="flex items-start gap-2 text-xs border-b border-border/50 pb-2 last:border-0 last:pb-0">
-                        <Badge variant={f.severity === "severe" ? "danger" : f.severity === "moderate" ? "warning" : "secondary"} className="shrink-0 text-[10px]">
+                      <div
+                        key={f.id}
+                        className="flex items-start gap-2 text-xs border-b border-border/50 pb-2 last:border-0 last:pb-0"
+                      >
+                        <Badge
+                          variant={
+                            f.severity === "severe"
+                              ? "danger"
+                              : f.severity === "moderate"
+                                ? "warning"
+                                : "secondary"
+                          }
+                          className="shrink-0 text-[10px]"
+                        >
                           {f.finding_type}
                         </Badge>
                         <div className="flex-1 min-w-0">
@@ -592,10 +774,16 @@ export default function TreatmentPlanApproval() {
                 </CardHeader>
                 <CardContent className="py-2 text-sm space-y-1">
                   {c.provisional_diagnosis && (
-                    <div><span className="text-muted-foreground text-xs">Provisional:</span> <span className="font-medium">{c.provisional_diagnosis}</span></div>
+                    <div>
+                      <span className="text-muted-foreground text-xs">Provisional:</span>{" "}
+                      <span className="font-medium">{c.provisional_diagnosis}</span>
+                    </div>
                   )}
                   {c.final_diagnosis && (
-                    <div><span className="text-muted-foreground text-xs">Final:</span> <span className="font-medium">{c.final_diagnosis}</span></div>
+                    <div>
+                      <span className="text-muted-foreground text-xs">Final:</span>{" "}
+                      <span className="font-medium">{c.final_diagnosis}</span>
+                    </div>
                   )}
                   {!c.provisional_diagnosis && !c.final_diagnosis && c.diagnosis && (
                     <p className="font-medium">{c.diagnosis}</p>
@@ -623,13 +811,16 @@ export default function TreatmentPlanApproval() {
               <Card>
                 <CardHeader className="py-3">
                   <CardTitle className="text-sm flex items-center gap-2">
-                    <FileText className="h-4 w-4" /> Clinical Progress Notes ({c.clinical_progress_notes.length})
+                    <FileText className="h-4 w-4" /> Clinical Progress Notes (
+                    {c.clinical_progress_notes.length})
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="py-2 text-xs space-y-2">
                   {c.clinical_progress_notes.map((n: ClinicalProgressNote) => (
                     <div key={n.id} className="border-l-2 border-blue-200 pl-2">
-                      <p className="text-muted-foreground">{new Date(n.note_date).toLocaleDateString()}</p>
+                      <p className="text-muted-foreground">
+                        {new Date(n.note_date).toLocaleDateString()}
+                      </p>
                       <p>{n.clinical_note}</p>
                     </div>
                   ))}
@@ -649,7 +840,9 @@ export default function TreatmentPlanApproval() {
               </CardHeader>
               <CardContent className="py-2">
                 {itemList.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-6 text-center">No treatment plan items found.</p>
+                  <p className="text-sm text-muted-foreground py-6 text-center">
+                    No treatment plan items found.
+                  </p>
                 ) : (
                   <div className="space-y-3">
                     {!allItemsHaveDoctor && isEditable && (
@@ -663,40 +856,70 @@ export default function TreatmentPlanApproval() {
                       const saveStatus = rowStatuses[item.id] || "idle"
                       const modified = isItemModified(item.id)
                       return (
-                        <div key={item.id} className={cn(
-                          "rounded-lg border p-4 text-sm space-y-3 transition-colors",
-                          modified && "border-blue-200 bg-blue-50/30",
-                          saveStatus === "error" && "border-red-200 bg-red-50/30",
-                        )}>
+                        <div
+                          key={item.id}
+                          className={cn(
+                            "rounded-lg border p-4 text-sm space-y-3 transition-colors",
+                            modified && "border-blue-200 bg-blue-50/30",
+                            saveStatus === "error" && "border-red-200 bg-red-50/30",
+                          )}
+                        >
                           <div className="flex items-start justify-between">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
                                 <p className="font-medium">{item.procedure_name || "—"}</p>
                                 {!edit.primary && isEditable && (
-                                  <Badge variant="warning" className="text-[10px]">No Doctor</Badge>
+                                  <Badge variant="warning" className="text-[10px]">
+                                    No Doctor
+                                  </Badge>
                                 )}
                                 {item.priority && (
-                                  <Badge variant={item.priority === "HIGH" ? "danger" : item.priority === "MEDIUM" ? "warning" : "secondary"} className="text-[10px]">
+                                  <Badge
+                                    variant={
+                                      item.priority === "HIGH"
+                                        ? "danger"
+                                        : item.priority === "MEDIUM"
+                                          ? "warning"
+                                          : "secondary"
+                                    }
+                                    className="text-[10px]"
+                                  >
                                     {item.priority}
                                   </Badge>
                                 )}
                               </div>
                               <p className="text-xs text-muted-foreground">
-                                Tooth: {Array.isArray(item.tooth_numbers) ? item.tooth_numbers.join(", ") : item.tooth_numbers || "—"}
-                                {" · "}{item.estimated_visits} visit(s)
-                                {" · "}{formatIndianRupees(item.estimated_cost || 0)}
+                                Tooth:{" "}
+                                {Array.isArray(item.tooth_numbers)
+                                  ? item.tooth_numbers.join(", ")
+                                  : item.tooth_numbers || "—"}
+                                {" · "}
+                                {item.estimated_visits} visit(s)
+                                {" · "}
+                                {formatIndianRupees(item.estimated_cost || 0)}
                               </p>
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0 ml-2">
                               <SaveStatusIcon status={modified ? saveStatus : "saved"} />
-                              <SaveStatusLabel status={modified ? saveStatus : (saveStatus === "error" ? "error" : "idle")} />
+                              <SaveStatusLabel
+                                status={
+                                  modified ? saveStatus : saveStatus === "error" ? "error" : "idle"
+                                }
+                              />
                               {saveStatus === "error" && (
-                                <Button variant="ghost" size="sm" className="h-5 px-1.5 text-[10px]" onClick={() => retrySave(item.id)}>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-5 px-1.5 text-[10px]"
+                                  onClick={() => retrySave(item.id)}
+                                >
                                   <RefreshCw className="h-3 w-3" /> Retry
                                 </Button>
                               )}
                               {!modified && saveStatus !== "error" && item.assigned_doctor_id && (
-                                <span className="text-[10px] text-green-600 flex items-center gap-0.5"><Check className="h-3 w-3" /> Saved</span>
+                                <span className="text-[10px] text-green-600 flex items-center gap-0.5">
+                                  <Check className="h-3 w-3" /> Saved
+                                </span>
                               )}
                             </div>
                           </div>
@@ -704,34 +927,60 @@ export default function TreatmentPlanApproval() {
                           {isEditable ? (
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                               <div>
-                                <Label className="text-xs text-muted-foreground">Primary Doctor *</Label>
+                                <Label className="text-xs text-muted-foreground">
+                                  Primary Doctor *
+                                </Label>
                                 {(() => {
-                                  const sorted = sortDoctorsByRelevance(doctorList, item.procedure_name)
+                                  const sorted = sortDoctorsByRelevance(
+                                    doctorList,
+                                    item.procedure_name,
+                                  )
                                   const specs = getRecommendedSpecializations(item.procedure_name)
-                                  const hasSpecialists = sorted.length > 0 && specs.length > 0 && sorted.some((d: DoctorOption) => d.specialization && specs.some((s: string) => d.specialization!.toLowerCase().includes(s.toLowerCase())))
+                                  const hasSpecialists =
+                                    sorted.length > 0 &&
+                                    specs.length > 0 &&
+                                    sorted.some(
+                                      (d: DoctorOption) =>
+                                        d.specialization &&
+                                        specs.some((s: string) =>
+                                          d.specialization!.toLowerCase().includes(s.toLowerCase()),
+                                        ),
+                                    )
                                   return (
                                     <>
                                       {specs.length > 0 && (
                                         <p className="text-[10px] text-blue-600 mt-0.5">
-                                          {hasSpecialists ? `Recommended: ${specs[0]}` : "No specialist available"}
+                                          {hasSpecialists
+                                            ? `Recommended: ${specs[0]}`
+                                            : "No specialist available"}
                                         </p>
                                       )}
                                       <select
                                         className={cn(
                                           "mt-1 flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm",
                                           "focus:outline-none focus:ring-1 focus:ring-ring",
-                                          !edit.primary && "border-yellow-300"
+                                          !edit.primary && "border-yellow-300",
                                         )}
                                         value={edit.primary}
-                                        onChange={(e) => setRowEdit(item.id, "primary", e.target.value)}
+                                        onChange={(e) =>
+                                          setRowEdit(item.id, "primary", e.target.value)
+                                        }
                                         onBlur={() => triggerAutoSave(item.id)}
                                       >
                                         <option value="">Select Doctor *</option>
                                         {sorted.map((doc: DoctorOption) => {
-                                          const isRecommended = specs.length > 0 && doc.specialization && specs.some((s: string) => doc.specialization!.toLowerCase().includes(s.toLowerCase()))
+                                          const isRecommended =
+                                            specs.length > 0 &&
+                                            doc.specialization &&
+                                            specs.some((s: string) =>
+                                              doc
+                                                .specialization!.toLowerCase()
+                                                .includes(s.toLowerCase()),
+                                            )
                                           return (
                                             <option key={doc.id} value={doc.id}>
-                                              {isRecommended ? "* " : ""}Dr. {doc.name}{doc.specialization ? ` (${doc.specialization})` : ""}
+                                              {isRecommended ? "* " : ""}Dr. {doc.name}
+                                              {doc.specialization ? ` (${doc.specialization})` : ""}
                                             </option>
                                           )
                                         })}
@@ -741,7 +990,9 @@ export default function TreatmentPlanApproval() {
                                 })()}
                               </div>
                               <div>
-                                <Label className="text-xs text-muted-foreground">Assistant (Optional)</Label>
+                                <Label className="text-xs text-muted-foreground">
+                                  Assistant (Optional)
+                                </Label>
                                 <select
                                   className="mt-1 flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                                   value={edit.assistant}
@@ -749,9 +1000,14 @@ export default function TreatmentPlanApproval() {
                                   onBlur={() => triggerAutoSave(item.id)}
                                 >
                                   <option value="">None</option>
-                                  {doctorList.filter((d: DoctorOption) => d.id !== edit.primary).map((doc: DoctorOption) => (
-                                    <option key={doc.id} value={doc.id}>Dr. {doc.name}{doc.specialization ? ` (${doc.specialization})` : ""}</option>
-                                  ))}
+                                  {doctorList
+                                    .filter((d: DoctorOption) => d.id !== edit.primary)
+                                    .map((doc: DoctorOption) => (
+                                      <option key={doc.id} value={doc.id}>
+                                        Dr. {doc.name}
+                                        {doc.specialization ? ` (${doc.specialization})` : ""}
+                                      </option>
+                                    ))}
                                 </select>
                               </div>
                               <div>
@@ -772,18 +1028,24 @@ export default function TreatmentPlanApproval() {
                           ) : (
                             <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                               {item.assigned_doctor_name && (
-                                <span className="text-blue-600 font-medium">Primary: Dr. {item.assigned_doctor_name}</span>
+                                <span className="text-blue-600 font-medium">
+                                  Primary: Dr. {item.assigned_doctor_name}
+                                </span>
                               )}
                               {item.assistant_doctor_name && (
                                 <span>Assistant: Dr. {item.assistant_doctor_name}</span>
                               )}
                               {item.priority && (
-                                <span className={cn(
-                                  "font-medium",
-                                  item.priority === "HIGH" && "text-red-600",
-                                  item.priority === "MEDIUM" && "text-amber-600",
-                                  item.priority === "LOW" && "text-green-600",
-                                )}>{item.priority}</span>
+                                <span
+                                  className={cn(
+                                    "font-medium",
+                                    item.priority === "HIGH" && "text-red-600",
+                                    item.priority === "MEDIUM" && "text-amber-600",
+                                    item.priority === "LOW" && "text-green-600",
+                                  )}
+                                >
+                                  {item.priority}
+                                </span>
                               )}
                             </div>
                           )}
@@ -800,7 +1062,9 @@ export default function TreatmentPlanApproval() {
                     <span className="text-muted-foreground">Total</span>
                     <div className="text-right">
                       <span className="font-semibold">{formatIndianRupees(totalCost)}</span>
-                      <span className="text-muted-foreground ml-2 text-xs">({totalVisits} visits)</span>
+                      <span className="text-muted-foreground ml-2 text-xs">
+                        ({totalVisits} visits)
+                      </span>
                     </div>
                   </div>
                 )}
@@ -816,7 +1080,10 @@ export default function TreatmentPlanApproval() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="py-2 text-sm space-y-3">
-                  <p className="text-xs text-muted-foreground">Configure the first appointment after approval. Future appointments are created during Treatment Execution.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Configure the first appointment after approval. Future appointments are created
+                    during Treatment Execution.
+                  </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <Label className="text-xs text-muted-foreground">Treatment</Label>
@@ -824,12 +1091,27 @@ export default function TreatmentPlanApproval() {
                         className="mt-1 flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                         value={firstAppointment?.treatment_item_id || ""}
                         onChange={(e) => {
-                          setFirstAppointment(prev => ({ ...prev, treatment_item_id: e.target.value, doctor_id: prev?.doctor_id || "", date: prev?.date || "", time: prev?.time || "", future_ready: prev?.future_ready || false, chair: prev?.chair || "", room: prev?.room || "" }))
+                          setFirstAppointment((prev) => ({
+                            ...prev,
+                            treatment_item_id: e.target.value,
+                            doctor_id: prev?.doctor_id || "",
+                            date: prev?.date || "",
+                            time: prev?.time || "",
+                            future_ready: prev?.future_ready || false,
+                            chair: prev?.chair || "",
+                            room: prev?.room || "",
+                          }))
                         }}
                       >
                         <option value="">Select Treatment</option>
                         {itemList.map((item: TreatmentPlanItem) => (
-                          <option key={item.id} value={item.id}>{item.procedure_name} (Tooth {Array.isArray(item.tooth_numbers) ? item.tooth_numbers.join(", ") : item.tooth_numbers || "—"})</option>
+                          <option key={item.id} value={item.id}>
+                            {item.procedure_name} (Tooth{" "}
+                            {Array.isArray(item.tooth_numbers)
+                              ? item.tooth_numbers.join(", ")
+                              : item.tooth_numbers || "—"}
+                            )
+                          </option>
                         ))}
                       </select>
                     </div>
@@ -838,11 +1120,24 @@ export default function TreatmentPlanApproval() {
                       <select
                         className="mt-1 flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                         value={firstAppointment?.doctor_id || ""}
-                        onChange={(e) => setFirstAppointment(prev => ({ ...prev, doctor_id: e.target.value, treatment_item_id: prev?.treatment_item_id || "", date: prev?.date || "", time: prev?.time || "", future_ready: prev?.future_ready || false, chair: prev?.chair || "", room: prev?.room || "" }))}
+                        onChange={(e) =>
+                          setFirstAppointment((prev) => ({
+                            ...prev,
+                            doctor_id: e.target.value,
+                            treatment_item_id: prev?.treatment_item_id || "",
+                            date: prev?.date || "",
+                            time: prev?.time || "",
+                            future_ready: prev?.future_ready || false,
+                            chair: prev?.chair || "",
+                            room: prev?.room || "",
+                          }))
+                        }
                       >
                         <option value="">Select Doctor</option>
                         {doctorList.map((doc: DoctorOption) => (
-                          <option key={doc.id} value={doc.id}>Dr. {doc.name}</option>
+                          <option key={doc.id} value={doc.id}>
+                            Dr. {doc.name}
+                          </option>
                         ))}
                       </select>
                     </div>
@@ -851,26 +1146,36 @@ export default function TreatmentPlanApproval() {
                   {firstAppointment?.doctor_id && (
                     <AppointmentScheduler
                       doctorId={firstAppointment.doctor_id}
-                      procedureName={itemList.find((i: TreatmentPlanItem) => i.id === firstAppointment.treatment_item_id)?.procedure_name || ""}
+                      procedureName={
+                        itemList.find(
+                          (i: TreatmentPlanItem) => i.id === firstAppointment.treatment_item_id,
+                        )?.procedure_name || ""
+                      }
                       appointmentType="TREATMENT"
                       date={firstAppointment.date || ""}
                       selectedTime={firstAppointment.time || ""}
                       showDoctorSelector={false}
                       showTypeSelector={false}
                       showProcedureSelector={false}
-                      onSelect={(data) => setFirstAppointment(prev => prev ? {
-                        ...prev,
-                        date: data.appointment_date,
-                        time: data.appointment_time,
-                      } : {
-                        treatment_item_id: "",
-                        doctor_id: data.doctor_id,
-                        date: data.appointment_date,
-                        time: data.appointment_time,
-                        future_ready: false,
-                        chair: "",
-                        room: "",
-                      })}
+                      onSelect={(data) =>
+                        setFirstAppointment((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                date: data.appointment_date,
+                                time: data.appointment_time,
+                              }
+                            : {
+                                treatment_item_id: "",
+                                doctor_id: data.doctor_id,
+                                date: data.appointment_date,
+                                time: data.appointment_time,
+                                future_ready: false,
+                                chair: "",
+                                room: "",
+                              },
+                        )
+                      }
                     />
                   )}
 
@@ -881,9 +1186,25 @@ export default function TreatmentPlanApproval() {
                         id="future_ready"
                         className="h-4 w-4"
                         checked={firstAppointment?.future_ready || false}
-                        onChange={(e) => setFirstAppointment(prev => ({ ...prev, future_ready: e.target.checked, treatment_item_id: prev?.treatment_item_id || "", doctor_id: prev?.doctor_id || "", date: prev?.date || "", time: prev?.time || "", chair: prev?.chair || "", room: prev?.room || "" }))}
+                        onChange={(e) =>
+                          setFirstAppointment((prev) => ({
+                            ...prev,
+                            future_ready: e.target.checked,
+                            treatment_item_id: prev?.treatment_item_id || "",
+                            doctor_id: prev?.doctor_id || "",
+                            date: prev?.date || "",
+                            time: prev?.time || "",
+                            chair: prev?.chair || "",
+                            room: prev?.room || "",
+                          }))
+                        }
                       />
-                      <Label htmlFor="future_ready" className="text-xs text-muted-foreground cursor-pointer">Future Ready</Label>
+                      <Label
+                        htmlFor="future_ready"
+                        className="text-xs text-muted-foreground cursor-pointer"
+                      >
+                        Future Ready
+                      </Label>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="flex-1">
@@ -892,7 +1213,18 @@ export default function TreatmentPlanApproval() {
                           type="text"
                           className="mt-1 flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                           value={firstAppointment?.chair || ""}
-                          onChange={(e) => setFirstAppointment(prev => ({ ...prev, chair: e.target.value, treatment_item_id: prev?.treatment_item_id || "", doctor_id: prev?.doctor_id || "", date: prev?.date || "", time: prev?.time || "", future_ready: prev?.future_ready || false, room: prev?.room || "" }))}
+                          onChange={(e) =>
+                            setFirstAppointment((prev) => ({
+                              ...prev,
+                              chair: e.target.value,
+                              treatment_item_id: prev?.treatment_item_id || "",
+                              doctor_id: prev?.doctor_id || "",
+                              date: prev?.date || "",
+                              time: prev?.time || "",
+                              future_ready: prev?.future_ready || false,
+                              room: prev?.room || "",
+                            }))
+                          }
                           placeholder="Optional"
                         />
                       </div>
@@ -902,7 +1234,18 @@ export default function TreatmentPlanApproval() {
                           type="text"
                           className="mt-1 flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                           value={firstAppointment?.room || ""}
-                          onChange={(e) => setFirstAppointment(prev => ({ ...prev, room: e.target.value, treatment_item_id: prev?.treatment_item_id || "", doctor_id: prev?.doctor_id || "", date: prev?.date || "", time: prev?.time || "", future_ready: prev?.future_ready || false, chair: prev?.chair || "" }))}
+                          onChange={(e) =>
+                            setFirstAppointment((prev) => ({
+                              ...prev,
+                              room: e.target.value,
+                              treatment_item_id: prev?.treatment_item_id || "",
+                              doctor_id: prev?.doctor_id || "",
+                              date: prev?.date || "",
+                              time: prev?.time || "",
+                              future_ready: prev?.future_ready || false,
+                              chair: prev?.chair || "",
+                            }))
+                          }
                           placeholder="Optional"
                         />
                       </div>
@@ -913,10 +1256,16 @@ export default function TreatmentPlanApproval() {
             )}
 
             {/* Treatment Readiness */}
-            <Card className={cn("border-2", allChecksPassed ? "border-green-200" : "border-amber-200")}>
+            <Card
+              className={cn("border-2", allChecksPassed ? "border-green-200" : "border-amber-200")}
+            >
               <CardHeader className="py-3">
                 <CardTitle className="text-sm flex items-center gap-2">
-                  {allChecksPassed ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : <AlertTriangle className="h-4 w-4 text-amber-600" />}
+                  {allChecksPassed ? (
+                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  ) : (
+                    <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  )}
                   Treatment Plan Readiness
                 </CardTitle>
               </CardHeader>
@@ -929,8 +1278,14 @@ export default function TreatmentPlanApproval() {
                       ) : (
                         <XCircle className="h-4 w-4 text-amber-500 shrink-0" />
                       )}
-                      <span className={cn(check.done ? "text-green-700" : "text-amber-700")}>{check.label}</span>
-                      {check.detail && <span className="text-xs text-muted-foreground ml-auto">{check.detail}</span>}
+                      <span className={cn(check.done ? "text-green-700" : "text-amber-700")}>
+                        {check.label}
+                      </span>
+                      {check.detail && (
+                        <span className="text-xs text-muted-foreground ml-auto">
+                          {check.detail}
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -951,7 +1306,9 @@ export default function TreatmentPlanApproval() {
                       <div key={doc.id} className="text-xs flex items-center gap-2 py-0.5">
                         <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
                         <span className="font-medium">Dr. {doc.name}</span>
-                        {doc.specialization && <span className="text-muted-foreground">({doc.specialization})</span>}
+                        {doc.specialization && (
+                          <span className="text-muted-foreground">({doc.specialization})</span>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -975,18 +1332,40 @@ export default function TreatmentPlanApproval() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Status</span>
-                  <Badge variant={c.status === "OPEN" ? "info" : c.status === "IN_PROGRESS" ? "success" : "default"}>{c.status}</Badge>
+                  <Badge
+                    variant={
+                      c.status === "OPEN"
+                        ? "info"
+                        : c.status === "IN_PROGRESS"
+                          ? "success"
+                          : "default"
+                    }
+                  >
+                    {c.status}
+                  </Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Plan Status</span>
-                  <Badge variant={isApproved ? "success" : isRejected ? "danger" : isPending ? "warning" : "default"}>
+                  <Badge
+                    variant={
+                      isApproved
+                        ? "success"
+                        : isRejected
+                          ? "danger"
+                          : isPending
+                            ? "warning"
+                            : "default"
+                    }
+                  >
                     {planStatus || "DRAFT"}
                   </Badge>
                 </div>
                 {isApproved && c.treatment_plan_approved_at && (
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Approved</span>
-                    <span className="text-xs">{new Date(c.treatment_plan_approved_at).toLocaleDateString()}</span>
+                    <span className="text-xs">
+                      {new Date(c.treatment_plan_approved_at).toLocaleDateString()}
+                    </span>
                   </div>
                 )}
                 {isRejected && c.treatment_plan_rejection_reason && (
@@ -1001,26 +1380,53 @@ export default function TreatmentPlanApproval() {
       </div>
 
       {/* ─── STICKY APPROVAL FOOTER ─── */}
-      <div className="sticky bottom-0 z-40 border-t bg-white shadow-lg">
+      <div className="sticky bottom-0 z-[var(--ds-z-sticky)] border-t bg-white shadow-lg">
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-3">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 text-xs">
-                <span className={cn("flex items-center gap-1", allItemsHaveDoctor ? "text-green-600" : "text-amber-600")}>
-                  {allItemsHaveDoctor ? <Check className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                <span
+                  className={cn(
+                    "flex items-center gap-1",
+                    allItemsHaveDoctor ? "text-green-600" : "text-amber-600",
+                  )}
+                >
+                  {allItemsHaveDoctor ? (
+                    <Check className="h-3 w-3" />
+                  ) : (
+                    <XCircle className="h-3 w-3" />
+                  )}
                   Doctors Assigned
                 </span>
-                <span className={cn("flex items-center gap-1", allItemsSaved ? "text-green-600" : "text-amber-600")}>
+                <span
+                  className={cn(
+                    "flex items-center gap-1",
+                    allItemsSaved ? "text-green-600" : "text-amber-600",
+                  )}
+                >
                   {allItemsSaved ? <Check className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
                   Data Saved
                 </span>
-                <span className={cn("flex items-center gap-1", allChecksPassed ? "text-green-600" : "text-amber-600")}>
-                  {allChecksPassed ? <Check className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                <span
+                  className={cn(
+                    "flex items-center gap-1",
+                    allChecksPassed ? "text-green-600" : "text-amber-600",
+                  )}
+                >
+                  {allChecksPassed ? (
+                    <Check className="h-3 w-3" />
+                  ) : (
+                    <XCircle className="h-3 w-3" />
+                  )}
                   Validation Passed
                 </span>
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {isApproved ? "Treatment Plan Approved" : isRejected ? "Treatment Plan Rejected" : "Treatment Plan Ready"}
+                {isApproved
+                  ? "Treatment Plan Approved"
+                  : isRejected
+                    ? "Treatment Plan Rejected"
+                    : "Treatment Plan Ready"}
               </p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
@@ -1032,8 +1438,13 @@ export default function TreatmentPlanApproval() {
               ) : isRejected ? (
                 <>
                   {isAdmin && itemList.length > 0 && (
-                    <Button onClick={() => submitMutation.mutate()} disabled={submitMutation.isPending || !allItemsHaveDoctor} size="sm">
-                      <Send className="h-4 w-4 mr-1" /> {submitMutation.isPending ? "Submitting..." : "Resubmit"}
+                    <Button
+                      onClick={() => submitMutation.mutate()}
+                      disabled={submitMutation.isPending || !allItemsHaveDoctor}
+                      size="sm"
+                    >
+                      <Send className="h-4 w-4 mr-1" />{" "}
+                      {submitMutation.isPending ? "Submitting..." : "Resubmit"}
                     </Button>
                   )}
                 </>
@@ -1041,13 +1452,26 @@ export default function TreatmentPlanApproval() {
                 <>
                   {isAdmin && (
                     <>
-                      <Button variant="outline" size="sm" onClick={() => setRequestChangesDialogOpen(true)}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setRequestChangesDialogOpen(true)}
+                      >
                         Request Changes
                       </Button>
-                      <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => setRejectDialogOpen(true)}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-red-600 border-red-200 hover:bg-red-50"
+                        onClick={() => setRejectDialogOpen(true)}
+                      >
                         <XCircle className="h-4 w-4 mr-1" /> Reject
                       </Button>
-                      <Button size="sm" onClick={() => setApproveDialogOpen(true)} disabled={!allItemsHaveDoctor || !allItemsSaved}>
+                      <Button
+                        size="sm"
+                        onClick={() => setApproveDialogOpen(true)}
+                        disabled={!allItemsHaveDoctor || !allItemsSaved}
+                      >
                         <CheckCircle2 className="h-4 w-4 mr-1" /> Approve & Generate
                       </Button>
                     </>
@@ -1056,8 +1480,15 @@ export default function TreatmentPlanApproval() {
               ) : isDraft ? (
                 <>
                   {itemList.length > 0 ? (
-                    <Button size="sm" onClick={() => submitMutation.mutate()} disabled={submitMutation.isPending || !allItemsHaveDoctor || !allItemsSaved}>
-                      <Send className="h-4 w-4 mr-1" /> {submitMutation.isPending ? "Submitting..." : `Submit (${itemList.length} items)`}
+                    <Button
+                      size="sm"
+                      onClick={() => submitMutation.mutate()}
+                      disabled={submitMutation.isPending || !allItemsHaveDoctor || !allItemsSaved}
+                    >
+                      <Send className="h-4 w-4 mr-1" />{" "}
+                      {submitMutation.isPending
+                        ? "Submitting..."
+                        : `Submit (${itemList.length} items)`}
                     </Button>
                   ) : (
                     <p className="text-xs text-muted-foreground">No items to submit</p>
@@ -1078,19 +1509,32 @@ export default function TreatmentPlanApproval() {
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            This will approve the treatment plan, generate executable treatments, and book the first appointment. This action locks the current version.
+            This will approve the treatment plan, generate executable treatments, and book the first
+            appointment. This action locks the current version.
           </p>
           <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-sm space-y-1">
-            <p className="font-medium text-green-800">{itemList.length} procedure(s) → treatments</p>
-            <p className="text-xs text-green-600">Total cost: {formatIndianRupees(totalCost)} · Total visits: {totalVisits}</p>
+            <p className="font-medium text-green-800">
+              {itemList.length} procedure(s) → treatments
+            </p>
+            <p className="text-xs text-green-600">
+              Total cost: {formatIndianRupees(totalCost)} · Total visits: {totalVisits}
+            </p>
             {firstAppointment?.doctor_id && firstAppointment?.date && (
-              <p className="text-xs text-green-600">First appointment: {firstAppointment.date} at {firstAppointment.time}</p>
+              <p className="text-xs text-green-600">
+                First appointment: {firstAppointment.date} at {firstAppointment.time}
+              </p>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setApproveDialogOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setApproveDialogOpen(false)}>
+              Cancel
+            </Button>
             <Button onClick={() => approveMutation.mutate()} disabled={approveMutation.isPending}>
-              {approveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CheckCircle2 className="h-4 w-4 mr-1" />}
+              {approveMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4 mr-1" />
+              )}
               Approve & Generate Treatments
             </Button>
           </DialogFooter>
@@ -1106,14 +1550,37 @@ export default function TreatmentPlanApproval() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">This will reject all {itemList.length} procedure items and send back to DRAFT.</p>
+            <p className="text-sm text-muted-foreground">
+              This will reject all {itemList.length} procedure items and send back to DRAFT.
+            </p>
             <Label>Reason for rejection *</Label>
-            <Textarea value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="Why is this plan being rejected?" rows={3} />
+            <Textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Why is this plan being rejected?"
+              rows={3}
+            />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setRejectDialogOpen(false); setRejectReason("") }}>Cancel</Button>
-            <Button variant="destructive" onClick={() => rejectMutation.mutate()} disabled={!rejectReason || rejectMutation.isPending}>
-              {rejectMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <XCircle className="h-4 w-4 mr-1" />}
+            <Button
+              variant="outline"
+              onClick={() => {
+                setRejectDialogOpen(false)
+                setRejectReason("")
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => rejectMutation.mutate()}
+              disabled={!rejectReason || rejectMutation.isPending}
+            >
+              {rejectMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : (
+                <XCircle className="h-4 w-4 mr-1" />
+              )}
               Reject
             </Button>
           </DialogFooter>
@@ -1129,14 +1596,36 @@ export default function TreatmentPlanApproval() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">Describe what changes are needed in the treatment plan.</p>
+            <p className="text-sm text-muted-foreground">
+              Describe what changes are needed in the treatment plan.
+            </p>
             <Label>Changes Required *</Label>
-            <Textarea value={requestChangesReason} onChange={(e) => setRequestChangesReason(e.target.value)} placeholder="What needs to be changed?" rows={3} />
+            <Textarea
+              value={requestChangesReason}
+              onChange={(e) => setRequestChangesReason(e.target.value)}
+              placeholder="What needs to be changed?"
+              rows={3}
+            />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setRequestChangesDialogOpen(false); setRequestChangesReason("") }}>Cancel</Button>
-            <Button onClick={() => requestChangesMutation.mutate()} disabled={!requestChangesReason || requestChangesMutation.isPending}>
-              {requestChangesMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Send className="h-4 w-4 mr-1" />}
+            <Button
+              variant="outline"
+              onClick={() => {
+                setRequestChangesDialogOpen(false)
+                setRequestChangesReason("")
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => requestChangesMutation.mutate()}
+              disabled={!requestChangesReason || requestChangesMutation.isPending}
+            >
+              {requestChangesMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : (
+                <Send className="h-4 w-4 mr-1" />
+              )}
               Send Changes
             </Button>
           </DialogFooter>

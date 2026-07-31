@@ -19,19 +19,19 @@ export default function Logo({ className, variant = "default", showTagline = fal
   const isSidebar = variant === "sidebar"
   const useDefaultIcon = !isWhite || isSidebar
   const iconFill = useDefaultIcon ? "url(#gradient-default)" : "url(#gradient-white)"
-  const toothFill = isWhite ? "#0C4A6E" : "white"
+  const toothFill = isWhite ? "var(--ds-primary-900)" : "white"
 
   return (
     <div className={cn("flex items-center gap-3", className)}>
       <svg width={s.icon} height={s.icon} viewBox="0 0 48 48" fill="none">
         <defs>
           <linearGradient id="gradient-default" x1="0" y1="0" x2="48" y2="48">
-            <stop offset="0%" stopColor="#0EA5E9" />
-            <stop offset="100%" stopColor="#14B8A6" />
+            <stop offset="0%" stopColor="var(--ds-primary-400)" />
+            <stop offset="100%" stopColor="var(--ds-primary-600)" />
           </linearGradient>
           <linearGradient id="gradient-white" x1="0" y1="0" x2="48" y2="48">
-            <stop offset="0%" stopColor="#fff" />
-            <stop offset="100%" stopColor="#e0f2fe" />
+            <stop offset="0%" stopColor="var(--ds-sidebar-logo-grad-1)" />
+            <stop offset="100%" stopColor="var(--ds-sidebar-logo-grad-2)" />
           </linearGradient>
         </defs>
         <rect width="48" height="48" rx="10" fill={iconFill} />
@@ -45,10 +45,10 @@ export default function Logo({ className, variant = "default", showTagline = fal
       <div>
         {isSidebar ? (
           <span className={cn("tracking-tight leading-tight", s.text)}>
-            <span className="bg-gradient-to-r from-[#0EA5E9] to-[#14B8A6] bg-clip-text text-transparent font-extrabold">
+            <span className="bg-gradient-to-r from-[var(--ds-primary-300)] to-[var(--ds-primary-400)] bg-clip-text text-transparent font-extrabold">
               NUSHINE
             </span>{" "}
-            <span className="text-[#0F172A] font-bold">Dental</span>
+            <span className="text-[var(--ds-sidebar-text)] font-bold">Dental</span>
           </span>
         ) : (
           <span className={cn("font-bold tracking-tight", s.text, isWhite ? "text-white" : "text-gray-900")}>
@@ -56,7 +56,7 @@ export default function Logo({ className, variant = "default", showTagline = fal
           </span>
         )}
         {showTagline && (
-          <p className={cn(s.tagline, isSidebar ? "text-[#64748B] mt-0.5" : isWhite ? "text-white/60" : "text-gray-400", "-mt-0.5")}>
+            <p className={cn(s.tagline, isSidebar ? "text-[var(--ds-sidebar-icon)] mt-0.5" : isWhite ? "text-white/60" : "text-gray-400", "-mt-0.5")}>
             {isSidebar ? "Dental Excellence Platform" : "Transforming Smiles Through Intelligent Care"}
           </p>
         )}

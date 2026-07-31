@@ -11,9 +11,9 @@ export function ToothLogo({ className = "", size = 27, showSparkle = true }: Too
     <svg className={cn("shrink-0", className)} width={size} height={size} viewBox="0 0 56 56" fill="none" aria-hidden="true">
       <defs>
         <linearGradient id="tooth-bg" x1="0" y1="0" x2="56" y2="56">
-          <stop offset="0%" stopColor="#16D3C5" />
-          <stop offset="55%" stopColor="#1AA5D4" />
-          <stop offset="100%" stopColor="#2563EB" />
+          <stop offset="0%" style={{ stopColor: "var(--ds-primary-500)" }} />
+          <stop offset="55%" style={{ stopColor: "var(--ds-primary-600)" }} />
+          <stop offset="100%" style={{ stopColor: "var(--ds-primary-800)" }} />
         </linearGradient>
         <linearGradient id="tooth-shine" x1="0" y1="0" x2="0" y2="56">
           <stop offset="0%" stopColor="white" stopOpacity="0.25" />
@@ -57,7 +57,7 @@ export function ToothLogo({ className = "", size = 27, showSparkle = true }: Too
         <g transform="translate(44, 9)">
           <path
             d="M3 0l1.2 2.3L6.5 3l-2.3 1.2L3 6.5 1.8 4.2-.5 3l2.3-1.2z"
-            fill="#16D3C5"
+            fill="var(--ds-accent-500)"
           />
         </g>
       )}
@@ -81,8 +81,8 @@ const brandSizeMap = {
 export function BrandText({ className = "", size = "md", darkBg }: BrandTextProps) {
   return (
     <span className={cn(brandSizeMap[size], "font-bold tracking-tight leading-none", className)}>
-      <span className="text-[#16D3C5]">Nu</span>
-      <span className={darkBg ? "text-white" : "text-[#0B1D3A]"}>Shine</span>
+      <span className="text-[var(--ds-primary-500)]">Nu</span>
+      <span className={darkBg ? "text-white" : "text-[var(--ds-text)]"}>Shine</span>
     </span>
   )
 }
@@ -110,7 +110,7 @@ export function BrandLogo({ className = "", size = "md", showTagline = false, sh
       <div>
         <BrandText size={s.brand} darkBg={darkBg} />
         {showTagline && (
-          <p className={cn(s.tagline, "text-[#94A3B8] font-medium tracking-[0.25em] uppercase")}>
+          <p className={cn(s.tagline, "text-[var(--ds-text-tertiary)] font-medium tracking-[0.25em] uppercase")}>
             {tagline || "Dental Management System"}
           </p>
         )}

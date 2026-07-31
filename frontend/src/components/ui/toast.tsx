@@ -50,7 +50,7 @@ function ToastViewport({ className, ...props }: React.HTMLAttributes<HTMLOListEl
   return (
     <ol
       className={cn(
-        "fixed bottom-0 right-0 z-[100] flex max-h-screen w-full flex-col-reverse gap-2 p-4 sm:max-w-[420px]",
+        "fixed bottom-0 right-0 z-[var(--ds-z-toast)] flex max-h-screen w-full flex-col-reverse gap-2 p-4 sm:max-w-[420px]",
         className
       )}
       {...props}

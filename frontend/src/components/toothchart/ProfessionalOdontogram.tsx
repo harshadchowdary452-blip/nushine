@@ -76,10 +76,10 @@ function ToothBox({ n, findings, sel, sz, onClick }: {
   const miss = tf.some((f) => f.condition === 'Missing')
   const impl = tf.some((f) => f.condition === 'Implant')
 
-  let bg = '#FFFFFF', bd = '#E5E7EB'
-  if (sel) { bg = '#EFF6FF'; bd = '#2563EB' }
-  else if (miss) { bg = '#F3F4F6'; bd = '#D1D5DB' }
-  else if (impl) { bg = '#F0F4F8'; bd = '#94A3B8' }
+  let bg = 'var(--ds-surface)', bd = 'var(--ds-border)'
+  if (sel) { bg = 'var(--ds-primary-50)'; bd = 'var(--ds-primary-500)' }
+  else if (miss) { bg = 'var(--ds-neutral-100)'; bd = 'var(--ds-neutral-300)' }
+  else if (impl) { bg = 'var(--ds-info-50)'; bd = 'var(--ds-neutral-400)' }
   else if (tf.length) { const c = findingColor(tf[0]); bg = c + '0D'; bd = c + '30' }
 
   const dots = tf.slice(0, max).map((f) => ({ label: findingLabel(f), color: findingColor(f) }))
@@ -92,15 +92,15 @@ function ToothBox({ n, findings, sel, sz, onClick }: {
       style={{
         width: sz, minWidth: sz, height: sz, borderRadius: 8, cursor: 'pointer',
         background: bg, border: `${sel ? 2 : 1}px solid ${bd}`,
-        boxShadow: sel ? '0 0 0 2px rgba(37,99,235,0.2)' : 'none',
+        boxShadow: sel ? '0 0 0 2px var(--ds-primary-200)' : 'none',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         justifyContent: 'center', gap: 1, transition: 'all 0.12s', userSelect: 'none',
       }}
-      onMouseEnter={(e) => { if (!sel && !miss) { e.currentTarget.style.background = '#F0F5FF'; e.currentTarget.style.borderColor = '#93C5FD' } }}
+      onMouseEnter={(e) => { if (!sel && !miss) { e.currentTarget.style.background = 'var(--ds-primary-50)'; e.currentTarget.style.borderColor = 'var(--ds-primary-300)' } }}
       onMouseLeave={(e) => { if (!sel) { e.currentTarget.style.background = bg; e.currentTarget.style.borderColor = bd } }}
     >
       <span style={{ fontSize: Math.max(10, sz * 0.27), fontWeight: 700, lineHeight: 1.2,
-        color: sel ? '#2563EB' : miss ? '#9CA3AF' : '#374151' }}>{n}</span>
+        color: sel ? 'var(--ds-primary-500)' : miss ? 'var(--ds-neutral-400)' : 'var(--ds-text)' }}>{n}</span>
       {tf.length > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 2, height: 10 }}>
           {dots.map((d, i) => (
@@ -320,7 +320,7 @@ function RightPanel({ n, fings, ro, onAdd, onRemove, onUpdateFinding, onClose }:
                   <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
                     {editId !== f.id && (
                       <button type="button" onClick={() => startEdit(f)} style={{
-                        background: 'none', border: 'none', cursor: 'pointer', color: '#3B82F6',
+                        background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ds-primary-600)',
                         fontSize: 10, padding: 0,
                       }}>✎</button>
                     )}
@@ -374,18 +374,18 @@ function RightPanel({ n, fings, ro, onAdd, onRemove, onUpdateFinding, onClose }:
             <div style={{ display: 'flex', gap: 4 }}>
               <button type="button" onClick={saveEdit} style={{
                 flex: 1, padding: '5px', borderRadius: 4, border: 'none',
-                background: '#2563EB', color: '#FFF', fontSize: 9, fontWeight: 600, cursor: 'pointer',
+                background: 'var(--ds-primary)', color: '#FFF', fontSize: 9, fontWeight: 600, cursor: 'pointer',
               }}>Save</button>
               <button type="button" onClick={cancelEdit} style={{
-                padding: '5px 10px', borderRadius: 4, border: '1px solid #D1D5DB',
-                background: '#FFF', color: '#374151', fontSize: 9, fontWeight: 500, cursor: 'pointer',
+                padding: '5px 10px', borderRadius: 4, border: '1px solid var(--ds-border)',
+                background: 'var(--ds-surface)', color: 'var(--ds-text)', fontSize: 9, fontWeight: 500, cursor: 'pointer',
               }}>Cancel</button>
             </div>
           ) : (
             <button type="button" onClick={handleAdd} disabled={!findingType} style={{
               width: '100%', padding: '5px', borderRadius: 4, border: 'none',
-              background: !findingType ? '#E5E7EB' : '#2563EB',
-              color: !findingType ? '#9CA3AF' : '#FFF',
+              background: !findingType ? 'var(--ds-neutral-200)' : 'var(--ds-primary)',
+              color: !findingType ? 'var(--ds-text-tertiary)' : '#FFF',
               fontSize: 9, fontWeight: 600, cursor: !findingType ? 'not-allowed' : 'pointer',
             }}>+ Add Finding</button>
           )}

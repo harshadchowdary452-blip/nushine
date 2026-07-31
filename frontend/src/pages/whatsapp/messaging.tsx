@@ -1,16 +1,36 @@
 import { useState } from "react"
 import { motion } from "framer-motion"
 import { useQuery, useMutation } from "@tanstack/react-query"
-import { Send, MessageSquare, Users, Search, Loader2, CheckCircle2, Eye, Filter, History, FileText, ExternalLink, Smartphone, Clock } from "lucide-react"
+import {
+  Send,
+  MessageSquare,
+  Users,
+  Search,
+  Loader2,
+  CheckCircle2,
+  Eye,
+  Filter,
+  History,
+  FileText,
+  ExternalLink,
+  Smartphone,
+  Clock,
+} from "lucide-react"
 import { patientsApi, whatsappV2Api } from "@/services/endpoints"
-import PageHeader from "@/components/layout/page-header"
+import { PageHeader } from "@/design-system"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/toast"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
@@ -36,11 +56,41 @@ const TEMPLATE_VARIABLES = [
 ]
 
 const PRESETS = [
-  { id: "appointment_reminder", label: "Appointment Reminder", icon: Clock, message: "Hi {{patient_name}}\n\nYour appointment with Dr. {{doctor_name}} is confirmed.\n\nDate: {{appointment_date}}\nTime: {{appointment_time}}\n\n- {{hospital_name}}" },
-  { id: "follow_up", label: "Follow-Up", icon: MessageSquare, message: "Dear {{patient_name}}, this is a follow-up reminder for your dental visit. Please contact us to schedule. - {{hospital_name}}" },
-  { id: "payment_reminder", label: "Payment Reminder", icon: FileText, message: "Dear {{patient_name}}, this is a gentle reminder about your pending payment of {{pending_amount}}. Please clear it by {{due_date}}. - {{hospital_name}}" },
-  { id: "recall", label: "6-Month Recall", icon: Clock, message: "Dear {{patient_name}}, it is time for your 6-month dental check-up. Please schedule an appointment at {{hospital_name}}." },
-  { id: "treatment_follow_up", label: "Treatment Follow-Up", icon: FileText, message: "Dear {{patient_name}}, we hope you are recovering well after your {{treatment_name}}. Please let us know if you have any concerns. - {{hospital_name}}" },
+  {
+    id: "appointment_reminder",
+    label: "Appointment Reminder",
+    icon: Clock,
+    message:
+      "Hi {{patient_name}}\n\nYour appointment with Dr. {{doctor_name}} is confirmed.\n\nDate: {{appointment_date}}\nTime: {{appointment_time}}\n\n- {{hospital_name}}",
+  },
+  {
+    id: "follow_up",
+    label: "Follow-Up",
+    icon: MessageSquare,
+    message:
+      "Dear {{patient_name}}, this is a follow-up reminder for your dental visit. Please contact us to schedule. - {{hospital_name}}",
+  },
+  {
+    id: "payment_reminder",
+    label: "Payment Reminder",
+    icon: FileText,
+    message:
+      "Dear {{patient_name}}, this is a gentle reminder about your pending payment of {{pending_amount}}. Please clear it by {{due_date}}. - {{hospital_name}}",
+  },
+  {
+    id: "recall",
+    label: "6-Month Recall",
+    icon: Clock,
+    message:
+      "Dear {{patient_name}}, it is time for your 6-month dental check-up. Please schedule an appointment at {{hospital_name}}.",
+  },
+  {
+    id: "treatment_follow_up",
+    label: "Treatment Follow-Up",
+    icon: FileText,
+    message:
+      "Dear {{patient_name}}, we hope you are recovering well after your {{treatment_name}}. Please let us know if you have any concerns. - {{hospital_name}}",
+  },
   { id: "custom", label: "Custom", icon: MessageSquare, message: "" },
 ]
 
@@ -54,16 +104,51 @@ export default function WhatsAppMessaging() {
   const [template, setTemplate] = useState("")
   const [filterType, setFilterType] = useState("all")
   const [showPreview, setShowPreview] = useState(false)
-  interface PreviewPayload { patient_id: string; patient_name: string; patient_phone: string | null; doctor_name: string | null; hospital_name: string | null; rendered_message: string; resolved_variables: Record<string, string>; unresolved_variables: string[]; validation: Record<string, boolean>; variables_panel: Record<string, Record<string, string | undefined>> }
+  interface PreviewPayload {
+    patient_id: string
+    patient_name: string
+    patient_phone: string | null
+    doctor_name: string | null
+    hospital_name: string | null
+    rendered_message: string
+    resolved_variables: Record<string, string>
+    unresolved_variables: string[]
+    validation: Record<string, boolean>
+    variables_panel: Record<string, Record<string, string | undefined>>
+  }
   const [previewData, setPreviewData] = useState<PreviewPayload | null>(null)
 
-  interface BulkItemPayload { patient_id: string; patient_name: string; patient_phone: string | null; rendered_message: string; resolved_variables: Record<string, string>; unresolved_variables: string[]; validation: Record<string, boolean>; has_phone: boolean; is_valid: boolean }
-  interface BulkPreviewPayload { items: BulkItemPayload[]; totals: { total: number; valid: number; invalid: number; with_phone: number; without_phone: number }; message: string }
+  interface BulkItemPayload {
+    patient_id: string
+    patient_name: string
+    patient_phone: string | null
+    rendered_message: string
+    resolved_variables: Record<string, string>
+    unresolved_variables: string[]
+    validation: Record<string, boolean>
+    has_phone: boolean
+    is_valid: boolean
+  }
+  interface BulkPreviewPayload {
+    items: BulkItemPayload[]
+    totals: {
+      total: number
+      valid: number
+      invalid: number
+      with_phone: number
+      without_phone: number
+    }
+    message: string
+  }
   const [showBulkPreview, setShowBulkPreview] = useState(false)
   const [bulkPreviewData, setBulkPreviewData] = useState<BulkPreviewPayload | null>(null)
 
   const [historyPage, setHistoryPage] = useState(1)
-  const [historyFilter, setHistoryFilter] = useState({ patient_id: "", message_type: "", status: "" })
+  const [historyFilter, setHistoryFilter] = useState({
+    patient_id: "",
+    message_type: "",
+    status: "",
+  })
 
   const { data: patients } = useQuery({
     queryKey: ["patients", "whatsapp"],
@@ -75,24 +160,30 @@ export default function WhatsAppMessaging() {
   })
   const { data: historyData, refetch: refetchHistory } = useQuery({
     queryKey: ["whatsapp", "history", historyPage, historyFilter],
-    queryFn: () => whatsappV2Api.history({
-      page: historyPage, page_size: 20,
-      ...(historyFilter.patient_id && { patient_id: historyFilter.patient_id }),
-      ...(historyFilter.message_type && { message_type: historyFilter.message_type }),
-      ...(historyFilter.status && { status: historyFilter.status }),
-    }),
+    queryFn: () =>
+      whatsappV2Api.history({
+        page: historyPage,
+        page_size: 20,
+        ...(historyFilter.patient_id && { patient_id: historyFilter.patient_id }),
+        ...(historyFilter.message_type && { message_type: historyFilter.message_type }),
+        ...(historyFilter.status && { status: historyFilter.status }),
+      }),
   })
 
   const patientList: Patient[] = patients?.items || patients || []
 
   const previewMutation = useMutation({
-    mutationFn: (data: { patient_id: string; message: string }) =>
-      whatsappV2Api.preview(data),
+    mutationFn: (data: { patient_id: string; message: string }) => whatsappV2Api.preview(data),
     onSuccess: (data) => {
       setPreviewData(data)
       setShowPreview(true)
     },
-    onError: () => addToast({ title: "Error", description: "Failed to generate preview", variant: "destructive" }),
+    onError: () =>
+      addToast({
+        title: "Error",
+        description: "Failed to generate preview",
+        variant: "destructive",
+      }),
   })
 
   const sendMutation = useMutation({
@@ -109,7 +200,8 @@ export default function WhatsAppMessaging() {
       setMessage("")
       setTemplate("")
     },
-    onError: () => addToast({ title: "Error", description: "Failed to send message", variant: "destructive" }),
+    onError: () =>
+      addToast({ title: "Error", description: "Failed to send message", variant: "destructive" }),
   })
 
   const bulkPreviewMutation = useMutation({
@@ -119,19 +211,31 @@ export default function WhatsAppMessaging() {
       setBulkPreviewData(data)
       setShowBulkPreview(true)
     },
-    onError: () => addToast({ title: "Error", description: "Failed to generate bulk preview", variant: "destructive" }),
+    onError: () =>
+      addToast({
+        title: "Error",
+        description: "Failed to generate bulk preview",
+        variant: "destructive",
+      }),
   })
 
   const bulkSendMutation = useMutation({
     mutationFn: (data: { items: Record<string, string>[]; send_mode: string }) =>
-      whatsappV2Api.bulkSend({ items: data.items.map(i => ({ ...i, send_mode: data.send_mode })) }),
+      whatsappV2Api.bulkSend({
+        items: data.items.map((i) => ({ ...i, send_mode: data.send_mode })),
+      }),
     onSuccess: (data) => {
-      addToast({ title: "Broadcast Done", description: `${data.sent} sent, ${data.failed} failed`, variant: "success" })
+      addToast({
+        title: "Broadcast Done",
+        description: `${data.sent} sent, ${data.failed} failed`,
+        variant: "success",
+      })
       setShowBulkPreview(false)
       setBulkPreviewData(null)
       setSelectedPatients([])
     },
-    onError: () => addToast({ title: "Error", description: "Broadcast failed", variant: "destructive" }),
+    onError: () =>
+      addToast({ title: "Error", description: "Broadcast failed", variant: "destructive" }),
   })
 
   function applyTemplate(t: string) {
@@ -145,7 +249,7 @@ export default function WhatsAppMessaging() {
 
   function togglePatient(id: string) {
     setSelectedPatients((prev) =>
-      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id],
     )
   }
 
@@ -175,7 +279,11 @@ export default function WhatsAppMessaging() {
   async function handleBulkPreview() {
     const ids = filterType === "all" ? patientList.map((p: Patient) => p.id) : selectedPatients
     if (ids.length === 0) {
-      addToast({ title: "No patients", description: "Select at least one patient", variant: "destructive" })
+      addToast({
+        title: "No patients",
+        description: "Select at least one patient",
+        variant: "destructive",
+      })
       return
     }
     bulkPreviewMutation.mutate({ patient_ids: ids, message })
@@ -195,13 +303,22 @@ export default function WhatsAppMessaging() {
 
   return (
     <motion.div className="space-y-6" variants={container} initial="hidden" animate="show">
-      <PageHeader title="WhatsApp Messaging" description="Send messages with live preview & audit trail" />
+      <PageHeader
+        title="WhatsApp Messaging"
+        description="Send messages with live preview & audit trail"
+      />
 
       <Tabs value={tab} onValueChange={(v: string) => setTab(v)} className="w-full">
         <TabsList className="bg-white border border-border rounded-xl p-1">
-          <TabsTrigger value="send"><Send className="h-4 w-4 mr-1" /> Send</TabsTrigger>
-          <TabsTrigger value="bulk"><Users className="h-4 w-4 mr-1" /> Bulk</TabsTrigger>
-          <TabsTrigger value="history"><History className="h-4 w-4 mr-1" /> History</TabsTrigger>
+          <TabsTrigger value="send">
+            <Send className="h-4 w-4 mr-1" /> Send
+          </TabsTrigger>
+          <TabsTrigger value="bulk">
+            <Users className="h-4 w-4 mr-1" /> Bulk
+          </TabsTrigger>
+          <TabsTrigger value="history">
+            <History className="h-4 w-4 mr-1" /> History
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="send" className="mt-6">
@@ -220,10 +337,14 @@ export default function WhatsAppMessaging() {
                     <div className="flex gap-2">
                       <div className="flex-1">
                         <Select value={selectedPatient} onValueChange={setSelectedPatient}>
-                          <SelectTrigger><SelectValue placeholder="Select patient..." /></SelectTrigger>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select patient..." />
+                          </SelectTrigger>
                           <SelectContent>
                             {patientList.map((p: Patient) => (
-                              <SelectItem key={p.id} value={p.id}>{p.full_name} - {p.phone}</SelectItem>
+                              <SelectItem key={p.id} value={p.id}>
+                                {p.full_name} - {p.phone}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -233,11 +354,21 @@ export default function WhatsAppMessaging() {
 
                   <div className="space-y-2">
                     <Label>Template</Label>
-                    <Select value={template} onValueChange={(v) => { setTemplate(v); applyTemplate(v) }}>
-                      <SelectTrigger><SelectValue placeholder="Choose a template..." /></SelectTrigger>
+                    <Select
+                      value={template}
+                      onValueChange={(v) => {
+                        setTemplate(v)
+                        applyTemplate(v)
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choose a template..." />
+                      </SelectTrigger>
                       <SelectContent>
                         {PRESETS.map((p) => (
-                          <SelectItem key={p.id} value={p.label}>{p.label}</SelectItem>
+                          <SelectItem key={p.id} value={p.label}>
+                            {p.label}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -247,8 +378,12 @@ export default function WhatsAppMessaging() {
                     <Label>Insert Variable</Label>
                     <div className="flex flex-wrap gap-1.5">
                       {TEMPLATE_VARIABLES.map((v) => (
-                        <button key={v.variable} type="button" onClick={() => insertVariable(v.variable)}
-                          className="rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition-colors">
+                        <button
+                          key={v.variable}
+                          type="button"
+                          onClick={() => insertVariable(v.variable)}
+                          className="rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                        >
                           {v.label}
                         </button>
                       ))}
@@ -257,14 +392,24 @@ export default function WhatsAppMessaging() {
 
                   <div className="space-y-2">
                     <Label>Message</Label>
-                    <Textarea placeholder="Type your message... Use {{variable}} for dynamic content." value={message}
-                      onChange={(e) => setMessage(e.target.value)} rows={5} />
+                    <Textarea
+                      placeholder="Type your message... Use {{variable}} for dynamic content."
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      rows={5}
+                    />
                   </div>
 
-                  <Button className="w-full gap-2"
+                  <Button
+                    className="w-full gap-2"
                     onClick={handlePreview}
-                    disabled={!selectedPatient || !message || previewMutation.isPending}>
-                    {previewMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
+                    disabled={!selectedPatient || !message || previewMutation.isPending}
+                  >
+                    {previewMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
                     Preview & Send
                   </Button>
                 </CardContent>
@@ -283,16 +428,26 @@ export default function WhatsAppMessaging() {
                   {PRESETS.map((p) => {
                     const Icon = p.icon
                     return (
-                      <button key={p.id} onClick={() => { setTemplate(p.label); applyTemplate(p.label) }}
+                      <button
+                        key={p.id}
+                        onClick={() => {
+                          setTemplate(p.label)
+                          applyTemplate(p.label)
+                        }}
                         className={`flex items-center gap-3 rounded-lg border p-3 text-left text-sm transition-all hover:border-green-300 hover:bg-green-50 ${
-                          template === p.label ? "border-green-400 bg-green-50 ring-1 ring-green-400" : "border-border"
-                        }`}>
+                          template === p.label
+                            ? "border-green-400 bg-green-50 ring-1 ring-green-400"
+                            : "border-border"
+                        }`}
+                      >
                         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100 text-green-600">
                           <Icon className="h-4 w-4" />
                         </div>
                         <div>
                           <p className="font-medium text-gray-900">{p.label}</p>
-                          <p className="text-xs text-gray-500">{p.message ? "Has template" : "Custom message"}</p>
+                          <p className="text-xs text-gray-500">
+                            {p.message ? "Has template" : "Custom message"}
+                          </p>
                         </div>
                       </button>
                     )
@@ -303,7 +458,9 @@ export default function WhatsAppMessaging() {
 
                 <div className="rounded-lg border bg-gray-50 p-3">
                   <p className="text-xs font-medium text-gray-500 mb-1">Raw Preview</p>
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{message || "Your message will appear here..."}</p>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                    {message || "Your message will appear here..."}
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -323,7 +480,10 @@ export default function WhatsAppMessaging() {
                 <BulkPreviewPanel
                   preview={bulkPreviewData}
                   onSendAll={handleBulkSend}
-                  onBack={() => { setShowBulkPreview(false); setBulkPreviewData(null) }}
+                  onBack={() => {
+                    setShowBulkPreview(false)
+                    setBulkPreviewData(null)
+                  }}
                   sending={bulkSendMutation.isPending}
                 />
               </CardContent>
@@ -340,11 +500,21 @@ export default function WhatsAppMessaging() {
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <Label>Template</Label>
-                    <Select value={template} onValueChange={(v) => { setTemplate(v); applyTemplate(v) }}>
-                      <SelectTrigger><SelectValue placeholder="Choose a template..." /></SelectTrigger>
+                    <Select
+                      value={template}
+                      onValueChange={(v) => {
+                        setTemplate(v)
+                        applyTemplate(v)
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choose a template..." />
+                      </SelectTrigger>
                       <SelectContent>
                         {PRESETS.map((p) => (
-                          <SelectItem key={p.id} value={p.label}>{p.label}</SelectItem>
+                          <SelectItem key={p.id} value={p.label}>
+                            {p.label}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -354,8 +524,12 @@ export default function WhatsAppMessaging() {
                     <Label>Insert Variable</Label>
                     <div className="flex flex-wrap gap-1.5">
                       {TEMPLATE_VARIABLES.map((v) => (
-                        <button key={v.variable} type="button" onClick={() => insertVariable(v.variable)}
-                          className="rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition-colors">
+                        <button
+                          key={v.variable}
+                          type="button"
+                          onClick={() => insertVariable(v.variable)}
+                          className="rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                        >
                           {v.label}
                         </button>
                       ))}
@@ -363,10 +537,15 @@ export default function WhatsAppMessaging() {
                   </div>
 
                   <div className="space-y-3 rounded-lg border bg-gray-50 p-3">
-                    <Label className="font-semibold text-gray-700"><Filter className="h-4 w-4 inline mr-1" />Recipients</Label>
+                    <Label className="font-semibold text-gray-700">
+                      <Filter className="h-4 w-4 inline mr-1" />
+                      Recipients
+                    </Label>
                     <div className="space-y-2">
                       <Select value={filterType} onValueChange={setFilterType}>
-                        <SelectTrigger><SelectValue placeholder="Select filter..." /></SelectTrigger>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select filter..." />
+                        </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All Patients</SelectItem>
                           <SelectItem value="ids">Select Manually</SelectItem>
@@ -377,14 +556,24 @@ export default function WhatsAppMessaging() {
 
                   <div className="space-y-2">
                     <Label>Message</Label>
-                    <Textarea placeholder="Type your broadcast message..." value={message}
-                      onChange={(e) => setMessage(e.target.value)} rows={4} />
+                    <Textarea
+                      placeholder="Type your broadcast message..."
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      rows={4}
+                    />
                   </div>
 
-                  <Button className="w-full gap-2"
+                  <Button
+                    className="w-full gap-2"
                     onClick={handleBulkPreview}
-                    disabled={!message || bulkPreviewMutation.isPending}>
-                    {bulkPreviewMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
+                    disabled={!message || bulkPreviewMutation.isPending}
+                  >
+                    {bulkPreviewMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
                     Generate Preview
                   </Button>
                 </CardContent>
@@ -404,17 +593,27 @@ export default function WhatsAppMessaging() {
                       <Input placeholder="Search patients..." className="pl-10" />
                     </div>
                     <div className="mb-2">
-                      <button onClick={toggleAll} className="flex items-center gap-2 rounded-md px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50">
-                        {selectedPatients.length === patientList.length ? "Deselect All" : "Select All"}
+                      <button
+                        onClick={toggleAll}
+                        className="flex items-center gap-2 rounded-md px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50"
+                      >
+                        {selectedPatients.length === patientList.length
+                          ? "Deselect All"
+                          : "Select All"}
                       </button>
                     </div>
                     <ScrollArea className="h-80">
                       <div className="space-y-1">
                         {patientList.map((p: Patient) => (
-                          <button key={p.id} onClick={() => togglePatient(p.id)}
+                          <button
+                            key={p.id}
+                            onClick={() => togglePatient(p.id)}
                             className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
-                              selectedPatients.includes(p.id) ? "bg-blue-50 text-blue-700" : "hover:bg-gray-50"
-                            }`}>
+                              selectedPatients.includes(p.id)
+                                ? "bg-blue-50 text-blue-700"
+                                : "hover:bg-gray-50"
+                            }`}
+                          >
                             {selectedPatients.includes(p.id) ? (
                               <CheckCircle2 className="h-4 w-4 shrink-0 text-blue-600" />
                             ) : (
@@ -422,9 +621,13 @@ export default function WhatsAppMessaging() {
                             )}
                             <div className="min-w-0 flex-1">
                               <p className="truncate font-medium">{p.full_name}</p>
-                              <p className="truncate text-xs text-gray-500">{p.phone || "No phone"}</p>
+                              <p className="truncate text-xs text-gray-500">
+                                {p.phone || "No phone"}
+                              </p>
                             </div>
-                            {p.phone && <Smartphone className="h-3.5 w-3.5 shrink-0 text-green-400" />}
+                            {p.phone && (
+                              <Smartphone className="h-3.5 w-3.5 shrink-0 text-green-400" />
+                            )}
                           </button>
                         ))}
                       </div>
@@ -448,15 +651,21 @@ export default function WhatsAppMessaging() {
               {historyData?.stats && (
                 <div className="grid grid-cols-4 gap-3 mb-4">
                   <div className="rounded-lg bg-blue-50 p-3 text-center">
-                    <p className="text-xl font-bold text-blue-600">{historyData.stats.today || 0}</p>
+                    <p className="text-xl font-bold text-blue-600">
+                      {historyData.stats.today || 0}
+                    </p>
                     <p className="text-xs text-blue-600/70">Today</p>
                   </div>
                   <div className="rounded-lg bg-purple-50 p-3 text-center">
-                    <p className="text-xl font-bold text-purple-600">{historyData.stats.this_week || 0}</p>
+                    <p className="text-xl font-bold text-purple-600">
+                      {historyData.stats.this_week || 0}
+                    </p>
                     <p className="text-xs text-purple-600/70">This Week</p>
                   </div>
                   <div className="rounded-lg bg-red-50 p-3 text-center">
-                    <p className="text-xl font-bold text-red-600">{historyData.stats.failed || 0}</p>
+                    <p className="text-xl font-bold text-red-600">
+                      {historyData.stats.failed || 0}
+                    </p>
                     <p className="text-xs text-red-600/70">Failed</p>
                   </div>
                   <div className="rounded-lg bg-green-50 p-3 text-center">
@@ -468,15 +677,27 @@ export default function WhatsAppMessaging() {
 
               <div className="flex gap-2 mb-4">
                 <div className="flex-1">
-                  <Input placeholder="Filter by patient ID..." value={historyFilter.patient_id}
-                    onChange={(e) => setHistoryFilter(f => ({ ...f, patient_id: e.target.value }))} />
+                  <Input
+                    placeholder="Filter by patient ID..."
+                    value={historyFilter.patient_id}
+                    onChange={(e) =>
+                      setHistoryFilter((f) => ({ ...f, patient_id: e.target.value }))
+                    }
+                  />
                 </div>
-                <Select value={historyFilter.message_type} onValueChange={(v) => setHistoryFilter(f => ({ ...f, message_type: v }))}>
-                  <SelectTrigger className="w-40"><SelectValue placeholder="Type" /></SelectTrigger>
+                <Select
+                  value={historyFilter.message_type}
+                  onValueChange={(v) => setHistoryFilter((f) => ({ ...f, message_type: v }))}
+                >
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Type" />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Types</SelectItem>
                     {messageTypes?.types?.map((t: Record<string, string>) => (
-                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                      <SelectItem key={t.value} value={t.value}>
+                        {t.label}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -499,13 +720,19 @@ export default function WhatsAppMessaging() {
                   </thead>
                   <tbody>
                     {historyData?.items?.length === 0 && (
-                      <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">No messages sent yet</td></tr>
+                      <tr>
+                        <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                          No messages sent yet
+                        </td>
+                      </tr>
                     )}
                     {historyData?.items?.map((item: Record<string, unknown>) => (
                       <tr key={String(item.id)} className="border-b last:border-0 hover:bg-gray-50">
                         <td className="px-4 py-2.5">
                           <div>
-                            <p className="font-medium text-gray-900">{item.patient_name as string}</p>
+                            <p className="font-medium text-gray-900">
+                              {item.patient_name as string}
+                            </p>
                             <p className="text-xs text-gray-500">{item.patient_phone as string}</p>
                           </div>
                         </td>
@@ -513,15 +740,37 @@ export default function WhatsAppMessaging() {
                           <Badge variant="info">{item.message_type as string}</Badge>
                         </td>
                         <td className="px-4 py-2.5">
-                          <Badge variant={(item.status === "SENT" || item.status === "DELIVERED") ? "success" : item.status === "FAILED" ? "destructive" : "default"}>
+                          <Badge
+                            variant={
+                              item.status === "SENT" || item.status === "DELIVERED"
+                                ? "success"
+                                : item.status === "FAILED"
+                                  ? "destructive"
+                                  : "default"
+                            }
+                          >
                             {item.status as string}
                           </Badge>
                         </td>
                         <td className="px-4 py-2.5 text-gray-600">
-                          {item.sent_via === "api" ? <><Smartphone className="h-3.5 w-3.5 inline mr-1" />API</> : <><ExternalLink className="h-3.5 w-3.5 inline mr-1" />Redirect</>}
+                          {item.sent_via === "api" ? (
+                            <>
+                              <Smartphone className="h-3.5 w-3.5 inline mr-1" />
+                              API
+                            </>
+                          ) : (
+                            <>
+                              <ExternalLink className="h-3.5 w-3.5 inline mr-1" />
+                              Redirect
+                            </>
+                          )}
                         </td>
-                        <td className="px-4 py-2.5 text-gray-600">{(item.template_name as string) || "-"}</td>
-                        <td className="px-4 py-2.5 text-gray-500 text-xs">{item.sent_at ? new Date(item.sent_at as string).toLocaleString() : "-"}</td>
+                        <td className="px-4 py-2.5 text-gray-600">
+                          {(item.template_name as string) || "-"}
+                        </td>
+                        <td className="px-4 py-2.5 text-gray-500 text-xs">
+                          {item.sent_at ? new Date(item.sent_at as string).toLocaleString() : "-"}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -530,12 +779,27 @@ export default function WhatsAppMessaging() {
 
               {historyData && historyData.total > historyData.page_size && (
                 <div className="flex items-center justify-between mt-4">
-                  <p className="text-sm text-gray-500">Page {historyData.page} of {Math.ceil(historyData.total / historyData.page_size)}</p>
+                  <p className="text-sm text-gray-500">
+                    Page {historyData.page} of{" "}
+                    {Math.ceil(historyData.total / historyData.page_size)}
+                  </p>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" disabled={historyPage <= 1}
-                      onClick={() => setHistoryPage(p => p - 1)}>Previous</Button>
-                    <Button variant="outline" size="sm" disabled={historyPage >= Math.ceil(historyData.total / historyData.page_size)}
-                      onClick={() => setHistoryPage(p => p + 1)}>Next</Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={historyPage <= 1}
+                      onClick={() => setHistoryPage((p) => p - 1)}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={historyPage >= Math.ceil(historyData.total / historyData.page_size)}
+                      onClick={() => setHistoryPage((p) => p + 1)}
+                    >
+                      Next
+                    </Button>
                   </div>
                 </div>
               )}
@@ -546,7 +810,10 @@ export default function WhatsAppMessaging() {
 
       <WhatsAppPreviewModal
         open={showPreview}
-        onClose={() => { setShowPreview(false); setPreviewData(null) }}
+        onClose={() => {
+          setShowPreview(false)
+          setPreviewData(null)
+        }}
         preview={previewData}
         loading={previewMutation.isPending}
         onSend={handleSendFromPreview}

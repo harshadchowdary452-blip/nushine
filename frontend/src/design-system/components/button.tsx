@@ -9,11 +9,11 @@ const buttonVariants = cva(
     variants: {
       variant: {
         primary:
-          "bg-[var(--ds-primary)] text-white shadow-sm hover:bg-[var(--ds-primary-hover)] active:bg-[var(--ds-primary-active)] active:scale-[0.98]",
+          "bg-[var(--ds-primary)] text-[var(--ds-primary-foreground)] shadow-sm hover:bg-[var(--ds-primary-hover)] active:bg-[var(--ds-primary-active)] active:scale-[0.98]",
         secondary:
           "bg-[var(--ds-surface-secondary)] text-[var(--ds-text)] hover:bg-[var(--ds-border)] active:bg-[var(--ds-border-hover)] active:scale-[0.98]",
         accent:
-          "bg-[var(--ds-accent)] text-white shadow-sm hover:bg-[var(--ds-accent-hover)] active:bg-[var(--ds-accent-active)] active:scale-[0.98]",
+          "bg-[var(--ds-accent)] text-[var(--ds-accent-foreground)] shadow-sm hover:bg-[var(--ds-accent-hover)] active:bg-[var(--ds-accent-active)] active:scale-[0.98]",
         destructive:
           "bg-[var(--ds-danger)] text-white shadow-sm hover:bg-[var(--ds-danger-hover)] active:scale-[0.98]",
         outline:

@@ -174,8 +174,8 @@ export default function ToothChart({
             width: 48,
             minWidth: 48,
             height: 18,
-            color: selectedTooth === n ? '#2563EB' : activeHighlight === n ? '#3B82F6' : '#6B7280',
-            backgroundColor: selectedTooth === n ? 'rgba(37,99,235,0.08)' : 'transparent',
+            color: selectedTooth === n ? 'var(--ds-primary-500)' : activeHighlight === n ? 'var(--ds-primary-400)' : 'var(--ds-text-tertiary)',
+            backgroundColor: selectedTooth === n ? 'var(--ds-primary-subtle)' : 'transparent',
             borderBottom: '1px solid rgba(0,0,0,0.06)',
           }}
         >

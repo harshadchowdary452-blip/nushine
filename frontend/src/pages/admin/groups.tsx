@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
 import { Plus, Search, Edit, Trash2, Shield, Building2 } from "lucide-react"
 import { format } from "date-fns"
-import PageHeader from "@/components/layout/page-header"
+import { PageHeader } from "@/design-system"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -33,7 +33,14 @@ interface GroupForm {
   admin_full_name: string
 }
 
-const emptyForm: GroupForm = { name: "", description: "", is_active: true, admin_email: "", admin_password: "", admin_full_name: "" }
+const emptyForm: GroupForm = {
+  name: "",
+  description: "",
+  is_active: true,
+  admin_email: "",
+  admin_password: "",
+  admin_full_name: "",
+}
 
 export default function AdminGroups() {
   const queryClient = useQueryClient()
@@ -53,7 +60,7 @@ export default function AdminGroups() {
   const createMutation = useMutation({
     mutationFn: async (data: GroupForm) => {
       const { admin_email, admin_password, admin_full_name, ...groupData } = data
-      const newGroup = await groupsApi.create(groupData) as AdminGroup
+      const newGroup = (await groupsApi.create(groupData)) as AdminGroup
       if (admin_email && admin_password) {
         await groupsApi.createAdmin(newGroup.id, {
           email: admin_email,
@@ -75,7 +82,8 @@ export default function AdminGroups() {
   })
 
   const updateMutation = useMutation({
-    mutationFn: (data: { id: string; payload: GroupForm }) => groupsApi.update(data.id, data.payload),
+    mutationFn: (data: { id: string; payload: GroupForm }) =>
+      groupsApi.update(data.id, data.payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-groups"] })
       addToast({ title: "Success", description: "Group updated successfully", variant: "success" })
@@ -96,7 +104,11 @@ export default function AdminGroups() {
     },
     onError: (err: unknown) => {
       const raw = (err as ApiError)?.response?.data?.detail
-      addToast({ title: "Error", description: typeof raw === "string" ? raw : "Failed to delete group", variant: "destructive" })
+      addToast({
+        title: "Error",
+        description: typeof raw === "string" ? raw : "Failed to delete group",
+        variant: "destructive",
+      })
     },
   })
 
@@ -110,7 +122,14 @@ export default function AdminGroups() {
 
   function openEditDialog(group: AdminGroup) {
     setEditingGroup(group)
-    setForm({ name: group.name, description: group.description || "", is_active: group.is_active, admin_email: "", admin_password: "", admin_full_name: "" })
+    setForm({
+      name: group.name,
+      description: group.description || "",
+      is_active: group.is_active,
+      admin_email: "",
+      admin_password: "",
+      admin_full_name: "",
+    })
     setDialogOpen(true)
   }
 
@@ -144,11 +163,15 @@ export default function AdminGroups() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Admin Groups" description="Manage admin groups and their permissions">
-        <Button onClick={openCreateDialog}>
-          <Plus className="h-4 w-4" /> Create Group
-        </Button>
-      </PageHeader>
+      <PageHeader
+        title="Admin Groups"
+        description="Manage admin groups and their permissions"
+        actions={
+          <Button onClick={openCreateDialog}>
+            <Plus className="h-4 w-4" /> Create Group
+          </Button>
+        }
+      />
 
       <Card>
         <CardContent className="p-6">
@@ -187,11 +210,21 @@ export default function AdminGroups() {
                 <thead>
                   <tr className="border-b bg-muted/50">
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Name</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Description</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Hospitals</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Created At</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Actions</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                      Description
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                      Hospitals
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                      Status
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                      Created At
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -202,17 +235,29 @@ export default function AdminGroups() {
                       animate={{ opacity: 1 }}
                       className="border-b transition-colors hover:bg-muted/50"
                     >
-                      <td className="px-4 py-3 font-medium" data-label="Name">{group.name}</td>
+                      <td className="px-4 py-3 font-medium" data-label="Name">
+                        {group.name}
+                      </td>
                       <td className="px-4 py-3 text-muted-foreground" data-label="Description">
                         {group.description || "—"}
                       </td>
                       <td className="px-4 py-3" data-label="Hospitals">
-                        <span className="inline-flex items-center gap-1.5" title={group.hospital_names?.length ? group.hospital_names.join(", ") : "No hospitals"}>
+                        <span
+                          className="inline-flex items-center gap-1.5"
+                          title={
+                            group.hospital_names?.length
+                              ? group.hospital_names.join(", ")
+                              : "No hospitals"
+                          }
+                        >
                           <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                          <Badge variant="secondary" className="font-mono text-xs">{group.hospital_count ?? 0}</Badge>
+                          <Badge variant="secondary" className="font-mono text-xs">
+                            {group.hospital_count ?? 0}
+                          </Badge>
                           {group.hospital_names?.length > 0 && (
                             <span className="text-xs text-muted-foreground hidden sm:inline truncate max-w-[120px]">
-                              {group.hospital_names.slice(0, 2).join(", ")}{group.hospital_names.length > 2 ? "..." : ""}
+                              {group.hospital_names.slice(0, 2).join(", ")}
+                              {group.hospital_names.length > 2 ? "..." : ""}
                             </span>
                           )}
                         </span>
@@ -249,7 +294,9 @@ export default function AdminGroups() {
           <DialogHeader className="px-6 pt-6 pb-0 shrink-0">
             <DialogTitle>{editingGroup ? "Edit Group" : "Create Group"}</DialogTitle>
             <DialogDescription>
-              {editingGroup ? "Update the admin group details." : "Fill in the details to create a new admin group."}
+              {editingGroup
+                ? "Update the admin group details."
+                : "Fill in the details to create a new admin group."}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
@@ -341,7 +388,12 @@ export default function AdminGroups() {
             <Button type="button" variant="outline" onClick={() => setDeleteDialogOpen(false)}>
               Cancel
             </Button>
-            <Button type="button" variant="destructive" onClick={handleDelete} disabled={deleteMutation.isPending}>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+            >
               {deleteMutation.isPending ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>

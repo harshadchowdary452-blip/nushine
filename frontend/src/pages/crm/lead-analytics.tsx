@@ -15,16 +15,16 @@ import { PieChart as RePie, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, B
 import type { Lead } from "@/types"
 
 const STATUS_COLORS: Record<string, string> = {
-  NEW: "#0EA5E9",
-  CONTACTED: "#8B5CF6",
-  INTERESTED: "#06B6D4",
-  FOLLOW_UP_REQUIRED: "#F59E0B",
-  APPOINTMENT_BOOKED: "#6366F1",
-  VISITED: "#10B981",
-  CONVERTED: "#22C55E",
-  LOST: "#EF4444",
-  NOT_INTERESTED: "#64748B",
-  NO_RESPONSE: "#F97316",
+  NEW: "var(--ds-chart-11)",
+  CONTACTED: "var(--ds-chart-10)",
+  INTERESTED: "var(--ds-chart-3)",
+  FOLLOW_UP_REQUIRED: "var(--ds-chart-6)",
+  APPOINTMENT_BOOKED: "var(--ds-chart-5)",
+  VISITED: "var(--ds-chart-4)",
+  CONVERTED: "var(--ds-chart-14)",
+  LOST: "var(--ds-chart-8)",
+  NOT_INTERESTED: "var(--ds-chart-7)",
+  NO_RESPONSE: "var(--ds-chart-12)",
 }
 
 export default function LeadAnalytics() {
@@ -55,7 +55,7 @@ export default function LeadAnalytics() {
       if (l.next_follow_up_date && new Date(l.next_follow_up_date) <= new Date()) followUpDue++
     })
 
-    const statusData = Object.entries(statusBreakdown).map(([name, value]) => ({ name: name.replace(/_/g, " "), value, fill: STATUS_COLORS[name] || "#64748B" }))
+    const statusData = Object.entries(statusBreakdown).map(([name, value]) => ({ name: name.replace(/_/g, " "), value,                 fill: STATUS_COLORS[name] || "var(--ds-chart-7)" }))
     const sourceData = Object.entries(sourceBreakdown).sort((a, b) => b[1] - a[1]).map(([name, value]) => ({ name: name.replace(/_/g, " "), value }))
     const conversionRate = total > 0 ? ((converted / total) * 100).toFixed(1) : "0.0"
     const avgScore = total > 0 ? (totalScore / total).toFixed(0) : "0"
@@ -129,11 +129,11 @@ export default function LeadAnalytics() {
             {analytics.sourceData.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={analytics.sourceData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--ds-border-light)" />
                   <XAxis type="number" tick={{ fontSize: 11 }} />
                   <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={100} />
                   <Tooltip />
-                  <Bar dataKey="value" fill="#0EA5E9" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="value" fill="var(--ds-chart-1)" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (

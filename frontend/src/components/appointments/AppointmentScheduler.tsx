@@ -174,10 +174,10 @@ export default function AppointmentScheduler({
   const today = format(new Date(), "yyyy-MM-dd")
 
   return (
-    <div className={cn("rounded-xl border border-[#E2E8F0] bg-white p-4 space-y-4", className)}>
+    <div className={cn("rounded-xl border border-[var(--ds-border)] bg-white p-4 space-y-4", className)}>
       <div className="flex items-center gap-2">
-        <Calendar className="h-4 w-4 text-[#64748B]" />
-        <h4 className="text-sm font-semibold text-[#0F172A]">Schedule Appointment</h4>
+        <Calendar className="h-4 w-4 text-[var(--ds-text-muted)]" />
+        <h4 className="text-sm font-semibold text-[var(--ds-text)]">Schedule Appointment</h4>
       </div>
 
       {showDoctorSelector && !doctorId && (
@@ -264,7 +264,7 @@ export default function AppointmentScheduler({
       {doctorId && appointmentDate && (
         slotsLoading ? (
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm text-[#64748B]">
+            <div className="flex items-center gap-2 text-sm text-[var(--ds-text-muted)]">
               <div className="h-2 w-2 rounded-full bg-yellow-400 animate-pulse" />
               Loading available slots...
             </div>
@@ -286,7 +286,7 @@ export default function AppointmentScheduler({
         ) : slotData ? (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <h4 className="text-xs font-semibold text-[#0F172A]">
+              <h4 className="text-xs font-semibold text-[var(--ds-text)]">
                 {slotData.doctor_name} — {format(new Date(slotData.date), "MMM dd, yyyy")}
               </h4>
               {slotData.is_on_leave && (
@@ -297,13 +297,13 @@ export default function AppointmentScheduler({
             </div>
 
             {slotData.working_hours && (
-              <p className="text-xs text-[#64748B]">
+              <p className="text-xs text-[var(--ds-text-muted)]">
                 Working hours: {slotData.working_hours}
               </p>
             )}
 
             {durationMinutes > 30 && (
-              <p className="text-xs text-[#64748B]">
+              <p className="text-xs text-[var(--ds-text-muted)]">
                 Selecting a start time will reserve {Math.ceil(durationMinutes / 30)} consecutive slot{durationMinutes > 30 ? "s" : ""} ({durationMinutes} min)
               </p>
             )}
@@ -328,7 +328,7 @@ export default function AppointmentScheduler({
             </div>
 
             {slotData.slots.length === 0 ? (
-              <p className="text-sm text-[#64748B] py-4 text-center">
+              <p className="text-sm text-[var(--ds-text-muted)] py-4 text-center">
                 No slots available for this date.
               </p>
             ) : (
@@ -382,14 +382,14 @@ export default function AppointmentScheduler({
       )}
 
       {!doctorId && showDoctorSelector && (
-        <div className="text-center py-6 text-xs text-[#64748B]">
+        <div className="text-center py-6 text-xs text-[var(--ds-text-muted)]">
           <UserIcon className="h-5 w-5 mx-auto mb-2 opacity-40" />
           Select a doctor to view available slots
         </div>
       )}
 
       {!doctorId && !showDoctorSelector && (
-        <div className="text-center py-6 text-xs text-[#64748B]">
+        <div className="text-center py-6 text-xs text-[var(--ds-text-muted)]">
           <Stethoscope className="h-5 w-5 mx-auto mb-2 opacity-40" />
           Doctor will be assigned during scheduling
         </div>

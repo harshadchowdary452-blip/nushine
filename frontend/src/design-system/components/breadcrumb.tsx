@@ -1,54 +1,19 @@
 import { Link, useLocation } from "react-router-dom"
-import { ChevronRight, Slash } from "lucide-react"
+import { ChevronRight, Slash, Home } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { routeLabels } from "./routeLabels"
-  "/": "Dashboard",
-  "/patients": "Patients",
-  "/patients/new": "New Patient",
-  "/appointments": "Appointments",
-  "/appointments/new": "New Appointment",
-  "/treatments": "Treatments",
-  "/treatments/new": "New Treatment",
-  "/treatments/workflow": "Workflow Board",
-  "/treatments/queue": "My Queue",
-  "/cases": "Cases",
-  "/cases/new": "New Case",
-  "/billing": "Billing",
-  "/billing/new": "New Invoice",
-  "/consent-forms": "Consent Forms",
-  "/doctors/availability": "Availability",
-  "/leads": "Leads",
-  "/crm/dashboard2": "CRM Dashboard",
-  "/crm/enquiry-calendar": "Enquiry Calendar",
-  "/crm/settings": "CRM Settings",
-  "/whatsapp": "WhatsApp",
-  "/whatsapp/templates": "WhatsApp Templates",
-  "/admin/groups": "Groups",
-  "/admin/hospitals": "Hospitals",
-  "/admin/doctors": "Doctors",
-  "/admin/expenses": "Expenses",
-  "/admin/users": "Users",
-  "/admin/roles": "Roles",
-  "/reports": "Reports",
-  "/analytics": "Analytics",
-  "/exports": "Export Center",
-  "/settings": "Settings",
-  "/settings/clinical": "Clinical Settings",
-  "/settings/whatsapp": "WhatsApp Config",
-  "/settings/notifications": "Notification Settings",
-  "/settings/security": "Security",
-}
 
 // Path segment patterns for dynamic routes (e.g., /patients/123 → /patients/:id)
 const dynamicSegments: { prefix: string; label: (id: string) => string }[] = [
-  { prefix: "/patients/", label: (id) => `Patient #${id.slice(0, 8)}` },
-  { prefix: "/appointments/", label: (id) => `Appointment #${id.slice(0, 8)}` },
-  { prefix: "/treatments/", label: (id) => `Treatment #${id.slice(0, 8)}` },
-  { prefix: "/cases/", label: (id) => `Case #${id.slice(0, 8)}` },
-  { prefix: "/billing/", label: (id) => `Invoice #${id.slice(0, 8)}` },
-  { prefix: "/leads/", label: (id) => `Lead #${id.slice(0, 8)}` },
-  { prefix: "/crm/leads/", label: (id) => `Lead #${id.slice(0, 8)}` },
-  { prefix: "/whatsapp/", label: (id) => `Template #${id.slice(0, 8)}` },
+  { prefix: "/patients/", label: (id) => `Patient ${id.slice(0, 8)}` },
+  { prefix: "/appointments/", label: (id) => `Appointment ${id.slice(0, 8)}` },
+  { prefix: "/treatments/", label: (id) => `Treatment ${id.slice(0, 8)}` },
+  { prefix: "/cases/", label: (id) => `Case ${id.slice(0, 8)}` },
+  { prefix: "/billing/", label: (id) => `Invoice ${id.slice(0, 8)}` },
+  { prefix: "/leads/", label: (id) => `Lead ${id.slice(0, 8)}` },
+  { prefix: "/whatsapp/", label: (id) => `Template ${id.slice(0, 8)}` },
+  { prefix: "/consent-forms/view/", label: (id) => `Consent Form ${id.slice(0, 8)}` },
+  { prefix: "/crm/", label: (id) => `CRM ${id.slice(0, 8)}` },
 ]
 
 function getLabel(path: string): string | null {
@@ -97,7 +62,13 @@ interface BreadcrumbProps {
   variant?: "default" | "compact"
 }
 
-export default function Breadcrumb({ className, variant = "default" }: BreadcrumbProps) {
+/**
+ * Intelligent breadcrumb. The current (last) segment is styled as the page title
+ * so the chrome header doubles as the location + page context without repeating
+ * the content-area header. Dynamic entity routes render human labels, and long
+ * labels truncate gracefully.
+ */
+export default function Breadcrumb({ className, variant = "compact" }: BreadcrumbProps) {
   const { pathname } = useLocation()
   const segments = buildSegments(pathname)
 
@@ -106,26 +77,27 @@ export default function Breadcrumb({ className, variant = "default" }: Breadcrum
   const isCompact = variant === "compact"
 
   return (
-    <nav aria-label="Breadcrumb" className={cn("flex items-center", className)}>
-      <ol className="flex items-center gap-1">
+    <nav aria-label="Breadcrumb" className={cn("flex min-w-0 items-center", className)}>
+      <ol className="flex min-w-0 items-center gap-1.5">
         {segments.map((seg, idx) => {
           const isLast = idx === segments.length - 1
           return (
-            <li key={seg.path} className="flex items-center gap-1">
+            <li key={seg.path} className="flex min-w-0 items-center gap-1.5">
               {idx > 0 && (
                 isCompact ? (
-                  <Slash className="h-3 w-3 text-[var(--ds-text-tertiary)]" strokeWidth={1.5} />
+                  <Slash className="h-3 w-3 shrink-0 text-[var(--ds-text-tertiary)]" strokeWidth={1.5} aria-hidden="true" />
                 ) : (
-                  <ChevronRight className="h-3 w-3 text-[var(--ds-text-tertiary)]" strokeWidth={1.5} />
+                  <ChevronRight className="h-3 w-3 shrink-0 text-[var(--ds-text-tertiary)]" strokeWidth={1.5} aria-hidden="true" />
                 )
               )}
               {isLast ? (
                 <span
                   className={cn(
-                    "truncate font-medium text-[var(--ds-text)]",
-                    isCompact ? "text-xs" : "text-sm"
+                    "truncate font-semibold text-[var(--ds-text)]",
+                    isCompact ? "text-sm" : "text-base"
                   )}
                   aria-current="page"
+                  title={seg.label}
                 >
                   {seg.label}
                 </span>
@@ -133,10 +105,11 @@ export default function Breadcrumb({ className, variant = "default" }: Breadcrum
                 <Link
                   to={seg.path}
                   className={cn(
-                    "truncate text-[var(--ds-text-tertiary)] transition-colors hover:text-[var(--ds-text-secondary)]",
+                    "flex shrink-0 items-center gap-1.5 truncate text-[var(--ds-text-tertiary)] transition-colors hover:text-[var(--ds-text-secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-primary)]/30 rounded-[var(--ds-radius-sm)]",
                     isCompact ? "text-xs" : "text-sm"
                   )}
                 >
+                  {idx === 0 && <Home className="h-3 w-3" strokeWidth={1.5} aria-hidden="true" />}
                   {seg.label}
                 </Link>
               )}

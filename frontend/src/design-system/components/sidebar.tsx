@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react"
+import { createPortal } from "react-dom"
 import { Link, useLocation } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import {
@@ -171,25 +172,42 @@ function getAllNavItems(role: RoleKey): NavItem[] {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 function SidebarTooltip({ label, children, show }: { label: string; children: React.ReactNode; show: boolean }) {
+  const [anchor, setAnchor] = useState<HTMLDivElement | null>(null)
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+
+  const update = useCallback(() => {
+    if (!anchor) return
+    const r = anchor.getBoundingClientRect()
+    setPos({ top: r.top + r.height / 2, left: r.right + 12 })
+  }, [anchor])
+
+  useEffect(() => {
+    if (show && anchor) {
+      update()
+      window.addEventListener("resize", update)
+      return () => window.removeEventListener("resize", update)
+    }
+  }, [show, anchor, update])
+
   return (
-    <div className="relative group">
+    <div ref={setAnchor} className="relative group" onMouseEnter={update}>
       {children}
-      <AnimatePresence>
-        {show && (
-          <motion.div
-            initial={{ opacity: 0, x: -6 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -6 }}
-            transition={{ duration: 0.15, ease: "easeOut" }}
-            className="absolute left-full ml-3 top-1/2 -translate-y-1/2 z-[var(--ds-z-tooltip)] pointer-events-none"
-          >
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--ds-radius-lg)] bg-[var(--ds-text)] text-[var(--ds-text-inverse)] text-xs font-medium whitespace-nowrap shadow-lg">
-              {label}
-              <kbd className="opacity-50 text-[10px] font-mono">⌘K</kbd>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {show && pos && createPortal(
+        <motion.div
+          initial={{ opacity: 0, x: -6 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -6 }}
+          transition={{ duration: 0.15, ease: "easeOut" }}
+          style={{ top: pos.top, left: pos.left, transform: "translateY(-50%)" }}
+          className="fixed z-[var(--ds-z-tooltip)] pointer-events-none"
+          role="tooltip"
+        >
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--ds-radius-lg)] bg-[var(--ds-text)] text-[var(--ds-text-inverse)] text-xs font-medium whitespace-nowrap shadow-[var(--ds-shadow-lg)]">
+            {label}
+          </div>
+        </motion.div>,
+        document.body
+      )}
     </div>
   )
 }
@@ -219,7 +237,7 @@ function NavItemInner({ item, isActive, isExpanded, isFavorite, onToggleFavorite
         "min-h-[var(--ds-sidebar-item-h)]",
         isExpanded ? "px-3" : "px-0 justify-center",
         isActive
-          ? "bg-[var(--ds-sidebar-active-bg)] text-[var(--ds-sidebar-text-active)]"
+          ? "bg-[var(--ds-sidebar-active-bg)] text-[var(--ds-sidebar-text-active)] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
           : "text-[var(--ds-sidebar-text)] hover:bg-[var(--ds-sidebar-hover)] hover:text-white"
       )}
       title={!isExpanded ? item.label : undefined}
@@ -284,12 +302,19 @@ function NavItemInner({ item, isActive, isExpanded, isFavorite, onToggleFavorite
    ═══════════════════════════════════════════════════════════════════════════ */
 
 export default function EnterpriseSidebar() {
-  const { collapsed, mobileOpen, toggle, setMobileOpen, bottomNavOpen, setBottomNavOpen } = useSidebarStore()
-  const { user } = useAuthStore()
-  const { theme, toggleTheme } = useThemeStore()
-  const { setOpen: setSearchOpen } = useSearchStore()
-  const favoriteStore = useFavoriteStore()
-  const recentStore = useRecentlyOpenedStore()
+  const collapsed = useSidebarStore((s) => s.collapsed)
+  const mobileOpen = useSidebarStore((s) => s.mobileOpen)
+  const toggle = useSidebarStore((s) => s.toggle)
+  const setMobileOpen = useSidebarStore((s) => s.setMobileOpen)
+  const bottomNavOpen = useSidebarStore((s) => s.bottomNavOpen)
+  const setBottomNavOpen = useSidebarStore((s) => s.setBottomNavOpen)
+  const user = useAuthStore((s) => s.user)
+  const theme = useThemeStore((s) => s.theme)
+  const toggleTheme = useThemeStore((s) => s.toggleTheme)
+  const setSearchOpen = useSearchStore((s) => s.setOpen)
+  const favItems = useFavoriteStore((s) => s.items)
+  const favToggle = useFavoriteStore((s) => s.toggle)
+  const recentOpened = useRecentlyOpenedStore((s) => s.items)
   const location = useLocation()
 
   const role = (user?.role as RoleKey) || "DOCTOR"
@@ -329,17 +354,20 @@ export default function EnterpriseSidebar() {
   )
 
   const favoriteItems = useMemo(
-    () => allItems.filter((i) => favoriteStore.items.includes(i.path)),
-    [allItems, favoriteStore.items]
+    () => allItems.filter((i) => favItems.includes(i.path)),
+    [allItems, favItems]
   )
 
-  const recentItems = recentStore.items
+  const recentItems = recentOpened
 
   const hospitalName = user?.hospital_name || null
 
   /* ─── SIDEBAR CONTENT ─── */
   const sidebarContent = (
-    <div className="flex h-full flex-col bg-[var(--ds-sidebar-bg)] text-[var(--ds-sidebar-text)] select-none">
+    <div
+      className="relative flex h-full flex-col overflow-hidden bg-[var(--ds-sidebar-bg)] text-[var(--ds-sidebar-text)] select-none"
+      style={{ backgroundImage: "var(--ds-sidebar-edge), var(--ds-sidebar-glow)" }}
+    >
 
       {/* ═══ BRAND AREA ═══ */}
       <div className={cn(
@@ -455,7 +483,7 @@ export default function EnterpriseSidebar() {
                 isActive={isActive(item.path)}
                 isExpanded={isExpanded}
                 isFavorite={true}
-                onToggleFavorite={(path, e) => { e.preventDefault(); e.stopPropagation(); favoriteStore.toggle(path) }}
+                onToggleFavorite={(path, e) => { e.preventDefault(); e.stopPropagation(); favToggle(path) }}
                 onClick={() => setMobileOpen(false)}
               />
             ))}
@@ -482,8 +510,8 @@ export default function EnterpriseSidebar() {
                   item={item}
                   isActive={isActive(item.path)}
                   isExpanded={isExpanded}
-                  isFavorite={favoriteStore.items.includes(item.path)}
-                  onToggleFavorite={(path, e) => { e.preventDefault(); e.stopPropagation(); favoriteStore.toggle(path) }}
+                  isFavorite={favItems.includes(item.path)}
+                  onToggleFavorite={(path, e) => { e.preventDefault(); e.stopPropagation(); favToggle(path) }}
                   onClick={() => setMobileOpen(false)}
                 />
               )
@@ -509,8 +537,8 @@ export default function EnterpriseSidebar() {
                 item={item}
                 isActive={isActive(item.path)}
                 isExpanded={true}
-                isFavorite={favoriteStore.items.includes(item.path)}
-                onToggleFavorite={(path, e) => { e.preventDefault(); e.stopPropagation(); favoriteStore.toggle(path) }}
+                isFavorite={favItems.includes(item.path)}
+                onToggleFavorite={(path, e) => { e.preventDefault(); e.stopPropagation(); favToggle(path) }}
                 onClick={() => { setSearchQuery(""); setMobileOpen(false) }}
               />
             ))}
@@ -534,8 +562,8 @@ export default function EnterpriseSidebar() {
                   item={item}
                   isActive={isActive(item.path)}
                   isExpanded={isExpanded}
-                  isFavorite={favoriteStore.items.includes(item.path)}
-                  onToggleFavorite={(path, e) => { e.preventDefault(); e.stopPropagation(); favoriteStore.toggle(path) }}
+                  isFavorite={favItems.includes(item.path)}
+                  onToggleFavorite={(path, e) => { e.preventDefault(); e.stopPropagation(); favToggle(path) }}
                   onClick={() => setMobileOpen(false)}
                 />
               ))}
@@ -610,16 +638,16 @@ export default function EnterpriseSidebar() {
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         className={cn(
-          "hidden lg:flex flex-col shrink-0 transition-all duration-[var(--ds-transition-slow)] ease-out will-change-transform overflow-hidden",
+          "hidden lg:flex flex-col shrink-0 overflow-hidden bg-[var(--ds-sidebar-bg)] transition-all duration-[var(--ds-transition-slow)] ease-out will-change-transform",
           collapsed && !hovered ? "w-[var(--ds-sidebar-collapsed-width)]" : "w-[var(--ds-sidebar-width)]"
         )}
       >
-        <div className="sticky top-0 h-screen overflow-hidden">{sidebarContent}</div>
+        <div className="h-full overflow-hidden">{sidebarContent}</div>
       </aside>
 
       {/* ─── TABLET ICON ONLY ─── */}
-      <aside aria-label="Sidebar" className="hidden md:flex lg:hidden flex-col shrink-0 w-[72px]">
-        <div className="sticky top-0 h-screen flex flex-col bg-[var(--ds-sidebar-bg)]">
+      <aside aria-label="Sidebar" className="hidden md:flex lg:hidden flex-col shrink-0 w-[72px] overflow-hidden bg-[var(--ds-sidebar-bg)]">
+        <div className="flex h-full flex-col bg-[var(--ds-sidebar-bg)]">
           <div className="flex h-[var(--ds-sidebar-brand-h)] items-center justify-center border-b border-[var(--ds-sidebar-border)]">
             <div className="flex items-center justify-center w-8 h-8 rounded-[var(--ds-radius-lg)] bg-[var(--ds-accent)]">
               <svg width="18" height="18" viewBox="0 0 56 56" fill="none" aria-hidden="true">

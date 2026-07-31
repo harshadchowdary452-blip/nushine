@@ -444,7 +444,7 @@ function GeneralTab({ form }: TabProps) {
                 className={cn(
                   "relative px-4 py-2.5 rounded-lg text-sm font-medium transition-all border",
                   isSelected
-                    ? "bg-[var(--ds-primary)] text-white border-[var(--ds-primary)] shadow-sm"
+                    ? "bg-[var(--ds-primary)] text-[var(--ds-primary-foreground)] border-[var(--ds-primary)] shadow-sm"
                     : "bg-[var(--ds-surface)] text-[var(--ds-text-secondary)] border-[var(--ds-border)] hover:border-[var(--ds-primary)] hover:text-[var(--ds-primary)]"
                 )}
               >

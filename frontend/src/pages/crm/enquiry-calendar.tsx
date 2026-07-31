@@ -1,18 +1,43 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
-  Phone, MessageCircle, CheckCircle, Loader2,
-  Search, ChevronLeft, ChevronRight, ChevronsLeft, Calendar,
-  FileText, History, RotateCcw, X, AlertTriangle, Filter,
+  Phone,
+  MessageCircle,
+  CheckCircle,
+  Loader2,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  Calendar,
+  FileText,
+  History,
+  RotateCcw,
+  X,
+  AlertTriangle,
+  Filter,
   Keyboard,
 } from "lucide-react"
 import {
-  format, addDays, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
-  addWeeks, subWeeks, addMonths, subMonths, isToday, isBefore, parseISO, startOfDay,
+  format,
+  addDays,
+  subDays,
+  startOfWeek,
+  endOfWeek,
+  startOfMonth,
+  endOfMonth,
+  addWeeks,
+  subWeeks,
+  addMonths,
+  subMonths,
+  isToday,
+  isBefore,
+  parseISO,
+  startOfDay,
 } from "date-fns"
 import { enquiriesApi, crmApi, doctorsApi, whatsappTemplatesApi } from "@/services/endpoints"
 import { extractDetail } from "@/types"
-import PageHeader from "@/components/layout/page-header"
+import { PageHeader } from "@/design-system"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -20,14 +45,32 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/toast"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet"
 import { EnquiryDetailSheet } from "./enquiry-detail-sheet"
 import { FeedbackDrawer } from "@/components/crm/FeedbackDrawer"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-
 
 interface CalendarItem {
   id: string
@@ -62,42 +105,84 @@ interface CalendarItem {
   completed_treatments?: Array<{ id: string; treatment_name: string; completed_at?: string }>
   // New enriched nested fields
   patient?: {
-    id: string; name: string; photo_url?: string; phone?: string
-    op_number?: string; age?: number; gender?: string; status?: string
+    id: string
+    name: string
+    photo_url?: string
+    phone?: string
+    op_number?: string
+    age?: number
+    gender?: string
+    status?: string
   }
   lead?: {
-    id: string; name: string; mobile: string; email?: string
-    source?: string; status?: string; interested_treatment?: string
-    priority?: string; next_follow_up_date?: string; notes?: string
-    alternate_mobile?: string; age?: number; gender?: string
-    city?: string; lead_score?: number; preferred_visit_date?: string
-    assigned_doctor?: string; assigned_staff?: string
+    id: string
+    name: string
+    mobile: string
+    email?: string
+    source?: string
+    status?: string
+    interested_treatment?: string
+    priority?: string
+    next_follow_up_date?: string
+    notes?: string
+    alternate_mobile?: string
+    age?: number
+    gender?: string
+    city?: string
+    lead_score?: number
+    preferred_visit_date?: string
+    assigned_doctor?: string
+    assigned_staff?: string
   }
   doctor?: {
-    id?: string; name?: string; specialization?: string; photo_url?: string
+    id?: string
+    name?: string
+    specialization?: string
+    photo_url?: string
   }
   hospital?: {
-    id: string; name: string; phone?: string; address?: string; logo_url?: string
+    id: string
+    name: string
+    phone?: string
+    address?: string
+    logo_url?: string
   }
   case?: {
-    id: string; case_number?: string; chief_complaint?: string
-    status?: string; diagnosis?: string
+    id: string
+    case_number?: string
+    chief_complaint?: string
+    status?: string
+    diagnosis?: string
   }
   treatment?: {
-    id: string; treatment_name?: string; treatment_type?: string; status?: string
-    start_date?: string; completion_date?: string
-    total_visits?: number; completed_visits?: number; remaining_visits?: number
-    current_visit?: number; current_stage?: string
+    id: string
+    treatment_name?: string
+    treatment_type?: string
+    status?: string
+    start_date?: string
+    completion_date?: string
+    total_visits?: number
+    completed_visits?: number
+    remaining_visits?: number
+    current_visit?: number
+    current_stage?: string
   }
   appointment?: {
-    id: string; date?: string; time?: string; doctor_name?: string
-    appointment_type?: string; purpose?: string; status?: string
+    id: string
+    date?: string
+    time?: string
+    doctor_name?: string
+    appointment_type?: string
+    purpose?: string
+    status?: string
   }
   occurrence_number?: number
   total_attempts?: number
   recurrence?: {
-    is_recurring: boolean; occurrence_number?: number
-    interval_days?: number; chain_id?: string
+    is_recurring: boolean
+    occurrence_number?: number
+    interval_days?: number
+    chain_id?: string
   }
   assigned_staff?: { id: string; name: string }
   template_variables?: Record<string, string>
@@ -105,11 +190,21 @@ interface CalendarItem {
 
 // Enriched detail response from /detail endpoint
 interface EnquiryDetail {
-  id: string; source: string; enquiry_type: string; enquiry_number?: string
-  status: string; priority: string; due_date: string
-  created_at?: string; updated_at?: string
-  description: string; notes?: string; trigger_event?: string
-  generation_reason?: string; visit_number?: number; total_visits?: number
+  id: string
+  source: string
+  enquiry_type: string
+  enquiry_number?: string
+  status: string
+  priority: string
+  due_date: string
+  created_at?: string
+  updated_at?: string
+  description: string
+  notes?: string
+  trigger_event?: string
+  generation_reason?: string
+  visit_number?: number
+  total_visits?: number
   patient?: CalendarItem["patient"]
   lead?: CalendarItem["lead"]
   doctor?: CalendarItem["doctor"]
@@ -121,12 +216,21 @@ interface EnquiryDetail {
   assigned_staff?: { id: string; name: string; email?: string; phone?: string }
   template_variables?: Record<string, string>
   communication_history?: Array<{
-    id: string; channel: string; message_type: string
-    message: string; status: string; sent_at?: string; created_at?: string
+    id: string
+    channel: string
+    message_type: string
+    message: string
+    status: string
+    sent_at?: string
+    created_at?: string
   }>
   timeline?: Array<{
-    id: string; enquiry_type: string; status: string
-    due_date?: string; created_at?: string; description?: string
+    id: string
+    enquiry_type: string
+    status: string
+    due_date?: string
+    created_at?: string
+    description?: string
   }>
   display_name?: string
   display_phone?: string
@@ -173,21 +277,89 @@ interface CalendarSummary {
   by_status: Record<string, number>
 }
 
-const ENQUIRY_TYPE_COLORS: Record<string, { bg: string; text: string; border: string; dot: string }> = {
-  LEAD_FOLLOW_UP: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", dot: "bg-blue-500" },
-  APPOINTMENT_REMINDER: { bg: "bg-orange-50", text: "text-orange-700", border: "border-orange-200", dot: "bg-orange-500" },
-  OPD_FOLLOW_UP: { bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-200", dot: "bg-purple-500" },
-  TREATMENT_WELLNESS: { bg: "bg-green-50", text: "text-green-700", border: "border-green-200", dot: "bg-green-500" },
-  CASE_WELLNESS: { bg: "bg-teal-50", text: "text-teal-700", border: "border-teal-200", dot: "bg-teal-500" },
+const ENQUIRY_TYPE_COLORS: Record<
+  string,
+  { bg: string; text: string; border: string; dot: string }
+> = {
+  LEAD_FOLLOW_UP: {
+    bg: "bg-blue-50",
+    text: "text-blue-700",
+    border: "border-blue-200",
+    dot: "bg-blue-500",
+  },
+  APPOINTMENT_REMINDER: {
+    bg: "bg-orange-50",
+    text: "text-orange-700",
+    border: "border-orange-200",
+    dot: "bg-orange-500",
+  },
+  OPD_FOLLOW_UP: {
+    bg: "bg-purple-50",
+    text: "text-purple-700",
+    border: "border-purple-200",
+    dot: "bg-purple-500",
+  },
+  TREATMENT_WELLNESS: {
+    bg: "bg-green-50",
+    text: "text-green-700",
+    border: "border-green-200",
+    dot: "bg-green-500",
+  },
+  CASE_WELLNESS: {
+    bg: "bg-teal-50",
+    text: "text-teal-700",
+    border: "border-teal-200",
+    dot: "bg-teal-500",
+  },
   RECALL: { bg: "bg-red-50", text: "text-red-700", border: "border-red-200", dot: "bg-red-500" },
-  MISSED_APPOINTMENT: { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200", dot: "bg-rose-500" },
-  ENQUIRY: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", dot: "bg-blue-400" },
-  "1_DAY_FOLLOW_UP": { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", dot: "bg-blue-500" },
-  "7_DAY_FOLLOW_UP": { bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-200", dot: "bg-purple-500" },
-  "6_MONTH_RECALL": { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200", dot: "bg-amber-500" },
-  "12_MONTH_RECALL": { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", dot: "bg-emerald-500" },
-  CUSTOM_FOLLOW_UP: { bg: "bg-gray-50", text: "text-gray-700", border: "border-gray-200", dot: "bg-gray-500" },
-  CRM_RULE: { bg: "bg-cyan-50", text: "text-cyan-700", border: "border-cyan-200", dot: "bg-cyan-500" },
+  MISSED_APPOINTMENT: {
+    bg: "bg-rose-50",
+    text: "text-rose-700",
+    border: "border-rose-200",
+    dot: "bg-rose-500",
+  },
+  ENQUIRY: {
+    bg: "bg-blue-50",
+    text: "text-blue-700",
+    border: "border-blue-200",
+    dot: "bg-blue-400",
+  },
+  "1_DAY_FOLLOW_UP": {
+    bg: "bg-blue-50",
+    text: "text-blue-700",
+    border: "border-blue-200",
+    dot: "bg-blue-500",
+  },
+  "7_DAY_FOLLOW_UP": {
+    bg: "bg-purple-50",
+    text: "text-purple-700",
+    border: "border-purple-200",
+    dot: "bg-purple-500",
+  },
+  "6_MONTH_RECALL": {
+    bg: "bg-amber-50",
+    text: "text-amber-700",
+    border: "border-amber-200",
+    dot: "bg-amber-500",
+  },
+  "12_MONTH_RECALL": {
+    bg: "bg-emerald-50",
+    text: "text-emerald-700",
+    border: "border-emerald-200",
+    dot: "bg-emerald-500",
+  },
+  CUSTOM_FOLLOW_UP: {
+    bg: "bg-gray-50",
+    text: "text-gray-700",
+    border: "border-gray-200",
+    dot: "bg-gray-500",
+  },
+  CRM_RULE: {
+    bg: "bg-cyan-50",
+    text: "text-cyan-700",
+    border: "border-cyan-200",
+    dot: "bg-cyan-500",
+  },
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -333,10 +505,10 @@ function getTypeColor(enquiryType: string) {
 }
 
 function isOverdue(dueDate: string, status: string) {
-  if (["COMPLETED", "APPOINTMENT_BOOKED", "LOST", "CONVERTED", "CANCELLED"].includes(status)) return false
+  if (["COMPLETED", "APPOINTMENT_BOOKED", "LOST", "CONVERTED", "CANCELLED"].includes(status))
+    return false
   return isBefore(parseISO(dueDate), startOfDay(new Date()))
 }
-
 
 export default function EnquiryCalendar() {
   const queryClient = useQueryClient()
@@ -362,35 +534,55 @@ export default function EnquiryCalendar() {
         end: format(endOfWeek(d, { weekStartsOn: 1 }), "yyyy-MM-dd"),
       }
     }
-    return { start: format(startOfMonth(d), "yyyy-MM-dd"), end: format(endOfMonth(d), "yyyy-MM-dd") }
+    return {
+      start: format(startOfMonth(d), "yyyy-MM-dd"),
+      end: format(endOfMonth(d), "yyyy-MM-dd"),
+    }
   }
 
   const dateRange = getRange()
 
   const { data: calData, isFetching } = useQuery({
-    queryKey: ["enquiry-calendar", dateRange.start, dateRange.end, statusFilter, typeFilter, doctorFilter, priorityFilter, includeTerminal],
-    queryFn: () => enquiriesApi.calendar({
-      start_date: dateRange.start, end_date: dateRange.end,
-      status: statusFilter || undefined, type: typeFilter || undefined,
-      doctor_id: doctorFilter || undefined, priority: priorityFilter || undefined,
-      include_terminal: includeTerminal || undefined,
-    }),
+    queryKey: [
+      "enquiry-calendar",
+      dateRange.start,
+      dateRange.end,
+      statusFilter,
+      typeFilter,
+      doctorFilter,
+      priorityFilter,
+      includeTerminal,
+    ],
+    queryFn: () =>
+      enquiriesApi.calendar({
+        start_date: dateRange.start,
+        end_date: dateRange.end,
+        status: statusFilter || undefined,
+        type: typeFilter || undefined,
+        doctor_id: doctorFilter || undefined,
+        priority: priorityFilter || undefined,
+        include_terminal: includeTerminal || undefined,
+      }),
   })
 
-  const apiItems: CalendarItem[] = useMemo(() =>
-    (calData?.items as CalendarItem[]) || (Array.isArray(calData) ? calData as CalendarItem[] : []),
-    [calData]
+  const apiItems: CalendarItem[] = useMemo(
+    () =>
+      (calData?.items as CalendarItem[]) ||
+      (Array.isArray(calData) ? (calData as CalendarItem[]) : []),
+    [calData],
   )
   const totalCount: number = calData?.total || apiItems.length
 
   const searchedItems = useMemo(() => {
     if (!searchQuery) return apiItems
     const sl = searchQuery.toLowerCase()
-    return apiItems.filter((i) =>
-      (i.display_name || i.patient_name || "").toLowerCase().includes(sl) ||
-      (i.op_number || "").toLowerCase().includes(sl) ||
-      (i.treatment_name || "").toLowerCase().includes(sl) ||
-      (i.display_phone || i.patient_phone || "").toLowerCase().includes(sl))
+    return apiItems.filter(
+      (i) =>
+        (i.display_name || i.patient_name || "").toLowerCase().includes(sl) ||
+        (i.op_number || "").toLowerCase().includes(sl) ||
+        (i.treatment_name || "").toLowerCase().includes(sl) ||
+        (i.display_phone || i.patient_phone || "").toLowerCase().includes(sl),
+    )
   }, [apiItems, searchQuery])
 
   const filteredItems = useMemo(() => {
@@ -401,24 +593,36 @@ export default function EnquiryCalendar() {
   // --- Summary ---
   const { data: summary } = useQuery<CalendarSummary>({
     queryKey: ["enquiry-calendar-summary", dateRange.start, dateRange.end, includeTerminal],
-    queryFn: () => enquiriesApi.calendarSummary({ start_date: dateRange.start, end_date: dateRange.end, include_terminal: includeTerminal || undefined }),
+    queryFn: () =>
+      enquiriesApi.calendarSummary({
+        start_date: dateRange.start,
+        end_date: dateRange.end,
+        include_terminal: includeTerminal || undefined,
+      }),
   })
 
   // --- Doctors ---
   const currentUser = (() => {
-    try { return JSON.parse(sessionStorage.getItem("user") || localStorage.getItem("user") || "null") } catch { return null }
+    try {
+      return JSON.parse(sessionStorage.getItem("user") || localStorage.getItem("user") || "null")
+    } catch {
+      return null
+    }
   })()
   const hospitalId = currentUser?.hospital_id
 
   const { data: doctors } = useQuery({
     queryKey: ["doctors-list", hospitalId],
-    queryFn: () => doctorsApi.list(hospitalId ? { hospital_id: hospitalId, limit: 200 } : { limit: 200 }).then((r: unknown) => {
-      if (Array.isArray(r)) return r as DoctorItem[]
-      const resp = r as Record<string, unknown> | undefined
-      if (resp?.users) return resp.users as DoctorItem[]
-      if (resp?.data) return resp.data as DoctorItem[]
-      return []
-    }),
+    queryFn: () =>
+      doctorsApi
+        .list(hospitalId ? { hospital_id: hospitalId, limit: 200 } : { limit: 200 })
+        .then((r: unknown) => {
+          if (Array.isArray(r)) return r as DoctorItem[]
+          const resp = r as Record<string, unknown> | undefined
+          if (resp?.users) return resp.users as DoctorItem[]
+          if (resp?.data) return resp.data as DoctorItem[]
+          return []
+        }),
   })
   const doctorsList: DoctorItem[] = Array.isArray(doctors) ? doctors : []
 
@@ -452,8 +656,6 @@ export default function EnquiryCalendar() {
     queryClient.invalidateQueries({ queryKey: ["crm-enhanced-dashboard"] })
   }, [queryClient])
 
-
-
   async function handleMarkCompleted(id: string, source?: string) {
     try {
       if (source === "generated_enquiry") {
@@ -464,7 +666,11 @@ export default function EnquiryCalendar() {
       invalidateCalendar()
       addToast({ title: "Marked completed", variant: "success" })
     } catch (err: unknown) {
-      addToast({ title: "Error", description: extractDetail(err) || "Failed", variant: "destructive" })
+      addToast({
+        title: "Error",
+        description: extractDetail(err) || "Failed",
+        variant: "destructive",
+      })
     }
   }
 
@@ -482,7 +688,11 @@ export default function EnquiryCalendar() {
       addToast({ title: "Rescheduled", variant: "success" })
       setReschedOpen(null)
     } catch (err: unknown) {
-      addToast({ title: "Error", description: extractDetail(err) || "Failed to reschedule", variant: "destructive" })
+      addToast({
+        title: "Error",
+        description: extractDetail(err) || "Failed to reschedule",
+        variant: "destructive",
+      })
     }
     setReschedSaving(false)
   }
@@ -498,13 +708,23 @@ export default function EnquiryCalendar() {
 
   async function handleDrop(e: React.DragEvent, targetDate: string) {
     e.preventDefault()
-    if (!draggedItem || draggedItem.due_date === targetDate) { setDraggedItem(null); return }
+    if (!draggedItem || draggedItem.due_date === targetDate) {
+      setDraggedItem(null)
+      return
+    }
     try {
       await enquiriesApi.reschedule(draggedItem.id, { new_date: targetDate })
       invalidateCalendar()
-      addToast({ title: `Moved to ${format(parseISO(targetDate), "dd MMM yyyy")}`, variant: "success" })
+      addToast({
+        title: `Moved to ${format(parseISO(targetDate), "dd MMM yyyy")}`,
+        variant: "success",
+      })
     } catch (err: unknown) {
-      addToast({ title: "Error", description: extractDetail(err) || "Failed to move", variant: "destructive" })
+      addToast({
+        title: "Error",
+        description: extractDetail(err) || "Failed to move",
+        variant: "destructive",
+      })
     }
     setDraggedItem(null)
   }
@@ -556,7 +776,8 @@ export default function EnquiryCalendar() {
     } else {
       vars.patient_name = item.patient?.name || item.patient_name || ""
       vars.patient_phone = item.patient?.phone || item.patient_phone || ""
-      vars.doctor_name = item.doctor?.name || item.doctor_name || item.appointment?.doctor_name || ""
+      vars.doctor_name =
+        item.doctor?.name || item.doctor_name || item.appointment?.doctor_name || ""
       vars.doctor_specialization = item.doctor?.specialization || ""
       vars.op_number = item.patient?.op_number || item.op_number || ""
       vars.treatment_name = item.treatment?.treatment_name || item.treatment_name || ""
@@ -581,8 +802,14 @@ export default function EnquiryCalendar() {
   }
 
   async function openWhatsApp(item: CalendarItem) {
-    const phone = item.enquiry_type === "LEAD_FOLLOW_UP" ? item.lead?.mobile : (item.patient_phone || item.patient?.phone)
-    if (!phone) { addToast({ title: "Mobile number is not available.", variant: "destructive" }); return }
+    const phone =
+      item.enquiry_type === "LEAD_FOLLOW_UP"
+        ? item.lead?.mobile
+        : item.patient_phone || item.patient?.phone
+    if (!phone) {
+      addToast({ title: "Mobile number is not available.", variant: "destructive" })
+      return
+    }
     setWaItem(item)
     setWaOpen(item.id)
     setWaTemplateError("")
@@ -597,8 +824,12 @@ export default function EnquiryCalendar() {
     } catch {
       try {
         const templates = await whatsappTemplatesApi.list({ hospital_id: currentUser?.hospital_id })
-        const list: WhatsAppTemplate[] = Array.isArray(templates) ? templates : (templates as { items?: WhatsAppTemplate[]; data?: WhatsAppTemplate[] })?.items || []
-        const template = list.find((t) => t.is_active !== false && t.enquiry_type === item.enquiry_type && t.message)
+        const list: WhatsAppTemplate[] = Array.isArray(templates)
+          ? templates
+          : (templates as { items?: WhatsAppTemplate[]; data?: WhatsAppTemplate[] })?.items || []
+        const template = list.find(
+          (t) => t.is_active !== false && t.enquiry_type === item.enquiry_type && t.message,
+        )
         if (template?.message) {
           setWaMessage(replaceTemplateVars(template.message, buildWhatsAppVars(item)))
         } else {
@@ -617,29 +848,53 @@ export default function EnquiryCalendar() {
     if (!waOpen || !waItem || !waMessage) return
     const unresolved = waMessage.match(/\{\{(\w+)\}\}/g)
     if (unresolved?.length) {
-      setWaTemplateError(`Unresolved variables: ${unresolved.join(", ")}. Please replace them before sending.`)
+      setWaTemplateError(
+        `Unresolved variables: ${unresolved.join(", ")}. Please replace them before sending.`,
+      )
       return
     }
-    const phone = (waItem.enquiry_type === "LEAD_FOLLOW_UP" ? (waItem.lead?.mobile || "") : (waItem.patient_phone || waItem.patient?.phone || "")).replace(/[^0-9]/g, "")
-    if (!phone) { addToast({ title: "Mobile number is not available.", variant: "destructive" }); return }
+    const phone = (
+      waItem.enquiry_type === "LEAD_FOLLOW_UP"
+        ? waItem.lead?.mobile || ""
+        : waItem.patient_phone || waItem.patient?.phone || ""
+    ).replace(/[^0-9]/g, "")
+    if (!phone) {
+      addToast({ title: "Mobile number is not available.", variant: "destructive" })
+      return
+    }
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(waMessage)}`, "_blank")
     try {
       if (waItem.source === "generated_enquiry") {
         await enquiriesApi.updateStatus(waOpen, { status: "CONTACTED" })
       } else {
-        await crmApi.followUps.update(waOpen, { status: "CONTACTED", contact_channel: "WHATSAPP", whatsapp_message: waMessage })
+        await crmApi.followUps.update(waOpen, {
+          status: "CONTACTED",
+          contact_channel: "WHATSAPP",
+          whatsapp_message: waMessage,
+        })
       }
       invalidateCalendar()
-    } catch { /* ignore */ }
-    setWaOpen(null); setWaMessage(""); setWaTemplateError("")
+    } catch {
+      /* ignore */
+    }
+    setWaOpen(null)
+    setWaMessage("")
+    setWaTemplateError("")
   }
 
   function handleCall(item: CalendarItem) {
-    const phone = item.patient_phone || item.lead?.mobile || item.patient?.phone || (item as any).display_phone
-    if (!phone) { addToast({ title: "No phone number available", variant: "destructive" }); return }
+    const phone =
+      item.patient_phone || item.lead?.mobile || item.patient?.phone || (item as any).display_phone
+    if (!phone) {
+      addToast({ title: "No phone number available", variant: "destructive" })
+      return
+    }
     window.location.href = `tel:${phone}`
     if (item.source !== "generated_enquiry") {
-      crmApi.followUps.update(item.id, { status: "CONTACTED", contact_channel: "CALL" }).then(() => invalidateCalendar()).catch(() => {})
+      crmApi.followUps
+        .update(item.id, { status: "CONTACTED", contact_channel: "CALL" })
+        .then(() => invalidateCalendar())
+        .catch(() => {})
     }
   }
 
@@ -655,24 +910,44 @@ export default function EnquiryCalendar() {
     enabled: !!timelineItem?.patient_id && !isLeadTimeline && !detailData?.timeline,
   })
 
-  const timelineEntries: { id?: string; enquiry_type?: string; status?: string; due_date?: string; created_at?: string; description?: string; action?: string; notes?: string }[] =
-    (detailData?.timeline as any[]) || (Array.isArray(timelineData) ? timelineData : [])
+  const timelineEntries: {
+    id?: string
+    enquiry_type?: string
+    status?: string
+    due_date?: string
+    created_at?: string
+    description?: string
+    action?: string
+    notes?: string
+  }[] = (detailData?.timeline as any[]) || (Array.isArray(timelineData) ? timelineData : [])
   // --- Navigation ---
   const navToday = useCallback(() => setSelectedDate(format(new Date(), "yyyy-MM-dd")), [])
-  const handleNav = useCallback((d: -1 | 1) => {
-    setSelectedDate((prev) => {
-      const p = parseISO(prev)
-      if (viewMode === "day") return format(d > 0 ? addDays(p, 1) : subDays(p, 1), "yyyy-MM-dd")
-      if (viewMode === "week" || viewMode === "agenda") return format(d > 0 ? addWeeks(p, 1) : subWeeks(p, 1), "yyyy-MM-dd")
-      return format(d > 0 ? addMonths(p, 1) : subMonths(p, 1), "yyyy-MM-dd")
-    })
-  }, [viewMode])
-  function handleDayClick(dateStr: string) { setSelectedDate(dateStr); setViewMode("day") }
+  const handleNav = useCallback(
+    (d: -1 | 1) => {
+      setSelectedDate((prev) => {
+        const p = parseISO(prev)
+        if (viewMode === "day") return format(d > 0 ? addDays(p, 1) : subDays(p, 1), "yyyy-MM-dd")
+        if (viewMode === "week" || viewMode === "agenda")
+          return format(d > 0 ? addWeeks(p, 1) : subWeeks(p, 1), "yyyy-MM-dd")
+        return format(d > 0 ? addMonths(p, 1) : subMonths(p, 1), "yyyy-MM-dd")
+      })
+    },
+    [viewMode],
+  )
+  function handleDayClick(dateStr: string) {
+    setSelectedDate(dateStr)
+    setViewMode("day")
+  }
 
   // --- Keyboard shortcuts ---
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        e.target instanceof HTMLSelectElement
+      )
+        return
       if (e.key === "ArrowLeft") handleNav(-1)
       else if (e.key === "ArrowRight") handleNav(1)
       else if (e.key === "t" || e.key === "T") navToday()
@@ -690,46 +965,72 @@ export default function EnquiryCalendar() {
   const calStart = startOfMonth(selDate)
   const calEnd = endOfMonth(selDate)
 
-  const dayItems = useMemo(() => searchedItems.filter((i) => i.due_date === selectedDate), [searchedItems, selectedDate])
+  const dayItems = useMemo(
+    () => searchedItems.filter((i) => i.due_date === selectedDate),
+    [searchedItems, selectedDate],
+  )
 
-  const overdueCount = useMemo(() =>
-    searchedItems.filter((i) => isOverdue(i.due_date || "", i.status || "")).length,
-    [searchedItems]
+  const overdueCount = useMemo(
+    () => searchedItems.filter((i) => isOverdue(i.due_date || "", i.status || "")).length,
+    [searchedItems],
   )
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Enquiry Calendar" description="Enterprise CRM action center — manage all enquiries from one screen">
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={navToday}><ChevronsLeft className="h-4 w-4 mr-1" />Today</Button>
-          <Button variant="outline" size="sm" onClick={() => handleNav(-1)}><ChevronLeft className="h-4 w-4" /></Button>
-          <span className="text-sm font-semibold min-w-[160px] text-center">
-            {viewMode === "day" ? format(selDate, "dd MMM yyyy") :
-             viewMode === "week" || viewMode === "agenda" ? `${format(startOfWeek(selDate, { weekStartsOn: 1 }), "dd MMM")} - ${format(endOfWeek(selDate, { weekStartsOn: 1 }), "dd MMM yyyy")}` :
-             format(selDate, "MMMM yyyy")}
-          </span>
-          <Button variant="outline" size="sm" onClick={() => handleNav(1)}><ChevronRight className="h-4 w-4" /></Button>
-          <div className="flex border rounded-md ml-2">
-            {(["day", "week", "month", "agenda"] as const).map((v, idx) => (
-              <Button key={v} variant={viewMode === v ? "default" : "ghost"} size="sm"
-                className={`${idx === 0 ? "rounded-r-none" : idx === 3 ? "rounded-l-none" : "rounded-none"} text-xs h-8`}
-                onClick={() => setViewMode(v)}>
-                {v.charAt(0).toUpperCase() + v.slice(1)}<span className="ml-1 text-[9px] text-muted-foreground">({idx + 1})</span>
-              </Button>
-            ))}
-          </div>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon-sm" className="h-8 w-8" onClick={() => setShowFilters(!showFilters)}>
-                  <Filter className={`h-4 w-4 ${showFilters ? "text-primary" : ""}`} />
+      <PageHeader
+        title="Enquiry Calendar"
+        description="Enterprise CRM action center — manage all enquiries from one screen"
+        actions={
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="outline" size="sm" onClick={navToday}>
+              <ChevronsLeft className="h-4 w-4 mr-1" />
+              Today
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => handleNav(-1)}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm font-semibold min-w-[160px] text-center">
+              {viewMode === "day"
+                ? format(selDate, "dd MMM yyyy")
+                : viewMode === "week" || viewMode === "agenda"
+                  ? `${format(startOfWeek(selDate, { weekStartsOn: 1 }), "dd MMM")} - ${format(endOfWeek(selDate, { weekStartsOn: 1 }), "dd MMM yyyy")}`
+                  : format(selDate, "MMMM yyyy")}
+            </span>
+            <Button variant="outline" size="sm" onClick={() => handleNav(1)}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <div className="flex border rounded-md ml-2">
+              {(["day", "week", "month", "agenda"] as const).map((v, idx) => (
+                <Button
+                  key={v}
+                  variant={viewMode === v ? "default" : "ghost"}
+                  size="sm"
+                  className={`${idx === 0 ? "rounded-r-none" : idx === 3 ? "rounded-l-none" : "rounded-none"} text-xs h-8`}
+                  onClick={() => setViewMode(v)}
+                >
+                  {v.charAt(0).toUpperCase() + v.slice(1)}
+                  <span className="ml-1 text-[9px] text-muted-foreground">({idx + 1})</span>
                 </Button>
-              </TooltipTrigger>
-              <TooltipContent>Toggle Filters (F)</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
-      </PageHeader>
+              ))}
+            </div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="h-8 w-8"
+                    onClick={() => setShowFilters(!showFilters)}
+                  >
+                    <Filter className={`h-4 w-4 ${showFilters ? "text-primary" : ""}`} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Toggle Filters (F)</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        }
+      />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -738,16 +1039,25 @@ export default function EnquiryCalendar() {
           <div className="text-xs text-muted-foreground">Total</div>
         </Card>
         <Card className="py-2 px-3 bg-amber-50 border-amber-200">
-          <div className="text-lg font-bold text-amber-700">{summary?.pending ?? dayItems.filter((i) => ["PENDING", "NEW"].includes(i.status || "")).length}</div>
+          <div className="text-lg font-bold text-amber-700">
+            {summary?.pending ??
+              dayItems.filter((i) => ["PENDING", "NEW"].includes(i.status || "")).length}
+          </div>
           <div className="text-xs text-amber-600">Pending</div>
         </Card>
         <Card className="py-2 px-3 bg-red-50 border-red-200">
           <div className="text-lg font-bold text-red-700">{summary?.overdue ?? overdueCount}</div>
-          <div className="text-xs text-red-600 flex items-center gap-1"><AlertTriangle className="h-3 w-3" />Overdue</div>
+          <div className="text-xs text-red-600 flex items-center gap-1">
+            <AlertTriangle className="h-3 w-3" />
+            Overdue
+          </div>
         </Card>
         <Card className="py-2 px-3 bg-blue-50 border-blue-200">
           <div className="text-lg font-bold text-blue-700">{summary?.due_today ?? 0}</div>
-          <div className="text-xs text-blue-600 flex items-center gap-1"><Calendar className="h-3 w-3" />Today</div>
+          <div className="text-xs text-blue-600 flex items-center gap-1">
+            <Calendar className="h-3 w-3" />
+            Today
+          </div>
         </Card>
         <Card className="py-2 px-3 bg-indigo-50 border-indigo-200">
           <div className="text-lg font-bold text-indigo-700">{summary?.due_tomorrow ?? 0}</div>
@@ -765,16 +1075,25 @@ export default function EnquiryCalendar() {
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative flex-1 min-w-[200px] max-w-sm">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Search patient, OP number, phone, treatment..." value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)} className="pl-8 h-9 text-sm" />
+              <Input
+                placeholder="Search patient, OP number, phone, treatment..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 h-9 text-sm"
+              />
               {searchQuery && (
-                <button onClick={() => setSearchQuery("")} className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2"
+                >
                   <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
                 </button>
               )}
             </div>
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v === " " ? "" : v)}>
-              <SelectTrigger className="w-[150px] h-9 text-sm"><SelectValue placeholder="All Statuses" /></SelectTrigger>
+              <SelectTrigger className="w-[150px] h-9 text-sm">
+                <SelectValue placeholder="All Statuses" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value=" ">All Statuses</SelectItem>
                 <SelectItem value="PENDING">Pending</SelectItem>
@@ -789,7 +1108,9 @@ export default function EnquiryCalendar() {
               </SelectContent>
             </Select>
             <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v === " " ? "" : v)}>
-              <SelectTrigger className="w-[180px] h-9 text-sm"><SelectValue placeholder="All Types" /></SelectTrigger>
+              <SelectTrigger className="w-[180px] h-9 text-sm">
+                <SelectValue placeholder="All Types" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value=" ">All Types</SelectItem>
                 <SelectItem value="LEAD_FOLLOW_UP">Lead Follow-Up</SelectItem>
@@ -806,16 +1127,25 @@ export default function EnquiryCalendar() {
               </SelectContent>
             </Select>
             <Select value={doctorFilter} onValueChange={(v) => setDoctorFilter(v === " " ? "" : v)}>
-              <SelectTrigger className="w-[160px] h-9 text-sm"><SelectValue placeholder="All Doctors" /></SelectTrigger>
+              <SelectTrigger className="w-[160px] h-9 text-sm">
+                <SelectValue placeholder="All Doctors" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value=" ">All Doctors</SelectItem>
                 {doctorsList.map((doc) => (
-                  <SelectItem key={doc.id} value={doc.id}>{doc.full_name || doc.name || doc.username}</SelectItem>
+                  <SelectItem key={doc.id} value={doc.id}>
+                    {doc.full_name || doc.name || doc.username}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <Select value={priorityFilter} onValueChange={(v) => setPriorityFilter(v === " " ? "" : v)}>
-              <SelectTrigger className="w-[130px] h-9 text-sm"><SelectValue placeholder="All Priority" /></SelectTrigger>
+            <Select
+              value={priorityFilter}
+              onValueChange={(v) => setPriorityFilter(v === " " ? "" : v)}
+            >
+              <SelectTrigger className="w-[130px] h-9 text-sm">
+                <SelectValue placeholder="All Priority" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value=" ">All Priority</SelectItem>
                 <SelectItem value="HIGH">High</SelectItem>
@@ -823,17 +1153,36 @@ export default function EnquiryCalendar() {
                 <SelectItem value="LOW">Low</SelectItem>
               </SelectContent>
             </Select>
-            {(statusFilter || typeFilter || doctorFilter || priorityFilter || searchQuery || includeTerminal) && (
-              <Button variant="ghost" size="sm" className="h-9 text-xs"
-                onClick={() => { setStatusFilter(""); setTypeFilter(""); setDoctorFilter(""); setPriorityFilter(""); setSearchQuery(""); setIncludeTerminal(false) }}>
+            {(statusFilter ||
+              typeFilter ||
+              doctorFilter ||
+              priorityFilter ||
+              searchQuery ||
+              includeTerminal) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 text-xs"
+                onClick={() => {
+                  setStatusFilter("")
+                  setTypeFilter("")
+                  setDoctorFilter("")
+                  setPriorityFilter("")
+                  setSearchQuery("")
+                  setIncludeTerminal(false)
+                }}
+              >
                 <X className="h-3 w-3 mr-1" /> Clear All
               </Button>
             )}
             <div className="flex items-center gap-2 ml-auto">
               <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
-                <input type="checkbox" checked={includeTerminal}
+                <input
+                  type="checkbox"
+                  checked={includeTerminal}
                   onChange={(e) => setIncludeTerminal(e.target.checked)}
-                  className="h-3.5 w-3.5 rounded border-gray-300" />
+                  className="h-3.5 w-3.5 rounded border-gray-300"
+                />
                 Include Completed/Cancelled
               </label>
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -852,20 +1201,28 @@ export default function EnquiryCalendar() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium">
                 {format(selDate, "EEEE, dd MMMM yyyy")}
-                <Badge variant="outline" className="ml-2 text-xs">{filteredItems.length} items</Badge>
+                <Badge variant="outline" className="ml-2 text-xs">
+                  {filteredItems.length} items
+                </Badge>
               </CardTitle>
               {!showFilters && (
                 <div className="relative flex-1 max-w-xs ml-4">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input placeholder="Quick search..." value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)} className="pl-8 h-8 text-sm" />
+                  <Input
+                    placeholder="Quick search..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-8 h-8 text-sm"
+                  />
                 </div>
               )}
             </div>
           </CardHeader>
           <CardContent className="p-0">
             {isFetching ? (
-              <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
             ) : filteredItems.length === 0 ? (
               <div className="py-12 text-center text-muted-foreground">
                 <Calendar className="h-12 w-12 mx-auto mb-3 opacity-30" />
@@ -875,7 +1232,7 @@ export default function EnquiryCalendar() {
             ) : (
               <div className="max-h-[600px] overflow-auto">
                 <Table>
-                  <TableHeader className="sticky top-0 bg-white z-10">
+                  <TableHeader className="sticky top-0 bg-white z-[var(--ds-z-sticky)]">
                     <TableRow>
                       <TableHead className="w-2" />
                       <TableHead className="whitespace-nowrap">Patient / Description</TableHead>
@@ -884,7 +1241,9 @@ export default function EnquiryCalendar() {
                       <TableHead className="whitespace-nowrap">Hospital</TableHead>
                       <TableHead className="whitespace-nowrap">Type</TableHead>
                       <TableHead className="whitespace-nowrap">Status</TableHead>
-                      <TableHead className="whitespace-nowrap sticky right-0 bg-white z-10">Actions</TableHead>
+                      <TableHead className="whitespace-nowrap sticky right-0 bg-white z-[var(--ds-z-sticky)]">
+                        Actions
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -892,24 +1251,37 @@ export default function EnquiryCalendar() {
                       const tc = getTypeColor(item.enquiry_type || item.follow_up_type || "")
                       const od = isOverdue(item.due_date || "", item.status || "")
                       const desc = item.description
-                      const patName = item.display_name || item.patient?.name || item.patient_name || "-"
+                      const patName =
+                        item.display_name || item.patient?.name || item.patient_name || "-"
                       const docName = item.doctor?.name || item.doctor_name
                       const docSpec = item.doctor?.specialization
                       const hospName = item.hospital?.name
                       const treatmentLabel = item.treatment?.treatment_name || item.treatment_name
                       return (
-                        <TableRow key={`${item.source}-${item.id}`}
+                        <TableRow
+                          key={`${item.source}-${item.id}`}
                           className={`cursor-pointer hover:bg-muted/50 ${od ? "bg-red-50/40" : ""}`}
                           draggable
                           onDragStart={(e) => handleDragStart(e, item)}
-                          onClick={() => { setDetailItem(item); setDetailOpen(true) }}>
-                          <TableCell className="w-2 p-0"><div className={`w-1.5 h-10 rounded-full ${tc.dot}`} /></TableCell>
+                          onClick={() => {
+                            setDetailItem(item)
+                            setDetailOpen(true)
+                          }}
+                        >
+                          <TableCell className="w-2 p-0">
+                            <div className={`w-1.5 h-10 rounded-full ${tc.dot}`} />
+                          </TableCell>
                           <TableCell>
                             <div className="font-medium text-sm whitespace-nowrap">{patName}</div>
                             {item.enquiry_type === "APPOINTMENT_REMINDER" && item.appointment && (
                               <div className="text-xs text-muted-foreground truncate max-w-[260px]">
                                 {treatmentLabel && <>{treatmentLabel} · </>}
-                                {item.treatment?.current_visit && <>Visit {item.treatment.current_visit + 1}/{item.treatment.total_visits} · </>}
+                                {item.treatment?.current_visit && (
+                                  <>
+                                    Visit {item.treatment.current_visit + 1}/
+                                    {item.treatment.total_visits} ·{" "}
+                                  </>
+                                )}
                                 {item.appointment.time && <>{item.appointment.time}</>}
                               </div>
                             )}
@@ -917,35 +1289,64 @@ export default function EnquiryCalendar() {
                               <div className="text-xs text-muted-foreground truncate max-w-[260px]">
                                 {treatmentLabel && <>{treatmentLabel}</>}
                                 {item.treatment?.status && <> · {item.treatment.status}</>}
-                                {item.treatment?.completion_date && <> · {item.treatment.completion_date}</>}
+                                {item.treatment?.completion_date && (
+                                  <> · {item.treatment.completion_date}</>
+                                )}
                               </div>
                             )}
-                            {(item.enquiry_type === "CASE_WELLNESS" || item.enquiry_type === "RECALL") && item.case && (
-                              <div className="text-xs text-muted-foreground truncate max-w-[260px]">
-                                {item.case.case_number && <>{item.case.case_number}</>}
-                                {desc && <> · {desc}</>}
-                              </div>
-                            )}
-                            {!["APPOINTMENT_REMINDER", "TREATMENT_WELLNESS", "CASE_WELLNESS", "RECALL"].includes(item.enquiry_type || "") && desc && (
-                              <div className="text-xs text-muted-foreground truncate max-w-[220px]">{desc}</div>
-                            )}
+                            {(item.enquiry_type === "CASE_WELLNESS" ||
+                              item.enquiry_type === "RECALL") &&
+                              item.case && (
+                                <div className="text-xs text-muted-foreground truncate max-w-[260px]">
+                                  {item.case.case_number && <>{item.case.case_number}</>}
+                                  {desc && <> · {desc}</>}
+                                </div>
+                              )}
+                            {![
+                              "APPOINTMENT_REMINDER",
+                              "TREATMENT_WELLNESS",
+                              "CASE_WELLNESS",
+                              "RECALL",
+                            ].includes(item.enquiry_type || "") &&
+                              desc && (
+                                <div className="text-xs text-muted-foreground truncate max-w-[220px]">
+                                  {desc}
+                                </div>
+                              )}
                           </TableCell>
-                          <TableCell className="text-muted-foreground text-xs whitespace-nowrap">{item.patient?.op_number || item.op_number || "—"}</TableCell>
+                          <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
+                            {item.patient?.op_number || item.op_number || "—"}
+                          </TableCell>
                           <TableCell className="text-xs whitespace-nowrap">
                             {docName ? (
                               <span>
                                 Dr. {docName}
-                                {docSpec && <span className="text-muted-foreground ml-1">({docSpec})</span>}
+                                {docSpec && (
+                                  <span className="text-muted-foreground ml-1">({docSpec})</span>
+                                )}
                               </span>
-                            ) : "—"}
+                            ) : (
+                              "—"
+                            )}
                           </TableCell>
-                          <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{hospName || "—"}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                            {hospName || "—"}
+                          </TableCell>
                           <TableCell>
-                            <Badge variant="outline" className={`text-[10px] ${tc.bg} ${tc.text} ${tc.border}`}>
-                              {ENQUIRY_TYPE_LABELS[item.enquiry_type || ""] || item.enquiry_type || item.follow_up_type || "—"}
+                            <Badge
+                              variant="outline"
+                              className={`text-[10px] ${tc.bg} ${tc.text} ${tc.border}`}
+                            >
+                              {ENQUIRY_TYPE_LABELS[item.enquiry_type || ""] ||
+                                item.enquiry_type ||
+                                item.follow_up_type ||
+                                "—"}
                             </Badge>
                             {item.enquiry_type === "LEAD_FOLLOW_UP" && item.occurrence_number && (
-                              <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 ml-1">
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 ml-1"
+                              >
                                 {item.total_attempts
                                   ? `Attempt ${item.occurrence_number} of ${item.total_attempts}`
                                   : `Attempt #${item.occurrence_number}`}
@@ -954,7 +1355,9 @@ export default function EnquiryCalendar() {
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1">
-                              <Badge className={`text-[10px] ${STATUS_COLORS[item.status || ""] || "bg-gray-100"}`}>
+                              <Badge
+                                className={`text-[10px] ${STATUS_COLORS[item.status || ""] || "bg-gray-100"}`}
+                              >
                                 {od && <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />}
                                 {item.status || "—"}
                               </Badge>
@@ -962,48 +1365,106 @@ export default function EnquiryCalendar() {
                                 <Badge className="text-[9px] bg-red-100 text-red-700">HIGH</Badge>
                               )}
                               {treatmentLabel && (
-                                <span className="text-[9px] text-muted-foreground truncate max-w-[80px] hidden lg:inline">{treatmentLabel}</span>
+                                <span className="text-[9px] text-muted-foreground truncate max-w-[80px] hidden lg:inline">
+                                  {treatmentLabel}
+                                </span>
                               )}
                             </div>
                           </TableCell>
-                          <TableCell className="sticky right-0 bg-white z-10">
+                          <TableCell className="sticky right-0 bg-white z-[var(--ds-z-sticky)]">
                             <TooltipProvider>
-                              <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
-                                <Tooltip><TooltipTrigger asChild>
-                                  <Button variant="ghost" size="icon-sm" className="h-7 w-7" onClick={() => handleCall(item)}>
-                                    <Phone className="h-3.5 w-3.5 text-green-600" />
-                                  </Button>
-                                </TooltipTrigger><TooltipContent>Call</TooltipContent></Tooltip>
-                                <Tooltip><TooltipTrigger asChild>
-                                  <Button variant="ghost" size="icon-sm" className="h-7 w-7" onClick={() => openWhatsApp(item)}>
-                                    <MessageCircle className="h-3.5 w-3.5 text-green-600" />
-                                  </Button>
-                                </TooltipTrigger><TooltipContent>WhatsApp</TooltipContent></Tooltip>
-                                <Tooltip><TooltipTrigger asChild>
-                                  <Button variant="ghost" size="icon-sm" className="h-7 w-7" onClick={() => openFeedback(item)}>
-                                    <FileText className="h-3.5 w-3.5 text-blue-600" />
-                                  </Button>
-                                </TooltipTrigger><TooltipContent>Feedback</TooltipContent></Tooltip>
-                                <Tooltip><TooltipTrigger asChild>
-                                  <Button variant="ghost" size="icon-sm" className="h-7 w-7"
-                                    onClick={() => { setReschedOpen(item.id); setReschedDate(item.due_date || selectedDate) }}>
-                                    <RotateCcw className="h-3.5 w-3.5 text-amber-600" />
-                                  </Button>
-                                </TooltipTrigger><TooltipContent>Reschedule</TooltipContent></Tooltip>
-                                {item.status !== "COMPLETED" && item.status !== "LOST" && item.status !== "CANCELLED" && (
-                                  <Tooltip><TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon-sm" className="h-7 w-7"
-                                      onClick={() => handleMarkCompleted(item.id, item.source)}>
-                                      <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+                              <div
+                                className="flex items-center gap-0.5"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon-sm"
+                                      className="h-7 w-7"
+                                      onClick={() => handleCall(item)}
+                                    >
+                                      <Phone className="h-3.5 w-3.5 text-green-600" />
                                     </Button>
-                                  </TooltipTrigger><TooltipContent>Complete</TooltipContent></Tooltip>
-                                )}
-                                <Tooltip><TooltipTrigger asChild>
-                                  <Button variant="ghost" size="icon-sm" className="h-7 w-7"
-                                    onClick={() => { setTimelineItem(item); setTimelineOpen(item.id) }}>
-                                    <History className="h-3.5 w-3.5 text-gray-500" />
-                                  </Button>
-                                </TooltipTrigger><TooltipContent>Timeline</TooltipContent></Tooltip>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Call</TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon-sm"
+                                      className="h-7 w-7"
+                                      onClick={() => openWhatsApp(item)}
+                                    >
+                                      <MessageCircle className="h-3.5 w-3.5 text-green-600" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>WhatsApp</TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon-sm"
+                                      className="h-7 w-7"
+                                      onClick={() => openFeedback(item)}
+                                    >
+                                      <FileText className="h-3.5 w-3.5 text-blue-600" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Feedback</TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon-sm"
+                                      className="h-7 w-7"
+                                      onClick={() => {
+                                        setReschedOpen(item.id)
+                                        setReschedDate(item.due_date || selectedDate)
+                                      }}
+                                    >
+                                      <RotateCcw className="h-3.5 w-3.5 text-amber-600" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Reschedule</TooltipContent>
+                                </Tooltip>
+                                {item.status !== "COMPLETED" &&
+                                  item.status !== "LOST" &&
+                                  item.status !== "CANCELLED" && (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon-sm"
+                                          className="h-7 w-7"
+                                          onClick={() => handleMarkCompleted(item.id, item.source)}
+                                        >
+                                          <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>Complete</TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon-sm"
+                                      className="h-7 w-7"
+                                      onClick={() => {
+                                        setTimelineItem(item)
+                                        setTimelineOpen(item.id)
+                                      }}
+                                    >
+                                      <History className="h-3.5 w-3.5 text-gray-500" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Timeline</TooltipContent>
+                                </Tooltip>
                               </div>
                             </TooltipProvider>
                           </TableCell>
@@ -1021,11 +1482,18 @@ export default function EnquiryCalendar() {
       {/* Week View */}
       {viewMode === "week" && (
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Week View — click a day</CardTitle></CardHeader>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Week View — click a day</CardTitle>
+          </CardHeader>
           <CardContent>
             <div className="grid grid-cols-7 gap-px rounded-lg border bg-gray-100 overflow-hidden">
               {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-                <div key={d} className="bg-white p-2 text-center text-xs font-semibold text-gray-500">{d}</div>
+                <div
+                  key={d}
+                  className="bg-white p-2 text-center text-xs font-semibold text-gray-500"
+                >
+                  {d}
+                </div>
               ))}
               {(() => {
                 const weekStart = startOfWeek(selDate, { weekStartsOn: 1 })
@@ -1036,27 +1504,38 @@ export default function EnquiryCalendar() {
                   const dayItemsAll = searchedItems.filter((item) => item.due_date === dateStr)
                   const todayCheck = isToday(day)
                   cells.push(
-                    <div key={dateStr}
+                    <div
+                      key={dateStr}
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={(e) => handleDrop(e, dateStr)}
                       onClick={() => handleDayClick(dateStr)}
                       className={`min-h-[100px] bg-white p-2 cursor-pointer hover:bg-blue-50 transition-colors
-                        ${todayCheck ? "ring-2 ring-inset ring-blue-400" : ""}`}>
-                      <div className={`text-xs font-bold mb-1 ${todayCheck ? "text-blue-600" : "text-gray-700"}`}>
+                        ${todayCheck ? "ring-2 ring-inset ring-blue-400" : ""}`}
+                    >
+                      <div
+                        className={`text-xs font-bold mb-1 ${todayCheck ? "text-blue-600" : "text-gray-700"}`}
+                      >
                         {format(day, "dd MMM")}
                       </div>
                       <div className="space-y-0.5">
                         {dayItemsAll.slice(0, 4).map((item) => {
                           const tc = getTypeColor(item.enquiry_type || "")
                           return (
-                            <div key={item.id} className={`text-[10px] px-1.5 py-0.5 rounded ${tc.bg} ${tc.text} truncate border ${tc.border}`}>
+                            <div
+                              key={item.id}
+                              className={`text-[10px] px-1.5 py-0.5 rounded ${tc.bg} ${tc.text} truncate border ${tc.border}`}
+                            >
                               {item.display_name || item.patient_name || "-"}
                             </div>
                           )
                         })}
-                        {dayItemsAll.length > 4 && <div className="text-[9px] text-gray-400">+{dayItemsAll.length - 4} more</div>}
+                        {dayItemsAll.length > 4 && (
+                          <div className="text-[9px] text-gray-400">
+                            +{dayItemsAll.length - 4} more
+                          </div>
+                        )}
                       </div>
-                    </div>
+                    </div>,
                   )
                 }
                 return cells
@@ -1069,38 +1548,59 @@ export default function EnquiryCalendar() {
       {/* Month View */}
       {viewMode === "month" && (
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">{format(selDate, "MMMM yyyy")} — click a day</CardTitle></CardHeader>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">{format(selDate, "MMMM yyyy")} — click a day</CardTitle>
+          </CardHeader>
           <CardContent>
             <div className="grid grid-cols-7 gap-px rounded-lg border bg-gray-100 overflow-hidden">
               {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-                <div key={d} className="bg-white p-2 text-center text-xs font-semibold text-gray-500">{d}</div>
+                <div
+                  key={d}
+                  className="bg-white p-2 text-center text-xs font-semibold text-gray-500"
+                >
+                  {d}
+                </div>
               ))}
               {(() => {
-                const startDay = calStart.getDay(), daysInMonth = calEnd.getDate()
+                const startDay = calStart.getDay(),
+                  daysInMonth = calEnd.getDate()
                 const cells: React.ReactNode[] = []
-                for (let i = 0; i < startDay; i++) cells.push(<div key={`e-${i}`} className="bg-gray-50 p-2" />)
+                for (let i = 0; i < startDay; i++)
+                  cells.push(<div key={`e-${i}`} className="bg-gray-50 p-2" />)
                 for (let d = 1; d <= daysInMonth; d++) {
                   const dateStr = `${format(selDate, "yyyy-MM")}-${String(d).padStart(2, "0")}`
                   const dayItemsAll = searchedItems.filter((item) => item.due_date === dateStr)
                   const todayCheck = dateStr === format(today, "yyyy-MM-dd")
                   const isSelected = dateStr === selectedDate
                   cells.push(
-                    <div key={dateStr}
+                    <div
+                      key={dateStr}
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={(e) => handleDrop(e, dateStr)}
                       onClick={() => handleDayClick(dateStr)}
                       className={`min-h-[55px] bg-white p-1.5 cursor-pointer hover:bg-blue-50 transition-colors
                         ${todayCheck ? "ring-2 ring-inset ring-blue-400" : ""}
-                        ${isSelected ? "bg-blue-100 ring-2 ring-inset ring-blue-500" : ""}`}>
-                      <div className={`text-xs font-bold ${todayCheck ? "text-blue-600" : isSelected ? "text-blue-700" : "text-gray-700"}`}>{d}</div>
+                        ${isSelected ? "bg-blue-100 ring-2 ring-inset ring-blue-500" : ""}`}
+                    >
+                      <div
+                        className={`text-xs font-bold ${todayCheck ? "text-blue-600" : isSelected ? "text-blue-700" : "text-gray-700"}`}
+                      >
+                        {d}
+                      </div>
                       <div className="text-[9px] mt-0.5 leading-tight">
                         {dayItemsAll.slice(0, 3).map((item) => {
                           const tc = getTypeColor(item.enquiry_type || "")
-                          return <div key={item.id} className={`truncate ${tc.text}`}>{item.display_name || item.patient_name || "-"}</div>
+                          return (
+                            <div key={item.id} className={`truncate ${tc.text}`}>
+                              {item.display_name || item.patient_name || "-"}
+                            </div>
+                          )
                         })}
-                        {dayItemsAll.length > 3 && <div className="text-gray-400">+{dayItemsAll.length - 3}</div>}
+                        {dayItemsAll.length > 3 && (
+                          <div className="text-gray-400">+{dayItemsAll.length - 3}</div>
+                        )}
                       </div>
-                    </div>
+                    </div>,
                   )
                 }
                 return cells
@@ -1115,15 +1615,22 @@ export default function EnquiryCalendar() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium">
-              Agenda — {format(startOfWeek(selDate, { weekStartsOn: 1 }), "dd MMM")} to {format(endOfWeek(selDate, { weekStartsOn: 1 }), "dd MMM yyyy")}
-              <Badge variant="outline" className="ml-2 text-xs">{filteredItems.length} items</Badge>
+              Agenda — {format(startOfWeek(selDate, { weekStartsOn: 1 }), "dd MMM")} to{" "}
+              {format(endOfWeek(selDate, { weekStartsOn: 1 }), "dd MMM yyyy")}
+              <Badge variant="outline" className="ml-2 text-xs">
+                {filteredItems.length} items
+              </Badge>
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {isFetching ? (
-              <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
             ) : filteredItems.length === 0 ? (
-              <div className="py-12 text-center text-muted-foreground text-sm">No items for this week</div>
+              <div className="py-12 text-center text-muted-foreground text-sm">
+                No items for this week
+              </div>
             ) : (
               <div className="max-h-[600px] overflow-auto">
                 {(() => {
@@ -1139,33 +1646,56 @@ export default function EnquiryCalendar() {
                     const dayDate = parseISO(dateStr)
                     const todayCheck = isToday(dayDate)
                     return (
-                      <div key={dateStr} className="border-b last:border-b-0"
+                      <div
+                        key={dateStr}
+                        className="border-b last:border-b-0"
                         onDragOver={(e) => e.preventDefault()}
-                        onDrop={(e) => handleDrop(e, dateStr)}>
-                        <div className={`px-4 py-2 sticky top-0 z-10 flex items-center gap-2 ${todayCheck ? "bg-blue-50" : "bg-gray-50"}`}>
+                        onDrop={(e) => handleDrop(e, dateStr)}
+                      >
+                        <div
+                          className={`px-4 py-2 sticky top-0 z-[var(--ds-z-sticky)] flex items-center gap-2 ${todayCheck ? "bg-blue-50" : "bg-gray-50"}`}
+                        >
                           {todayCheck && <div className="w-2 h-2 rounded-full bg-blue-500" />}
-                          <span className={`text-sm font-semibold ${todayCheck ? "text-blue-700" : "text-gray-700"}`}>
+                          <span
+                            className={`text-sm font-semibold ${todayCheck ? "text-blue-700" : "text-gray-700"}`}
+                          >
                             {format(dayDate, "EEEE, dd MMM yyyy")}
                           </span>
-                          <Badge variant="outline" className="text-[10px]">{dateItems.length}</Badge>
+                          <Badge variant="outline" className="text-[10px]">
+                            {dateItems.length}
+                          </Badge>
                         </div>
                         {dateItems.map((item) => {
                           const tc = getTypeColor(item.enquiry_type || "")
                           const od = isOverdue(item.due_date || "", item.status || "")
                           return (
-                            <div key={`${item.source}-${item.id}`}
+                            <div
+                              key={`${item.source}-${item.id}`}
                               className={`flex items-center gap-3 px-4 py-2.5 hover:bg-muted/30 cursor-pointer border-l-4 ${tc.border} ${od ? "bg-red-50/30" : ""}`}
                               draggable
                               onDragStart={(e) => handleDragStart(e, item)}
-                              onClick={() => { setDetailItem(item); setDetailOpen(true) }}>
+                              onClick={() => {
+                                setDetailItem(item)
+                                setDetailOpen(true)
+                              }}
+                            >
                               <div className={`w-2 h-2 rounded-full flex-shrink-0 ${tc.dot}`} />
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
-                                  <span className="text-sm font-medium truncate">{item.display_name || item.patient_name || "-"}</span>
-                                  <Badge variant="outline" className={`text-[9px] ${tc.bg} ${tc.text} ${tc.border}`}>
-                                    {ENQUIRY_TYPE_LABELS[item.enquiry_type || ""] || item.enquiry_type || "—"}
+                                  <span className="text-sm font-medium truncate">
+                                    {item.display_name || item.patient_name || "-"}
+                                  </span>
+                                  <Badge
+                                    variant="outline"
+                                    className={`text-[9px] ${tc.bg} ${tc.text} ${tc.border}`}
+                                  >
+                                    {ENQUIRY_TYPE_LABELS[item.enquiry_type || ""] ||
+                                      item.enquiry_type ||
+                                      "—"}
                                   </Badge>
-                                  <Badge className={`text-[9px] ${STATUS_COLORS[item.status || ""] || ""}`}>
+                                  <Badge
+                                    className={`text-[9px] ${STATUS_COLORS[item.status || ""] || ""}`}
+                                  >
                                     {od && <AlertTriangle className="h-2 w-2 mr-0.5" />}
                                     {item.status}
                                   </Badge>
@@ -1175,36 +1705,76 @@ export default function EnquiryCalendar() {
                                   {item.doctor_name && ` · Dr. ${item.doctor_name}`}
                                   {item.treatment_name && ` · ${item.treatment_name}`}
                                 </div>
-                                {item.enquiry_type === "APPOINTMENT_REMINDER" && item.appointment?.time && (
-                                  <div className="text-xs font-medium text-blue-600">{item.appointment.time}</div>
-                                )}
-                                {item.enquiry_type === "TREATMENT_WELLNESS" && item.treatment?.status && (
-                                  <div className="text-xs text-muted-foreground">{item.treatment.status.replace("_", " ")}</div>
-                                )}
-                                {(item.enquiry_type === "CASE_WELLNESS" || item.enquiry_type === "RECALL") && item.completed_treatments && item.completed_treatments.length > 0 && (
-                                  <div className="text-xs text-muted-foreground truncate">
-                                    {item.completed_treatments.slice(0, 3).map((ct: { treatment_name?: string }) => ct.treatment_name).join(" · ")}
-                                    {item.completed_treatments.length > 3 && ` +${item.completed_treatments.length - 3}`}
-                                  </div>
-                                )}
+                                {item.enquiry_type === "APPOINTMENT_REMINDER" &&
+                                  item.appointment?.time && (
+                                    <div className="text-xs font-medium text-blue-600">
+                                      {item.appointment.time}
+                                    </div>
+                                  )}
+                                {item.enquiry_type === "TREATMENT_WELLNESS" &&
+                                  item.treatment?.status && (
+                                    <div className="text-xs text-muted-foreground">
+                                      {item.treatment.status.replace("_", " ")}
+                                    </div>
+                                  )}
+                                {(item.enquiry_type === "CASE_WELLNESS" ||
+                                  item.enquiry_type === "RECALL") &&
+                                  item.completed_treatments &&
+                                  item.completed_treatments.length > 0 && (
+                                    <div className="text-xs text-muted-foreground truncate">
+                                      {item.completed_treatments
+                                        .slice(0, 3)
+                                        .map((ct: { treatment_name?: string }) => ct.treatment_name)
+                                        .join(" · ")}
+                                      {item.completed_treatments.length > 3 &&
+                                        ` +${item.completed_treatments.length - 3}`}
+                                    </div>
+                                  )}
                               </div>
-                              <div className="flex items-center gap-0.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                              <div
+                                className="flex items-center gap-0.5 flex-shrink-0"
+                                onClick={(e) => e.stopPropagation()}
+                              >
                                 <TooltipProvider>
-                                  <Tooltip><TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon-sm" className="h-6 w-6" onClick={() => handleCall(item)}>
-                                      <Phone className="h-3 w-3 text-green-600" />
-                                    </Button>
-                                  </TooltipTrigger><TooltipContent>Call</TooltipContent></Tooltip>
-                                  <Tooltip><TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon-sm" className="h-6 w-6" onClick={() => openWhatsApp(item)}>
-                                      <MessageCircle className="h-3 w-3 text-green-600" />
-                                    </Button>
-                                  </TooltipTrigger><TooltipContent>WhatsApp</TooltipContent></Tooltip>
-                                  <Tooltip><TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon-sm" className="h-6 w-6" onClick={() => openFeedback(item)}>
-                                      <FileText className="h-3 w-3 text-blue-600" />
-                                    </Button>
-                                  </TooltipTrigger><TooltipContent>Feedback</TooltipContent></Tooltip>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon-sm"
+                                        className="h-6 w-6"
+                                        onClick={() => handleCall(item)}
+                                      >
+                                        <Phone className="h-3 w-3 text-green-600" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Call</TooltipContent>
+                                  </Tooltip>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon-sm"
+                                        className="h-6 w-6"
+                                        onClick={() => openWhatsApp(item)}
+                                      >
+                                        <MessageCircle className="h-3 w-3 text-green-600" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>WhatsApp</TooltipContent>
+                                  </Tooltip>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon-sm"
+                                        className="h-6 w-6"
+                                        onClick={() => openFeedback(item)}
+                                      >
+                                        <FileText className="h-3 w-3 text-blue-600" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Feedback</TooltipContent>
+                                  </Tooltip>
                                 </TooltipProvider>
                               </div>
                             </div>
@@ -1225,12 +1795,32 @@ export default function EnquiryCalendar() {
         open={detailOpen}
         onOpenChange={setDetailOpen}
         enquiryId={detailItem?.id || null}
-        onCall={(item) => { setDetailOpen(false); handleCall(item) }}
-        onWhatsApp={(item) => { setDetailOpen(false); openWhatsApp(item) }}
-        onFeedback={(item) => { setDetailOpen(false); openFeedback(item) }}
-        onReschedule={(id, date) => { setReschedOpen(id); setReschedDate(date); setDetailOpen(false) }}
-        onComplete={(id, source) => { handleMarkCompleted(id, source); setDetailOpen(false) }}
-        onTimeline={(item) => { setTimelineItem(item); setTimelineOpen(item.id); setDetailOpen(false) }}
+        onCall={(item) => {
+          setDetailOpen(false)
+          handleCall(item)
+        }}
+        onWhatsApp={(item) => {
+          setDetailOpen(false)
+          openWhatsApp(item)
+        }}
+        onFeedback={(item) => {
+          setDetailOpen(false)
+          openFeedback(item)
+        }}
+        onReschedule={(id, date) => {
+          setReschedOpen(id)
+          setReschedDate(date)
+          setDetailOpen(false)
+        }}
+        onComplete={(id, source) => {
+          handleMarkCompleted(id, source)
+          setDetailOpen(false)
+        }}
+        onTimeline={(item) => {
+          setTimelineItem(item)
+          setTimelineOpen(item.id)
+          setDetailOpen(false)
+        }}
         calendarItem={detailItem}
       />
 
@@ -1245,31 +1835,78 @@ export default function EnquiryCalendar() {
       />
 
       {/* WhatsApp Dialog */}
-      <Dialog open={!!waOpen} onOpenChange={(o) => { if (!o) { setWaOpen(null); setWaMessage(""); setWaTemplateError("") } }}>
+      <Dialog
+        open={!!waOpen}
+        onOpenChange={(o) => {
+          if (!o) {
+            setWaOpen(null)
+            setWaMessage("")
+            setWaTemplateError("")
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              Send WhatsApp to {waItem?.enquiry_type === "LEAD_FOLLOW_UP"
-                ? (waItem?.lead?.name || "Lead")
-                : (waItem?.patient_name || "")}
+              Send WhatsApp to{" "}
+              {waItem?.enquiry_type === "LEAD_FOLLOW_UP"
+                ? waItem?.lead?.name || "Lead"
+                : waItem?.patient_name || ""}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="text-sm text-muted-foreground">To: <strong>{waItem?.patient_phone || waItem?.lead?.mobile || ""}</strong></div>
+            <div className="text-sm text-muted-foreground">
+              To: <strong>{waItem?.patient_phone || waItem?.lead?.mobile || ""}</strong>
+            </div>
             <div className="space-y-2">
               <Label>Message Preview</Label>
               {waLoading ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground py-4"><Loader2 className="h-4 w-4 animate-spin" /> Loading template...</div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Loading template...
+                </div>
               ) : (
-                <Textarea value={waMessage} onChange={(e) => setWaMessage(e.target.value)} rows={8} className="text-sm font-mono" />
+                <Textarea
+                  value={waMessage}
+                  onChange={(e) => setWaMessage(e.target.value)}
+                  rows={8}
+                  className="text-sm font-mono"
+                />
               )}
             </div>
-            {waTemplateError && <div className="text-xs text-red-600 bg-red-50 rounded px-3 py-2">{waTemplateError}</div>}
+            {waTemplateError && (
+              <div className="text-xs text-red-600 bg-red-50 rounded px-3 py-2">
+                {waTemplateError}
+              </div>
+            )}
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={async () => { if (!waItem) return; setWaLoading(true); try { const r = await enquiriesApi.whatsappPreview(waItem.id); if (r?.rendered_message) setWaMessage(r.rendered_message) } catch (e) { console.error('Preview failed', e) } setWaLoading(false) }}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  if (!waItem) return
+                  setWaLoading(true)
+                  try {
+                    const r = await enquiriesApi.whatsappPreview(waItem.id)
+                    if (r?.rendered_message) setWaMessage(r.rendered_message)
+                  } catch (e) {
+                    console.error("Preview failed", e)
+                  }
+                  setWaLoading(false)
+                }}
+              >
                 <RotateCcw className="h-3 w-3 mr-1" /> Refresh
               </Button>
-              <Button variant="outline" className="flex-1" onClick={() => { setWaOpen(null); setWaMessage(""); setWaTemplateError("") }}>Cancel</Button>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setWaOpen(null)
+                  setWaMessage("")
+                  setWaTemplateError("")
+                }}
+              >
+                Cancel
+              </Button>
               <Button className="flex-1" onClick={sendWhatsApp} disabled={!waMessage || waLoading}>
                 <MessageCircle className="h-4 w-4 mr-2" /> Open WhatsApp
               </Button>
@@ -1279,15 +1916,33 @@ export default function EnquiryCalendar() {
       </Dialog>
 
       {/* Reschedule Dialog */}
-      <Dialog open={!!reschedOpen} onOpenChange={(o) => { if (!o) setReschedOpen(null) }}>
+      <Dialog
+        open={!!reschedOpen}
+        onOpenChange={(o) => {
+          if (!o) setReschedOpen(null)
+        }}
+      >
         <DialogContent className="sm:max-w-sm">
-          <DialogHeader><DialogTitle>Reschedule Enquiry</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Reschedule Enquiry</DialogTitle>
+          </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>New Date <span className="text-red-500">*</span></Label>
-              <Input type="date" value={reschedDate} onChange={(e) => setReschedDate(e.target.value)} min={format(today, "yyyy-MM-dd")} />
+              <Label>
+                New Date <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                type="date"
+                value={reschedDate}
+                onChange={(e) => setReschedDate(e.target.value)}
+                min={format(today, "yyyy-MM-dd")}
+              />
             </div>
-            <Button className="w-full" onClick={handleReschedule} disabled={!reschedDate || reschedSaving}>
+            <Button
+              className="w-full"
+              onClick={handleReschedule}
+              disabled={!reschedDate || reschedSaving}
+            >
               {reschedSaving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Reschedule
             </Button>
@@ -1296,11 +1951,21 @@ export default function EnquiryCalendar() {
       </Dialog>
 
       {/* Timeline Dialog */}
-      <Dialog open={!!timelineOpen} onOpenChange={(o) => { if (!o) { setTimelineOpen(null); setTimelineItem(null) } }}>
+      <Dialog
+        open={!!timelineOpen}
+        onOpenChange={(o) => {
+          if (!o) {
+            setTimelineOpen(null)
+            setTimelineItem(null)
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-md max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {timelineItem?.enquiry_type === "LEAD_FOLLOW_UP" ? "Lead Timeline" : "Patient Timeline"}
+              {timelineItem?.enquiry_type === "LEAD_FOLLOW_UP"
+                ? "Lead Timeline"
+                : "Patient Timeline"}
               {timelineItem?.enquiry_type === "LEAD_FOLLOW_UP"
                 ? ` — ${timelineItem?.lead?.name || ""}`
                 : ` — ${timelineItem?.patient_name || ""}`}
@@ -1317,15 +1982,33 @@ export default function EnquiryCalendar() {
                 <div key={entry.id || idx} className="flex gap-3">
                   <div className="flex flex-col items-center">
                     <div className="w-2.5 h-2.5 rounded-full bg-primary mt-1.5" />
-                    {idx < timelineEntries.length - 1 && <div className="w-px flex-1 bg-gray-200" />}
+                    {idx < timelineEntries.length - 1 && (
+                      <div className="w-px flex-1 bg-gray-200" />
+                    )}
                   </div>
                   <div className="flex-1 pb-4">
                     <div className="text-xs text-muted-foreground">
-                      {entry.created_at ? format(new Date(entry.created_at), "dd MMM yyyy HH:mm") : ""}
+                      {entry.created_at
+                        ? format(new Date(entry.created_at), "dd MMM yyyy HH:mm")
+                        : ""}
                     </div>
-                    <div className="text-sm font-medium">{entry.action || entry.status || entry.follow_up_type || entry.event_type || "Event"}</div>
-                    {(entry.notes || entry.patient_feedback || entry.response_summary || entry.description) && (
-                      <div className="text-xs text-muted-foreground mt-0.5">{entry.notes || entry.patient_feedback || entry.response_summary || entry.description}</div>
+                    <div className="text-sm font-medium">
+                      {entry.action ||
+                        entry.status ||
+                        entry.follow_up_type ||
+                        entry.event_type ||
+                        "Event"}
+                    </div>
+                    {(entry.notes ||
+                      entry.patient_feedback ||
+                      entry.response_summary ||
+                      entry.description) && (
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        {entry.notes ||
+                          entry.patient_feedback ||
+                          entry.response_summary ||
+                          entry.description}
+                      </div>
                     )}
                   </div>
                 </div>

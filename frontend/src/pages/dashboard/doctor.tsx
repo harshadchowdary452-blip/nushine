@@ -103,11 +103,11 @@ export default function DoctorDashboard() {
               <CardContent className="px-4 pb-4">
                 <ResponsiveContainer width="100%" height={260}>
                   <LineChart data={stats?.revenue_trend || []}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--ds-border-light)" />
                     <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
                     <Tooltip content={<CustomTooltip />} />
-                    <Line type="monotone" dataKey="revenue" name="Revenue" stroke="#10B981" strokeWidth={2} dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="revenue" name="Revenue" stroke="var(--ds-chart-4)" strokeWidth={2} dot={{ r: 3 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -117,12 +117,12 @@ export default function DoctorDashboard() {
               <CardContent className="px-4 pb-4">
                 <ResponsiveContainer width="100%" height={260}>
                   <BarChart data={stats?.case_trend || []}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--ds-border-light)" />
                     <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 11 }} />
                     <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="completed" name="Completed" fill="#10B981" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="active" name="Active" fill="#4F46E5" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="completed" name="Completed" fill="var(--ds-chart-4)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="active" name="Active" fill="var(--ds-chart-5)" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>

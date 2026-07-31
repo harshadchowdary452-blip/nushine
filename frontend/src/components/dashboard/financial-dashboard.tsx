@@ -20,7 +20,18 @@ import { formatIndianRupees, formatIndianNumber } from "@/lib/currency"
 import type { RevenueExpenseTrendPoint } from "@/types"
 import { cn } from "@/lib/utils"
 
-const PIE_COLORS = ["#4F46E5", "#EF4444", "#F59E0B", "#10B981", "#8B5CF6", "#EC4899", "#06B6D4", "#F97316", "#14B8A6", "#84CC16"]
+const PIE_COLORS = [
+  "var(--ds-chart-5)",
+  "var(--ds-chart-8)",
+  "var(--ds-chart-6)",
+  "var(--ds-chart-4)",
+  "var(--ds-chart-10)",
+  "var(--ds-chart-13)",
+  "var(--ds-chart-11)",
+  "var(--ds-chart-12)",
+  "var(--ds-chart-1)",
+  "var(--ds-chart-14)",
+]
 
 interface ChartTooltipProps {
   active?: boolean
@@ -170,14 +181,14 @@ function FinancialDashboard({ className }: FinancialDashboardProps) {
           <CardContent className="px-4 pb-4">
             <ResponsiveContainer width="100%" height={260}>
               <LineChart data={revenueExpenseTrend.length > 0 ? revenueExpenseTrend : ([{ month: "No data", revenue: 0, expenses: 0, profit: 0, profit_margin: 0 }] as RevenueExpenseTrendPoint[])}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--ds-border-light)" />
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
                 <Tooltip content={<ChartTooltip />} />
                 <Legend />
-                <Line type="monotone" dataKey="revenue" name="Revenue" stroke="#10B981" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5, onClick: () => navigate("/billing") }} />
-                <Line type="monotone" dataKey="expenses" name="Expenses" stroke="#EF4444" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5, onClick: () => navigate("/admin/expenses") }} />
-                <Line type="monotone" dataKey="profit" name="Profit" stroke="#4F46E5" strokeWidth={2} dot={{ r: 3 }} />
+                <Line type="monotone" dataKey="revenue" name="Revenue" stroke="var(--ds-chart-4)" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5, onClick: () => navigate("/billing") }} />
+                <Line type="monotone" dataKey="expenses" name="Expenses" stroke="var(--ds-chart-8)" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5, onClick: () => navigate("/admin/expenses") }} />
+                <Line type="monotone" dataKey="profit" name="Profit" stroke="var(--ds-chart-5)" strokeWidth={2} dot={{ r: 3 }} />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>

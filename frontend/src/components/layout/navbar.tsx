@@ -20,12 +20,12 @@ interface NotificationItem {
 }
 
 const iconMap: Record<string, { icon: React.ElementType; color: string }> = {
-  appointment: { icon: Calendar, color: "text-[#2563EB]" },
+  appointment: { icon: Calendar, color: "text-[var(--ds-primary)]" },
   alert: { icon: AlertCircle, color: "text-red-500" },
   message: { icon: MessageSquare, color: "text-emerald-500" },
   reminder: { icon: Clock, color: "text-amber-500" },
   billing: { icon: AlertCircle, color: "text-amber-500" },
-  crm: { icon: MessageSquare, color: "text-[#2563EB]" },
+  crm: { icon: MessageSquare, color: "text-[var(--ds-primary)]" },
   system: { icon: AlertCircle, color: "text-gray-400" },
 }
 
@@ -117,7 +117,7 @@ export default function Navbar() {
             <ToothLogo size={22} showSparkle={false} />
             <div>
               <p className="text-sm font-bold text-gray-900 leading-tight"><BrandText size="sm" /></p>
-              <p className="text-[10px] text-[#94A3B8] font-medium tracking-[0.25em] uppercase -mt-px">Dental Management System</p>
+              <p className="text-[10px] text-[var(--ds-sidebar-icon)] font-medium tracking-[0.25em] uppercase -mt-px">Dental Management System</p>
             </div>
           </Link>
         </div>
@@ -133,7 +133,7 @@ export default function Navbar() {
               <Bell className="h-[18px] w-[18px]" />
               {notifCount > 0 && (
                 <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }}
-                  className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-[#2563EB] px-1 text-[8px] font-bold text-white">
+                  className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-[var(--ds-primary)] px-1 text-[8px] font-bold text-[var(--ds-primary-foreground)]">
                   {notifCount > 9 ? "9+" : notifCount}
                 </motion.span>
               )}
@@ -175,7 +175,7 @@ export default function Navbar() {
                           aria-selected={activeFilter === f.key}
                           className={cn(
                             "shrink-0 rounded-lg px-2.5 py-1 text-xs font-medium transition-all whitespace-nowrap",
-                            activeFilter === f.key ? "bg-[#2563EB] text-white shadow-sm" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                            activeFilter === f.key ? "bg-[var(--ds-primary)] text-[var(--ds-primary-foreground)] shadow-sm" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
                           )}>
                           {f.label}
                         </button>
@@ -197,7 +197,7 @@ export default function Navbar() {
                                 role="listitem"
                                 className={cn(
                                   "flex gap-2.5 rounded-lg px-4 py-2.5 transition-colors group",
-                                  !n.is_read ? "bg-[#2563EB]/5" : "hover:bg-gray-50"
+                                  !n.is_read ? "bg-[var(--ds-primary)]/5" : "hover:bg-gray-50"
                                 )}>
                                 <div className={cn("mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gray-50", mapped.color)}>
                                   <Icon className="h-3.5 w-3.5" />
@@ -234,7 +234,7 @@ export default function Navbar() {
               title={user?.full_name ?? "User"}
               className="flex items-center gap-2 rounded-lg pl-1.5 pr-2.5 py-1 transition-colors hover:bg-gray-100">
               <Avatar className="h-7 w-7 ring-2 ring-gray-100">
-                <AvatarFallback className="bg-gradient-to-br from-[#16D3C5] to-[#2563EB] text-xs font-medium text-white">{initials}</AvatarFallback>
+                <AvatarFallback className="bg-gradient-to-br from-[var(--ds-primary-500)] to-[var(--ds-primary-600)] text-xs font-medium text-white">{initials}</AvatarFallback>
               </Avatar>
               <div className="hidden lg:block text-left">
                 <p className="text-sm font-medium text-gray-900 leading-tight">{user?.full_name ?? "User"}</p>

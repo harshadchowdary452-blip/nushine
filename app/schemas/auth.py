@@ -34,3 +34,15 @@ class LoginResponse(BaseModel):
     refresh_token: str
     token_type: str
     user: dict
+
+
+class ContextSwitchRequest(BaseModel):
+    hospital_id: Optional[str] = None
+
+
+class ContextSwitchResponse(BaseModel):
+    scope: str
+    hospital_id: Optional[str] = None
+    hospital_name: Optional[str] = None
+    admin_group_id: Optional[str] = None
+    admin_group_name: Optional[str] = None

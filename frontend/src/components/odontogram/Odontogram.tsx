@@ -131,7 +131,7 @@ const ROOT_GRADIENT = [
 ]
 
 const CROWN_SHADOW = "rgba(0,0,0,0.06)"
-const SELECTION_GLOW = "#3B82F6"
+const SELECTION_GLOW = "#2E7785"
 
 // ─── Helpers ──────────────────────────────────────────────────────
 
@@ -702,7 +702,7 @@ function RightPanel({
           <div style={{ display: "flex", gap: 6 }}>
             <button onClick={addFinding} style={{
               flex: 1, padding: "7px", borderRadius: 6, border: "none",
-              background: "#3B82F6", color: "#fff", fontSize: 12, fontWeight: 600,
+              background: "var(--ds-primary)", color: "#fff", fontSize: 12, fontWeight: 600,
               cursor: "pointer", transition: "background 0.15s",
             }}>+ Add Finding</button>
             <button onClick={resetTooth} style={{
@@ -976,9 +976,9 @@ export default function Odontogram({
           {/* Dentition badge */}
           <span style={{
             padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600,
-            background: isPrimary ? "#FEF3C7" : "#DBEAFE",
-            color: isPrimary ? "#92400E" : "#1E40AF",
-            border: `1px solid ${isPrimary ? "#FDE68A" : "#93C5FD"}`,
+            background: isPrimary ? "#FEF3C7" : "var(--ds-info-100)",
+            color: isPrimary ? "#92400E" : "var(--ds-info-800)",
+            border: `1px solid ${isPrimary ? "#FDE68A" : "var(--ds-info-300)"}`,
           }}>
             {dentitionLabel} Dentition
           </span>
@@ -1132,9 +1132,9 @@ export default function Odontogram({
 function btnStyle(active: boolean): React.CSSProperties {
   return {
     padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 500,
-    border: `1px solid ${active ? "#3B82F6" : "#e5e7eb"}`,
-    background: active ? "#EFF6FF" : "#fff",
-    color: active ? "#1D4ED8" : "#374151",
+    border: `1px solid ${active ? "var(--ds-primary-400)" : "var(--ds-border)"}`,
+    background: active ? "var(--ds-primary-50)" : "var(--ds-surface)",
+    color: active ? "var(--ds-primary-600)" : "var(--ds-text)",
     cursor: "pointer", transition: "all 0.15s",
     whiteSpace: "nowrap",
   }

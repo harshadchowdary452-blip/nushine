@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
 import { Plus, Search, Edit, Trash2, Building2 } from "lucide-react"
 
-import PageHeader from "@/components/layout/page-header"
+import { PageHeader } from "@/design-system"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -85,14 +85,19 @@ export default function AdminHospitals() {
 
   const groups: AdminGroup[] = isGroupAdmin
     ? currentUser?.admin_group_id
-      ? [{ id: currentUser.admin_group_id, name: currentUser.admin_group_name || "My Group" } as AdminGroup]
+      ? [
+          {
+            id: currentUser.admin_group_id,
+            name: currentUser.admin_group_name || "My Group",
+          } as AdminGroup,
+        ]
       : []
     : groupsData || []
 
   const createMutation = useMutation({
     mutationFn: async (data: HospitalForm) => {
       const { admin_email, admin_password, admin_full_name, ...hospitalData } = data
-      const newHospital = await hospitalsApi.create(hospitalData) as Hospital
+      const newHospital = (await hospitalsApi.create(hospitalData)) as Hospital
       if (admin_email && admin_password) {
         await hospitalsApi.createAdmin(newHospital.id, {
           email: admin_email,
@@ -105,7 +110,11 @@ export default function AdminHospitals() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["hospitals"] })
-      addToast({ title: "Success", description: "Hospital created successfully", variant: "success" })
+      addToast({
+        title: "Success",
+        description: "Hospital created successfully",
+        variant: "success",
+      })
       closeDialog()
     },
     onError: () => {
@@ -114,10 +123,15 @@ export default function AdminHospitals() {
   })
 
   const updateMutation = useMutation({
-    mutationFn: (data: { id: string; payload: HospitalForm }) => hospitalsApi.update(data.id, data.payload),
+    mutationFn: (data: { id: string; payload: HospitalForm }) =>
+      hospitalsApi.update(data.id, data.payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["hospitals"] })
-      addToast({ title: "Success", description: "Hospital updated successfully", variant: "success" })
+      addToast({
+        title: "Success",
+        description: "Hospital updated successfully",
+        variant: "success",
+      })
       closeDialog()
     },
     onError: () => {
@@ -129,7 +143,11 @@ export default function AdminHospitals() {
     mutationFn: (id: string) => hospitalsApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["hospitals"] })
-      addToast({ title: "Success", description: "Hospital deleted successfully", variant: "success" })
+      addToast({
+        title: "Success",
+        description: "Hospital deleted successfully",
+        variant: "success",
+      })
       setDeleteDialogOpen(false)
       setDeletingHospital(null)
     },
@@ -184,7 +202,11 @@ export default function AdminHospitals() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.admin_group_id && !editingHospital) {
-      addToast({ title: "Validation Error", description: "Please select an admin group", variant: "destructive" })
+      addToast({
+        title: "Validation Error",
+        description: "Please select an admin group",
+        variant: "destructive",
+      })
       return
     }
     if (editingHospital) {
@@ -213,11 +235,15 @@ export default function AdminHospitals() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Hospitals" description="Manage hospitals across admin groups">
-        <Button onClick={openCreateDialog}>
-          <Plus className="h-4 w-4" /> Add Hospital
-        </Button>
-      </PageHeader>
+      <PageHeader
+        title="Hospitals"
+        description="Manage hospitals across admin groups"
+        actions={
+          <Button onClick={openCreateDialog}>
+            <Plus className="h-4 w-4" /> Add Hospital
+          </Button>
+        }
+      />
 
       <Card>
         <CardContent className="p-6">
@@ -256,7 +282,11 @@ export default function AdminHospitals() {
               icon={Building2}
               title="No hospitals yet"
               description="Get started by adding your first hospital to begin managing dental care."
-              action={<Button onClick={openCreateDialog}><Plus className="h-4 w-4" /> Add Hospital</Button>}
+              action={
+                <Button onClick={openCreateDialog}>
+                  <Plus className="h-4 w-4" /> Add Hospital
+                </Button>
+              }
             />
           ) : (
             <div className="overflow-x-auto rounded-md border mobile-card-view">
@@ -264,12 +294,20 @@ export default function AdminHospitals() {
                 <thead>
                   <tr className="border-b bg-muted/50">
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Name</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Address</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                      Address
+                    </th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Phone</th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Email</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Registration No.</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Actions</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                      Registration No.
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                      Status
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -280,13 +318,24 @@ export default function AdminHospitals() {
                       animate={{ opacity: 1 }}
                       className="border-b transition-colors hover:bg-muted/50"
                     >
-                      <td className="px-4 py-3 font-medium" data-label="Name">{hospital.name}</td>
-                      <td className="px-4 py-3 text-muted-foreground max-w-[200px] truncate" data-label="Address">
+                      <td className="px-4 py-3 font-medium" data-label="Name">
+                        {hospital.name}
+                      </td>
+                      <td
+                        className="px-4 py-3 text-muted-foreground max-w-[200px] truncate"
+                        data-label="Address"
+                      >
                         {hospital.address || "—"}
                       </td>
-                      <td className="px-4 py-3" data-label="Phone">{hospital.phone || "—"}</td>
-                      <td className="px-4 py-3" data-label="Email">{hospital.email || "—"}</td>
-                      <td className="px-4 py-3" data-label="Registration No.">{hospital.registration_number || "—"}</td>
+                      <td className="px-4 py-3" data-label="Phone">
+                        {hospital.phone || "—"}
+                      </td>
+                      <td className="px-4 py-3" data-label="Email">
+                        {hospital.email || "—"}
+                      </td>
+                      <td className="px-4 py-3" data-label="Registration No.">
+                        {hospital.registration_number || "—"}
+                      </td>
                       <td className="px-4 py-3" data-label="Status">
                         <Badge variant={hospital.is_active ? "success" : "secondary"}>
                           {hospital.is_active ? "Active" : "Inactive"}
@@ -294,10 +343,18 @@ export default function AdminHospitals() {
                       </td>
                       <td className="px-4 py-3" data-label="Actions">
                         <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => openEditDialog(hospital)}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEditDialog(hospital)}
+                          >
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => confirmDelete(hospital)}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => confirmDelete(hospital)}
+                          >
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
@@ -316,7 +373,9 @@ export default function AdminHospitals() {
           <DialogHeader className="px-6 pt-6 pb-0 shrink-0">
             <DialogTitle>{editingHospital ? "Edit Hospital" : "Add Hospital"}</DialogTitle>
             <DialogDescription>
-              {editingHospital ? "Update the hospital details." : "Fill in the details to add a new hospital."}
+              {editingHospital
+                ? "Update the hospital details."
+                : "Fill in the details to add a new hospital."}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
@@ -366,7 +425,9 @@ export default function AdminHospitals() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="admin_group">Admin Group <span className="text-red-500">*</span></Label>
+                <Label htmlFor="admin_group">
+                  Admin Group <span className="text-red-500">*</span>
+                </Label>
                 <Select
                   value={form.admin_group_id}
                   onValueChange={(v) => setForm({ ...form, admin_group_id: v })}
@@ -438,14 +499,20 @@ export default function AdminHospitals() {
           <DialogHeader>
             <DialogTitle>Delete Hospital</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{deletingHospital?.name}"? This action cannot be undone.
+              Are you sure you want to delete "{deletingHospital?.name}"? This action cannot be
+              undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setDeleteDialogOpen(false)}>
               Cancel
             </Button>
-            <Button type="button" variant="destructive" onClick={handleDelete} disabled={deleteMutation.isPending}>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+            >
               {deleteMutation.isPending ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>

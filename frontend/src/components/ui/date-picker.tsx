@@ -1,7 +1,9 @@
-import { useState, useRef, useEffect } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { useState, useRef } from "react"
+import { createPortal } from "react-dom"
+import { motion } from "framer-motion"
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useFixedPosition, useOverlayDismiss, resolveOverlayLayer } from "@/lib/overlay"
 import { Button } from "@/components/ui/button"
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, isToday, getYear } from "date-fns"
 
@@ -25,15 +27,11 @@ const presets = [
 export default function DatePicker({ value, onChange, placeholder = "Select date", className }: DatePickerProps) {
   const [open, setOpen] = useState(false)
   const [viewDate, setViewDate] = useState(value || new Date())
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const popupRef = useRef<HTMLDivElement>(null)
+  const { position } = useFixedPosition(open, triggerRef)
+  useOverlayDismiss(open, () => setOpen(false), triggerRef, popupRef)
+  const layer = resolveOverlayLayer(triggerRef.current)
 
   const daysInMonth = eachDayOfInterval({
     start: startOfWeek(startOfMonth(viewDate)),
@@ -70,62 +68,63 @@ export default function DatePicker({ value, onChange, placeholder = "Select date
   }
 
   return (
-    <div ref={ref} className={cn("relative", className)}>
-      <Button variant="outline" size="sm" onClick={() => setOpen(!open)}
+    <div className={cn("relative", className)}>
+      <Button ref={triggerRef} variant="outline" size="sm" onClick={() => setOpen(!open)}
         className="flex items-center gap-2 text-gray-600 w-full justify-start">
         <CalendarIcon className="h-4 w-4 shrink-0" />
         <span className="flex-1 text-left truncate">{value ? format(value, "MMM d, yyyy") : placeholder}</span>
         <ChevronDown className={cn("h-3.5 w-3.5 transition-transform shrink-0", open && "rotate-180")} />
       </Button>
-      <AnimatePresence>
-        {open && (
-          <motion.div initial={{ opacity: 0, y: -4, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -4, scale: 0.96 }} transition={{ duration: 0.15 }}
-            className="absolute left-0 top-full z-30 mt-1.5 w-72 rounded-2xl border border-gray-100 bg-white p-3 shadow-dropdown">
-            <div className="flex gap-1.5 mb-3 overflow-x-auto">
-              {presets.map((p) => (
-                <button key={p.label} onClick={() => handlePreset(p)}
-                  className="shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-medium bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors whitespace-nowrap">
-                  {p.label}
+      {open &&
+        createPortal(
+          <motion.div ref={popupRef} initial={{ opacity: 0, y: -4, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.15 }}
+            style={position ? { top: position.top, left: position.left, width: position.width } : undefined}
+            className={cn("fixed w-72 rounded-2xl border border-gray-100 bg-white p-3 shadow-dropdown", layer)}>
+              <div className="flex gap-1.5 mb-3 overflow-x-auto">
+                {presets.map((p) => (
+                  <button key={p.label} onClick={() => handlePreset(p)}
+                    className="shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-medium bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors whitespace-nowrap">
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center justify-between mb-3">
+                <button onClick={handlePrev} className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 transition-colors">
+                  <ChevronLeft className="h-4 w-4" />
                 </button>
-              ))}
-            </div>
-            <div className="flex items-center justify-between mb-3">
-              <button onClick={handlePrev} className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 transition-colors">
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <div className="flex items-center gap-1">
-                <button onClick={() => { const y = getYear(viewDate); onChange?.(new Date(y, 0, 1)) }}
-                  className="text-sm font-semibold text-gray-900 hover:text-primary transition-colors">
-                  {format(viewDate, "MMMM yyyy")}
+                <div className="flex items-center gap-1">
+                  <button onClick={() => { const y = getYear(viewDate); onChange?.(new Date(y, 0, 1)) }}
+                    className="text-sm font-semibold text-gray-900 hover:text-primary transition-colors">
+                    {format(viewDate, "MMMM yyyy")}
+                  </button>
+                </div>
+                <button onClick={handleNext} className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 transition-colors">
+                  <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
-              <button onClick={handleNext} className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 transition-colors">
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="grid grid-cols-7 gap-0.5 mb-1">
-              {["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map((d) => (
-                <div key={d} className="text-center text-[11px] font-medium text-gray-400 py-1">{d}</div>
-              ))}
-            </div>
-            <div className="grid grid-cols-7 gap-0.5">
-              {daysInMonth.map((day, i) => (
-                <button key={i} onClick={() => handleSelect(day)}
-                  className={cn(
-                    "flex h-8 w-full items-center justify-center rounded-lg text-sm transition-colors",
-                    !isSameMonth(day, viewDate) && "text-gray-300",
-                    isSameMonth(day, viewDate) && !isSameDay(day, value || new Date(0)) && "text-gray-700 hover:bg-gray-100",
-                    isToday(day) && "font-bold text-primary",
-                    value && isSameDay(day, value) && "bg-primary text-white hover:bg-primary-hover font-semibold shadow-sm"
-                  )}>
-                  {format(day, "d")}
-                </button>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              <div className="grid grid-cols-7 gap-0.5 mb-1">
+                {["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map((d) => (
+                  <div key={d} className="text-center text-[11px] font-medium text-gray-400 py-1">{d}</div>
+                ))}
+              </div>
+              <div className="grid grid-cols-7 gap-0.5">
+                {daysInMonth.map((day, i) => (
+                  <button key={i} onClick={() => handleSelect(day)}
+                    className={cn(
+                      "flex h-8 w-full items-center justify-center rounded-lg text-sm transition-colors",
+                      !isSameMonth(day, viewDate) && "text-gray-300",
+                      isSameMonth(day, viewDate) && !isSameDay(day, value || new Date(0)) && "text-gray-700 hover:bg-gray-100",
+                      isToday(day) && "font-bold text-primary",
+                      value && isSameDay(day, value) && "bg-primary text-primary-foreground hover:bg-primary-hover font-semibold shadow-sm"
+                    )}>
+                    {format(day, "d")}
+                  </button>
+                ))}
+              </div>
+            </motion.div>,
+            document.body
+          )}
     </div>
   )
 }

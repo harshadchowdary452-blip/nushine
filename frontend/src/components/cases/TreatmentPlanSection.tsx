@@ -1,6 +1,9 @@
-import { useState, useRef, useEffect, useMemo } from "react"
+import { useState, useRef, useMemo, useEffect } from "react"
+import { createPortal } from "react-dom"
 import { useQuery } from "@tanstack/react-query"
 import { Plus, X, Search, Check, Activity, IndianRupee, Stethoscope, Hash } from "lucide-react"
+import { useFixedPosition, useOverlayDismiss, resolveOverlayLayer } from "@/lib/overlay"
+import { cn } from "@/lib/utils"
 import { treatmentTypesApi } from "@/services/endpoints"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -42,7 +45,11 @@ export default function TreatmentPlanSection({
   const [showDropdown, setShowDropdown] = useState(false)
   const [customMode, setCustomMode] = useState(false)
   const [customName, setCustomName] = useState("")
-  const searchRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLInputElement>(null)
+  const popupRef = useRef<HTMLDivElement>(null)
+  const { position } = useFixedPosition(showDropdown, triggerRef)
+  useOverlayDismiss(showDropdown, () => setShowDropdown(false), triggerRef, popupRef)
+  const layer = resolveOverlayLayer(triggerRef.current)
 
   const { data: treatmentTypes } = useQuery({
     queryKey: ["treatment-types"],
@@ -63,16 +70,6 @@ export default function TreatmentPlanSection({
     }
     return unique
   }, [treatmentTypes])
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
-        setShowDropdown(false)
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
 
   const filtered = treatmentNames.filter((n) =>
     n.toLowerCase().includes(search.toLowerCase())
@@ -137,11 +134,12 @@ export default function TreatmentPlanSection({
   return (
     <div className="space-y-4">
       {/* Treatment Search + Add */}
-      <div ref={searchRef} className="relative">
+      <div className="relative">
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
+              ref={triggerRef}
               placeholder="Search treatment procedure..."
               value={search}
               onChange={(e) => { setSearch(e.target.value); setShowDropdown(true); setCustomMode(false) }}
@@ -153,27 +151,33 @@ export default function TreatmentPlanSection({
             <Plus className="h-4 w-4 mr-1.5" /> Custom
           </Button>
         </div>
-        {showDropdown && search && (
-          <div className="absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg">
-            <div className="max-h-56 overflow-y-auto p-1.5">
-              {filtered.length === 0 ? (
-                <p className="py-3 text-center text-sm text-gray-500">No matching procedures</p>
-              ) : (
-                filtered.map((name, idx) => (
-                  <button
-                    key={`${name}-${idx}`}
-                    type="button"
-                    onClick={() => addTreatment(name)}
-                    className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm text-gray-800 hover:bg-blue-50 hover:text-blue-700 transition-colors"
-                  >
-                    <Plus className="h-4 w-4 text-gray-400 shrink-0" />
-                    {name}
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
-        )}
+        {showDropdown && search &&
+          createPortal(
+            <div
+              ref={popupRef}
+              style={position ? { top: position.top, left: position.left, width: position.width } : undefined}
+              className={cn("fixed rounded-lg border border-gray-200 bg-white shadow-lg", layer)}
+            >
+              <div className="max-h-56 overflow-y-auto p-1.5">
+                {filtered.length === 0 ? (
+                  <p className="py-3 text-center text-sm text-gray-500">No matching procedures</p>
+                ) : (
+                  filtered.map((name, idx) => (
+                    <button
+                      key={`${name}-${idx}`}
+                      type="button"
+                      onClick={() => addTreatment(name)}
+                      className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm text-gray-800 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                    >
+                      <Plus className="h-4 w-4 text-gray-400 shrink-0" />
+                      {name}
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>,
+            document.body
+          )}
         {customMode && (
           <div className="mt-2 flex gap-2">
             <Input

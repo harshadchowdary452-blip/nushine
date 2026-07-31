@@ -155,7 +155,7 @@ export default function ToothGrid({
                   height: BOX_SIZE,
                   borderRadius: 6,
                   background: bg,
-                  border: `${isSelected ? 2 : 1}px solid ${isSelected ? '#2563EB' : border}`,
+                  border: `${isSelected ? 2 : 1}px solid ${isSelected ? 'var(--ds-primary-500)' : border}`,
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
@@ -163,7 +163,7 @@ export default function ToothGrid({
                   cursor: 'pointer',
                   position: 'relative',
                   transition: 'all 0.15s',
-                  boxShadow: isSelected ? '0 0 0 2px rgba(37,99,235,0.2)' : 'none',
+                  boxShadow: isSelected ? '0 0 0 2px var(--ds-primary-200)' : 'none',
                 }}
               >
                 <span style={{ fontSize: 13, fontWeight: 700, color: primary ? '#1F2937' : '#6B7280', lineHeight: 1 }}>
@@ -333,7 +333,7 @@ export default function ToothGrid({
 
             <button onClick={addFinding} style={{
               width: '100%', padding: '7px', borderRadius: 6, border: 'none',
-              background: '#3B82F6', color: '#FFF', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              background: 'var(--ds-primary)', color: '#FFF', fontSize: 12, fontWeight: 600, cursor: 'pointer',
             }}>+ Add Finding</button>
           </div>
         </div>

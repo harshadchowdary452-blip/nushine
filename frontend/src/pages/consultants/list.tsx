@@ -12,7 +12,7 @@ import {
 } from "@tanstack/react-table"
 import { motion } from "framer-motion"
 import { Plus, Search, Eye, Edit, UserCog } from "lucide-react"
-import PageHeader from "@/components/layout/page-header"
+import { PageHeader } from "@/design-system"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -65,15 +65,24 @@ export default function ConsultantList() {
   })
 
   const createMutation = useMutation({
-    mutationFn: (data: ConsultantForm) => consultantsApi.create(data as unknown as Record<string, unknown>),
+    mutationFn: (data: ConsultantForm) =>
+      consultantsApi.create(data as unknown as Record<string, unknown>),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["consultants"] })
       queryClient.invalidateQueries({ queryKey: ["dash"] })
-      addToast({ title: "Success", description: "Consultant created successfully", variant: "success" })
+      addToast({
+        title: "Success",
+        description: "Consultant created successfully",
+        variant: "success",
+      })
       resetForm()
     },
     onError: (err: unknown) => {
-      addToast({ title: "Error", description: extractDetail(err) || "Failed to create consultant", variant: "destructive" })
+      addToast({
+        title: "Error",
+        description: extractDetail(err) || "Failed to create consultant",
+        variant: "destructive",
+      })
     },
   })
 
@@ -89,7 +98,7 @@ export default function ConsultantList() {
 
   const consultants: Consultant[] = useMemo(
     () => (data?.items || data || []) as Consultant[],
-    [data]
+    [data],
   )
 
   const columns = useMemo<ColumnDef<Consultant>[]>(
@@ -97,9 +106,7 @@ export default function ConsultantList() {
       {
         accessorKey: "full_name",
         header: "Name",
-        cell: ({ row }) => (
-          <span className="font-medium">{row.getValue("full_name")}</span>
-        ),
+        cell: ({ row }) => <span className="font-medium">{row.getValue("full_name")}</span>,
       },
       {
         accessorKey: "specialization",
@@ -140,7 +147,7 @@ export default function ConsultantList() {
         ),
       },
     ],
-    []
+    [],
   )
 
   const table = useReactTable({
@@ -163,11 +170,15 @@ export default function ConsultantList() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Consultants" description="Manage consultants">
-        <Button onClick={() => setDialogOpen(true)}>
-          <Plus className="h-4 w-4" /> Add Consultant
-        </Button>
-      </PageHeader>
+      <PageHeader
+        title="Consultants"
+        description="Manage consultants"
+        actions={
+          <Button onClick={() => setDialogOpen(true)}>
+            <Plus className="h-4 w-4" /> Add Consultant
+          </Button>
+        }
+      />
 
       <Card>
         <CardContent className="p-6">
@@ -282,9 +293,7 @@ export default function ConsultantList() {
         <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
           <DialogHeader className="px-6 pt-6 pb-0 shrink-0">
             <DialogTitle>Add Consultant</DialogTitle>
-            <DialogDescription>
-              Register a new consultant.
-            </DialogDescription>
+            <DialogDescription>Register a new consultant.</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
             <div className="overflow-y-auto px-6 py-4 space-y-4 flex-1">
@@ -345,11 +354,7 @@ export default function ConsultantList() {
               </div>
             </div>
             <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-gray-100">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={resetForm}
-              >
+              <Button type="button" variant="outline" onClick={resetForm}>
                 Cancel
               </Button>
               <Button type="submit" disabled={createMutation.isPending}>

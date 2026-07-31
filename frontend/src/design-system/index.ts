@@ -35,7 +35,7 @@ export { default as EnterpriseSidebar } from "./components/sidebar"
 export { default as EnterpriseHeader } from "./components/header"
 export { default as GlobalSearch } from "./components/global-search"
 export { default as Breadcrumb } from "./components/breadcrumb"
-export { routeLabels } from "./components/breadcrumb"
+export { routeLabels } from "./components/routeLabels"
 
 // Page Templates
 export {

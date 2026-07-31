@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, text, extract, or_
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, verify_hospital_context
 from app.core.permissions import Role
 from app.models.admin_group import AdminGroup
 from app.models.hospital import Hospital
@@ -571,14 +571,21 @@ async def hospital_admin_dashboard(
     start_date: Optional[str] = Query(None, description="Custom range start (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="Custom range end (YYYY-MM-DD)"),
     doctor_id: Optional[str] = Query(None, description="Filter by doctor ID"),
+    x_hospital_id: Optional[str] = Depends(verify_hospital_context),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    if current_user.get("role") != Role.HOSPITAL_ADMIN.value:
+    role = current_user.get("role")
+    if role not in (Role.SUPER_ADMIN.value, Role.GROUP_ADMIN.value, Role.HOSPITAL_ADMIN.value):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
-    hospital_id = current_user.get("hospital_id")
+    # The validated X-Hospital-ID context takes precedence (SUPER_ADMIN /
+    # GROUP_ADMIN must switch into a hospital to view this dashboard); a
+    # HOSPITAL_ADMIN falls back to their own hospital.
+    hospital_id = x_hospital_id or current_user.get("hospital_id")
+    hospital_name = None
     if not hospital_id:
         return {
+            "hospital_name": None,
             "today_appointments": 0, "total_revenue": 0.0, "monthly_revenue": 0.0, "yearly_revenue": 0.0,
             "total_patients": 0, "total_cases": 0, "total_active_cases": 0,
             "total_expenses": 0, "net_profit": 0, "profit_margin": 0, "period_revenue": 0,
@@ -598,6 +605,10 @@ async def hospital_admin_dashboard(
     current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     current_year_start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
     today = date.today()
+
+    hospital_name = (await db.execute(
+        select(Hospital.name).where(Hospital.id == hospital_id)
+    )).scalar()
 
     # Period date range (used by all period-filtered queries)
     date_start, date_end = get_date_range(period, start_date, end_date)
@@ -927,6 +938,7 @@ async def hospital_admin_dashboard(
         "total_revenue": total_revenue, "monthly_revenue": monthly_revenue, "yearly_revenue": yearly_revenue,
         "period_revenue": period_revenue, "total_expenses": total_expenses,
         "net_profit": net_profit, "profit_margin": profit_margin,
+        "hospital_name": hospital_name,
         "total_patients": total_patients, "total_cases": total_cases, "total_active_cases": total_active_cases,
         "revenue_trend": revenue_trend, "patient_growth_trend": patient_growth_trend,
         "appointment_count_trend": appointment_count_trend, "case_count_trend": case_count_trend,

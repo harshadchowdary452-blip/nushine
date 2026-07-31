@@ -41,6 +41,7 @@ import { PageHeader, EmptyState, LoadingSkeleton, MetricCard, StatusBadge, Table
 import type { Billing, Case, PaginatedResponse } from "@/types"
 import { extractDetail } from "@/types"
 import { useAuthStore } from "@/store/authStore"
+import { useCreateParam } from "@/lib/use-create-param"
 
 interface InvoiceForm {
   [key: string]: unknown
@@ -68,6 +69,8 @@ export default function BillingList() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deletingBilling, setDeletingBilling] = useState<Billing | null>(null)
   const [form, setForm] = useState<InvoiceForm>(getEmptyInvoiceForm)
+
+  useCreateParam(() => openDialog())
 
   const { data, isLoading } = useQuery<PaginatedResponse<Billing>>({
     queryKey: ["billings"],

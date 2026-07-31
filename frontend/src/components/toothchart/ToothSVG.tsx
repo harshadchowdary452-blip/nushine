@@ -62,11 +62,11 @@ export default React.memo(function ToothSVG({
   const eruptFinding = findings.find((f) => f.condition === 'Erupt')
   const isHighlighted = activeFilter ? findings.some((f) => f.condition === activeFilter) : false
 
-  const stroke = wholeCondition === 'Missing' ? '#888'
-    : isSelected ? '#2563EB'
-    : isHovered ? '#3B82F6'
+  const stroke = wholeCondition === 'Missing' ? 'var(--ds-neutral-500)'
+    : isSelected ? 'var(--ds-primary-500)'
+    : isHovered ? 'var(--ds-primary-400)'
     : isHighlighted ? getConditionColor(activeFilter!)
-    : '#B0A090'
+    : 'var(--ds-neutral-400)'
 
   const strokeWidth = wholeCondition === 'Missing' ? 1.5
     : isSelected || isHovered ? 1.5
@@ -163,8 +163,7 @@ export default React.memo(function ToothSVG({
           <path
             d={pathDef.outline}
             fill={`url(#enamel-${toothNumber}-${view})`}
-            stroke={stroke}
-            strokeWidth={strokeWidth}
+            style={{ stroke, strokeWidth }}
             opacity={opacity}
             filter={isSelected || isHovered || isHighlighted ? `url(#glow-${toothNumber}-${view})` : undefined}
           />

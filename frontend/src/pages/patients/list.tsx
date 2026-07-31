@@ -32,6 +32,7 @@ import { PageHeader, EmptyState, LoadingSkeleton, Table, TableHeader, TableBody,
 import type { Patient, PaginatedResponse, User } from "@/types"
 import { extractDetail } from "@/types"
 import { useAuthStore } from "@/store/authStore"
+import { useCreateParam } from "@/lib/use-create-param"
 
 const DATE_PRESET_KEYS = new Set(["date_preset"])
 
@@ -93,6 +94,8 @@ export default function PatientList() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deletingPatient, setDeletingPatient] = useState<Patient | null>(null)
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
+
+  useCreateParam(() => openDialog())
 
   const currentUser = useAuthStore((s) => s.user)
 

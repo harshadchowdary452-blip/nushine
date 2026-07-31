@@ -2,7 +2,7 @@ import { useState, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
 import { Save, Smartphone, Globe, ToggleRight, Info } from "lucide-react"
-import PageHeader from "@/components/layout/page-header"
+import { PageHeader } from "@/design-system"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -51,31 +51,54 @@ export default function WhatsAppConfigPage() {
       queryClient.invalidateQueries({ queryKey: ["whatsapp-config", hospitalId] })
       addToast({ title: "WhatsApp configuration saved", variant: "success" })
     },
-    onError: () => addToast({ title: "Error", description: "Failed to save configuration", variant: "destructive" }),
+    onError: () =>
+      addToast({
+        title: "Error",
+        description: "Failed to save configuration",
+        variant: "destructive",
+      }),
   })
 
   function handleSave() {
     updateMutation.mutate({
-      enabled, whatsapp_mode: whatsappMode,
+      enabled,
+      whatsapp_mode: whatsappMode,
       clinic_whatsapp_number: clinicNumber || null,
-      country_code: countryCode, default_message_templates_enabled: defaultTemplates,
-      broadcast_enabled: broadcastEnabled, campaign_enabled: campaignEnabled,
+      country_code: countryCode,
+      default_message_templates_enabled: defaultTemplates,
+      broadcast_enabled: broadcastEnabled,
+      campaign_enabled: campaignEnabled,
     })
   }
 
   if (!hospitalId) return <div className="p-4 text-gray-500">No hospital selected</div>
-  if (isLoading) return <div className="space-y-4 p-4">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}</div>
+  if (isLoading)
+    return (
+      <div className="space-y-4 p-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-16 w-full rounded-lg" />
+        ))}
+      </div>
+    )
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-      <PageHeader title="WhatsApp Configuration" description="Configure your clinic WhatsApp integration">
-        <Button onClick={handleSave} disabled={updateMutation.isPending}>
-          <Save className="h-4 w-4 mr-1.5" /> {updateMutation.isPending ? "Saving..." : "Save"}
-        </Button>
-      </PageHeader>
+      <PageHeader
+        title="WhatsApp Configuration"
+        description="Configure your clinic WhatsApp integration"
+        actions={
+          <Button onClick={handleSave} disabled={updateMutation.isPending}>
+            <Save className="h-4 w-4 mr-1.5" /> {updateMutation.isPending ? "Saving..." : "Save"}
+          </Button>
+        }
+      />
 
       <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2 text-sm"><Smartphone className="h-4 w-4 text-primary" /> WhatsApp Settings</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <Smartphone className="h-4 w-4 text-primary" /> WhatsApp Settings
+          </CardTitle>
+        </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
             <div>
@@ -90,7 +113,11 @@ export default function WhatsAppConfigPage() {
               <p className="font-medium text-gray-900">WhatsApp Mode</p>
               <p className="text-sm text-gray-500">LIVE for production, SANDBOX for testing</p>
             </div>
-            <select value={whatsappMode} onChange={(e) => setWhatsappMode(e.target.value)} className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none focus:border-primary">
+            <select
+              value={whatsappMode}
+              onChange={(e) => setWhatsappMode(e.target.value)}
+              className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none focus:border-primary"
+            >
               <option value="LIVE">Live</option>
               <option value="SANDBOX">Sandbox</option>
             </select>
@@ -101,42 +128,64 @@ export default function WhatsAppConfigPage() {
               <Label>Country Code</Label>
               <div className="relative">
                 <Globe className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                <Input value={countryCode} onChange={(e) => setCountryCode(e.target.value)} className="pl-9" placeholder="+91" />
+                <Input
+                  value={countryCode}
+                  onChange={(e) => setCountryCode(e.target.value)}
+                  className="pl-9"
+                  placeholder="+91"
+                />
               </div>
             </div>
             <div className="md:col-span-2 space-y-2">
               <Label>Clinic WhatsApp Number</Label>
               <div className="relative">
                 <Smartphone className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                <Input value={clinicNumber} onChange={(e) => setClinicNumber(e.target.value)} className="pl-9" placeholder="9876543210" />
+                <Input
+                  value={clinicNumber}
+                  onChange={(e) => setClinicNumber(e.target.value)}
+                  className="pl-9"
+                  placeholder="9876543210"
+                />
               </div>
-              <p className="text-xs text-gray-400">Enter number without country code (e.g. 9876543210)</p>
+              <p className="text-xs text-gray-400">
+                Enter number without country code (e.g. 9876543210)
+              </p>
             </div>
           </div>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2 text-sm"><ToggleRight className="h-4 w-4 text-primary" /> Features</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <ToggleRight className="h-4 w-4 text-primary" /> Features
+          </CardTitle>
+        </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
             <div>
               <p className="font-medium text-gray-900">Default Message Templates</p>
-              <p className="text-sm text-gray-500">Enable pre-built message templates for common scenarios</p>
+              <p className="text-sm text-gray-500">
+                Enable pre-built message templates for common scenarios
+              </p>
             </div>
             <Switch checked={defaultTemplates} onCheckedChange={setDefaultTemplates} />
           </div>
           <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
             <div>
               <p className="font-medium text-gray-900">Broadcast Messaging</p>
-              <p className="text-sm text-gray-500">Allow sending bulk WhatsApp messages to patients</p>
+              <p className="text-sm text-gray-500">
+                Allow sending bulk WhatsApp messages to patients
+              </p>
             </div>
             <Switch checked={broadcastEnabled} onCheckedChange={setBroadcastEnabled} />
           </div>
           <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
             <div>
               <p className="font-medium text-gray-900">Campaign Messaging</p>
-              <p className="text-sm text-gray-500">Allow WhatsApp campaigns (promotions, awareness)</p>
+              <p className="text-sm text-gray-500">
+                Allow WhatsApp campaigns (promotions, awareness)
+              </p>
             </div>
             <Switch checked={campaignEnabled} onCheckedChange={setCampaignEnabled} />
           </div>
@@ -148,7 +197,11 @@ export default function WhatsAppConfigPage() {
           <Info className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
           <div className="text-sm text-blue-800">
             <p className="font-medium mb-1">How WhatsApp Messaging Works</p>
-            <p>This MVP uses WhatsApp deep links (<code>wa.me</code>) to open WhatsApp with pre-filled messages. No API integration or messaging costs required. Staff can send messages through their clinic WhatsApp number.</p>
+            <p>
+              This MVP uses WhatsApp deep links (<code>wa.me</code>) to open WhatsApp with
+              pre-filled messages. No API integration or messaging costs required. Staff can send
+              messages through their clinic WhatsApp number.
+            </p>
           </div>
         </CardContent>
       </Card>

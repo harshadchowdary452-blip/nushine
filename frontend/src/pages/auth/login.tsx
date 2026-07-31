@@ -75,14 +75,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#F8FAFC] font-['Poppins','Inter',sans-serif]">
+    <div className="flex min-h-screen bg-[var(--ds-background)] font-['Poppins','Inter',sans-serif]">
       {/* LEFT PANEL */}
-      <div className="hidden md:flex md:w-1/2 relative overflow-hidden bg-gradient-to-br from-[#071B4D] to-[#0B1D3A]">
+      <div className="hidden md:flex md:w-1/2 relative overflow-hidden bg-gradient-to-br from-[var(--ds-sidebar-bg)] to-[var(--ds-primary-950)]">
         {/* Gradient orbs */}
         <div className="absolute inset-0">
-          <div className="absolute -top-24 -right-24 w-[600px] h-[600px] rounded-full bg-[#2563EB] opacity-20 blur-[140px]" />
-          <div className="absolute bottom-0 -left-24 w-[500px] h-[500px] rounded-full bg-[#16D3C5] opacity-12 blur-[120px]" />
-          <div className="absolute top-[30%] left-[30%] w-[350px] h-[350px] rounded-full bg-[#7C3AED] opacity-8 blur-[100px]" />
+          <div className="absolute -top-24 -right-24 w-[600px] h-[600px] rounded-full bg-[var(--ds-primary-600)] opacity-20 blur-[140px]" />
+          <div className="absolute bottom-0 -left-24 w-[500px] h-[500px] rounded-full bg-[var(--ds-primary-400)] opacity-12 blur-[120px]" />
+          <div className="absolute top-[30%] left-[30%] w-[350px] h-[350px] rounded-full bg-[var(--ds-plum-500)] opacity-8 blur-[100px]" />
           <div
             className="absolute inset-0 opacity-[0.04]"
             style={{
@@ -117,9 +117,9 @@ export default function LoginPage() {
               </motion.div>
               <div>
                 <h1 className="text-[18px] font-bold leading-none tracking-tight text-white">
-                  <span className="text-[#16D3C5]">Nu</span>Shine
+                  <span className="text-[var(--ds-primary-300)]">Nu</span>Shine
                 </h1>
-                <p className="text-[9px] text-[#94A3B8] font-medium tracking-[0.25em] uppercase mt-0.5">
+                <p className="text-[9px] text-[var(--ds-text-placeholder)] font-medium tracking-[0.25em] uppercase mt-0.5">
                   Dental Management System
                 </p>
               </div>
@@ -136,7 +136,7 @@ export default function LoginPage() {
             >
               Smarter Dental Care.
               <br />
-              <span className="bg-gradient-to-r from-[#16D3C5] via-[#2563EB] to-[#7C3AED] bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-[var(--ds-primary-300)] via-[var(--ds-primary-400)] to-[var(--ds-accent-300)] bg-clip-text text-transparent">
                 Stronger Practice.
               </span>
             </motion.h2>
@@ -145,7 +145,7 @@ export default function LoginPage() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.18 }}
-              className="mt-4 text-[11px] text-[#CBD5E1] max-w-[480px] leading-relaxed"
+              className="mt-4 text-[11px] text-[var(--ds-sidebar-text)] max-w-[480px] leading-relaxed"
             >
               NuShine helps dental clinics manage patients, appointments, treatments, billing, CRM, reports and operations in one intelligent platform.
             </motion.p>
@@ -162,8 +162,8 @@ export default function LoginPage() {
                   key={f.title}
                   className="group rounded-xl border border-white/10 bg-white/[0.04] p-3 backdrop-blur-xl transition-all duration-300 hover:bg-white/[0.08] hover:border-white/[0.18]"
                 >
-                  <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-[#16D3C5]/20 to-[#2563EB]/20 mb-2">
-                    <f.icon className="w-[14px] h-[14px] text-[#16D3C5]" strokeWidth={1.5} />
+                  <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-[var(--ds-primary-300)]/20 to-[var(--ds-primary-400)]/20 mb-2">
+                    <f.icon className="w-[14px] h-[14px] text-[var(--ds-primary-300)]" strokeWidth={1.5} />
                   </div>
                   <h3 className="text-xs font-semibold text-white mb-0.5">{f.title}</h3>
                   <p className="text-[10px] text-white/45 leading-relaxed">{f.desc}</p>
@@ -182,9 +182,9 @@ export default function LoginPage() {
               />
               <defs>
                 <linearGradient id="wave-grad-login" x1="0" y1="0" x2="560" y2="0">
-                  <stop offset="0%" stopColor="#16D3C5" />
-                  <stop offset="50%" stopColor="#2563EB" />
-                  <stop offset="100%" stopColor="#7C3AED" />
+                  <stop offset="0%" style={{ stopColor: "var(--ds-primary-400)" }} />
+                  <stop offset="50%" style={{ stopColor: "var(--ds-primary-600)" }} />
+                  <stop offset="100%" style={{ stopColor: "var(--ds-accent-500)" }} />
                 </linearGradient>
               </defs>
             </svg>
@@ -193,10 +193,10 @@ export default function LoginPage() {
       </div>
 
       {/* RIGHT SIDE */}
-      <div className="flex w-full md:w-1/2 items-center justify-center bg-[#F8FAFC] p-4 sm:p-5 lg:p-6 relative overflow-hidden">
+      <div className="flex w-full md:w-1/2 items-center justify-center bg-[var(--ds-background)] p-4 sm:p-5 lg:p-6 relative overflow-hidden">
         {/* Subtle decor */}
-        <div className="absolute top-0 right-0 w-[450px] h-[450px] rounded-full bg-[#2563EB] opacity-[0.03] blur-[100px]" />
-        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full bg-[#16D3C5] opacity-[0.03] blur-[100px]" />
+        <div className="absolute top-0 right-0 w-[450px] h-[450px] rounded-full bg-[var(--ds-primary-600)] opacity-[0.03] blur-[100px]" />
+        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full bg-[var(--ds-primary-400)] opacity-[0.03] blur-[100px]" />
 
         <motion.div
           initial={{ opacity: 0, y: 16 }}
@@ -215,7 +215,7 @@ export default function LoginPage() {
               <h1 className="text-base font-bold tracking-tight">
                 <BrandText size="sm" />
               </h1>
-              <p className="text-[9px] text-[#94A3B8] font-medium tracking-[0.25em] uppercase mt-0.5">
+              <p className="text-[9px] text-[var(--ds-text-placeholder)] font-medium tracking-[0.25em] uppercase mt-0.5">
                 Dental Management System
               </p>
             </div>
@@ -236,23 +236,23 @@ export default function LoginPage() {
               <h2 className="text-base font-bold tracking-tight">
                 <BrandText size="sm" />
               </h2>
-              <p className="text-[9px] text-[#94A3B8] font-medium tracking-[0.25em] uppercase mt-0.5">
+              <p className="text-[9px] text-[var(--ds-text-placeholder)] font-medium tracking-[0.25em] uppercase mt-0.5">
                 Dental Management System
               </p>
               <div className="mt-3">
-                <h3 className="text-base font-bold text-[#0B1D3A] tracking-tight">Welcome Back!</h3>
-                <p className="text-xs text-[#64748B] mt-1">Sign in to access your NuShine account</p>
+                <h3 className="text-base font-bold text-[var(--ds-text)] tracking-tight">Welcome Back!</h3>
+                <p className="text-xs text-[var(--ds-text-secondary)] mt-1">Sign in to access your NuShine account</p>
               </div>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-3">
               {/* Email */}
               <div className="space-y-1">
-                <label htmlFor="email" className="text-[11px] font-medium text-[#475569]">
+                <label htmlFor="email" className="text-[11px] font-medium text-[var(--ds-text-secondary)]">
                   Email Address
                 </label>
                 <div className="relative group">
-                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#94A3B8] group-focus-within:text-[#2563EB] transition-colors duration-200" strokeWidth={1.5} />
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--ds-text-placeholder)] group-focus-within:text-[var(--ds-primary)] transition-colors duration-200" strokeWidth={1.5} />
                   <input
                     id="email"
                     name="email"
@@ -264,7 +264,7 @@ export default function LoginPage() {
                     autoFocus
                     autoComplete="email"
                     aria-label="Email address"
-                    className="h-10 w-full rounded-[10px] border border-gray-200 bg-[#F8FAFC] pl-9 pr-3.5 text-xs text-[#0B1D3A] outline-none transition-all duration-200 placeholder:text-[#94A3B8] hover:border-gray-300 focus:border-[#2563EB] focus:bg-white focus:ring-3 focus:ring-[#2563EB]/10"
+                    className="h-10 w-full rounded-[10px] border-[var(--ds-input-border)] bg-[var(--ds-background-subtle)] pl-9 pr-3.5 text-xs text-[var(--ds-input-text)] outline-none transition-all duration-200 placeholder:text-[var(--ds-input-placeholder)] hover:border-[var(--ds-input-border-hover)] focus:border-[var(--ds-primary)] focus:bg-[var(--ds-surface)] focus:ring-3 focus:ring-[var(--ds-primary)]/10"
                   />
                 </div>
               </div>
@@ -272,20 +272,20 @@ export default function LoginPage() {
               {/* Password */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <label htmlFor="password" className="text-[11px] font-medium text-[#475569]">
+                  <label htmlFor="password" className="text-[11px] font-medium text-[var(--ds-text-secondary)]">
                     Password
                   </label>
                   <button
                     type="button"
                     aria-label="Forgot password"
                     title="Forgot password"
-                    className="text-[11px] font-medium text-[#16D3C5] transition-all duration-200 hover:text-[#2563EB]"
+                    className="text-[11px] font-medium text-[var(--ds-primary)] transition-all duration-200 hover:text-[var(--ds-primary-hover)]"
                   >
                     Forgot password?
                   </button>
                 </div>
                 <div className="relative group">
-                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#94A3B8] group-focus-within:text-[#2563EB] transition-colors duration-200" strokeWidth={1.5} />
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--ds-text-placeholder)] group-focus-within:text-[var(--ds-primary)] transition-colors duration-200" strokeWidth={1.5} />
                   <input
                     id="password"
                     name="password"
@@ -296,7 +296,7 @@ export default function LoginPage() {
                     required
                     autoComplete="current-password"
                     aria-label="Password"
-                    className="h-10 w-full rounded-[10px] border border-gray-200 bg-[#F8FAFC] pl-9 pr-11 text-xs text-[#0B1D3A] outline-none transition-all duration-200 placeholder:text-[#94A3B8] hover:border-gray-300 focus:border-[#2563EB] focus:bg-white focus:ring-3 focus:ring-[#2563EB]/10"
+                    className="h-10 w-full rounded-[10px] border-[var(--ds-input-border)] bg-[var(--ds-background-subtle)] pl-9 pr-11 text-xs text-[var(--ds-input-text)] outline-none transition-all duration-200 placeholder:text-[var(--ds-input-placeholder)] hover:border-[var(--ds-input-border-hover)] focus:border-[var(--ds-primary)] focus:bg-[var(--ds-surface)] focus:ring-3 focus:ring-[var(--ds-primary)]/10"
                   />
                   <CapsLockIndicator active={capsLock} />
                   <button
@@ -304,7 +304,7 @@ export default function LoginPage() {
                     onClick={() => setShowPassword(!showPassword)}
                     aria-label={showPassword ? "Hide password" : "Show password"}
                     title={showPassword ? "Hide password" : "Show password"}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-[#475569] transition-colors duration-200"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[var(--ds-text-placeholder)] hover:text-[var(--ds-text-secondary)] transition-colors duration-200"
                   >
                     {showPassword ? <EyeOff className="h-3.5 w-3.5" strokeWidth={1.5} /> : <Eye className="h-3.5 w-3.5" strokeWidth={1.5} />}
                   </button>
@@ -313,14 +313,14 @@ export default function LoginPage() {
 
               {/* Remember me */}
               <div className="flex items-center">
-                <label className="flex items-center gap-2 text-xs text-[#64748B] cursor-pointer select-none group">
+                <label className="flex items-center gap-2 text-xs text-[var(--ds-text-secondary)] cursor-pointer select-none group">
                   <input
                     type="checkbox"
                     checked={remember}
                     onChange={(e) => setRemember(e.target.checked)}
-                    className="h-3.5 w-3.5 rounded border-gray-300 text-[#2563EB] focus:ring-[#2563EB]/20 transition-all"
+                    className="h-3.5 w-3.5 rounded border-gray-300 text-[var(--ds-primary)] focus:ring-[var(--ds-primary)]/20 transition-all"
                   />
-                  <span className="group-hover:text-[#0B1D3A] transition-colors">Remember me</span>
+                  <span className="group-hover:text-[var(--ds-text)] transition-colors">Remember me</span>
                 </label>
               </div>
 
@@ -341,7 +341,7 @@ export default function LoginPage() {
                 <button
                   disabled
                   aria-label="Signing in"
-                  className="relative flex h-10 w-full items-center justify-center gap-2 rounded-[10px] bg-gradient-to-r from-[#16D3C5] via-[#2563EB] to-[#7C3AED] text-white text-xs font-semibold shadow-md shadow-[#2563EB]/25 cursor-not-allowed overflow-hidden"
+                  className="relative flex h-10 w-full items-center justify-center gap-2 rounded-[10px] bg-gradient-to-r from-[var(--ds-primary)] via-[var(--ds-primary-600)] to-[var(--ds-primary-800)] text-white text-xs font-semibold shadow-md shadow-[var(--ds-primary)]/25 cursor-not-allowed overflow-hidden"
                 >
                   <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" aria-hidden="true" />
                   Signing In...
@@ -353,7 +353,7 @@ export default function LoginPage() {
                   whileTap={{ scale: 0.98 }}
                   aria-label="Sign in"
                   title="Sign in to your account"
-                  className="relative flex h-10 w-full items-center justify-center gap-2 rounded-[10px] bg-gradient-to-r from-[#16D3C5] via-[#2563EB] to-[#7C3AED] text-white text-xs font-semibold shadow-md shadow-[#2563EB]/25 transition-all duration-300 hover:shadow-lg hover:shadow-[#2563EB]/30 overflow-hidden group"
+                  className="relative flex h-10 w-full items-center justify-center gap-2 rounded-[10px] bg-gradient-to-r from-[var(--ds-primary)] via-[var(--ds-primary-600)] to-[var(--ds-primary-800)] text-white text-xs font-semibold shadow-md shadow-[var(--ds-primary)]/25 transition-all duration-300 hover:shadow-lg hover:shadow-[var(--ds-primary)]/30 overflow-hidden group"
                 >
                   <span className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-all duration-300" />
                   <span className="relative flex items-center gap-1.5">
@@ -367,8 +367,8 @@ export default function LoginPage() {
             {/* Security */}
             <div className="mt-5 pt-4 border-t border-gray-100">
               <div className="flex items-center justify-center gap-2 text-center">
-                <ShieldCheck className="h-3.5 w-3.5 text-[#16D3C5]" strokeWidth={1.5} />
-                <p className="text-[11px] text-[#94A3B8]">
+                <ShieldCheck className="h-3.5 w-3.5 text-[var(--ds-primary)]" strokeWidth={1.5} />
+                <p className="text-[11px] text-[var(--ds-text-placeholder)]">
                   Secure. Reliable. Trusted by dental professionals.
                 </p>
               </div>

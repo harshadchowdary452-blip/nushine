@@ -323,7 +323,7 @@ export default function BillingDetail() {
                 </Select>
               </div>
               <Button
-                className="bg-primary hover:bg-primary-hover text-white"
+                className="bg-primary hover:bg-primary-hover text-primary-foreground"
                 onClick={() => {
                   const amt = parseFloat(paymentAmount);
                   if (isNaN(amt) || amt <= 0) {

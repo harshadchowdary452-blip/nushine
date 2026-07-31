@@ -2,13 +2,26 @@ import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
-  MessageSquare, Phone, Send, UserPlus, CalendarCheck, UserCheck, FileText,
-  Search, Filter, Loader2, ChevronLeft, ChevronRight, MoreHorizontal, MessageCircle,
-  AlertCircle, Megaphone,
+  MessageSquare,
+  Phone,
+  Send,
+  UserPlus,
+  CalendarCheck,
+  UserCheck,
+  FileText,
+  Search,
+  Filter,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+  MoreHorizontal,
+  MessageCircle,
+  AlertCircle,
+  Megaphone,
 } from "lucide-react"
 import { campaignsApi } from "@/services/endpoints"
 
-import PageHeader from "@/components/layout/page-header"
+import { PageHeader } from "@/design-system"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -17,11 +30,37 @@ import { Input } from "@/components/ui/input"
 import { NumericInput } from "@/components/ui/numeric-input"
 import { useToast } from "@/components/ui/toast"
 import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter } from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogBody,
+  DialogFooter,
+} from "@/components/ui/dialog"
 
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 import { appointmentsApi, usersApi } from "@/services/endpoints"
 
@@ -111,14 +150,29 @@ export default function CampaignResponses() {
   const limit = 10
 
   // Dialogs
-  const [replyOpen, setReplyOpen] = useState<null | { id: string; message: string; phone?: string; patientName?: string }>(null)
+  const [replyOpen, setReplyOpen] = useState<null | {
+    id: string
+    message: string
+    phone?: string
+    patientName?: string
+  }>(null)
   const [notesOpen, setNotesOpen] = useState<null | { id: string; currentNotes?: string }>(null)
   const [assignOpen, setAssignOpen] = useState<null | { id: string; currentStaffId?: string }>(null)
   const [appointmentOpen, setAppointmentOpen] = useState<null | {
-    id: string; patientId?: string; patientName?: string; phone?: string; campaignId?: string
+    id: string
+    patientId?: string
+    patientName?: string
+    phone?: string
+    campaignId?: string
   }>(null)
   const [convertOpen, setConvertOpen] = useState<null | {
-    id: string; leadId?: string; leadName?: string; phone?: string; email?: string; source?: string; campaignId?: string
+    id: string
+    leadId?: string
+    leadName?: string
+    phone?: string
+    email?: string
+    source?: string
+    campaignId?: string
   }>(null)
 
   // Sub-states for dialogs
@@ -151,7 +205,12 @@ export default function CampaignResponses() {
   if (campaignFilter !== "all") params.campaign_id = campaignFilter
   if (statusFilter !== "all") params.status = statusFilter
 
-  const { data: responsesData, isLoading, isError, refetch } = useQuery({
+  const {
+    data: responsesData,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: ["campaign-responses", search, campaignFilter, statusFilter, page],
     queryFn: () => campaignsApi.responses(params),
     refetchInterval: 10000,
@@ -169,42 +228,76 @@ export default function CampaignResponses() {
 
   const { data: doctorsData } = useQuery({
     queryKey: ["doctors", "available"],
-    queryFn: () => campaignsApi.availableDoctors({ date: apptDate || new Date().toISOString().split("T")[0] }),
+    queryFn: () =>
+      campaignsApi.availableDoctors({ date: apptDate || new Date().toISOString().split("T")[0] }),
     enabled: !!apptDate,
   })
 
-  const responses: CampaignResponse[] = Array.isArray(responsesData) ? responsesData : responsesData?.items || responsesData?.data || []
-  const totalItems = responsesData?.total ?? (Array.isArray(responsesData) ? responsesData.length : 0)
+  const responses: CampaignResponse[] = Array.isArray(responsesData)
+    ? responsesData
+    : responsesData?.items || responsesData?.data || []
+  const totalItems =
+    responsesData?.total ?? (Array.isArray(responsesData) ? responsesData.length : 0)
   const totalPages = Math.max(1, Math.ceil(totalItems / limit))
-  const campaigns: CampaignItem[] = Array.isArray(campaignsData) ? campaignsData : campaignsData?.items || campaignsData?.data || []
-  const users: StaffUser[] = Array.isArray(usersData) ? usersData : usersData?.items || usersData?.data || []
-  const doctors: DoctorOption[] = Array.isArray(doctorsData) ? doctorsData : doctorsData?.items || doctorsData?.data || []
+  const campaigns: CampaignItem[] = Array.isArray(campaignsData)
+    ? campaignsData
+    : campaignsData?.items || campaignsData?.data || []
+  const users: StaffUser[] = Array.isArray(usersData)
+    ? usersData
+    : usersData?.items || usersData?.data || []
+  const doctors: DoctorOption[] = Array.isArray(doctorsData)
+    ? doctorsData
+    : doctorsData?.items || doctorsData?.data || []
 
   const replyMutation = useMutation({
     mutationFn: (data: { campaignId: string; recipientId: string; message: string }) =>
       campaignsApi.recordResponse(data.campaignId, data.recipientId, { message: data.message }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["campaign-responses"] })
-      addToast({ title: "Reply Sent", description: "Your reply has been sent successfully", variant: "success" })
+      addToast({
+        title: "Reply Sent",
+        description: "Your reply has been sent successfully",
+        variant: "success",
+      })
       setReplyOpen(null)
       setReplyText("")
     },
-    onError: () => addToast({ title: "Error", description: "Failed to send reply", variant: "destructive" }),
+    onError: () =>
+      addToast({ title: "Error", description: "Failed to send reply", variant: "destructive" }),
   })
 
   const convertMutation = useMutation({
-    mutationFn: (data: { campaignId: string; leadId: string; patientData: Record<string, unknown> }) =>
-      campaignsApi.convertLead(data.campaignId, { lead_id: data.leadId, patient_data: data.patientData }),
+    mutationFn: (data: {
+      campaignId: string
+      leadId: string
+      patientData: Record<string, unknown>
+    }) =>
+      campaignsApi.convertLead(data.campaignId, {
+        lead_id: data.leadId,
+        patient_data: data.patientData,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["campaign-responses"] })
-      addToast({ title: "Converted", description: "Lead converted to patient successfully", variant: "success" })
+      addToast({
+        title: "Converted",
+        description: "Lead converted to patient successfully",
+        variant: "success",
+      })
       setConvertOpen(null)
     },
-    onError: () => addToast({ title: "Error", description: "Failed to convert lead", variant: "destructive" }),
+    onError: () =>
+      addToast({ title: "Error", description: "Failed to convert lead", variant: "destructive" }),
   })
 
   const createApptMutation = useMutation({
-    mutationFn: (data: { campaignId: string; patientId: string; doctorId: string; date: string; time: string; notes?: string }) =>
+    mutationFn: (data: {
+      campaignId: string
+      patientId: string
+      doctorId: string
+      date: string
+      time: string
+      notes?: string
+    }) =>
       campaignsApi.createAppointment(data.campaignId, {
         patient_id: data.patientId,
         doctor_id: data.doctorId,
@@ -214,7 +307,11 @@ export default function CampaignResponses() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["campaign-responses"] })
-      addToast({ title: "Appointment Created", description: "Appointment has been booked successfully", variant: "success" })
+      addToast({
+        title: "Appointment Created",
+        description: "Appointment has been booked successfully",
+        variant: "success",
+      })
       setAppointmentOpen(null)
       setApptDoctorId("")
       setApptDate("")
@@ -222,7 +319,12 @@ export default function CampaignResponses() {
       setApptNotes("")
       setAvailSlots([])
     },
-    onError: () => addToast({ title: "Error", description: "Failed to create appointment", variant: "destructive" }),
+    onError: () =>
+      addToast({
+        title: "Error",
+        description: "Failed to create appointment",
+        variant: "destructive",
+      }),
   })
 
   const handleSaveNotes = (responseId: string) => {
@@ -236,7 +338,11 @@ export default function CampaignResponses() {
     const user = users.find((u: StaffUser) => u.id === selectedStaffId)
     if (!user) return
     setLocalStaff((prev) => ({ ...prev, [responseId]: { id: user.id, name: user.full_name } }))
-    addToast({ title: "Staff Assigned", description: `Assigned to ${user.full_name}`, variant: "success" })
+    addToast({
+      title: "Staff Assigned",
+      description: `Assigned to ${user.full_name}`,
+      variant: "success",
+    })
     setAssignOpen(null)
     setSelectedStaffId("")
   }
@@ -247,7 +353,9 @@ export default function CampaignResponses() {
     try {
       const result = await appointmentsApi.slots({ doctor_id: doctorId, date })
       const data: SlotItem[] = Array.isArray(result) ? result : result?.slots || []
-      const available = data.filter((s: SlotItem) => s.available !== false).map((s: SlotItem) => String(s.time || s))
+      const available = data
+        .filter((s: SlotItem) => s.available !== false)
+        .map((s: SlotItem) => String(s.time || s))
       setAvailSlots(available.length > 0 ? available : [])
     } catch {
       setAvailSlots([])
@@ -269,7 +377,10 @@ export default function CampaignResponses() {
 
   const handleOpenAssign = (resp: CampaignResponse) => {
     setSelectedStaffId(localStaff[resp.id]?.id || resp.assigned_staff_id || "")
-    setAssignOpen({ id: resp.id, currentStaffId: localStaff[resp.id]?.id || resp.assigned_staff_id })
+    setAssignOpen({
+      id: resp.id,
+      currentStaffId: localStaff[resp.id]?.id || resp.assigned_staff_id,
+    })
   }
 
   const handleOpenAppointment = (resp: CampaignResponse) => {
@@ -343,8 +454,11 @@ export default function CampaignResponses() {
     if (!dateStr) return "-"
     try {
       const d = new Date(dateStr)
-      return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) +
-        " " + d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })
+      return (
+        d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) +
+        " " +
+        d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })
+      )
     } catch {
       return dateStr
     }
@@ -360,10 +474,16 @@ export default function CampaignResponses() {
     return (
       <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3">
         <p className="text-sm text-gray-500">
-          Showing {Math.min((page - 1) * limit + 1, totalItems)} to {Math.min(page * limit, totalItems)} of {totalItems}
+          Showing {Math.min((page - 1) * limit + 1, totalItems)} to{" "}
+          {Math.min(page * limit, totalItems)} of {totalItems}
         </p>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon-sm" disabled={page <= 1} onClick={() => handlePageChange(page - 1)}>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            disabled={page <= 1}
+            onClick={() => handlePageChange(page - 1)}
+          >
             <ChevronLeft className="h-4 w-4" />
           </Button>
           {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
@@ -382,7 +502,12 @@ export default function CampaignResponses() {
               </Button>
             )
           })}
-          <Button variant="ghost" size="icon-sm" disabled={page >= totalPages} onClick={() => handlePageChange(page + 1)}>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            disabled={page >= totalPages}
+            onClick={() => handlePageChange(page + 1)}
+          >
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
@@ -404,11 +529,20 @@ export default function CampaignResponses() {
                 placeholder="Search by sender name or phone..."
                 className="pl-10"
                 value={search}
-                onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+                onChange={(e) => {
+                  setSearch(e.target.value)
+                  setPage(1)
+                }}
               />
             </div>
             <div className="flex flex-wrap gap-3">
-              <Select value={campaignFilter} onValueChange={(v) => { setCampaignFilter(v); setPage(1) }}>
+              <Select
+                value={campaignFilter}
+                onValueChange={(v) => {
+                  setCampaignFilter(v)
+                  setPage(1)
+                }}
+              >
                 <SelectTrigger className="w-44">
                   <Megaphone className="h-4 w-4 mr-2 text-gray-400" />
                   <SelectValue placeholder="All Campaigns" />
@@ -416,11 +550,19 @@ export default function CampaignResponses() {
                 <SelectContent>
                   <SelectItem value="all">All Campaigns</SelectItem>
                   {campaigns.map((c: CampaignItem) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1) }}>
+              <Select
+                value={statusFilter}
+                onValueChange={(v) => {
+                  setStatusFilter(v)
+                  setPage(1)
+                }}
+              >
                 <SelectTrigger className="w-36">
                   <Filter className="h-4 w-4 mr-2 text-gray-400" />
                   <SelectValue placeholder="All Status" />
@@ -508,27 +650,46 @@ export default function CampaignResponses() {
                         <TableRow key={resp.id}>
                           <TableCell>
                             <div className="flex flex-col">
-                              <span className="font-medium text-sm text-gray-900">{resp.patient_name || "-"}</span>
-                              {resp.phone && <span className="text-xs text-gray-400">{resp.phone}</span>}
+                              <span className="font-medium text-sm text-gray-900">
+                                {resp.patient_name || "-"}
+                              </span>
+                              {resp.phone && (
+                                <span className="text-xs text-gray-400">{resp.phone}</span>
+                              )}
                             </div>
                           </TableCell>
                           <TableCell>
-                            <span className="text-sm text-gray-700">{resp.campaign_name || "-"}</span>
+                            <span className="text-sm text-gray-700">
+                              {resp.campaign_name || "-"}
+                            </span>
                           </TableCell>
                           <TableCell className="max-w-xs">
-                            <p className="truncate text-sm text-gray-600" title={resp.message}>{resp.message}</p>
+                            <p className="truncate text-sm text-gray-600" title={resp.message}>
+                              {resp.message}
+                            </p>
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline" className={cn("text-xs", getStatusBadge(resp.status))}>
+                            <Badge
+                              variant="outline"
+                              className={cn("text-xs", getStatusBadge(resp.status))}
+                            >
                               {resp.status || "NEW"}
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <span className="text-xs text-gray-500 whitespace-nowrap">{formatDateTime(resp.reply_time || resp.created_at)}</span>
+                            <span className="text-xs text-gray-500 whitespace-nowrap">
+                              {formatDateTime(resp.reply_time || resp.created_at)}
+                            </span>
                           </TableCell>
                           <TableCell>
                             {resp.is_lead ? (
-                              <Badge variant="outline" className={cn("text-xs", getStatusBadge(resp.lead_status, leadStatusStyle))}>
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "text-xs",
+                                  getStatusBadge(resp.lead_status, leadStatusStyle),
+                                )}
+                              >
                                 {resp.lead_status || "NEW"}
                               </Badge>
                             ) : (
@@ -540,7 +701,9 @@ export default function CampaignResponses() {
                           </TableCell>
                           <TableCell>
                             {resp.next_action ? (
-                              <span className="text-xs text-gray-600 bg-gray-100 rounded px-2 py-0.5">{resp.next_action}</span>
+                              <span className="text-xs text-gray-600 bg-gray-100 rounded px-2 py-0.5">
+                                {resp.next_action}
+                              </span>
                             ) : (
                               <span className="text-xs text-gray-400">-</span>
                             )}
@@ -553,25 +716,47 @@ export default function CampaignResponses() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-48">
-                                <DropdownMenuItem onClick={() => window.open(`tel:${resp.phone}`, "_self")} disabled={!resp.phone}>
+                                <DropdownMenuItem
+                                  onClick={() => window.open(`tel:${resp.phone}`, "_self")}
+                                  disabled={!resp.phone}
+                                >
                                   <Phone className="h-4 w-4 mr-2" /> Call
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
-                                  onClick={() => window.open(`https://wa.me/${resp.phone?.replace(/[^0-9]/g, "")}`, "_blank")}
+                                  onClick={() =>
+                                    window.open(
+                                      `https://wa.me/${resp.phone?.replace(/[^0-9]/g, "")}`,
+                                      "_blank",
+                                    )
+                                  }
                                   disabled={!resp.phone}
                                 >
                                   <MessageCircle className="h-4 w-4 mr-2" /> WhatsApp
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setReplyText(""); setReplyOpen({ id: resp.id, message: resp.message || "", phone: resp.phone, patientName: resp.patient_name }) }}>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setReplyText("")
+                                    setReplyOpen({
+                                      id: resp.id,
+                                      message: resp.message || "",
+                                      phone: resp.phone,
+                                      patientName: resp.patient_name,
+                                    })
+                                  }}
+                                >
                                   <Send className="h-4 w-4 mr-2" /> Reply
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleOpenNotes(resp)}>
-                                  <FileText className="h-4 w-4 mr-2" /> Add Notes{respNotes ? " (has notes)" : ""}
+                                  <FileText className="h-4 w-4 mr-2" /> Add Notes
+                                  {respNotes ? " (has notes)" : ""}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleOpenAssign(resp)}>
                                   <UserCheck className="h-4 w-4 mr-2" /> Assign Staff
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleOpenAppointment(resp)} disabled={!resp.patient_id && !resp.lead_id}>
+                                <DropdownMenuItem
+                                  onClick={() => handleOpenAppointment(resp)}
+                                  disabled={!resp.patient_id && !resp.lead_id}
+                                >
                                   <CalendarCheck className="h-4 w-4 mr-2" /> Create Appointment
                                 </DropdownMenuItem>
                                 {resp.is_lead && (
@@ -595,7 +780,15 @@ export default function CampaignResponses() {
       </Card>
 
       {/* Reply Dialog */}
-      <Dialog open={!!replyOpen} onOpenChange={(o) => { if (!o) { setReplyOpen(null); setReplyText("") } }}>
+      <Dialog
+        open={!!replyOpen}
+        onOpenChange={(o) => {
+          if (!o) {
+            setReplyOpen(null)
+            setReplyText("")
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Reply to {replyOpen?.patientName || "Sender"}</DialogTitle>
@@ -621,8 +814,20 @@ export default function CampaignResponses() {
             )}
           </DialogBody>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setReplyOpen(null); setReplyText("") }}>Cancel</Button>
-            <Button onClick={handleReply} disabled={!replyText.trim() || replyMutation.isPending} className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setReplyOpen(null)
+                setReplyText("")
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleReply}
+              disabled={!replyText.trim() || replyMutation.isPending}
+              className="gap-2"
+            >
               {replyMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               <Send className="h-4 w-4" /> Send Reply
             </Button>
@@ -631,7 +836,15 @@ export default function CampaignResponses() {
       </Dialog>
 
       {/* Notes Dialog */}
-      <Dialog open={!!notesOpen} onOpenChange={(o) => { if (!o) { setNotesOpen(null); setNotesText("") } }}>
+      <Dialog
+        open={!!notesOpen}
+        onOpenChange={(o) => {
+          if (!o) {
+            setNotesOpen(null)
+            setNotesText("")
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Add Notes</DialogTitle>
@@ -649,8 +862,20 @@ export default function CampaignResponses() {
             </div>
           </DialogBody>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setNotesOpen(null); setNotesText("") }}>Cancel</Button>
-            <Button onClick={() => notesOpen && handleSaveNotes(notesOpen.id)} disabled={!notesText.trim()} className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setNotesOpen(null)
+                setNotesText("")
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => notesOpen && handleSaveNotes(notesOpen.id)}
+              disabled={!notesText.trim()}
+              className="gap-2"
+            >
               <FileText className="h-4 w-4" /> Save Notes
             </Button>
           </DialogFooter>
@@ -658,7 +883,15 @@ export default function CampaignResponses() {
       </Dialog>
 
       {/* Assign Staff Dialog */}
-      <Dialog open={!!assignOpen} onOpenChange={(o) => { if (!o) { setAssignOpen(null); setSelectedStaffId("") } }}>
+      <Dialog
+        open={!!assignOpen}
+        onOpenChange={(o) => {
+          if (!o) {
+            setAssignOpen(null)
+            setSelectedStaffId("")
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Assign Staff</DialogTitle>
@@ -673,10 +906,14 @@ export default function CampaignResponses() {
                 </SelectTrigger>
                 <SelectContent>
                   {users.length === 0 ? (
-                    <SelectItem value="_none" disabled>No staff available</SelectItem>
+                    <SelectItem value="_none" disabled>
+                      No staff available
+                    </SelectItem>
                   ) : (
                     users.map((u: StaffUser) => (
-                      <SelectItem key={u.id} value={u.id}>{u.full_name} ({u.role.replace(/_/g, " ")})</SelectItem>
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.full_name} ({u.role.replace(/_/g, " ")})
+                      </SelectItem>
                     ))
                   )}
                 </SelectContent>
@@ -684,8 +921,20 @@ export default function CampaignResponses() {
             </div>
           </DialogBody>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setAssignOpen(null); setSelectedStaffId("") }}>Cancel</Button>
-            <Button onClick={() => assignOpen && handleAssignStaff(assignOpen.id)} disabled={!selectedStaffId} className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setAssignOpen(null)
+                setSelectedStaffId("")
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => assignOpen && handleAssignStaff(assignOpen.id)}
+              disabled={!selectedStaffId}
+              className="gap-2"
+            >
               <UserCheck className="h-4 w-4" /> Assign
             </Button>
           </DialogFooter>
@@ -693,7 +942,15 @@ export default function CampaignResponses() {
       </Dialog>
 
       {/* Create Appointment Dialog */}
-      <Dialog open={!!appointmentOpen} onOpenChange={(o) => { if (!o) { setAppointmentOpen(null); setAvailSlots([]) } }}>
+      <Dialog
+        open={!!appointmentOpen}
+        onOpenChange={(o) => {
+          if (!o) {
+            setAppointmentOpen(null)
+            setAvailSlots([])
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Create Appointment</DialogTitle>
@@ -703,8 +960,12 @@ export default function CampaignResponses() {
             {appointmentOpen && (
               <div className="space-y-4">
                 <div className="rounded-lg bg-gray-50 p-3">
-                  <p className="text-sm font-medium text-gray-800">{appointmentOpen.patientName || "Patient"}</p>
-                  {appointmentOpen.phone && <p className="text-xs text-gray-500">{appointmentOpen.phone}</p>}
+                  <p className="text-sm font-medium text-gray-800">
+                    {appointmentOpen.patientName || "Patient"}
+                  </p>
+                  {appointmentOpen.phone && (
+                    <p className="text-xs text-gray-500">{appointmentOpen.phone}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>Doctor</Label>
@@ -714,7 +975,9 @@ export default function CampaignResponses() {
                     </SelectTrigger>
                     <SelectContent>
                       {doctors.length === 0 ? (
-                        <SelectItem value="_none" disabled>No doctors available</SelectItem>
+                        <SelectItem value="_none" disabled>
+                          No doctors available
+                        </SelectItem>
                       ) : (
                         doctors.map((d: DoctorOption) => (
                           <SelectItem key={d.id || d.doctor_id} value={d.id || d.doctor_id || ""}>
@@ -742,15 +1005,29 @@ export default function CampaignResponses() {
                       <Loader2 className="h-4 w-4 animate-spin" /> Loading slots...
                     </div>
                   ) : availSlots.length === 0 && apptDoctorId && apptDate ? (
-                    <p className="text-sm text-amber-600">No available slots for this date/doctor</p>
+                    <p className="text-sm text-amber-600">
+                      No available slots for this date/doctor
+                    </p>
                   ) : (
-                    <Select value={apptTime} onValueChange={setApptTime} disabled={availSlots.length === 0}>
+                    <Select
+                      value={apptTime}
+                      onValueChange={setApptTime}
+                      disabled={availSlots.length === 0}
+                    >
                       <SelectTrigger>
-                        <SelectValue placeholder={availSlots.length === 0 ? "Select doctor & date first..." : "Select time..."} />
+                        <SelectValue
+                          placeholder={
+                            availSlots.length === 0
+                              ? "Select doctor & date first..."
+                              : "Select time..."
+                          }
+                        />
                       </SelectTrigger>
                       <SelectContent>
                         {availSlots.map((slot: string) => (
-                          <SelectItem key={slot} value={slot}>{slot}</SelectItem>
+                          <SelectItem key={slot} value={slot}>
+                            {slot}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -769,16 +1046,27 @@ export default function CampaignResponses() {
             )}
           </DialogBody>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setAppointmentOpen(null); setAvailSlots([]) }}>Cancel</Button>
             <Button
-              onClick={() => appointmentOpen && createApptMutation.mutate({
-                campaignId: appointmentOpen.campaignId || appointmentOpen.id,
-                patientId: appointmentOpen.patientId || "",
-                doctorId: apptDoctorId,
-                date: apptDate,
-                time: apptTime,
-                notes: apptNotes || undefined,
-              })}
+              variant="outline"
+              onClick={() => {
+                setAppointmentOpen(null)
+                setAvailSlots([])
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() =>
+                appointmentOpen &&
+                createApptMutation.mutate({
+                  campaignId: appointmentOpen.campaignId || appointmentOpen.id,
+                  patientId: appointmentOpen.patientId || "",
+                  doctorId: apptDoctorId,
+                  date: apptDate,
+                  time: apptTime,
+                  notes: apptNotes || undefined,
+                })
+              }
               disabled={!apptDoctorId || !apptDate || !apptTime || createApptMutation.isPending}
               className="gap-2"
             >
@@ -790,7 +1078,12 @@ export default function CampaignResponses() {
       </Dialog>
 
       {/* Convert To Patient Dialog */}
-      <Dialog open={!!convertOpen} onOpenChange={(o) => { if (!o) setConvertOpen(null) }}>
+      <Dialog
+        open={!!convertOpen}
+        onOpenChange={(o) => {
+          if (!o) setConvertOpen(null)
+        }}
+      >
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Convert To Patient</DialogTitle>
@@ -813,15 +1106,27 @@ export default function CampaignResponses() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Full Name *</Label>
-                      <Input value={convName} onChange={(e) => setConvName(e.target.value)} placeholder="Patient name" />
+                      <Input
+                        value={convName}
+                        onChange={(e) => setConvName(e.target.value)}
+                        placeholder="Patient name"
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label>Phone *</Label>
-                      <Input value={convPhone} onChange={(e) => setConvPhone(e.target.value)} placeholder="Phone number" />
+                      <Input
+                        value={convPhone}
+                        onChange={(e) => setConvPhone(e.target.value)}
+                        placeholder="Phone number"
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label>Email</Label>
-                      <Input value={convEmail} onChange={(e) => setConvEmail(e.target.value)} placeholder="Email address" />
+                      <Input
+                        value={convEmail}
+                        onChange={(e) => setConvEmail(e.target.value)}
+                        placeholder="Email address"
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label>Gender</Label>
@@ -838,7 +1143,14 @@ export default function CampaignResponses() {
                     </div>
                     <div className="space-y-2">
                       <Label>Age</Label>
-                      <NumericInput value={convAge} onChange={(v) => setConvAge(v)} placeholder="Age" mode="integer" min={0} max={150} />
+                      <NumericInput
+                        value={convAge}
+                        onChange={(v) => setConvAge(v)}
+                        placeholder="Age"
+                        mode="integer"
+                        min={0}
+                        max={150}
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label>OP Number</Label>
@@ -847,7 +1159,12 @@ export default function CampaignResponses() {
                   </div>
                   <div className="space-y-2">
                     <Label>Address</Label>
-                    <Textarea value={convAddress} onChange={(e) => setConvAddress(e.target.value)} rows={2} placeholder="Full address" />
+                    <Textarea
+                      value={convAddress}
+                      onChange={(e) => setConvAddress(e.target.value)}
+                      rows={2}
+                      placeholder="Full address"
+                    />
                   </div>
                   <div className="flex items-center gap-2">
                     <input
@@ -857,14 +1174,18 @@ export default function CampaignResponses() {
                       onChange={(e) => setConvCreateAppt(e.target.checked)}
                       className="h-4 w-4 rounded border-gray-300 text-blue-600"
                     />
-                    <Label htmlFor="create-appt" className="text-sm cursor-pointer">Create Appointment after conversion</Label>
+                    <Label htmlFor="create-appt" className="text-sm cursor-pointer">
+                      Create Appointment after conversion
+                    </Label>
                   </div>
                 </div>
               </div>
             )}
           </DialogBody>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConvertOpen(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setConvertOpen(null)}>
+              Cancel
+            </Button>
             <Button
               onClick={handleConvert}
               disabled={!convName || !convPhone || convertMutation.isPending}

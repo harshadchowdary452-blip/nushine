@@ -40,13 +40,13 @@ export default function DashboardDateFilter({ value, onChange }: DashboardDateFi
       <AnimatePresence>
         {open && (
           <>
-            <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+            <div className="fixed inset-0 z-[var(--ds-z-overlay)]" onClick={() => setOpen(false)} />
             <motion.div
               initial={{ opacity: 0, y: -4, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -4, scale: 0.96 }}
               transition={{ duration: 0.15 }}
-              className="absolute left-0 top-full z-20 mt-1.5 w-44 rounded-2xl border border-gray-100 bg-white p-1.5 shadow-dropdown"
+              className="absolute left-0 top-full z-[var(--ds-z-dropdown)] mt-1.5 w-44 rounded-2xl border border-gray-100 bg-white p-1.5 shadow-dropdown"
             >
               {presets.map((preset) => (
                 <button

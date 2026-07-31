@@ -13,7 +13,24 @@ import { PieChart as RePie, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, B
 import { formatIndianRupees } from "@/lib/currency"
 import type { Lead } from "@/types"
 
-const SOURCE_COLORS = ["#0EA5E9", "#8B5CF6", "#F59E0B", "#10B981", "#EF4444", "#EC4899", "#14B8A6", "#F97316", "#6366F1", "#84CC16", "#06B6D4", "#D946EF", "#FB923C", "#22C55E", "#E11D48", "#A855F7", "#64748B"]
+const SOURCE_COLORS = [
+  "var(--ds-chart-1)",
+  "var(--ds-chart-10)",
+  "var(--ds-chart-6)",
+  "var(--ds-chart-4)",
+  "var(--ds-chart-8)",
+  "var(--ds-chart-13)",
+  "var(--ds-chart-2)",
+  "var(--ds-chart-12)",
+  "var(--ds-chart-5)",
+  "var(--ds-chart-14)",
+  "var(--ds-chart-11)",
+  "var(--ds-chart-16)",
+  "var(--ds-chart-15)",
+  "var(--ds-chart-3)",
+  "var(--ds-chart-9)",
+  "var(--ds-chart-7)",
+]
 
 export default function RevenueAttribution() {
 
@@ -109,11 +126,11 @@ export default function RevenueAttribution() {
             {revenueData.bySource.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={revenueData.bySource} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--ds-border-light)" />
                   <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v: number) => `\u20B9${(v / 1000).toFixed(0)}k`} />
                   <YAxis type="category" dataKey="source" tick={{ fontSize: 11 }} width={100} />
                   <Tooltip formatter={(value: unknown) => formatIndianRupees(Number(value))} />
-                  <Bar dataKey="potentialRevenue" fill="#0EA5E9" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="potentialRevenue" fill="var(--ds-chart-1)" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (

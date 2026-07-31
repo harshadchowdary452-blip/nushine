@@ -75,7 +75,7 @@ const ChartTooltip = ({ active, payload, label, valueType }: ChartTooltipProps) 
 }
 
 export default function AnalyticsDrawer({
-  open, onClose, title, icon, color = "#2563EB", data = [], trend, metrics = [],
+  open, onClose, title, icon, color = "var(--ds-primary-600)", data = [], trend, metrics = [],
   chartType = "line", dataKeys = [], xAxisKey = "month", valueType = "currency",
   period, onPeriodChange,
 }: AnalyticsDrawerProps) {
@@ -97,7 +97,7 @@ export default function AnalyticsDrawer({
     return (
       <ResponsiveContainer width="100%" height={280}>
         <ChartComponent data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--ds-border-light)" />
           <XAxis dataKey={xAxisKey} tick={{ fontSize: 11 }} />
           <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => valueType === "number" ? formatIndianNumber(v) : `₹${(v / 1000).toFixed(0)}k`} />
           <Tooltip content={<ChartTooltip valueType={valueType} />} />
@@ -116,16 +116,16 @@ export default function AnalyticsDrawer({
         <>
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50 bg-black/30"
+            className="fixed inset-0 z-[var(--ds-z-dialog)] bg-black/30"
             onClick={onClose} />
           <motion.div
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-lg bg-white shadow-2xl md:max-w-md lg:max-w-lg overflow-y-auto"
+            className="fixed right-0 top-0 bottom-0 z-[var(--ds-z-dialog)] w-full max-w-lg bg-white shadow-2xl md:max-w-md lg:max-w-lg overflow-y-auto"
           >
-            <div className="sticky top-0 z-10 bg-white border-b border-gray-100">
+            <div className="sticky top-0 z-[var(--ds-z-sticky)] bg-white border-b border-gray-100">
               <div className="flex items-center justify-between p-6 pb-4">
                 <div className="flex items-center gap-3">
                   {icon && <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: `${color}15`, color }}>{icon}</div>}
@@ -152,7 +152,7 @@ export default function AnalyticsDrawer({
                     <button key={p} onClick={() => onPeriodChange(reversePeriodMap[p])}
                       className={cn(
                         "shrink-0 rounded-lg px-4 py-1.5 text-sm font-medium transition-all",
-                        displayPeriod === p ? "bg-primary text-white shadow-sm" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                        displayPeriod === p ? "bg-primary text-primary-foreground shadow-sm" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
                       )}>
                       {p}
                     </button>
@@ -165,7 +165,7 @@ export default function AnalyticsDrawer({
                   {metrics.map((m, i) => (
                     <div key={i} className="rounded-xl border bg-white p-4">
                       <p className="text-xs text-gray-500 font-medium">{m.label}</p>
-                      <p className="text-xl font-bold mt-1" style={{ color: m.color || "#0F172A" }}>{m.value}</p>
+                      <p className="text-xl font-bold mt-1" style={{ color: m.color || "var(--ds-text)" }}>{m.value}</p>
                     </div>
                   ))}
                 </div>

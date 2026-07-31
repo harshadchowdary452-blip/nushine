@@ -66,8 +66,8 @@ function ExpensesVsRevenueQuickView({ className }: ExpensesVsRevenueQuickViewPro
   const profitMargin = periodRevenue > 0 ? (netProfit / periodRevenue) * 100 : 0
 
   const compareData = [
-    { name: "Revenue", amount: periodRevenue, fill: "#10B981" },
-    { name: "Expenses", amount: totalExpenses, fill: "#EF4444" },
+    { name: "Revenue", amount: periodRevenue, fill: "var(--ds-chart-4)" },
+    { name: "Expenses", amount: totalExpenses, fill: "var(--ds-chart-8)" },
   ]
 
   return (

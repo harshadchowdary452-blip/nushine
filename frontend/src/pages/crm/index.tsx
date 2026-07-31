@@ -3,18 +3,32 @@ import { motion } from "framer-motion"
 import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "react-router-dom"
 import {
-  LayoutDashboard, Megaphone, CalendarDays, MessageSquare, FileText, BarChart3,
-  Plus, Send, Trash2, Edit3,
+  LayoutDashboard,
+  Megaphone,
+  CalendarDays,
+  MessageSquare,
+  FileText,
+  BarChart3,
+  Plus,
+  Send,
+  Trash2,
+  Edit3,
 } from "lucide-react"
 import { crmApi, campaignsApi } from "@/services/endpoints"
-import PageHeader from "@/components/layout/page-header"
+import { PageHeader } from "@/design-system"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import CrmDashboard from "@/pages/dashboard/crm-dashboard"
@@ -59,13 +73,17 @@ export default function CrmPage() {
     queryKey: ["crm-campaigns"],
     queryFn: () => campaignsApi.list(),
   })
-  const campaigns: CrmCampaign[] = Array.isArray(campaignsData) ? campaignsData : campaignsData?.items || []
+  const campaigns: CrmCampaign[] = Array.isArray(campaignsData)
+    ? campaignsData
+    : campaignsData?.items || []
 
   const { data: templatesData } = useQuery({
     queryKey: ["crm", "templates"],
     queryFn: () => crmApi.templates.list(),
   })
-  const templates: CrmTemplate[] = Array.isArray(templatesData) ? templatesData : templatesData?.items || []
+  const templates: CrmTemplate[] = Array.isArray(templatesData)
+    ? templatesData
+    : templatesData?.items || []
 
   return (
     <motion.div className="space-y-6" variants={container} initial="hidden" animate="show">
@@ -76,12 +94,30 @@ export default function CrmPage() {
 
       <Tabs defaultValue="dashboard" className="w-full">
         <TabsList className="bg-white border border-border rounded-xl p-1 flex-wrap">
-          <TabsTrigger value="dashboard"><LayoutDashboard className="h-4 w-4 mr-1.5" />Dashboard</TabsTrigger>
-          <TabsTrigger value="calendar"><CalendarDays className="h-4 w-4 mr-1.5" />Enquiries</TabsTrigger>
-          <TabsTrigger value="campaigns"><Megaphone className="h-4 w-4 mr-1.5" />Campaigns ({campaigns.length})</TabsTrigger>
-          <TabsTrigger value="templates"><FileText className="h-4 w-4 mr-1.5" />Templates ({templates.length})</TabsTrigger>
-          <TabsTrigger value="whatsapp"><MessageSquare className="h-4 w-4 mr-1.5" />WhatsApp</TabsTrigger>
-          <TabsTrigger value="analytics"><BarChart3 className="h-4 w-4 mr-1.5" />Analytics</TabsTrigger>
+          <TabsTrigger value="dashboard">
+            <LayoutDashboard className="h-4 w-4 mr-1.5" />
+            Dashboard
+          </TabsTrigger>
+          <TabsTrigger value="calendar">
+            <CalendarDays className="h-4 w-4 mr-1.5" />
+            Enquiries
+          </TabsTrigger>
+          <TabsTrigger value="campaigns">
+            <Megaphone className="h-4 w-4 mr-1.5" />
+            Campaigns ({campaigns.length})
+          </TabsTrigger>
+          <TabsTrigger value="templates">
+            <FileText className="h-4 w-4 mr-1.5" />
+            Templates ({templates.length})
+          </TabsTrigger>
+          <TabsTrigger value="whatsapp">
+            <MessageSquare className="h-4 w-4 mr-1.5" />
+            WhatsApp
+          </TabsTrigger>
+          <TabsTrigger value="analytics">
+            <BarChart3 className="h-4 w-4 mr-1.5" />
+            Analytics
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard" className="mt-6">
@@ -96,7 +132,8 @@ export default function CrmPage() {
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-text-primary">Campaigns</h2>
             <Button size="sm" onClick={() => setCampaignOpen(true)}>
-              <Plus className="h-4 w-4 mr-1.5" />New Campaign
+              <Plus className="h-4 w-4 mr-1.5" />
+              New Campaign
             </Button>
           </div>
           {campaignsLoading ? (
@@ -118,14 +155,26 @@ export default function CrmPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-text-primary truncate">{c.name}</span>
-                        <Badge className={`text-xs ${statusBadge[c.status] || "bg-gray-50 text-gray-600"}`}>{c.status || "DRAFT"}</Badge>
+                        <Badge
+                          className={`text-xs ${statusBadge[c.status] || "bg-gray-50 text-gray-600"}`}
+                        >
+                          {c.status || "DRAFT"}
+                        </Badge>
                         <Badge className="text-xs bg-muted">{c.type || "General"}</Badge>
                       </div>
-                      {c.message && <p className="text-sm text-text-secondary mt-1 truncate">{c.message}</p>}
-                      <p className="text-xs text-text-muted mt-1">Target: {c.target_audience || "All"} | Sent: {c.sent_count || 0}</p>
+                      {c.message && (
+                        <p className="text-sm text-text-secondary mt-1 truncate">{c.message}</p>
+                      )}
+                      <p className="text-xs text-text-muted mt-1">
+                        Target: {c.target_audience || "All"} | Sent: {c.sent_count || 0}
+                      </p>
                     </div>
                     <div className="flex items-center gap-2 ml-4 shrink-0">
-                      <Button variant="ghost" size="icon-sm" onClick={() => navigate(`/crm/campaigns`)}>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => navigate(`/crm/campaigns`)}
+                      >
                         <Edit3 className="h-4 w-4" />
                       </Button>
                       <Button variant="ghost" size="icon-sm" onClick={() => {}}>
@@ -143,7 +192,8 @@ export default function CrmPage() {
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-text-primary">Message Templates</h2>
             <Button size="sm" onClick={() => navigate("/crm/templates")}>
-              <Plus className="h-4 w-4 mr-1.5" />Manage Templates
+              <Plus className="h-4 w-4 mr-1.5" />
+              Manage Templates
             </Button>
           </div>
           {templates.length === 0 ? (
@@ -158,7 +208,9 @@ export default function CrmPage() {
                   <div className="flex items-center gap-2 mb-2">
                     <FileText className="h-4 w-4 text-primary" />
                     <span className="font-medium text-text-primary">{t.name}</span>
-                    <Badge className={`text-xs ${t.is_active ? "bg-green-50 text-green-700" : "bg-gray-50 text-gray-500"}`}>
+                    <Badge
+                      className={`text-xs ${t.is_active ? "bg-green-50 text-green-700" : "bg-gray-50 text-gray-500"}`}
+                    >
                       {t.is_active ? "Active" : "Inactive"}
                     </Badge>
                   </div>
@@ -174,20 +226,39 @@ export default function CrmPage() {
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-text-primary">WhatsApp Messaging</h2>
             <Button size="sm" onClick={() => navigate("/whatsapp")}>
-              <Send className="h-4 w-4 mr-1.5" />Open Full WhatsApp
+              <Send className="h-4 w-4 mr-1.5" />
+              Open Full WhatsApp
             </Button>
           </div>
           <Card className="p-6 border-border shadow-card">
-            <p className="text-sm text-text-secondary mb-4">Send quick WhatsApp messages to patients. Use the full WhatsApp page for advanced features like templates, broadcasts, and analytics.</p>
+            <p className="text-sm text-text-secondary mb-4">
+              Send quick WhatsApp messages to patients. Use the full WhatsApp page for advanced
+              features like templates, broadcasts, and analytics.
+            </p>
             <div className="grid md:grid-cols-3 gap-3">
-              <Button variant="outline" className="justify-start" onClick={() => navigate("/whatsapp?tab=presets")}>
-                <MessageSquare className="h-4 w-4 mr-2 text-green-600" />Message Presets
+              <Button
+                variant="outline"
+                className="justify-start"
+                onClick={() => navigate("/whatsapp?tab=presets")}
+              >
+                <MessageSquare className="h-4 w-4 mr-2 text-green-600" />
+                Message Presets
               </Button>
-              <Button variant="outline" className="justify-start" onClick={() => navigate("/whatsapp?tab=broadcast")}>
-                <Send className="h-4 w-4 mr-2 text-blue-600" />Broadcast
+              <Button
+                variant="outline"
+                className="justify-start"
+                onClick={() => navigate("/whatsapp?tab=broadcast")}
+              >
+                <Send className="h-4 w-4 mr-2 text-blue-600" />
+                Broadcast
               </Button>
-              <Button variant="outline" className="justify-start" onClick={() => navigate("/whatsapp")}>
-                <BarChart3 className="h-4 w-4 mr-2 text-purple-600" />Analytics
+              <Button
+                variant="outline"
+                className="justify-start"
+                onClick={() => navigate("/whatsapp")}
+              >
+                <BarChart3 className="h-4 w-4 mr-2 text-purple-600" />
+                Analytics
               </Button>
             </div>
           </Card>
@@ -206,7 +277,9 @@ export default function CrmPage() {
             <Card className="p-6 border-border shadow-card">
               <p className="text-sm text-text-muted mb-1">Modules Active</p>
               <p className="text-3xl font-bold text-primary">4</p>
-              <p className="text-xs text-text-muted mt-1">Leads · Enquiries · Follow-Ups · Recalls</p>
+              <p className="text-xs text-text-muted mt-1">
+                Leads · Enquiries · Follow-Ups · Recalls
+              </p>
             </Card>
           </div>
         </TabsContent>
@@ -214,16 +287,24 @@ export default function CrmPage() {
 
       <Dialog open={campaignOpen} onOpenChange={setCampaignOpen}>
         <DialogContent className="sm:max-w-[480px]">
-          <DialogHeader><DialogTitle>Create Campaign</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Create Campaign</DialogTitle>
+          </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="grid gap-2">
               <Label>Campaign Name</Label>
-              <Input value={campaignName} onChange={(e) => setCampaignName(e.target.value)} placeholder="e.g. Summer Checkup Drive" />
+              <Input
+                value={campaignName}
+                onChange={(e) => setCampaignName(e.target.value)}
+                placeholder="e.g. Summer Checkup Drive"
+              />
             </div>
             <div className="grid gap-2">
               <Label>Type</Label>
               <Select value={campaignType} onValueChange={setCampaignType}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="PROMOTIONAL">Promotional</SelectItem>
                   <SelectItem value="SEASONAL">Seasonal</SelectItem>
@@ -237,11 +318,18 @@ export default function CrmPage() {
             </div>
             <div className="grid gap-2">
               <Label>Message</Label>
-              <Textarea value={campaignMessage} onChange={(e) => setCampaignMessage(e.target.value)} rows={3} placeholder="Campaign message..." />
+              <Textarea
+                value={campaignMessage}
+                onChange={(e) => setCampaignMessage(e.target.value)}
+                rows={3}
+                placeholder="Campaign message..."
+              />
             </div>
-            <Button className="w-full bg-primary text-white"
+            <Button
+              className="w-full bg-primary text-primary-foreground"
               onClick={() => {}}
-              disabled={!campaignName}>
+              disabled={!campaignName}
+            >
               Create Campaign
             </Button>
           </div>

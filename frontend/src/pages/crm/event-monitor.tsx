@@ -2,20 +2,41 @@ import { useState, useCallback } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
 import {
-  Activity, Clock, CheckCircle2, AlertTriangle,
-  RefreshCw, Eye, Timer, Loader2, RotateCcw,
-  CalendarDays, Server, Database, ArrowUpDown,
+  Activity,
+  Clock,
+  CheckCircle2,
+  AlertTriangle,
+  RefreshCw,
+  Eye,
+  Timer,
+  Loader2,
+  RotateCcw,
+  CalendarDays,
+  Server,
+  Database,
+  ArrowUpDown,
 } from "lucide-react"
 import { crmEventsApi } from "@/services/endpoints"
-import PageHeader from "@/components/layout/page-header"
+import { PageHeader } from "@/design-system"
 import KpiCard from "@/components/ui/kpi-card"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog"
 import { SearchFilterBar } from "@/components/crm/search-filter-bar"
 import { MetricCard } from "@/components/crm/metric-card"
@@ -75,11 +96,25 @@ const statusDotColors: Record<string, string> = {
 const EVENT_STATUSES = ["PENDING", "PROCESSING", "COMPLETED", "FAILED", "RETRYING", "SKIPPED"]
 
 const SOURCE_MODULES = [
-  "APPOINTMENT", "PATIENT", "CASE", "TREATMENT", "BILLING",
-  "WHATSAPP", "CAMPAIGN", "LEAD", "ENQUIRY", "FOLLOW_UP",
+  "APPOINTMENT",
+  "PATIENT",
+  "CASE",
+  "TREATMENT",
+  "BILLING",
+  "WHATSAPP",
+  "CAMPAIGN",
+  "LEAD",
+  "ENQUIRY",
+  "FOLLOW_UP",
 ]
 
-function PayloadModal({ payload, event }: { payload: Record<string, unknown>; event: EventRecord }) {
+function PayloadModal({
+  payload,
+  event,
+}: {
+  payload: Record<string, unknown>
+  event: EventRecord
+}) {
   return (
     <Dialog>
       <DialogTrigger asChild>
@@ -96,10 +131,21 @@ function PayloadModal({ payload, event }: { payload: Record<string, unknown>; ev
         </DialogHeader>
         <div className="space-y-2 text-xs overflow-auto flex-1">
           <div className="grid grid-cols-2 gap-2 text-muted-foreground">
-            <div><span className="font-medium text-foreground">Event ID:</span> {event.event_id}</div>
-            <div><span className="font-medium text-foreground">Type:</span> {formatLabel(event.event_type)}</div>
-            <div><span className="font-medium text-foreground">Source:</span> {formatLabel(event.source_module)}</div>
-            <div><span className="font-medium text-foreground">Entity:</span> {formatLabel(event.entity_type)}</div>
+            <div>
+              <span className="font-medium text-foreground">Event ID:</span> {event.event_id}
+            </div>
+            <div>
+              <span className="font-medium text-foreground">Type:</span>{" "}
+              {formatLabel(event.event_type)}
+            </div>
+            <div>
+              <span className="font-medium text-foreground">Source:</span>{" "}
+              {formatLabel(event.source_module)}
+            </div>
+            <div>
+              <span className="font-medium text-foreground">Entity:</span>{" "}
+              {formatLabel(event.entity_type)}
+            </div>
           </div>
           <pre className="bg-gray-950 text-green-400 rounded-lg p-4 overflow-auto text-xs leading-relaxed">
             <code>{JSON.stringify(payload, null, 2)}</code>
@@ -156,7 +202,14 @@ export default function EventMonitor() {
     },
   })
 
-  const s = statistics || { total_today: 0, pending: 0, completed: 0, failed: 0, avg_processing_time_ms: 0, retry_queue: 0 }
+  const s = statistics || {
+    total_today: 0,
+    pending: 0,
+    completed: 0,
+    failed: 0,
+    avg_processing_time_ms: 0,
+    retry_queue: 0,
+  }
   const events = eventsData?.items || []
 
   const truncatedId = useCallback((id: string) => {
@@ -168,7 +221,9 @@ export default function EventMonitor() {
       <div className="space-y-6">
         <Skeleton className="h-10 w-80 rounded-xl" />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-[130px] rounded-2xl" />)}
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-[130px] rounded-2xl" />
+          ))}
         </div>
         <Skeleton className="h-40 rounded-2xl" />
         <Skeleton className="h-80 rounded-2xl" />
@@ -177,14 +232,46 @@ export default function EventMonitor() {
   }
 
   return (
-    <motion.div className="space-y-6" variants={PAGE_CONTAINER_VARIANTS} initial="hidden" animate="visible">
-      <PageHeader title="Event Monitor" description="Track, retry, and replay CRM automation events" />
+    <motion.div
+      className="space-y-6"
+      variants={PAGE_CONTAINER_VARIANTS}
+      initial="hidden"
+      animate="visible"
+    >
+      <PageHeader
+        title="Event Monitor"
+        description="Track, retry, and replay CRM automation events"
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard icon={CalendarDays} title="Today's Events" value={s.total_today} color="text-blue-600" delay={0} />
-        <KpiCard icon={Clock} title="Pending" value={s.pending} color="text-amber-600" delay={0.05} />
-        <KpiCard icon={CheckCircle2} title="Completed" value={s.completed} color="text-green-600" delay={0.1} />
-        <KpiCard icon={AlertTriangle} title="Failed" value={s.failed} color="text-red-600" delay={0.15} />
+        <KpiCard
+          icon={CalendarDays}
+          title="Today's Events"
+          value={s.total_today}
+          color="text-blue-600"
+          delay={0}
+        />
+        <KpiCard
+          icon={Clock}
+          title="Pending"
+          value={s.pending}
+          color="text-amber-600"
+          delay={0.05}
+        />
+        <KpiCard
+          icon={CheckCircle2}
+          title="Completed"
+          value={s.completed}
+          color="text-green-600"
+          delay={0.1}
+        />
+        <KpiCard
+          icon={AlertTriangle}
+          title="Failed"
+          value={s.failed}
+          color="text-red-600"
+          delay={0.15}
+        />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -234,7 +321,9 @@ export default function EventMonitor() {
 
           {eventsLoading ? (
             <div className="space-y-2">
-              {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 rounded-lg" />)}
+              {[...Array(5)].map((_, i) => (
+                <Skeleton key={i} className="h-12 rounded-lg" />
+              ))}
             </div>
           ) : events.length === 0 ? (
             <div className="py-12 text-center text-muted-foreground text-sm">
@@ -247,7 +336,9 @@ export default function EventMonitor() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[140px]">
-                      <span className="flex items-center gap-1"><ArrowUpDown className="h-3 w-3" /> Event ID</span>
+                      <span className="flex items-center gap-1">
+                        <ArrowUpDown className="h-3 w-3" /> Event ID
+                      </span>
                     </TableHead>
                     <TableHead>Event Type</TableHead>
                     <TableHead>Source</TableHead>
@@ -271,8 +362,12 @@ export default function EventMonitor() {
                         <TableCell className="text-xs">{formatLabel(ev.source_module)}</TableCell>
                         <TableCell className="text-xs">{formatLabel(ev.entity_type)}</TableCell>
                         <TableCell>
-                          <Badge className={`text-[10px] font-medium ${statusColors[ev.status] || "bg-gray-50 text-gray-600"}`}>
-                            <span className={`inline-block h-1.5 w-1.5 rounded-full ${dotColor} mr-1.5`} />
+                          <Badge
+                            className={`text-[10px] font-medium ${statusColors[ev.status] || "bg-gray-50 text-gray-600"}`}
+                          >
+                            <span
+                              className={`inline-block h-1.5 w-1.5 rounded-full ${dotColor} mr-1.5`}
+                            />
                             {formatLabel(ev.status)}
                           </Badge>
                         </TableCell>
@@ -287,9 +382,7 @@ export default function EventMonitor() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
-                            {ev.payload && (
-                              <PayloadModal payload={ev.payload} event={ev} />
-                            )}
+                            {ev.payload && <PayloadModal payload={ev.payload} event={ev} />}
                             {ev.status === "FAILED" && (
                               <Button
                                 variant="ghost"

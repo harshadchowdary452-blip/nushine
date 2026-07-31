@@ -147,7 +147,7 @@ export default function Sidebar() {
           <ToothLogo size={isExpanded ? 27 : 24} showSparkle={false} />
           <div className={cn("transition-all duration-200", !isExpanded ? "opacity-0 w-0" : "opacity-100")}>
             <p className="text-sm font-bold leading-tight"><BrandText size="sm" /></p>
-            <p className="text-[10px] text-[#94A3B8] font-medium tracking-[0.25em] uppercase -mt-px">Dental Management System</p>
+            <p className="text-[10px] text-[var(--ds-sidebar-icon)] font-medium tracking-[0.25em] uppercase -mt-px">Dental Management System</p>
           </div>
         </Link>
         <div className="flex-1" />
@@ -174,7 +174,7 @@ export default function Sidebar() {
             aria-label="Search navigation"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-8 w-full rounded-lg border border-gray-200 bg-gray-50 pl-8 pr-2 text-xs text-gray-900 outline-none placeholder:text-gray-400 focus:border-[#2563EB] focus:bg-white focus:ring-2 focus:ring-[#2563EB]/10 transition-all"
+            className="h-8 w-full rounded-lg border border-gray-200 bg-gray-50 pl-8 pr-2 text-xs text-gray-900 outline-none placeholder:text-gray-400 focus:border-[var(--ds-primary)] focus:bg-white focus:ring-2 focus:ring-[var(--ds-primary)]/10 transition-all"
           />
           <kbd className="absolute right-2 top-1/2 -translate-y-1/2 hidden sm:inline-flex h-4 items-center px-1.5 rounded border border-gray-200 bg-white text-[10px] font-medium text-gray-400">⌘K</kbd>
         </div>
@@ -217,12 +217,12 @@ export default function Sidebar() {
                   className={cn(
                     "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 group relative",
                     active
-                      ? "bg-gradient-to-r from-[#16D3C5]/10 to-[#2563EB]/10 text-[#0B1D3A] font-semibold"
+                      ? "bg-gradient-to-r from-[var(--ds-primary-300)]/10 to-[var(--ds-primary-500)]/10 text-[var(--ds-sidebar-text-active)] font-semibold"
                       : "text-gray-500 hover:bg-gray-50 hover:text-gray-700"
                   )}
                   title={!isExpanded ? item.label : undefined}>
-                  {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3.5px] h-5 rounded-r-full bg-gradient-to-b from-[#16D3C5] to-[#2563EB]" />}
-                  <span className={cn("flex items-center justify-center shrink-0", active ? "text-[#2563EB]" : "text-gray-400 group-hover:text-gray-600")}>
+                  {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3.5px] h-5 rounded-r-full bg-gradient-to-b from-[var(--ds-primary-300)] to-[var(--ds-primary-500)]" />}
+                  <span className={cn("flex items-center justify-center shrink-0", active ? "text-[var(--ds-primary-300)]" : "text-gray-400 group-hover:text-gray-600")}>
                     <Icon className="h-[22px] w-[22px]" strokeWidth={1.5} />
                   </span>
                   <span className={cn(
@@ -243,7 +243,7 @@ export default function Sidebar() {
           !isExpanded ? "justify-center" : ""
         )}>
           <Avatar className="h-8 w-8 shrink-0 ring-2 ring-gray-100">
-            <AvatarFallback className="bg-gradient-to-br from-[#16D3C5]/20 to-[#2563EB]/20 text-xs font-semibold text-[#2563EB]">{initials}</AvatarFallback>
+            <AvatarFallback className="bg-gradient-to-br from-[var(--ds-primary-300)]/20 to-[var(--ds-primary-500)]/20 text-xs font-semibold text-[var(--ds-primary-300)]">{initials}</AvatarFallback>
           </Avatar>
           <div className={cn("overflow-hidden transition-all duration-200", !isExpanded ? "max-w-0 opacity-0" : "max-w-36 opacity-100")}>
             <p className="text-sm font-medium text-gray-900 truncate leading-tight">{user?.full_name ?? "User"}</p>
@@ -278,10 +278,10 @@ export default function Sidebar() {
                     aria-current={active ? "page" : undefined}
                     className={cn(
                       "flex items-center justify-center rounded-lg p-2.5 transition-all duration-150 relative",
-                      active ? "bg-gradient-to-r from-[#16D3C5]/10 to-[#2563EB]/10 text-[#2563EB]" : "text-gray-400 hover:bg-gray-50 hover:text-gray-600"
+                      active ? "bg-gradient-to-r from-[var(--ds-primary-300)]/10 to-[var(--ds-primary-500)]/10 text-[var(--ds-primary-300)]" : "text-gray-400 hover:bg-gray-50 hover:text-gray-600"
                     )}
                     title={item.label}>
-                    {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3.5px] h-5 rounded-r-full bg-gradient-to-b from-[#16D3C5] to-[#2563EB]" />}
+                    {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3.5px] h-5 rounded-r-full bg-gradient-to-b from-[var(--ds-primary-300)] to-[var(--ds-primary-500)]" />}
                     <Icon className="h-[22px] w-[22px]" strokeWidth={1.5} />
                   </Link>
                 )
@@ -290,7 +290,7 @@ export default function Sidebar() {
           </nav>
           <div className="border-t border-sidebar-border p-2 flex justify-center">
             <Avatar className="h-8 w-8 shrink-0 ring-2 ring-gray-100">
-              <AvatarFallback className="bg-gradient-to-br from-[#16D3C5]/20 to-[#2563EB]/20 text-xs font-semibold text-[#2563EB]">{initials}</AvatarFallback>
+              <AvatarFallback className="bg-gradient-to-br from-[var(--ds-primary-300)]/20 to-[var(--ds-primary-500)]/20 text-xs font-semibold text-[var(--ds-primary-300)]">{initials}</AvatarFallback>
             </Avatar>
           </div>
         </div>
@@ -327,7 +327,7 @@ export default function Sidebar() {
             <Link key={item.path} to={item.path}
               className={cn(
                 "flex flex-col items-center justify-center gap-0.5 min-w-[56px] py-1 px-2 transition-colors",
-                active ? "text-[#2563EB]" : "text-gray-400 hover:text-gray-600"
+                active ? "text-[var(--ds-primary-300)]" : "text-gray-400 hover:text-gray-600"
               )}>
               <Icon className={cn("h-[22px] w-[22px]", active && "scale-105")} strokeWidth={1.5} />
               <span className="text-[10px] font-medium leading-tight text-center truncate w-full">{item.label}</span>
@@ -367,7 +367,7 @@ export default function Sidebar() {
                     <Link key={item.path} to={item.path} onClick={() => setBottomNavOpen(false)}
                       className={cn(
                         "flex flex-col items-center justify-center gap-1 rounded-xl p-3 transition-colors",
-                        active ? "bg-gradient-to-r from-[#16D3C5]/10 to-[#2563EB]/10 text-[#2563EB]" : "text-gray-500 hover:bg-gray-50"
+                        active ? "bg-gradient-to-r from-[var(--ds-primary-300)]/10 to-[var(--ds-primary-500)]/10 text-[var(--ds-primary-300)]" : "text-gray-500 hover:bg-gray-50"
                       )}>
                       <Icon className="h-[22px] w-[22px]" strokeWidth={1.5} />
                       <span className="text-[10px] font-medium text-center">{item.label}</span>

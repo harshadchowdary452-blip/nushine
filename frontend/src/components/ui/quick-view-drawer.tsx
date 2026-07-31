@@ -280,7 +280,7 @@ function PatientContent({ id, onClose }: QuickViewContentProps) {
             key={t.key}
             onClick={() => setActiveTab(t.key)}
             className={`text-xs font-medium px-2.5 py-1.5 rounded-md whitespace-nowrap transition-colors ${
-              activeTab === t.key ? "bg-primary text-white" : "text-gray-500 hover:bg-gray-100"
+              activeTab === t.key ? "bg-primary text-primary-foreground" : "text-gray-500 hover:bg-gray-100"
             }`}
           >
             {t.label}

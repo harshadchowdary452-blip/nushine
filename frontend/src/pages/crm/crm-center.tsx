@@ -1,19 +1,34 @@
 import { useQuery } from "@tanstack/react-query"
 import { motion } from "framer-motion"
 import {
-  CalendarCheck, Clock, AlertTriangle, CheckCircle2,
-  Phone, MessageCircle, Mail,
-  UserX, CalendarClock, Stethoscope, CreditCard,
+  CalendarCheck,
+  Clock,
+  AlertTriangle,
+  CheckCircle2,
+  Phone,
+  MessageCircle,
+  Mail,
+  UserX,
+  CalendarClock,
+  Stethoscope,
+  CreditCard,
   LayoutDashboard,
 } from "lucide-react"
 import { crmV2Api } from "@/services/endpoints"
-import PageHeader from "@/components/layout/page-header"
+import { PageHeader } from "@/design-system"
 import KpiCard from "@/components/ui/kpi-card"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 
 interface DashboardData {
   today_followups: number
@@ -90,15 +105,32 @@ const channelIcons: Record<string, React.ElementType> = {
   PHONE: Phone,
 }
 
-const formatLabel = (s: string) => s.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
+const formatLabel = (s: string) =>
+  s
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase())
 
-function MiniBar({ label, count, max, color }: { label: string; count: number; max: number; color: string }) {
+function MiniBar({
+  label,
+  count,
+  max,
+  color,
+}: {
+  label: string
+  count: number
+  max: number
+  color: string
+}) {
   const pct = max > 0 ? (count / max) * 100 : 0
   return (
     <div className="flex items-center gap-3 text-sm">
       <span className="w-28 text-muted-foreground text-xs">{formatLabel(label)}</span>
       <div className="flex-1 h-5 bg-gray-100 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full ${color} transition-all duration-500`} style={{ width: `${pct}%` }} />
+        <div
+          className={`h-full rounded-full ${color} transition-all duration-500`}
+          style={{ width: `${pct}%` }}
+        />
       </div>
       <span className="w-8 text-right font-medium text-xs">{count}</span>
     </div>
@@ -118,7 +150,9 @@ export default function CrmCenter() {
       <div className="space-y-6">
         <Skeleton className="h-10 w-80 rounded-xl" />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-[130px] rounded-2xl" />)}
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-[130px] rounded-2xl" />
+          ))}
         </div>
       </div>
     )
@@ -131,13 +165,40 @@ export default function CrmCenter() {
 
   return (
     <motion.div className="space-y-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-      <PageHeader title="CRM Center" description="Today's follow-up activity & patient status overview" />
+      <PageHeader
+        title="CRM Center"
+        description="Today's follow-up activity & patient status overview"
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard icon={CalendarCheck} title="Today's Follow-Ups" value={d.today_followups} color="text-blue-600" delay={0} />
-        <KpiCard icon={Clock} title="Upcoming" value={d.upcoming} color="text-amber-600" delay={0.05} />
-        <KpiCard icon={AlertTriangle} title="Overdue" value={d.overdue} color="text-red-600" delay={0.1} />
-        <KpiCard icon={CheckCircle2} title="Completed Today" value={d.completed_today} color="text-green-600" delay={0.15} />
+        <KpiCard
+          icon={CalendarCheck}
+          title="Today's Follow-Ups"
+          value={d.today_followups}
+          color="text-blue-600"
+          delay={0}
+        />
+        <KpiCard
+          icon={Clock}
+          title="Upcoming"
+          value={d.upcoming}
+          color="text-amber-600"
+          delay={0.05}
+        />
+        <KpiCard
+          icon={AlertTriangle}
+          title="Overdue"
+          value={d.overdue}
+          color="text-red-600"
+          delay={0.1}
+        />
+        <KpiCard
+          icon={CheckCircle2}
+          title="Completed Today"
+          value={d.completed_today}
+          color="text-green-600"
+          delay={0.15}
+        />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
@@ -248,20 +309,29 @@ export default function CrmCenter() {
                   return (
                     <TableRow key={fu.id}>
                       <TableCell className="font-medium">{fu.patient_name}</TableCell>
-                      <TableCell className="text-muted-foreground text-xs">{fu.follow_up_date}</TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {fu.follow_up_date}
+                      </TableCell>
                       <TableCell>
                         <Badge className={`text-[10px] ${channelColors[fu.channel] || ""}`}>
-                          <ChIcon className="h-3 w-3 mr-1" />{fu.channel}
+                          <ChIcon className="h-3 w-3 mr-1" />
+                          {fu.channel}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge className={`text-[10px] ${statusColors[fu.status] || ""}`}>{fu.status}</Badge>
+                        <Badge className={`text-[10px] ${statusColors[fu.status] || ""}`}>
+                          {fu.status}
+                        </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge className={`text-[10px] ${priorityColors[fu.priority] || ""}`}>{fu.priority}</Badge>
+                        <Badge className={`text-[10px] ${priorityColors[fu.priority] || ""}`}>
+                          {fu.priority}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" className="text-xs">View</Button>
+                        <Button variant="ghost" size="sm" className="text-xs">
+                          View
+                        </Button>
                       </TableCell>
                     </TableRow>
                   )
@@ -269,7 +339,9 @@ export default function CrmCenter() {
               </TableBody>
             </Table>
           ) : (
-            <div className="py-8 text-center text-muted-foreground text-sm">No recent follow-ups</div>
+            <div className="py-8 text-center text-muted-foreground text-sm">
+              No recent follow-ups
+            </div>
           )}
         </CardContent>
       </Card>
@@ -280,9 +352,19 @@ export default function CrmCenter() {
             <CardTitle className="text-sm">Follow-Ups by Status</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {d.followups_by_status?.length > 0 ? d.followups_by_status.map((s) => (
-              <MiniBar key={s.status} label={s.status} count={s.count} max={statusMax} color={statusBarColors[s.status] || "bg-gray-400"} />
-            )) : <p className="text-sm text-muted-foreground text-center py-4">No data</p>}
+            {d.followups_by_status?.length > 0 ? (
+              d.followups_by_status.map((s) => (
+                <MiniBar
+                  key={s.status}
+                  label={s.status}
+                  count={s.count}
+                  max={statusMax}
+                  color={statusBarColors[s.status] || "bg-gray-400"}
+                />
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">No data</p>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -290,9 +372,19 @@ export default function CrmCenter() {
             <CardTitle className="text-sm">Follow-Ups by Channel</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {d.followups_by_channel?.length > 0 ? d.followups_by_channel.map((c) => (
-              <MiniBar key={c.channel} label={c.channel} count={c.count} max={channelMax} color={channelBarColors[c.channel] || "bg-gray-400"} />
-            )) : <p className="text-sm text-muted-foreground text-center py-4">No data</p>}
+            {d.followups_by_channel?.length > 0 ? (
+              d.followups_by_channel.map((c) => (
+                <MiniBar
+                  key={c.channel}
+                  label={c.channel}
+                  count={c.count}
+                  max={channelMax}
+                  color={channelBarColors[c.channel] || "bg-gray-400"}
+                />
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">No data</p>
+            )}
           </CardContent>
         </Card>
       </div>

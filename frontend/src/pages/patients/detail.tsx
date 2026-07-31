@@ -57,8 +57,8 @@ import {
   ThumbsUp,
 } from "lucide-react";
 
-function getInitials(name: string): string {
-  return name
+function getInitials(name: string | null | undefined): string {
+  return (name || "")
     .split(" ")
     .map((n) => n[0])
     .join("")
@@ -373,7 +373,7 @@ export default function PatientDetail() {
         <div className="flex flex-col md:flex-row md:items-center gap-6">
           {/* Avatar */}
           <Avatar className="h-20 w-20 ring-4 ring-primary-light">
-            <AvatarFallback className="bg-primary text-white text-xl font-bold">
+            <AvatarFallback className="bg-primary text-primary-foreground text-xl font-bold">
               {getInitials(patient.full_name)}
             </AvatarFallback>
           </Avatar>
@@ -422,7 +422,7 @@ export default function PatientDetail() {
             {/* Quick Create Appointment */}
             <Dialog open={apptOpen} onOpenChange={setApptOpen}>
               <DialogTrigger asChild>
-                <Button size="sm" className="bg-primary text-white hover:bg-primary-hover">
+                <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary-hover">
                   <CalendarRange className="h-4 w-4 mr-1.5" />
                   Appointment
                 </Button>
@@ -439,7 +439,7 @@ export default function PatientDetail() {
                   <DialogBody className="space-y-4">
                     <div className="rounded-xl bg-primary-light/10 p-3 flex items-center gap-3">
                       <Avatar className="h-10 w-10">
-                        <AvatarFallback className="bg-primary text-white text-sm">{getInitials(patient.full_name)}</AvatarFallback>
+                        <AvatarFallback className="bg-primary text-primary-foreground text-sm">{getInitials(patient.full_name)}</AvatarFallback>
                       </Avatar>
                       <div>
                         <p className="text-sm font-semibold text-text-primary">{patient.full_name}</p>
@@ -517,7 +517,7 @@ export default function PatientDetail() {
                   <DialogBody className="space-y-4">
                     <div className="rounded-xl bg-primary-light/10 p-3 flex items-center gap-3">
                       <Avatar className="h-10 w-10">
-                        <AvatarFallback className="bg-primary text-white text-sm">{getInitials(patient.full_name)}</AvatarFallback>
+                        <AvatarFallback className="bg-primary text-primary-foreground text-sm">{getInitials(patient.full_name)}</AvatarFallback>
                       </Avatar>
                       <div>
                         <p className="text-sm font-semibold text-text-primary">{patient.full_name}</p>
@@ -795,7 +795,7 @@ export default function PatientDetail() {
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
                   <Button
-                    className="bg-primary hover:bg-primary-hover text-white"
+                    className="bg-primary hover:bg-primary-hover text-primary-foreground"
                     onClick={() => {
                       const cleaned: Record<string, string | number> = {}
                       for (const [key, value] of Object.entries(editForm)) {
@@ -839,7 +839,7 @@ export default function PatientDetail() {
       </Card>
 
       {/* Sticky Responsive Tab Navigation */}
-      <div className="sticky top-[57px] z-20 bg-white border-b border-gray-200 -mx-6 px-6 mb-6 shadow-sm">
+      <div className="sticky top-0 z-[var(--ds-z-sticky)] bg-white border-b border-gray-200 -mx-6 px-6 mb-6 shadow-sm">
         <div
           ref={tabBarRef}
           className="flex items-center gap-1 overflow-x-auto scrollbar-hide scroll-smooth py-2"

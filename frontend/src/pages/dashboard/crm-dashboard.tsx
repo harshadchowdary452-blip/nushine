@@ -27,7 +27,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import DentalEmptyState from "@/components/ui/dental-empty-state"
 import ExpensesVsRevenueQuickView from "@/components/dashboard/expenses-vs-revenue-quick-view"
 
-const COLORS = ["#4F46E5", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899", "#06B6D4", "#F97316", "#14B8A6", "#84CC16"]
+const COLORS = [
+  "var(--ds-chart-5)",
+  "var(--ds-chart-4)",
+  "var(--ds-chart-6)",
+  "var(--ds-chart-8)",
+  "var(--ds-chart-10)",
+  "var(--ds-chart-13)",
+  "var(--ds-chart-11)",
+  "var(--ds-chart-12)",
+  "var(--ds-chart-1)",
+  "var(--ds-chart-14)",
+]
 const GLASS = "bg-white/80 backdrop-blur-xl border border-white/20 shadow-lg"
 
 const fuTypeLabels: Record<string, string> = {
@@ -203,7 +214,7 @@ export default function CrmDashboardPage() {
         <div className="flex items-center gap-2 flex-wrap">
           <DashboardDateFilter value={period} onChange={setPeriod} />
           <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)}
-            className={cn("h-9 gap-1.5 text-xs", showFilters && "bg-primary text-white border-primary")}>
+            className={cn("h-9 gap-1.5 text-xs", showFilters && "bg-primary text-primary-foreground border-primary")}>
             <Filter className="h-3.5 w-3.5" /> Filters
           </Button>
           {period === "custom" && (
@@ -357,7 +368,7 @@ export default function CrmDashboardPage() {
         {workQueue.length > 0 ? (
           <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
             <Table>
-              <TableHeader className="sticky top-0 bg-white/95 backdrop-blur-sm z-10">
+              <TableHeader className="sticky top-0 bg-white/95 backdrop-blur-sm z-[var(--ds-z-sticky)]">
                 <TableRow>
                   <TableHead className="text-[10px]">Patient</TableHead>
                   <TableHead className="text-[10px]">OP No</TableHead>
@@ -529,11 +540,11 @@ export default function CrmDashboardPage() {
           {conditions.length > 0 ? (
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={conditions}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--ds-border-light)" />
                 <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip />
-                <Bar dataKey="count" fill="#8B5CF6" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="count" fill="var(--ds-chart-10)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : (
@@ -643,11 +654,11 @@ export default function CrmDashboardPage() {
             {revenueBySource.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={revenueBySource}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--ds-border-light)" />
                   <XAxis dataKey="source" tick={{ fontSize: 9 }} />
                   <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
                   <Tooltip formatter={(value) => formatIndianRupees(Number(value))} />
-                  <Bar dataKey="revenue" fill="#4F46E5" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="revenue" fill="var(--ds-chart-5)" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : <p className="text-sm text-gray-400 text-center py-10">No revenue data</p>}
@@ -718,11 +729,11 @@ export default function CrmDashboardPage() {
               {leadAnalytics.by_source && Object.keys(leadAnalytics.by_source).length > 0 ? (
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={Object.entries(leadAnalytics.by_source).map(([name, count]) => ({ name: name.replace(/_/g, " "), count }))}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--ds-border-light)" />
                     <XAxis dataKey="name" tick={{ fontSize: 9 }} />
                     <YAxis tick={{ fontSize: 10 }} />
                     <Tooltip />
-                    <Bar dataKey="count" fill="#6366F1" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="count" fill="var(--ds-chart-5)" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : <p className="text-sm text-gray-400 text-center py-10">No source data</p>}

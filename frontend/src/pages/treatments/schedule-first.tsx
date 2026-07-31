@@ -3,14 +3,20 @@ import { useState, useMemo } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft, Calendar, Loader2, CheckCircle2 } from "lucide-react"
-import PageHeader from "@/components/layout/page-header"
+import { PageHeader } from "@/design-system"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { casesApi, treatmentApi, usersApi, appointmentsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
 import { formatIndianRupees } from "@/lib/currency"
@@ -34,7 +40,7 @@ export default function ScheduleFirstAppointment() {
   })
 
   const plan = useMemo(() => {
-    const list = Array.isArray(plans) ? plans : (plans?.items || [])
+    const list = Array.isArray(plans) ? plans : plans?.items || []
     return list[0] || null
   }, [plans])
 
@@ -50,8 +56,11 @@ export default function ScheduleFirstAppointment() {
   })
 
   const doctorList = useMemo(() => {
-    const raw = Array.isArray(doctors) ? doctors : (doctors?.items || [])
-    return raw.map((d: any) => ({ id: d.id, name: `${d.first_name || ""} ${d.last_name || ""}`.trim() || d.email }))
+    const raw = Array.isArray(doctors) ? doctors : doctors?.items || []
+    return raw.map((d: any) => ({
+      id: d.id,
+      name: `${d.first_name || ""} ${d.last_name || ""}`.trim() || d.email,
+    }))
   }, [doctors])
 
   const scheduleMutation = useMutation({
@@ -61,22 +70,39 @@ export default function ScheduleFirstAppointment() {
       addToast({ title: "First Appointment Scheduled", variant: "success" })
       navigate(`/cases/${caseId}`)
     },
-    onError: (err: any) => addToast({ title: "Error", description: err?.response?.data?.detail || "Failed to schedule", variant: "destructive" }),
+    onError: (err: any) =>
+      addToast({
+        title: "Error",
+        description: err?.response?.data?.detail || "Failed to schedule",
+        variant: "destructive",
+      }),
   })
 
-  if (plansLoading) return <div className="p-6 space-y-4">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-6 w-full" />)}</div>
-  if (!caseData) return <div className="py-20 text-center text-muted-foreground">Case not found</div>
+  if (plansLoading)
+    return (
+      <div className="p-6 space-y-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-6 w-full" />
+        ))}
+      </div>
+    )
+  if (!caseData)
+    return <div className="py-20 text-center text-muted-foreground">Case not found</div>
 
   const c = caseData as any
   const totalCost = plan?.cost || 0
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Schedule First Appointment" description={c.case_number || caseId!.slice(0, 8)}>
-        <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
-          <ArrowLeft className="h-4 w-4 mr-1" /> Back
-        </Button>
-      </PageHeader>
+      <PageHeader
+        title="Schedule First Appointment"
+        description={c.case_number || caseId!.slice(0, 8)}
+        actions={
+          <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-4 w-4 mr-1" /> Back
+          </Button>
+        }
+      />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-4">
@@ -87,13 +113,28 @@ export default function ScheduleFirstAppointment() {
             </CardHeader>
             <CardContent className="py-2 text-sm space-y-1">
               <div className="grid grid-cols-2 gap-2">
-                <div><span className="text-muted-foreground">Patient:</span> <span className="font-medium">{c.patient_name || "—"}</span></div>
-                <div><span className="text-muted-foreground">Case:</span> <span className="font-medium">#{c.case_number || "—"}</span></div>
+                <div>
+                  <span className="text-muted-foreground">Patient:</span>{" "}
+                  <span className="font-medium">{c.patient_name || "—"}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Case:</span>{" "}
+                  <span className="font-medium">#{c.case_number || "—"}</span>
+                </div>
                 {plan && (
                   <>
-                    <div><span className="text-muted-foreground">Treatment:</span> <span className="font-medium">{plan.treatment_name}</span></div>
-                    <div><span className="text-muted-foreground">Cost:</span> <span className="font-medium">{formatIndianRupees(totalCost)}</span></div>
-                    <div><span className="text-muted-foreground">Visits Planned:</span> <span className="font-medium">{plan.total_sittings || 0}</span></div>
+                    <div>
+                      <span className="text-muted-foreground">Treatment:</span>{" "}
+                      <span className="font-medium">{plan.treatment_name}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Cost:</span>{" "}
+                      <span className="font-medium">{formatIndianRupees(totalCost)}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Visits Planned:</span>{" "}
+                      <span className="font-medium">{plan.total_sittings || 0}</span>
+                    </div>
                   </>
                 )}
               </div>
@@ -114,7 +155,7 @@ export default function ScheduleFirstAppointment() {
                   <Input
                     type="date"
                     value={form.appointment_date}
-                    onChange={(e) => setForm(p => ({ ...p, appointment_date: e.target.value }))}
+                    onChange={(e) => setForm((p) => ({ ...p, appointment_date: e.target.value }))}
                     min={new Date().toISOString().split("T")[0]}
                   />
                 </div>
@@ -123,19 +164,24 @@ export default function ScheduleFirstAppointment() {
                   <Input
                     type="time"
                     value={form.appointment_time}
-                    onChange={(e) => setForm(p => ({ ...p, appointment_time: e.target.value }))}
+                    onChange={(e) => setForm((p) => ({ ...p, appointment_time: e.target.value }))}
                   />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label>Doctor *</Label>
-                <Select value={form.doctor_id} onValueChange={(val) => setForm(p => ({ ...p, doctor_id: val }))}>
+                <Select
+                  value={form.doctor_id}
+                  onValueChange={(val) => setForm((p) => ({ ...p, doctor_id: val }))}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select Doctor" />
                   </SelectTrigger>
                   <SelectContent>
                     {doctorList.map((doc: any) => (
-                      <SelectItem key={doc.id} value={doc.id}>Dr. {doc.name}</SelectItem>
+                      <SelectItem key={doc.id} value={doc.id}>
+                        Dr. {doc.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -144,7 +190,7 @@ export default function ScheduleFirstAppointment() {
                 <Label>Notes</Label>
                 <Textarea
                   value={form.notes}
-                  onChange={(e) => setForm(p => ({ ...p, notes: e.target.value }))}
+                  onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
                   placeholder="Any special instructions..."
                   rows={2}
                 />
@@ -162,20 +208,35 @@ export default function ScheduleFirstAppointment() {
             <CardContent className="space-y-3">
               <Button
                 className="w-full"
-                onClick={() => scheduleMutation.mutate({
-                  patient_id: c.patient_id,
-                  doctor_id: form.doctor_id,
-                  appointment_date: form.appointment_date,
-                  appointment_time: form.appointment_time,
-                  appointment_type: "TREATMENT",
-                  notes: form.notes,
-                })}
-                disabled={!form.appointment_date || !form.appointment_time || !form.doctor_id || scheduleMutation.isPending}
+                onClick={() =>
+                  scheduleMutation.mutate({
+                    patient_id: c.patient_id,
+                    doctor_id: form.doctor_id,
+                    appointment_date: form.appointment_date,
+                    appointment_time: form.appointment_time,
+                    appointment_type: "TREATMENT",
+                    notes: form.notes,
+                  })
+                }
+                disabled={
+                  !form.appointment_date ||
+                  !form.appointment_time ||
+                  !form.doctor_id ||
+                  scheduleMutation.isPending
+                }
               >
-                {scheduleMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CheckCircle2 className="h-4 w-4 mr-1" />}
+                {scheduleMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4 mr-1" />
+                )}
                 Schedule Appointment
               </Button>
-              <Button variant="outline" className="w-full" onClick={() => navigate(`/cases/${caseId}`)}>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => navigate(`/cases/${caseId}`)}
+              >
                 Skip for Now
               </Button>
             </CardContent>

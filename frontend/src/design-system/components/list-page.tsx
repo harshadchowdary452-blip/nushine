@@ -154,7 +154,7 @@ export function DetailPage({
                 {tab.count !== undefined && (
                   <span className={cn(
                     "inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-semibold",
-                    isActive ? "bg-[var(--ds-primary)] text-white" : "bg-[var(--ds-surface-secondary)] text-[var(--ds-text-secondary)]"
+                    isActive ? "bg-[var(--ds-primary)] text-[var(--ds-primary-foreground)]" : "bg-[var(--ds-surface-secondary)] text-[var(--ds-text-secondary)]"
                   )}>
                     {tab.count}
                   </span>
@@ -196,8 +196,7 @@ export function FormPage({
       {loading ? <LoadingSkeleton rows={5} /> : children}
 
       {(onSave || onCancel) && (
-        <div className="fixed bottom-0 left-0 right-0 z-[var(--ds-z-sticky)] border-t border-[var(--ds-border)] bg-[var(--ds-surface)] px-6 py-3 flex items-center justify-end gap-3 shadow-[var(--ds-shadow-elevated)]"
-          style={{ marginLeft: "var(--ds-sidebar-width)" }}>
+        <div className="sticky bottom-0 z-[var(--ds-z-sticky)] border-t border-[var(--ds-border)] bg-[var(--ds-surface)] px-6 py-3 flex items-center justify-end gap-3 shadow-[var(--ds-shadow-elevated)]">
           {onCancel && (
             <Button type="button" variant="outline" onClick={onCancel}>{cancelLabel}</Button>
           )}

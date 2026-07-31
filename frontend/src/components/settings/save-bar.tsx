@@ -24,7 +24,7 @@ export function SettingsSaveBar({
       animate={{ y: 0, opacity: 1 }}
       exit={{ y: 80, opacity: 0 }}
       transition={{ type: "spring", damping: 25, stiffness: 300 }}
-      className="fixed bottom-0 left-0 right-0 z-[var(--ds-z-sticky)]"
+      className="sticky bottom-0 z-[var(--ds-z-sticky)]"
     >
       <div className="bg-[var(--ds-surface)]/90 backdrop-blur-xl border-t border-[var(--ds-border)] shadow-[0_-4px_20px_-4px_rgba(0,0,0,0.08)]">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
@@ -55,7 +55,7 @@ export function SettingsSaveBar({
               disabled={isSaving || !hasChanges}
               className={cn(
                 "h-8 px-4 rounded-[var(--ds-radius-lg)] text-sm font-medium transition-all",
-                "bg-[var(--ds-primary)] text-white shadow-sm",
+                "bg-[var(--ds-primary)] text-[var(--ds-primary-foreground)] shadow-sm",
                 "hover:bg-[var(--ds-primary-hover)] active:scale-[0.98]",
                 "disabled:opacity-50 disabled:cursor-not-allowed",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-primary)]/30"

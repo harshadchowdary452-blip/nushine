@@ -2,13 +2,32 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
 import {
-  Plus, Search, Edit, Trash2, Calendar, Building2, IndianRupee, Users, Zap,
-  Droplets, Wifi, Settings, ShoppingBag, Megaphone, Wrench, MoreHorizontal,
-  List, ChevronLeft, ChevronRight, Clock, TrendingUp, Wallet,
+  Plus,
+  Search,
+  Edit,
+  Trash2,
+  Calendar,
+  Building2,
+  IndianRupee,
+  Users,
+  Zap,
+  Droplets,
+  Wifi,
+  Settings,
+  ShoppingBag,
+  Megaphone,
+  Wrench,
+  MoreHorizontal,
+  List,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  TrendingUp,
+  Wallet,
   DollarSign,
 } from "lucide-react"
 import { format } from "date-fns"
-import PageHeader from "@/components/layout/page-header"
+import { PageHeader } from "@/design-system"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { NumericInput } from "@/components/ui/numeric-input"
@@ -25,7 +44,13 @@ import {
   DialogBody,
 } from "@/components/ui/dialog"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { expensesApi, hospitalsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
@@ -34,21 +59,29 @@ import type { HospitalMonthlyExpense, Hospital, ApiError } from "@/types"
 import { extractDetail } from "@/types"
 
 const EXPENSE_CATEGORIES = [
-  "Staff Salaries", "Rent", "Electricity", "Water", "Internet",
-  "Equipment", "Consumables", "Marketing", "Maintenance", "Miscellaneous",
+  "Staff Salaries",
+  "Rent",
+  "Electricity",
+  "Water",
+  "Internet",
+  "Equipment",
+  "Consumables",
+  "Marketing",
+  "Maintenance",
+  "Miscellaneous",
 ]
 
 const CATEGORY_ICONS: Record<string, typeof Users> = {
   "Staff Salaries": Users,
-  "Rent": Building2,
-  "Electricity": Zap,
-  "Water": Droplets,
-  "Internet": Wifi,
-  "Equipment": Settings,
-  "Consumables": ShoppingBag,
-  "Marketing": Megaphone,
-  "Maintenance": Wrench,
-  "Miscellaneous": MoreHorizontal,
+  Rent: Building2,
+  Electricity: Zap,
+  Water: Droplets,
+  Internet: Wifi,
+  Equipment: Settings,
+  Consumables: ShoppingBag,
+  Marketing: Megaphone,
+  Maintenance: Wrench,
+  Miscellaneous: MoreHorizontal,
 }
 
 const EXPENSE_FILTERS = [
@@ -65,7 +98,20 @@ const EXPENSE_FILTERS = [
 const PAYMENT_METHODS = ["Cash", "Card", "Bank Transfer", "Cheque", "UPI", "Other"]
 
 const currentYear = new Date().getFullYear()
-const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+const MONTHS_SHORT = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+]
 
 export default function AdminExpenses() {
   const { user } = useAuthStore()
@@ -150,12 +196,17 @@ export default function AdminExpenses() {
       resetForm()
     },
     onError: (err: ApiError) => {
-      addToast({ title: "Failed to create expense", description: extractDetail(err) || err.message, variant: "destructive" })
+      addToast({
+        title: "Failed to create expense",
+        description: extractDetail(err) || err.message,
+        variant: "destructive",
+      })
     },
   })
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) => expensesApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
+      expensesApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["expenses"], refetchType: "all" })
       queryClient.invalidateQueries({ queryKey: ["expenses-analytics"], refetchType: "all" })
@@ -167,7 +218,11 @@ export default function AdminExpenses() {
       resetForm()
     },
     onError: (err: ApiError) => {
-      addToast({ title: "Failed to update expense", description: extractDetail(err) || err.message, variant: "destructive" })
+      addToast({
+        title: "Failed to update expense",
+        description: extractDetail(err) || err.message,
+        variant: "destructive",
+      })
     },
   })
 
@@ -181,7 +236,11 @@ export default function AdminExpenses() {
       addToast({ title: "Expense deleted", variant: "success" })
     },
     onError: (err: ApiError) => {
-      addToast({ title: "Failed to delete expense", description: extractDetail(err) || err.message, variant: "destructive" })
+      addToast({
+        title: "Failed to delete expense",
+        description: extractDetail(err) || err.message,
+        variant: "destructive",
+      })
     },
   })
 
@@ -245,25 +304,29 @@ export default function AdminExpenses() {
   }
 
   const filteredExpenses = Array.isArray(expenses)
-    ? expenses.filter((e: HospitalMonthlyExpense) =>
-        !search || e.expense_name?.toLowerCase().includes(search.toLowerCase()) ||
-        e.expense_category?.toLowerCase().includes(search.toLowerCase()) ||
-        e.vendor?.toLowerCase().includes(search.toLowerCase())
+    ? expenses.filter(
+        (e: HospitalMonthlyExpense) =>
+          !search ||
+          e.expense_name?.toLowerCase().includes(search.toLowerCase()) ||
+          e.expense_category?.toLowerCase().includes(search.toLowerCase()) ||
+          e.vendor?.toLowerCase().includes(search.toLowerCase()),
       )
     : []
 
-  const categoryBadgeVariant = (cat: string): "default" | "secondary" | "warning" | "info" | "outline" => {
+  const categoryBadgeVariant = (
+    cat: string,
+  ): "default" | "secondary" | "warning" | "info" | "outline" => {
     const map: Record<string, "default" | "secondary" | "warning" | "info" | "outline"> = {
       "Staff Salaries": "default",
-      "Rent": "secondary",
-      "Electricity": "warning",
-      "Water": "info",
-      "Internet": "info",
-      "Equipment": "default",
-      "Consumables": "secondary",
-      "Marketing": "warning",
-      "Maintenance": "secondary",
-      "Miscellaneous": "outline",
+      Rent: "secondary",
+      Electricity: "warning",
+      Water: "info",
+      Internet: "info",
+      Equipment: "default",
+      Consumables: "secondary",
+      Marketing: "warning",
+      Maintenance: "secondary",
+      Miscellaneous: "outline",
     }
     return map[cat] || "outline"
   }
@@ -273,8 +336,12 @@ export default function AdminExpenses() {
     : {}
 
   // ── Calendar helpers ──
-  function daysInMonth(m: number, y: number) { return new Date(y, m, 0).getDate() }
-  function firstDayOfMonth(m: number, y: number) { return new Date(y, m - 1, 1).getDay() }
+  function daysInMonth(m: number, y: number) {
+    return new Date(y, m, 0).getDate()
+  }
+  function firstDayOfMonth(m: number, y: number) {
+    return new Date(y, m - 1, 1).getDay()
+  }
   const calDaysCount = daysInMonth(calMonth, calYear)
   const calFirstDow = firstDayOfMonth(calMonth, calYear)
   const calMap: Record<string, { count: number; total: number }> = {}
@@ -305,7 +372,9 @@ export default function AdminExpenses() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Today</p>
-              <p className="text-lg font-bold">₹{(analytics?.today_total || 0).toLocaleString("en-IN")}</p>
+              <p className="text-lg font-bold">
+                ₹{(analytics?.today_total || 0).toLocaleString("en-IN")}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -316,7 +385,9 @@ export default function AdminExpenses() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">This Week</p>
-              <p className="text-lg font-bold">₹{(analytics?.this_week_total || 0).toLocaleString("en-IN")}</p>
+              <p className="text-lg font-bold">
+                ₹{(analytics?.this_week_total || 0).toLocaleString("en-IN")}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -327,7 +398,9 @@ export default function AdminExpenses() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">This Month</p>
-              <p className="text-lg font-bold">₹{(analytics?.this_month_total || 0).toLocaleString("en-IN")}</p>
+              <p className="text-lg font-bold">
+                ₹{(analytics?.this_month_total || 0).toLocaleString("en-IN")}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -338,7 +411,9 @@ export default function AdminExpenses() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Year to Date</p>
-              <p className="text-lg font-bold">₹{(analytics?.year_to_date_total || 0).toLocaleString("en-IN")}</p>
+              <p className="text-lg font-bold">
+                ₹{(analytics?.year_to_date_total || 0).toLocaleString("en-IN")}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -347,27 +422,35 @@ export default function AdminExpenses() {
       {/* Category Breakdown */}
       {analytics?.category_breakdown && analytics.category_breakdown.length > 0 && (
         <Card>
-          <CardHeader><CardTitle className="text-sm">Expense by Category</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-sm">Expense by Category</CardTitle>
+          </CardHeader>
           <CardContent className="p-4 pt-0">
             <div className="space-y-2">
-              {analytics.category_breakdown.slice(0, 5).map((cat: { category: string; amount: number }) => {
-                const pct = analytics.total_expenses > 0 ? (cat.amount / analytics.total_expenses * 100) : 0
-                const Icon = CATEGORY_ICONS[cat.category] || MoreHorizontal
-                return (
-                  <div key={cat.category} className="flex items-center gap-3">
-                    <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between text-sm">
-                        <span className="truncate">{cat.category}</span>
-                        <span className="font-medium">₹{cat.amount.toLocaleString("en-IN")}</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-muted rounded-full mt-1">
-                        <div className="h-full bg-primary rounded-full" style={{ width: `${Math.min(pct, 100)}%` }} />
+              {analytics.category_breakdown
+                .slice(0, 5)
+                .map((cat: { category: string; amount: number }) => {
+                  const pct =
+                    analytics.total_expenses > 0 ? (cat.amount / analytics.total_expenses) * 100 : 0
+                  const Icon = CATEGORY_ICONS[cat.category] || MoreHorizontal
+                  return (
+                    <div key={cat.category} className="flex items-center gap-3">
+                      <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between text-sm">
+                          <span className="truncate">{cat.category}</span>
+                          <span className="font-medium">₹{cat.amount.toLocaleString("en-IN")}</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-muted rounded-full mt-1">
+                          <div
+                            className="h-full bg-primary rounded-full"
+                            style={{ width: `${Math.min(pct, 100)}%` }}
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )
-              })}
+                  )
+                })}
             </div>
           </CardContent>
         </Card>
@@ -390,10 +473,18 @@ export default function AdminExpenses() {
               ))}
             </div>
             <div className="flex gap-2">
-              <Button variant={viewMode === "list" ? "default" : "outline"} size="icon" onClick={() => setViewMode("list")}>
+              <Button
+                variant={viewMode === "list" ? "default" : "outline"}
+                size="icon"
+                onClick={() => setViewMode("list")}
+              >
                 <List className="h-4 w-4" />
               </Button>
-              <Button variant={viewMode === "calendar" ? "default" : "outline"} size="icon" onClick={() => setViewMode("calendar")}>
+              <Button
+                variant={viewMode === "calendar" ? "default" : "outline"}
+                size="icon"
+                onClick={() => setViewMode("calendar")}
+              >
                 <Calendar className="h-4 w-4" />
               </Button>
             </div>
@@ -401,9 +492,19 @@ export default function AdminExpenses() {
 
           {activeFilter === "custom" && (
             <div className="flex gap-2 items-center">
-              <Input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="w-[180px]" />
+              <Input
+                type="date"
+                value={customStart}
+                onChange={(e) => setCustomStart(e.target.value)}
+                className="w-[180px]"
+              />
               <span className="text-muted-foreground">to</span>
-              <Input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="w-[180px]" />
+              <Input
+                type="date"
+                value={customEnd}
+                onChange={(e) => setCustomEnd(e.target.value)}
+                className="w-[180px]"
+              />
             </div>
           )}
 
@@ -418,7 +519,10 @@ export default function AdminExpenses() {
               />
             </div>
             {(role === "SUPER_ADMIN" || role === "GROUP_ADMIN") && Array.isArray(hospitals) && (
-              <Select value={filterHospitalId || "all"} onValueChange={(v) => setFilterHospitalId(v !== "all" ? v : undefined)}>
+              <Select
+                value={filterHospitalId || "all"}
+                onValueChange={(v) => setFilterHospitalId(v !== "all" ? v : undefined)}
+              >
                 <SelectTrigger className="w-[200px]">
                   <Building2 className="h-4 w-4 mr-1" />
                   <SelectValue placeholder="Hospital" />
@@ -426,7 +530,9 @@ export default function AdminExpenses() {
                 <SelectContent>
                   <SelectItem value="all">All Hospitals</SelectItem>
                   {hospitals.map((h: Hospital) => (
-                    <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>
+                    <SelectItem key={h.id} value={h.id}>
+                      {h.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -444,7 +550,9 @@ export default function AdminExpenses() {
           <CardContent className="p-0">
             {isLoading ? (
               <div className="p-4 space-y-3">
-                {[1,2,3,4,5].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
               </div>
             ) : filteredExpenses.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground">
@@ -455,14 +563,32 @@ export default function AdminExpenses() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-muted/50">
-                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Date</th>
-                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Name</th>
-                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Category</th>
-                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Amount</th>
-                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Payment</th>
-                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Vendor</th>
-                      {(role === "SUPER_ADMIN" || role === "GROUP_ADMIN") && <th className="px-4 py-3 text-left font-medium text-muted-foreground">Hospital</th>}
-                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Actions</th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                        Date
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                        Name
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                        Category
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                        Amount
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                        Payment
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                        Vendor
+                      </th>
+                      {(role === "SUPER_ADMIN" || role === "GROUP_ADMIN") && (
+                        <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                          Hospital
+                        </th>
+                      )}
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -474,12 +600,16 @@ export default function AdminExpenses() {
                         className="border-b transition-colors hover:bg-muted/50"
                       >
                         <td className="px-4 py-3 text-muted-foreground" data-label="Date">
-                          {expense.expense_date ? format(new Date(expense.expense_date), "dd MMM yyyy") : ""}
+                          {expense.expense_date
+                            ? format(new Date(expense.expense_date), "dd MMM yyyy")
+                            : ""}
                         </td>
                         <td className="px-4 py-3 font-medium" data-label="Name">
                           <div>{expense.expense_name}</div>
                           {expense.description && (
-                            <div className="text-xs text-muted-foreground truncate max-w-[200px]">{expense.description}</div>
+                            <div className="text-xs text-muted-foreground truncate max-w-[200px]">
+                              {expense.description}
+                            </div>
                           )}
                         </td>
                         <td className="px-4 py-3" data-label="Category">
@@ -505,10 +635,21 @@ export default function AdminExpenses() {
                           <div className="flex items-center gap-1">
                             {role !== "HOSPITAL_ADMIN" && (
                               <>
-                                <Button variant="ghost" size="icon" onClick={() => openEditDialog(expense)}>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => openEditDialog(expense)}
+                                >
                                   <Edit className="h-4 w-4" />
                                 </Button>
-                                <Button variant="ghost" size="icon" onClick={() => { setDeletingExpense(expense); setDeleteDialogOpen(true) }}>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => {
+                                    setDeletingExpense(expense)
+                                    setDeleteDialogOpen(true)
+                                  }}
+                                >
                                   <Trash2 className="h-4 w-4 text-danger" />
                                 </Button>
                               </>
@@ -530,21 +671,51 @@ export default function AdminExpenses() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-4">
-              <Button variant="outline" size="sm" onClick={() => { if (calMonth === 1) { setCalMonth(12); setCalYear(calYear - 1) } else { setCalMonth(calMonth - 1) } }}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (calMonth === 1) {
+                    setCalMonth(12)
+                    setCalYear(calYear - 1)
+                  } else {
+                    setCalMonth(calMonth - 1)
+                  }
+                }}
+              >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <span className="font-medium">{MONTHS_SHORT[calMonth - 1]} {calYear}</span>
-              <Button variant="outline" size="sm" onClick={() => { if (calMonth === 12) { setCalMonth(1); setCalYear(calYear + 1) } else { setCalMonth(calMonth + 1) } }}>
+              <span className="font-medium">
+                {MONTHS_SHORT[calMonth - 1]} {calYear}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (calMonth === 12) {
+                    setCalMonth(1)
+                    setCalYear(calYear + 1)
+                  } else {
+                    setCalMonth(calMonth + 1)
+                  }
+                }}
+              >
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
 
             <div className="grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground mb-1">
-              {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((d) => <div key={d} className="py-1">{d}</div>)}
+              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+                <div key={d} className="py-1">
+                  {d}
+                </div>
+              ))}
             </div>
 
             <div className="grid grid-cols-7 gap-1">
-              {Array.from({ length: calFirstDow }).map((_, i) => <div key={`empty-${i}`} />)}
+              {Array.from({ length: calFirstDow }).map((_, i) => (
+                <div key={`empty-${i}`} />
+              ))}
               {Array.from({ length: calDaysCount }).map((_, i) => {
                 const day = i + 1
                 const dateStr = `${calYear}-${String(calMonth).padStart(2, "0")}-${String(day).padStart(2, "0")}`
@@ -572,20 +743,31 @@ export default function AdminExpenses() {
             {selectedCalDate && (
               <div className="mt-4 border rounded-lg p-3">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="font-medium text-sm">{format(new Date(selectedCalDate), "dd MMM yyyy")}</span>
-                  <Button variant="ghost" size="sm" onClick={handleCloseCalDay}>Close</Button>
+                  <span className="font-medium text-sm">
+                    {format(new Date(selectedCalDate), "dd MMM yyyy")}
+                  </span>
+                  <Button variant="ghost" size="sm" onClick={handleCloseCalDay}>
+                    Close
+                  </Button>
                 </div>
                 {calDayQuery.isLoading ? (
                   <Skeleton className="h-8 w-full" />
-                ) : calDayQuery.data && Array.isArray(calDayQuery.data) && calDayQuery.data.length > 0 ? (
+                ) : calDayQuery.data &&
+                  Array.isArray(calDayQuery.data) &&
+                  calDayQuery.data.length > 0 ? (
                   <div className="space-y-2">
                     {(calDayQuery.data as HospitalMonthlyExpense[]).map((exp) => (
-                      <div key={exp.id} className="flex items-center justify-between text-sm p-2 bg-muted/30 rounded">
+                      <div
+                        key={exp.id}
+                        className="flex items-center justify-between text-sm p-2 bg-muted/30 rounded"
+                      >
                         <div>
                           <span className="font-medium">{exp.expense_name}</span>
                           <span className="text-muted-foreground ml-2">{exp.expense_category}</span>
                         </div>
-                        <span className="font-mono font-medium">₹{exp.amount.toLocaleString("en-IN")}</span>
+                        <span className="font-mono font-medium">
+                          ₹{exp.amount.toLocaleString("en-IN")}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -604,18 +786,27 @@ export default function AdminExpenses() {
           <DialogHeader>
             <DialogTitle>{editingExpense ? "Edit Expense" : "Add Expense"}</DialogTitle>
             <DialogDescription>
-              {editingExpense ? "Update the expense details below." : "Enter the details for the new expense."}
+              {editingExpense
+                ? "Update the expense details below."
+                : "Enter the details for the new expense."}
             </DialogDescription>
           </DialogHeader>
           <DialogBody>
             {(role === "SUPER_ADMIN" || role === "GROUP_ADMIN") && Array.isArray(hospitals) && (
               <div className="space-y-2 mb-4">
                 <Label>Hospital</Label>
-                <Select value={formData.hospital_id} onValueChange={(v) => setFormData({ ...formData, hospital_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="Select hospital" /></SelectTrigger>
+                <Select
+                  value={formData.hospital_id}
+                  onValueChange={(v) => setFormData({ ...formData, hospital_id: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select hospital" />
+                  </SelectTrigger>
                   <SelectContent>
                     {hospitals.map((h: Hospital) => (
-                      <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>
+                      <SelectItem key={h.id} value={h.id}>
+                        {h.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -631,14 +822,20 @@ export default function AdminExpenses() {
               />
               {formData.expense_date && (
                 <p className="text-xs text-muted-foreground">
-                  Month: {format(new Date(formData.expense_date + "T00:00:00"), "MMMM")} | Year: {format(new Date(formData.expense_date + "T00:00:00"), "yyyy")}
+                  Month: {format(new Date(formData.expense_date + "T00:00:00"), "MMMM")} | Year:{" "}
+                  {format(new Date(formData.expense_date + "T00:00:00"), "yyyy")}
                 </p>
               )}
             </div>
             <div className="space-y-2">
               <Label>Category *</Label>
-              <Select value={formData.expense_category} onValueChange={(v) => setFormData({ ...formData, expense_category: v })}>
-                <SelectTrigger className="h-12"><SelectValue placeholder="Select category" /></SelectTrigger>
+              <Select
+                value={formData.expense_category}
+                onValueChange={(v) => setFormData({ ...formData, expense_category: v })}
+              >
+                <SelectTrigger className="h-12">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
                 <SelectContent>
                   {EXPENSE_CATEGORIES.map((cat) => {
                     const Icon = CATEGORY_ICONS[cat]
@@ -688,7 +885,8 @@ export default function AdminExpenses() {
               <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none z-10 peer-focus:text-primary" />
               <NumericInput
                 id="amount"
-                mode="currency" prefix="₹"
+                mode="currency"
+                prefix="₹"
                 value={formData.amount || ""}
                 onChange={(v) => setFormData({ ...formData, amount: parseFloat(v) || 0 })}
                 placeholder=" "
@@ -704,11 +902,18 @@ export default function AdminExpenses() {
             <div className="grid grid-cols-2 gap-4 mt-4">
               <div className="space-y-2">
                 <Label>Payment Method</Label>
-                <Select value={formData.payment_method} onValueChange={(v) => setFormData({ ...formData, payment_method: v })}>
-                  <SelectTrigger className="h-12"><SelectValue placeholder="Select" /></SelectTrigger>
+                <Select
+                  value={formData.payment_method}
+                  onValueChange={(v) => setFormData({ ...formData, payment_method: v })}
+                >
+                  <SelectTrigger className="h-12">
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
                   <SelectContent>
                     {PAYMENT_METHODS.map((pm) => (
-                      <SelectItem key={pm} value={pm}>{pm}</SelectItem>
+                      <SelectItem key={pm} value={pm}>
+                        {pm}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -761,10 +966,20 @@ export default function AdminExpenses() {
             </div>
           </DialogBody>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setDialogOpen(false); setEditingExpense(null); resetForm() }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDialogOpen(false)
+                setEditingExpense(null)
+                resetForm()
+              }}
+            >
               Cancel
             </Button>
-            <Button onClick={handleSubmit} disabled={!formData.expense_name || !formData.expense_category || !formData.amount}>
+            <Button
+              onClick={handleSubmit}
+              disabled={!formData.expense_name || !formData.expense_category || !formData.amount}
+            >
               {editingExpense ? "Update" : "Create"}
             </Button>
           </DialogFooter>
@@ -777,14 +992,31 @@ export default function AdminExpenses() {
           <DialogHeader>
             <DialogTitle>Delete Expense</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{deletingExpense?.expense_name}"? This action cannot be undone.
+              Are you sure you want to delete "{deletingExpense?.expense_name}"? This action cannot
+              be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => { setDeleteDialogOpen(false); setDeletingExpense(null) }}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setDeleteDialogOpen(false)
+                setDeletingExpense(null)
+              }}
+            >
               Cancel
             </Button>
-            <Button type="button" variant="destructive" onClick={() => { if (deletingExpense) deleteMutation.mutate(deletingExpense.id); setDeleteDialogOpen(false); setDeletingExpense(null) }} disabled={deleteMutation.isPending}>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => {
+                if (deletingExpense) deleteMutation.mutate(deletingExpense.id)
+                setDeleteDialogOpen(false)
+                setDeletingExpense(null)
+              }}
+              disabled={deleteMutation.isPending}
+            >
               {deleteMutation.isPending ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>

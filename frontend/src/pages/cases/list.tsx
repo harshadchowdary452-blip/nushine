@@ -22,6 +22,7 @@ import CaseReportForm from "@/components/cases/CaseReportForm"
 import { PageHeader, EmptyState, StatusBadge } from "@/design-system"
 import type { Case } from "@/types"
 import { extractDetail } from "@/types"
+import { useCreateParam } from "@/lib/use-create-param"
 
 interface CaseDoctor {
   id: string
@@ -54,6 +55,8 @@ export default function CaseReportsList() {
   const [sortBy, setSortBy] = useState("created_at")
   const [sortDesc, setSortDesc] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)
+
+  useCreateParam(() => setCreateOpen(true))
 
   const { data: items, isFetching } = useQuery({
     queryKey: ["case-history-list", page, pageSize, search, statusFilter, doctorFilter, dateFrom, dateTo, sortBy, sortDesc],

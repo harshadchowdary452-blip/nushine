@@ -377,7 +377,7 @@ export default function LeadDetail() {
         <span className="text-gray-700 font-medium truncate">{lead.lead_name}</span>
       </div>
 
-      <Card className="sticky top-0 z-10 shadow-sm border-gray-200">
+      <Card className="sticky top-0 z-[var(--ds-z-sticky)] shadow-sm border-gray-200">
         <CardContent className="p-0">
           <div className="p-5">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">

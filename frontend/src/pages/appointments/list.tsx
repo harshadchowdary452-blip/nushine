@@ -36,6 +36,7 @@ import type { Appointment, Patient, User, PaginatedResponse } from "@/types"
 import { extractDetail } from "@/types"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/store/authStore"
+import { useCreateParam } from "@/lib/use-create-param"
 
 const DATE_PRESET_KEYS = new Set(["date_preset"])
 
@@ -80,6 +81,8 @@ export default function AppointmentList() {
   const [, setAvailability] = useState<{ available: boolean; current_count: number; max_allowed: number; message?: string } | null>(null)
   const [, setCheckingAvailability] = useState(false)
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
+
+  useCreateParam(() => openDialog())
 
   const currentUser = useAuthStore((s) => s.user)
 
@@ -496,15 +499,15 @@ export default function AppointmentList() {
                           <UserIcon className="h-5 w-5 text-primary" />
                         </div>
                         <div>
-                          <p className="font-semibold text-[#0F172A] ">{selectedPatient.full_name}</p>
-                          <p className="text-xs text-[#64748B] ">ID: {selectedPatient.id.slice(0, 8)}</p>
+                          <p className="font-semibold text-[var(--ds-text)] ">{selectedPatient.full_name}</p>
+                          <p className="text-xs text-[var(--ds-text-muted)] ">ID: {selectedPatient.id.slice(0, 8)}</p>
                         </div>
                       </div>
                       <button type="button" onClick={clearPatientSelection} className="text-muted-foreground hover:text-foreground">
                         <X className="h-4 w-4" />
                       </button>
                     </div>
-                    <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-[#64748B] ">
+                    <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-[var(--ds-text-muted)] ">
                       {selectedPatient.age && <span>Age: {selectedPatient.age}</span>}
                       {selectedPatient.gender && <span>Gender: {selectedPatient.gender}</span>}
                       {selectedPatient.phone && <span>Phone: {selectedPatient.phone}</span>}
@@ -514,24 +517,24 @@ export default function AppointmentList() {
                 ) : (
                   <div className="space-y-2">
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
+                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ds-text-muted)]" />
                       <Input ref={patientSearchRef} placeholder="Search by Name / Phone" value={patientSearch}
                         onChange={(e) => setPatientSearch(e.target.value)}
-                        className="pl-10 bg-white  border-[#E2E8F0]  text-[#0F172A] " />
+                        className="pl-10 bg-white  border-[var(--ds-border)]  text-[var(--ds-text)] " />
                     </div>
                     {patientSearch && (
-                      <div className="max-h-[260px] overflow-y-auto rounded-xl border border-[#E2E8F0]  bg-white ">
+                      <div className="max-h-[260px] overflow-y-auto rounded-xl border border-[var(--ds-border)]  bg-white ">
                         {filteredPatients.length === 0 ? (
-                          <div className="p-6 text-center text-sm text-[#64748B]">No patients found</div>
+                          <div className="p-6 text-center text-sm text-[var(--ds-text-muted)]">No patients found</div>
                         ) : filteredPatients.map((p) => (
                           <button key={p.id} type="button"
-                            className="w-full px-4 py-3 text-left border-b border-[#E2E8F0]  last:border-0 hover:bg-gray-50 transition-colors"
+                            className="w-full px-4 py-3 text-left border-b border-[var(--ds-border)]  last:border-0 hover:bg-gray-50 transition-colors"
                             onClick={() => handlePatientSelect(p.id)}>
                             <div className="flex items-center justify-between">
-                              <span className="font-medium text-sm text-[#0F172A] ">{p.full_name}</span>
+                              <span className="font-medium text-sm text-[var(--ds-text)] ">{p.full_name}</span>
                               <StatusBadge status={p.status} />
                             </div>
-                            <div className="flex items-center gap-3 text-xs text-[#64748B]  mt-1">
+                            <div className="flex items-center gap-3 text-xs text-[var(--ds-text-muted)]  mt-1">
                               {p.phone && <span>{p.phone}</span>}
                               <span>ID: {p.id.slice(0, 8)}</span>
                             </div>

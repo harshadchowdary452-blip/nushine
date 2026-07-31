@@ -53,25 +53,23 @@ const SurfacePath = memo(function SurfacePath({
   const fill = findingColor
     ? findingColor
     : isSelected
-    ? 'rgba(59,130,246,0.12)'
+    ? 'var(--ds-primary-200)'
     : isHovered
-    ? 'rgba(59,130,246,0.08)'
+    ? 'var(--ds-primary-100)'
     : 'transparent'
 
-  const stroke = isSelected ? '#2563EB' : isHovered ? '#3B82F6' : 'transparent'
+  const stroke = isSelected ? 'var(--ds-primary-500)' : isHovered ? 'var(--ds-primary-400)' : 'transparent'
   const strokeW = isSelected ? 2 : isHovered ? 1.5 : 0
 
   return (
     <path
       d={outline}
       fill={fill}
-      stroke={stroke}
-      strokeWidth={strokeW}
+      style={{ stroke, strokeWidth: strokeW, cursor: 'pointer', transition: 'fill 0.15s, stroke 0.15s' }}
       clipPath={`url(#${clipPathId})`}
       onClick={onClick}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      style={{ cursor: 'pointer', transition: 'fill 0.15s, stroke 0.15s' }}
     />
   )
 })

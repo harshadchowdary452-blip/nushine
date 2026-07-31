@@ -2,75 +2,79 @@
 @import "./design-system/tokens.css";
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   DEPRECATED THEME  —  kept for backward compat until all pages migrated
+   LEGACY THEME ALIASES  —  kept for backward compat until all pages migrated.
+   Every alias references design-system tokens (see design-system/tokens.css)
+   so legacy utilities like bg-primary / bg-card / border-border adapt to both
+   Light and Dark themes automatically.
    ═══════════════════════════════════════════════════════════════════════════ */
 @theme {
-  --color-brand-teal: #16D3C5;
-  --color-brand-blue: #2563EB;
-  --color-brand-purple: #7C3AED;
-  --color-brand-dark: #0B1D3A;
-  --color-brand-navy: #071B4D;
+  --color-brand-teal: var(--ds-primary-500);
+  --color-brand-blue: var(--ds-primary-600);
+  --color-brand-purple: var(--ds-plum-500);
+  --color-brand-dark: var(--ds-primary-950);
+  --color-brand-navy: var(--ds-primary-900);
 
-  --color-primary: #16D3C5;
-  --color-primary-hover: #0EBFB3;
-  --color-primary-light: #E6FCFA;
-  --color-primary-soft: #CCF8F4;
+  --color-primary: var(--ds-primary);
+  --color-primary-hover: var(--ds-primary-hover);
+  --color-primary-light: var(--ds-primary-subtle);
+  --color-primary-soft: var(--ds-primary-light);
+  --color-primary-foreground: var(--ds-primary-foreground);
 
-  --color-secondary: #2563EB;
-  --color-secondary-hover: #1D4ED8;
-  --color-secondary-light: #EFF6FF;
+  --color-secondary: var(--ds-primary-hover);
+  --color-secondary-hover: var(--ds-primary-active);
+  --color-secondary-light: var(--ds-primary-light);
 
-  --color-accent: #7C3AED;
-  --color-accent-light: #F3E8FF;
+  --color-accent: var(--ds-accent);
+  --color-accent-light: var(--ds-accent-light);
 
-  --color-bg: #F8FAFC;
-  --color-card: #FFFFFF;
-  --color-border: #E2E8F0;
-  --color-text-primary: #0B1D3A;
-  --color-text-secondary: #64748B;
-  --color-text-muted: #94A3B8;
+  --color-bg: var(--ds-background);
+  --color-card: var(--ds-surface);
+  --color-border: var(--ds-border);
+  --color-text-primary: var(--ds-text);
+  --color-text-secondary: var(--ds-text-secondary);
+  --color-text-muted: var(--ds-text-muted);
 
-  --color-status-active-bg: #D1FAE5;
-  --color-status-active-text: #065F46;
-  --color-status-followup-bg: #FEF3C7;
-  --color-status-followup-text: #92400E;
-  --color-status-completed-bg: #EEF2FF;
-  --color-status-completed-text: #4338CA;
-  --color-status-inactive-bg: #F1F5F9;
-  --color-status-inactive-text: #64748B;
-  --color-status-discontinued-bg: #FEE2E2;
-  --color-status-discontinued-text: #DC2626;
-  --color-status-new-bg: #D1FAE5;
-  --color-status-new-text: #065F46;
-  --color-status-progress-bg: #EEF2FF;
-  --color-status-progress-text: #4338CA;
-  --color-status-cancelled-bg: #FEE2E2;
-  --color-status-cancelled-text: #DC2626;
+  --color-status-active-bg: var(--ds-status-active-bg);
+  --color-status-active-text: var(--ds-status-active-text);
+  --color-status-followup-bg: var(--ds-status-followup-bg);
+  --color-status-followup-text: var(--ds-status-followup-text);
+  --color-status-completed-bg: var(--ds-status-completed-bg);
+  --color-status-completed-text: var(--ds-status-completed-text);
+  --color-status-inactive-bg: var(--ds-status-inactive-bg);
+  --color-status-inactive-text: var(--ds-status-inactive-text);
+  --color-status-discontinued-bg: var(--ds-status-discontinued-bg);
+  --color-status-discontinued-text: var(--ds-status-discontinued-text);
+  --color-status-new-bg: var(--ds-status-new-bg);
+  --color-status-new-text: var(--ds-status-new-text);
+  --color-status-progress-bg: var(--ds-status-progress-bg);
+  --color-status-progress-text: var(--ds-status-progress-text);
+  --color-status-cancelled-bg: var(--ds-status-cancelled-bg);
+  --color-status-cancelled-text: var(--ds-status-cancelled-text);
 
-  --color-sidebar-bg: #FFFFFF;
-  --color-sidebar-text: #475569;
-  --color-sidebar-muted: #94A3B8;
-  --color-sidebar-border: #E2E8F0;
-  --color-sidebar-hover: #F8FAFC;
-  --color-sidebar-active: #16D3C5;
-  --color-sidebar-active-bg: #E6FCFA;
+  --color-sidebar-bg: var(--ds-sidebar-bg);
+  --color-sidebar-text: var(--ds-sidebar-text);
+  --color-sidebar-muted: var(--ds-sidebar-icon);
+  --color-sidebar-border: var(--ds-sidebar-border);
+  --color-sidebar-hover: var(--ds-sidebar-surface);
+  --color-sidebar-active: var(--ds-accent);
+  --color-sidebar-active-bg: var(--ds-sidebar-active-bg);
 
-  --color-danger: #EF4444;
-  --color-danger-hover: #DC2626;
-  --color-danger-soft: #FEE2E2;
-  --color-success: #10B981;
-  --color-success-hover: #059669;
-  --color-success-soft: #D1FAE5;
-  --color-warning: #F59E0B;
-  --color-warning-soft: #FEF3C7;
-  --color-info: #2563EB;
-  --color-info-soft: #EFF6FF;
+  --color-danger: var(--ds-danger);
+  --color-danger-hover: var(--ds-danger-hover);
+  --color-danger-soft: var(--ds-danger-subtle);
+  --color-success: var(--ds-success);
+  --color-success-hover: var(--ds-success-hover);
+  --color-success-soft: var(--ds-success-subtle);
+  --color-warning: var(--ds-warning);
+  --color-warning-soft: var(--ds-warning-subtle);
+  --color-info: var(--ds-info);
+  --color-info-soft: var(--ds-info-subtle);
 
-  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.03), 0 1px 2px -1px rgb(0 0 0 / 0.02);
-  --shadow-card-hover: 0 4px 12px -2px rgb(0 0 0 / 0.06);
-  --shadow-dropdown: 0 4px 16px -4px rgb(0 0 0 / 0.08);
-  --shadow-modal: 0 12px 24px -6px rgb(0 0 0 / 0.08);
-  --shadow-sidebar: 0 0 0 1px rgb(0 0 0 / 0.03);
+  --shadow-card: var(--ds-shadow-card);
+  --shadow-card-hover: var(--ds-shadow-card-hover);
+  --shadow-dropdown: var(--ds-shadow-dropdown);
+  --shadow-modal: var(--ds-shadow-dialog);
+  --shadow-sidebar: 0 0 0 1px var(--ds-sidebar-border);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -87,6 +91,7 @@
 @layer utilities {
   .scrollbar-none::-webkit-scrollbar { display: none; }
   .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+  .app-shell { height: 100vh; height: 100dvh; }
 }
 
 * {
@@ -96,8 +101,8 @@
 
 *::-webkit-scrollbar { width: 6px; height: 6px; }
 *::-webkit-scrollbar-track { background: transparent; }
-*::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
-*::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+*::-webkit-scrollbar-thumb { background: var(--ds-neutral-300); border-radius: 3px; }
+*::-webkit-scrollbar-thumb:hover { background: var(--ds-neutral-400); }
 
 body {
   font-family: var(--ds-font-family);
@@ -150,7 +155,7 @@ body {
    SKELETON LOADER (legacy)
    ═══════════════════════════════════════════════════════════════════════════ */
 .skeleton {
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background: linear-gradient(90deg, var(--ds-surface-secondary) 25%, var(--ds-border-light) 50%, var(--ds-surface-secondary) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
@@ -178,20 +183,20 @@ body {
 .status-badge-progress, .status-badge-in_progress, .status-badge-diagnosis_pending, .status-badge-treatment_planned { background-color: var(--color-status-progress-bg); color: var(--color-status-progress-text); }
 .status-badge-cancelled { background-color: var(--color-status-cancelled-bg); color: var(--color-status-cancelled-text); }
 .status-badge-scheduled, .status-badge-confirmed { background-color: var(--color-primary-light); color: var(--color-primary-hover); }
-.status-badge-no_show { background-color: #FEE2E2; color: #DC2626; }
-.status-badge-pending { background-color: #FEF3C7; color: #B45309; }
-.status-badge-partial { background-color: #EDE9FE; color: #7C3AED; }
-.status-badge-paid { background-color: #D1FAE5; color: #065F46; }
-.status-badge-overdue { background-color: #FEE2E2; color: #DC2626; }
-.status-badge-refunded { background-color: #F1F5F9; color: #64748B; }
+.status-badge-no_show { background-color: var(--ds-danger-subtle); color: var(--ds-danger); }
+.status-badge-pending { background-color: var(--ds-warning-subtle); color: var(--ds-warning); }
+.status-badge-partial { background-color: var(--ds-accent-subtle); color: var(--ds-accent); }
+.status-badge-paid { background-color: var(--ds-success-subtle); color: var(--ds-success); }
+.status-badge-overdue { background-color: var(--ds-danger-subtle); color: var(--ds-danger); }
+.status-badge-refunded { background-color: var(--ds-background-subtle); color: var(--ds-text-tertiary); }
 
 /* Legacy gradients */
 .gradient-hero {
-  background: linear-gradient(135deg, #16D3C5 0%, #2563EB 50%, #7C3AED 100%);
+  background: linear-gradient(135deg, var(--ds-primary-500) 0%, var(--ds-primary-700) 55%, var(--ds-accent-600) 100%);
 }
 
 .gradient-hero-subtle {
-  background: linear-gradient(135deg, #E6FCFA 0%, #EFF6FF 50%, #F3E8FF 100%);
+  background: linear-gradient(135deg, var(--ds-primary-50) 0%, var(--ds-info-100) 55%, var(--ds-accent-50) 100%);
 }
 
 .bg-grid-pattern {
@@ -285,6 +290,36 @@ body {
 .ds-badge-overdue .ds-badge-dot { background-color: var(--ds-status-overdue-text); }
 .ds-badge-refunded { background-color: var(--ds-status-refunded-bg); color: var(--ds-status-refunded-text); }
 .ds-badge-refunded .ds-badge-dot { background-color: var(--ds-status-refunded-text); }
+.ds-badge-approved { background-color: var(--ds-status-approved-bg); color: var(--ds-status-approved-text); }
+.ds-badge-approved .ds-badge-dot { background-color: var(--ds-status-approved-text); }
+.ds-badge-rejected { background-color: var(--ds-status-rejected-bg); color: var(--ds-status-rejected-text); }
+.ds-badge-rejected .ds-badge-dot { background-color: var(--ds-status-rejected-text); }
+.ds-badge-generated { background-color: var(--ds-status-generated-bg); color: var(--ds-status-generated-text); }
+.ds-badge-generated .ds-badge-dot { background-color: var(--ds-status-generated-text); }
+.ds-badge-assigned { background-color: var(--ds-status-assigned-bg); color: var(--ds-status-assigned-text); }
+.ds-badge-assigned .ds-badge-dot { background-color: var(--ds-status-assigned-text); }
+.ds-badge-rescheduled { background-color: var(--ds-status-rescheduled-bg); color: var(--ds-status-rescheduled-text); }
+.ds-badge-rescheduled .ds-badge-dot { background-color: var(--ds-status-rescheduled-text); }
+.ds-badge-draft { background-color: var(--ds-status-draft-bg); color: var(--ds-status-draft-text); }
+.ds-badge-draft .ds-badge-dot { background-color: var(--ds-status-draft-text); }
+.ds-badge-planned { background-color: var(--ds-status-planned-bg); color: var(--ds-status-planned-text); }
+.ds-badge-planned .ds-badge-dot { background-color: var(--ds-status-planned-text); }
+.ds-badge-on-hold, .ds-badge-on_hold { background-color: var(--ds-status-on-hold-bg); color: var(--ds-status-on-hold-text); }
+.ds-badge-on-hold .ds-badge-dot, .ds-badge-on_hold .ds-badge-dot { background-color: var(--ds-status-on-hold-text); }
+
+/* Generic badge variants (semantic) — used by mapped statuses and fallbacks */
+.ds-badge-primary { background-color: var(--ds-status-planned-bg); color: var(--ds-status-planned-text); }
+.ds-badge-primary .ds-badge-dot { background-color: var(--ds-status-planned-text); }
+.ds-badge-success { background-color: var(--ds-status-approved-bg); color: var(--ds-status-approved-text); }
+.ds-badge-success .ds-badge-dot { background-color: var(--ds-status-approved-text); }
+.ds-badge-danger { background-color: var(--ds-status-rejected-bg); color: var(--ds-status-rejected-text); }
+.ds-badge-danger .ds-badge-dot { background-color: var(--ds-status-rejected-text); }
+.ds-badge-info { background-color: var(--ds-status-generated-bg); color: var(--ds-status-generated-text); }
+.ds-badge-info .ds-badge-dot { background-color: var(--ds-status-generated-text); }
+.ds-badge-warning { background-color: var(--ds-status-rescheduled-bg); color: var(--ds-status-rescheduled-text); }
+.ds-badge-warning .ds-badge-dot { background-color: var(--ds-status-rescheduled-text); }
+.ds-badge-default { background-color: var(--ds-status-draft-bg); color: var(--ds-status-draft-text); }
+.ds-badge-default .ds-badge-dot { background-color: var(--ds-status-draft-text); }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    FOCUS RING UTILITY
@@ -319,7 +354,7 @@ body {
     border: 1px solid var(--color-border);
     border-radius: 12px;
     padding: 12px;
-    background: white;
+    background: var(--ds-surface);
     box-shadow: var(--shadow-card);
   }
 

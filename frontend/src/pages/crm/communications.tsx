@@ -3,10 +3,16 @@ import { motion } from "framer-motion"
 import { useQuery } from "@tanstack/react-query"
 import { MessageSquare, Mail, Phone, Search, Filter } from "lucide-react"
 import { crmApi } from "@/services/endpoints"
-import PageHeader from "@/components/layout/page-header"
+import { PageHeader } from "@/design-system"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.05 } } }
@@ -46,14 +52,18 @@ export default function CommunicationHistory() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["crm", "communications", channelFilter],
-    queryFn: () => crmApi.communications.list({ channel: channelFilter !== "all" ? channelFilter : undefined }),
+    queryFn: () =>
+      crmApi.communications.list({ channel: channelFilter !== "all" ? channelFilter : undefined }),
   })
 
   const items = data?.items || []
 
   return (
     <motion.div className="space-y-6" variants={container} initial="hidden" animate="show">
-      <PageHeader title="Communication History" description="View all communications sent to patients" />
+      <PageHeader
+        title="Communication History"
+        description="View all communications sent to patients"
+      />
 
       <Card>
         <CardHeader>
@@ -94,25 +104,43 @@ export default function CommunicationHistory() {
           ) : (
             <div className="space-y-3">
               {items
-                .filter((c: CommunicationItem) => !search || c.message?.toLowerCase().includes(search.toLowerCase()) || c.subject?.toLowerCase().includes(search.toLowerCase()))
+                .filter(
+                  (c: CommunicationItem) =>
+                    !search ||
+                    c.message?.toLowerCase().includes(search.toLowerCase()) ||
+                    c.subject?.toLowerCase().includes(search.toLowerCase()),
+                )
                 .map((c: CommunicationItem) => {
                   const Icon = channelIcons[c.channel] || MessageSquare
                   return (
-                    <div key={c.id} className="flex items-start gap-4 rounded-lg border p-4 transition-colors hover:bg-gray-50">
-                      <div className={`flex h-10 w-10 items-center justify-center rounded-full ${channelColors[c.channel] || "bg-gray-50 text-gray-500"}`}>
+                    <div
+                      key={c.id}
+                      className="flex items-start gap-4 rounded-lg border p-4 transition-colors hover:bg-gray-50"
+                    >
+                      <div
+                        className={`flex h-10 w-10 items-center justify-center rounded-full ${channelColors[c.channel] || "bg-gray-50 text-gray-500"}`}
+                      >
                         <Icon className="h-5 w-5" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium uppercase tracking-wide text-gray-400">{c.channel}</span>
+                          <span className="text-xs font-medium uppercase tracking-wide text-gray-400">
+                            {c.channel}
+                          </span>
                           {c.message_type && (
-                            <span className="text-xs text-gray-400">• {c.message_type.replace(/_/g, " ")}</span>
+                            <span className="text-xs text-gray-400">
+                              • {c.message_type.replace(/_/g, " ")}
+                            </span>
                           )}
-                          <Badge className={`ml-auto text-xs ${statusBadge[c.status] || "bg-gray-50 text-gray-600"}`}>
+                          <Badge
+                            className={`ml-auto text-xs ${statusBadge[c.status] || "bg-gray-50 text-gray-600"}`}
+                          >
                             {c.status}
                           </Badge>
                         </div>
-                        {c.subject && <p className="mt-1 text-sm font-medium text-gray-900">{c.subject}</p>}
+                        {c.subject && (
+                          <p className="mt-1 text-sm font-medium text-gray-900">{c.subject}</p>
+                        )}
                         <p className="mt-0.5 text-sm text-gray-600 line-clamp-2">{c.message}</p>
                         <p className="mt-1 text-xs text-gray-400">
                           {c.sent_at ? new Date(c.sent_at).toLocaleString() : ""}

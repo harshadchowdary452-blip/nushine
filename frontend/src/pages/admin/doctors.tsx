@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
 import { Plus, Edit, Stethoscope, UserX, UserCheck } from "lucide-react"
 import { format } from "date-fns"
-import PageHeader from "@/components/layout/page-header"
+import { PageHeader } from "@/design-system"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -45,7 +45,16 @@ interface DoctorForm {
 }
 
 function getEmptyDoctorForm(): DoctorForm {
-  return { email: "", password: "", full_name: "", phone: "", specialization: "", license_number: "", hospital_id: "", admin_group_id: "" }
+  return {
+    email: "",
+    password: "",
+    full_name: "",
+    phone: "",
+    specialization: "",
+    license_number: "",
+    hospital_id: "",
+    admin_group_id: "",
+  }
 }
 
 export default function AdminDoctors() {
@@ -83,19 +92,28 @@ export default function AdminDoctors() {
       closeDialog()
     },
     onError: (err: unknown) => {
-      addToast({ title: "Error", description: extractDetail(err) || "Failed to create doctor", variant: "destructive" })
+      addToast({
+        title: "Error",
+        description: extractDetail(err) || "Failed to create doctor",
+        variant: "destructive",
+      })
     },
   })
 
   const updateMutation = useMutation({
-    mutationFn: (data: { id: string; payload: Partial<DoctorForm> }) => doctorsApi.update(data.id, data.payload),
+    mutationFn: (data: { id: string; payload: Partial<DoctorForm> }) =>
+      doctorsApi.update(data.id, data.payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["doctors"] })
       addToast({ title: "Success", description: "Doctor updated successfully", variant: "success" })
       closeDialog()
     },
     onError: (err: unknown) => {
-      addToast({ title: "Error", description: extractDetail(err) || "Failed to update doctor", variant: "destructive" })
+      addToast({
+        title: "Error",
+        description: extractDetail(err) || "Failed to update doctor",
+        variant: "destructive",
+      })
     },
   })
 
@@ -106,7 +124,11 @@ export default function AdminDoctors() {
       addToast({ title: "Success", description: "Doctor deactivated", variant: "success" })
     },
     onError: (err: unknown) => {
-      addToast({ title: "Error", description: extractDetail(err) || "Failed to deactivate", variant: "destructive" })
+      addToast({
+        title: "Error",
+        description: extractDetail(err) || "Failed to deactivate",
+        variant: "destructive",
+      })
     },
   })
 
@@ -117,7 +139,11 @@ export default function AdminDoctors() {
       addToast({ title: "Success", description: "Doctor activated", variant: "success" })
     },
     onError: (err: unknown) => {
-      addToast({ title: "Error", description: extractDetail(err) || "Failed to activate", variant: "destructive" })
+      addToast({
+        title: "Error",
+        description: extractDetail(err) || "Failed to activate",
+        variant: "destructive",
+      })
     },
   })
 
@@ -156,7 +182,12 @@ export default function AdminDoctors() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (editingDoctor) {
-      const payload: Partial<DoctorForm> = { full_name: form.full_name, phone: form.phone, specialization: form.specialization, license_number: form.license_number }
+      const payload: Partial<DoctorForm> = {
+        full_name: form.full_name,
+        phone: form.phone,
+        specialization: form.specialization,
+        license_number: form.license_number,
+      }
       if (form.password) payload.password = form.password
       updateMutation.mutate({ id: editingDoctor.id, payload })
     } else {
@@ -168,26 +199,49 @@ export default function AdminDoctors() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Doctors" description="Manage doctors across hospitals">
-        <Button id="add-doctor-btn" onClick={openCreateDialog}><Plus className="h-4 w-4" /> Add Doctor</Button>
-      </PageHeader>
+      <PageHeader
+        title="Doctors"
+        description="Manage doctors across hospitals"
+        actions={
+          <Button id="add-doctor-btn" onClick={openCreateDialog}>
+            <Plus className="h-4 w-4" /> Add Doctor
+          </Button>
+        }
+      />
 
       <Card>
         <CardContent className="p-6">
           <div className="mb-4">
-            <SearchBar value={search} onChange={setSearch} placeholder="Search doctors by name..." className="w-full sm:w-72" />
+            <SearchBar
+              value={search}
+              onChange={setSearch}
+              placeholder="Search doctors by name..."
+              className="w-full sm:w-72"
+            />
           </div>
 
           {isLoading ? (
             <div className="space-y-3">
-              {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-xl" />)}
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full rounded-xl" />
+              ))}
             </div>
           ) : doctors.length === 0 ? (
             <DentalEmptyState
               icon={Stethoscope}
               title="No doctors found"
-              description={search ? "Try a different search term." : "Add your first doctor to start building your dental team."}
-              action={!search && <Button onClick={openCreateDialog}><Plus className="h-4 w-4" /> Add Doctor</Button>}
+              description={
+                search
+                  ? "Try a different search term."
+                  : "Add your first doctor to start building your dental team."
+              }
+              action={
+                !search && (
+                  <Button onClick={openCreateDialog}>
+                    <Plus className="h-4 w-4" /> Add Doctor
+                  </Button>
+                )
+              }
             />
           ) : (
             <div className="overflow-x-auto rounded-xl border border-gray-100 mobile-card-view">
@@ -196,7 +250,9 @@ export default function AdminDoctors() {
                   <tr className="border-b border-gray-100 bg-gray-50/50">
                     <th className="px-4 py-3 text-left font-medium text-gray-500">Name</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500">Email</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500">Specialization</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-500">
+                      Specialization
+                    </th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500">Status</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500">Created</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500">Actions</th>
@@ -204,11 +260,21 @@ export default function AdminDoctors() {
                 </thead>
                 <tbody>
                   {doctors.map((doctor) => (
-                    <motion.tr key={doctor.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                      className="border-b border-gray-50 transition-colors hover:bg-gray-50/50">
-                      <td className="px-4 py-3 font-medium text-gray-900" data-label="Name">{doctor.full_name}</td>
-                      <td className="px-4 py-3 text-gray-500" data-label="Email">{doctor.email}</td>
-                      <td className="px-4 py-3 text-gray-500" data-label="Specialization">{doctor.specialization || "—"}</td>
+                    <motion.tr
+                      key={doctor.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="border-b border-gray-50 transition-colors hover:bg-gray-50/50"
+                    >
+                      <td className="px-4 py-3 font-medium text-gray-900" data-label="Name">
+                        {doctor.full_name}
+                      </td>
+                      <td className="px-4 py-3 text-gray-500" data-label="Email">
+                        {doctor.email}
+                      </td>
+                      <td className="px-4 py-3 text-gray-500" data-label="Specialization">
+                        {doctor.specialization || "—"}
+                      </td>
                       <td className="px-4 py-3" data-label="Status">
                         <Badge variant={doctor.is_active ? "success" : "secondary"}>
                           {doctor.is_active ? "Active" : "Inactive"}
@@ -219,17 +285,29 @@ export default function AdminDoctors() {
                       </td>
                       <td className="px-4 py-3" data-label="Actions">
                         <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => openEditDialog(doctor)}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEditDialog(doctor)}
+                          >
                             <Edit className="h-4 w-4" />
                           </Button>
                           {doctor.is_active ? (
-                            <Button variant="ghost" size="icon" onClick={() => deactivateMutation.mutate(doctor.id)}
-                              className="text-warning hover:text-warning hover:bg-warning-soft">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => deactivateMutation.mutate(doctor.id)}
+                              className="text-warning hover:text-warning hover:bg-warning-soft"
+                            >
                               <UserX className="h-4 w-4" />
                             </Button>
                           ) : (
-                            <Button variant="ghost" size="icon" onClick={() => activateMutation.mutate(doctor.id)}
-                              className="text-success hover:text-success hover:bg-success-soft">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => activateMutation.mutate(doctor.id)}
+                              className="text-success hover:text-success hover:bg-success-soft"
+                            >
                               <UserCheck className="h-4 w-4" />
                             </Button>
                           )}
@@ -262,51 +340,97 @@ export default function AdminDoctors() {
             <div className="overflow-y-auto px-6 py-4 space-y-4 flex-1">
               <div className="grid gap-2">
                 <Label htmlFor="full_name">Full Name</Label>
-                <Input id="full_name" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} required />
+                <Input
+                  id="full_name"
+                  value={form.full_name}
+                  onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+                  required
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  required={!editingDoctor} disabled={!!editingDoctor} />
+                <Input
+                  id="email"
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  required={!editingDoctor}
+                  disabled={!!editingDoctor}
+                />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="password">Password {editingDoctor && "(leave blank to keep current)"}</Label>
-                <Input id="password" type="password" value={form.password}
+                <Label htmlFor="password">
+                  Password {editingDoctor && "(leave blank to keep current)"}
+                </Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  required={!editingDoctor} placeholder={editingDoctor ? "Leave blank to keep" : "Min. 8 characters"} />
+                  required={!editingDoctor}
+                  placeholder={editingDoctor ? "Leave blank to keep" : "Min. 8 characters"}
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="phone">Phone</Label>
-                <Input id="phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                <Input
+                  id="phone"
+                  value={form.phone}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="specialization">Specialization</Label>
-                <Input id="specialization" value={form.specialization} onChange={(e) => setForm({ ...form, specialization: e.target.value })} />
+                <Input
+                  id="specialization"
+                  value={form.specialization}
+                  onChange={(e) => setForm({ ...form, specialization: e.target.value })}
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="license_number">License Number</Label>
-                <Input id="license_number" value={form.license_number} onChange={(e) => setForm({ ...form, license_number: e.target.value })} />
+                <Input
+                  id="license_number"
+                  value={form.license_number}
+                  onChange={(e) => setForm({ ...form, license_number: e.target.value })}
+                />
               </div>
               {isSuperAdmin && !editingDoctor && (
                 <>
                   <div className="grid gap-2">
                     <Label htmlFor="hospital_id">Hospital</Label>
-                    <Select value={form.hospital_id || ""} onValueChange={(v) => setForm({ ...form, hospital_id: v })} required>
-                      <SelectTrigger><SelectValue placeholder="Select hospital" /></SelectTrigger>
+                    <Select
+                      value={form.hospital_id || ""}
+                      onValueChange={(v) => setForm({ ...form, hospital_id: v })}
+                      required
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select hospital" />
+                      </SelectTrigger>
                       <SelectContent>
                         {(Array.isArray(hospitals) ? hospitals : []).map((h) => (
-                          <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>
+                          <SelectItem key={h.id} value={h.id}>
+                            {h.name}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="admin_group_id">Admin Group</Label>
-                    <Select value={form.admin_group_id || ""} onValueChange={(v) => setForm({ ...form, admin_group_id: v })} required>
-                      <SelectTrigger><SelectValue placeholder="Select admin group" /></SelectTrigger>
+                    <Select
+                      value={form.admin_group_id || ""}
+                      onValueChange={(v) => setForm({ ...form, admin_group_id: v })}
+                      required
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select admin group" />
+                      </SelectTrigger>
                       <SelectContent>
                         {(Array.isArray(adminGroups) ? adminGroups : []).map((g) => (
-                          <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                          <SelectItem key={g.id} value={g.id}>
+                            {g.name}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -315,7 +439,9 @@ export default function AdminDoctors() {
               )}
             </div>
             <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-gray-100">
-              <Button type="button" variant="outline" onClick={closeDialog}>Cancel</Button>
+              <Button type="button" variant="outline" onClick={closeDialog}>
+                Cancel
+              </Button>
               <Button type="submit" disabled={isPending}>
                 {isPending ? "Saving..." : editingDoctor ? "Update" : "Create Doctor"}
               </Button>

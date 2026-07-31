@@ -43,6 +43,13 @@ export const useThemeStore = create<ThemeState>()(
         },
       }
     },
-    { name: "nushine-theme" }
+    {
+      name: "nushine-theme",
+      onRehydrateStorage: () => (state) => {
+        if (state && typeof document !== "undefined") {
+          applyTheme(state.theme)
+        }
+      },
+    }
   )
 )

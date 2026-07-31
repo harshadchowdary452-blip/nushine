@@ -15,7 +15,7 @@ export default function CasePrintPreview() {
     enabled: !!id,
   })
 
-  if (isFetching) return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin" /></div>
+  if (isFetching) return <div className="flex items-center justify-center min-h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>
   if (!c) return <div className="py-20 text-center text-muted-foreground">Case report not found</div>
 
   const hn = c.hospital?.name || ""
@@ -48,8 +48,8 @@ export default function CasePrintPreview() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <div className="nop sticky top-0 z-50 bg-white border-b shadow-sm px-4 py-2 flex items-center justify-between">
+    <div className="min-h-full bg-[var(--ds-background-subtle)]">
+      <div className="nop sticky top-0 z-[var(--ds-z-sticky)] bg-white border-b shadow-sm px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => navigate(`/cases/${id}`)}>
             <ArrowLeft className="h-4 w-4 mr-1" /> Back

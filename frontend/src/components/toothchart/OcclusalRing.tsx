@@ -100,8 +100,8 @@ export default React.memo(function OcclusalRing({
             key={seg.surface}
             d={describeArc(CENTER, CENTER, OUTER_R, INNER_R, seg.startAngle, seg.endAngle)}
             fill={fill}
-            stroke={isSelected ? '#2563EB' : isHovered ? '#3B82F6' : '#C0B8A8'}
             strokeWidth={isSelected || isHovered ? 1.2 : 0.6}
+            style={{ stroke: isSelected ? 'var(--ds-primary-500)' : isHovered ? 'var(--ds-primary-400)' : 'var(--ds-neutral-400)' }}
           />
         )
       })}
