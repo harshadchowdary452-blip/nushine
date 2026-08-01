@@ -29,8 +29,6 @@ from app.models.follow_up import FollowUp, FollowUpStatus, FollowUpType
 from app.models.status_audit_log import StatusAuditLog
 from app.models.email_template import EmailTemplate
 from app.models.hospital_settings import HospitalSettings
-from app.models.campaign import Campaign, CampaignRecipient, CampaignResponse, CampaignTimeline, CampaignStatus, CampaignType, CampaignChannel, CampaignTarget, CampaignRecipientStatus
-from app.models.campaign_template import CampaignTemplate, TemplateChannel, TemplateCategory
 from app.models.follow_up_response import FollowUpResponse, FollowUpResponseStatus, FeedbackType, EnquiryOutcome
 from app.models.whatsapp_template import WhatsAppTemplate
 from app.models.lead import Lead, LeadCommunication, LeadCall, LeadSource, LeadStatus, LeadCallOutcome
@@ -52,6 +50,15 @@ from app.models.communication_template_master import CommunicationTemplateMaster
 from app.models.crm_config import CrmConfig
 from app.models.crm_rule import CrmRule
 from app.models.feedback import LeadFeedback, PatientFeedback, FeedbackNote
+from app.models.automation_rule import AutomationRule
+from app.models.automation_rule_action import AutomationRuleAction
+from app.models.automation_rule_condition import AutomationRuleCondition
+from app.models.automation_rule_log import AutomationRuleLog
+from app.models.automation_rule_version import AutomationRuleVersion
+from app.models.automation_execution_queue import AutomationExecutionQueue
+from app.models.follow_up_template import FollowUpTemplate
+from app.models.generated_enquiry import GeneratedEnquiry
+from app.models.event_log import EventLog
 
 __all__ = [
     "AdminGroup", "Hospital", "User", "Patient", "Consultant",
@@ -63,9 +70,6 @@ __all__ = [
     "Notification", "PatientFeedback", "FollowUp", "FollowUpStatus", "FollowUpType",
     "EmailTemplate",
     "StatusAuditLog", "HospitalSettings",
-    "Campaign", "CampaignRecipient", "CampaignResponse", "CampaignTimeline",
-    "CampaignStatus", "CampaignType", "CampaignChannel", "CampaignTarget", "CampaignRecipientStatus",
-    "CampaignTemplate", "TemplateChannel", "TemplateCategory",
     "FollowUpResponse", "FollowUpResponseStatus", "FeedbackType", "EnquiryOutcome",
     "WhatsAppTemplate",
     "WhatsAppConfig",
@@ -88,4 +92,9 @@ __all__ = [
     "CrmConfig",
     "CrmRule",
     "LeadFeedback", "PatientFeedback", "FeedbackNote",
+    "AutomationRule", "AutomationRuleAction", "AutomationRuleCondition",
+    "AutomationRuleLog", "AutomationRuleVersion", "AutomationExecutionQueue",
+    "FollowUpTemplate",
+    "GeneratedEnquiry",
+    "EventLog",
 ]

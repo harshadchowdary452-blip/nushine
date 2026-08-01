@@ -1,4 +1,5 @@
 import asyncio
+import calendar
 import traceback
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -38,7 +39,7 @@ from app.models.patient import Patient
 from app.models.user import User
 from app.models.hospital import Hospital
 from app.models.lead import Lead, LeadCommunication, LeadCall, LeadStatus
-from app.models.campaign import Campaign, CampaignRecipient
+from app.models.generated_enquiry import GeneratedEnquiry
 from app.models.case import Case
 from app.models.treatment_plan import TreatmentPlan, TreatmentPlanStatus
 from app.models.billing import Billing
@@ -1655,7 +1656,6 @@ async def get_comprehensive_crm_dashboard(
     messages_sent = (await db.execute(select(func.count()).select_from(wa_base.subquery()))).scalar() or 0
     broadcast_messages_q = wa_base.where(CommunicationLog.message_type == "CAMPAIGN")
     broadcast_messages = (await db.execute(select(func.count()).select_from(broadcast_messages_q.subquery()))).scalar() or 0
-    campaign_messages = broadcast_messages
     appointment_reminders_q = wa_base.where(CommunicationLog.message_type == "APPOINTMENT_REMINDER")
     appointment_reminders = (await db.execute(select(func.count()).select_from(appointment_reminders_q.subquery()))).scalar() or 0
     recall_messages_q = wa_base.where(CommunicationLog.message_type == "RECALL")
@@ -1673,9 +1673,6 @@ async def get_comprehensive_crm_dashboard(
         wa_by_day_raw = wa_by_day_raw.where(CommunicationLog.hospital_id == hospital_id)
     wa_by_day_raw = wa_by_day_raw.group_by(func.date(CommunicationLog.created_at)).order_by(func.date(CommunicationLog.created_at).desc()).limit(30)
     messages_by_day = [{"day": str(r[0]), "count": r[1]} for r in (await db.execute(wa_by_day_raw)).all()]
-
-    # Messages by campaign
-    messages_by_campaign = []
 
     # Messages by template
     wa_by_template_raw = select(
@@ -1696,64 +1693,6 @@ async def get_comprehensive_crm_dashboard(
     for sid, cnt in wa_by_staff_rows:
         u = await db.get(User, sid) if sid else None
         messages_by_staff.append({"staff_id": sid, "staff_name": u.full_name if u else "Unknown", "count": cnt})
-
-    # =========================================================================
-    # CAMPAIGN DASHBOARD
-    # =========================================================================
-    camp_base = select(Campaign)
-    if hospital_id:
-        camp_base = camp_base.where(Campaign.hospital_id == hospital_id)
-
-    active_campaigns_q = camp_base.where(Campaign.status == "ACTIVE")
-    active_campaigns = (await db.execute(select(func.count()).select_from(active_campaigns_q.subquery()))).scalar() or 0
-    completed_campaigns_q = camp_base.where(Campaign.status == "COMPLETED")
-    completed_campaigns = (await db.execute(select(func.count()).select_from(completed_campaigns_q.subquery()))).scalar() or 0
-
-    camp_total_messages = (await db.execute(
-        select(func.coalesce(func.sum(Campaign.messages_sent), 0)).select_from(camp_base.subquery())
-    )).scalar() or 0
-    camp_patients_reached = (await db.execute(
-        select(func.count(CampaignRecipient.id)).select_from(camp_base.subquery())
-    )).scalar() or 0
-
-    campaign_analytics = []
-    campaigns_list = (await db.execute(camp_base.order_by(Campaign.created_at.desc()).limit(50))).scalars().all()
-    for c in campaigns_list:
-        # Find patients attributed to this campaign via source_campaign_name
-        c_pat_q = select(Patient.id).where(
-            Patient.source_campaign_name == c.name,
-            Patient.source_campaign_id == str(c.id))
-        if hospital_id:
-            c_pat_q = c_pat_q.where(Patient.hospital_id == hospital_id)
-        c_pids = [r[0] for r in (await db.execute(c_pat_q)).all()]
-        c_lead_count = len(c_pids)
-        c_conv_count = 0
-        c_rev = 0.0
-        if c_pids:
-            c_conv_count = (await db.execute(
-                select(func.count(func.distinct(Case.patient_id))).where(Case.patient_id.in_(c_pids))
-            )).scalar() or 0
-            c_cids = [r[0] for r in (await db.execute(select(Case.id).where(Case.patient_id.in_(c_pids)))).all()]
-            if c_cids:
-                c_rev = float((await db.execute(
-                    select(func.coalesce(func.sum(Billing.paid_amount), 0)).where(Billing.case_id.in_(c_cids))
-                )).scalar() or 0)
-        c_cost = float(c.messages_sent or 0) * 0.5
-        c_roi = round(((c_rev - c_cost) / c_cost * 100), 1) if c_cost > 0 else 0
-        c_cpl = round(c_cost / c_lead_count, 2) if c_lead_count > 0 else 0
-        c_cpc = round(c_cost / c_conv_count, 2) if c_conv_count > 0 else 0
-        c_cr = round((c_conv_count / c_lead_count * 100), 1) if c_lead_count > 0 else 0
-        campaign_analytics.append({
-            "id": str(c.id), "name": c.name,
-            "sent": c.messages_sent or 0,
-            "leads": c_lead_count, "appts": c_conv_count,
-            "revenue": c_rev, "roi": c_roi,
-            "cost": c_cost, "cost_per_lead": c_cpl,
-            "cost_per_conversion": c_cpc, "conversion_rate": c_cr,
-        })
-    camp_leads_generated = sum(c["leads"] for c in campaign_analytics)
-    camp_appointments_generated = sum(c["appts"] for c in campaign_analytics)
-    camp_revenue_generated = sum(c["revenue"] for c in campaign_analytics)
 
     # =========================================================================
     # PATIENT ACQUISITION ANALYTICS (via Patient.source → Case → Billing)
@@ -1950,7 +1889,6 @@ async def get_comprehensive_crm_dashboard(
         "completed_follow_ups": completed_follow_ups,
         "response_follow_ups": response_follow_ups,
         "feedback_count": feedback_count,
-        "active_campaigns": active_campaigns,
         "patient_acquisition": patient_acquisition_total,
         "lead_sources": lead_sources_count,
     }
@@ -2054,32 +1992,19 @@ async def get_comprehensive_crm_dashboard(
         "whatsapp_analytics": {
             "messages_sent": messages_sent,
             "broadcast_messages": broadcast_messages,
-            "campaign_messages": campaign_messages,
             "appointment_reminders": appointment_reminders,
             "recall_messages": recall_messages,
             "enquiry_messages": enquiry_messages,
             "lead_messages": lead_messages,
             "messages_by_day": messages_by_day,
-            "messages_by_campaign": messages_by_campaign,
             "messages_by_template": messages_by_template,
             "messages_by_staff": messages_by_staff,
-        },
-        "campaign_dashboard": {
-            "active_campaigns": active_campaigns,
-            "completed_campaigns": completed_campaigns,
-            "messages_sent": camp_total_messages,
-            "patients_reached": camp_patients_reached,
-            "leads_generated": camp_leads_generated,
-            "appointments_generated": camp_appointments_generated,
-            "revenue_generated": camp_revenue_generated,
-            "campaigns": campaign_analytics,
         },
         "patient_acquisition": acquisition_data,
         "calendar_widget": {
             "enquiries": calendar_enquiries,
             "follow_ups": pending_follow_ups_today,
             "appointments": calendar_appointments,
-            "campaign_schedules": active_campaigns,
         },
         "alerts": {
             "overdue_follow_ups": overdue_count,
@@ -2558,11 +2483,20 @@ async def log_follow_up_communication(
     if req.channel == "WHATSAPP":
         if not patient or not patient.phone:
             raise HTTPException(status_code=400, detail="Patient has no phone number")
+        from app.routers.whatsapp_messaging import resolve_variables, render_message, unresolved_in_message
+        ctx = await resolve_variables(db, patient.id, hospital_id)
+        rendered = render_message(req.message, ctx["resolved"])
+        missing = unresolved_in_message(rendered, ctx["resolved"])
+        if missing:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Cannot send: unresolved variables {', '.join(missing)}. Resolve or remove them before sending.",
+            )
         provider = WhatsAppProvider()
-        success = await provider.send_message(patient.phone, req.message)
+        success = await provider.send_message(patient.phone, rendered)
         if not success:
             raise HTTPException(status_code=500, detail="Failed to send WhatsApp")
-        fu.whatsapp_message = req.message
+        fu.whatsapp_message = rendered
         fu.whatsapp_sent_at = datetime.now(timezone.utc)
         fu.status = FollowUpStatus.PENDING.value
         comm_status = CommunicationStatus.SENT.value
@@ -2582,7 +2516,7 @@ async def log_follow_up_communication(
         follow_up_id=follow_up_id,
         channel=req.channel,
         message_type="FOLLOW_UP",
-        message=req.message,
+        message=rendered if req.channel == "WHATSAPP" else req.message,
         status=comm_status,
         sent_at=datetime.now(timezone.utc))
     db.add(log)
@@ -2979,95 +2913,6 @@ async def get_todays_enquiries(
     return enriched
 
 
-# --- Campaign WhatsApp Sending ---
-
-class CampaignWhatsAppSendRequest(BaseModel):
-    campaign_id: str
-    template_id: Optional[str] = None
-    custom_message: Optional[str] = None
-
-
-@router.post("/campaigns/send-whatsapp")
-async def send_campaign_whatsapp(
-    req: CampaignWhatsAppSendRequest,
-    db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user)):
-    verify_permission(current_user, Permission.MANAGE_PATIENTS)
-    from app.models.campaign import Campaign, CampaignRecipient, CampaignRecipientStatus, CampaignStatus
-
-    campaign = await db.get(Campaign, req.campaign_id)
-    if not campaign:
-        raise HTTPException(status_code=404, detail="Campaign not found")
-    _verify_hospital_access(campaign, current_user)
-
-    template_message = None
-    if req.template_id:
-        t = await db.get(WhatsAppTemplate, req.template_id)
-        if t:
-            template_message = t.message
-
-    message = req.custom_message or template_message or campaign.message
-    if not message:
-        raise HTTPException(status_code=400, detail="No message content")
-
-    hospital_name = None
-    if campaign.hospital_id:
-        h = await db.get(Hospital, campaign.hospital_id)
-        if h:
-            hospital_name = h.name
-
-    recipients_q = select(CampaignRecipient).where(
-        CampaignRecipient.campaign_id == req.campaign_id,
-        CampaignRecipient.status == CampaignRecipientStatus.PENDING)
-    recipients = (await db.execute(recipients_q)).scalars().all()
-
-    provider = WhatsAppProvider()
-    sent = 0
-    failed = 0
-    for r in recipients:
-        patient = await db.get(Patient, r.patient_id)
-        if not patient or not patient.phone:
-            r.status = CampaignRecipientStatus.FAILED.value if hasattr(CampaignRecipientStatus, 'FAILED') else "FAILED"
-            failed += 1
-            continue
-        doctor = await db.get(User, patient.doctor_id) if patient.doctor_id else None
-        variables = TemplateEngine.build_variables(
-            patient_name=patient.full_name,
-            doctor_name=doctor.full_name if doctor else None,
-            hospital_name=hospital_name)
-        rendered = TemplateEngine.render_template(message, variables)
-        success = await provider.send_message(patient.phone, rendered)
-        if success:
-            r.status = CampaignRecipientStatus.SENT.value
-            r.response_message = rendered
-            sent += 1
-        else:
-            r.status = "FAILED"
-            failed += 1
-
-        log = CommunicationLog(
-            patient_id=patient.id, hospital_id=campaign.hospital_id,
-            doctor_id=current_user.get("sub"),
-            channel="WHATSAPP", message_type="CAMPAIGN",
-            message=rendered,
-            status="SENT" if success else "FAILED",
-            sent_at=datetime.now(timezone.utc) if success else None)
-        db.add(log)
-
-    campaign.messages_sent = (campaign.messages_sent or 0) + sent
-    campaign.messages_delivered = (campaign.messages_delivered or 0) + sent
-    if sent > 0:
-        campaign.status = CampaignStatus.ACTIVE if hasattr(CampaignStatus, 'ACTIVE') else "ACTIVE"
-
-    await db.commit()
-    return {
-        "success": True,
-        "sent": sent,
-        "failed": failed,
-        "total": len(recipients),
-    }
-
-
 # =========================================================================
 # CRM QUICK VIEW ENDPOINTS
 # =========================================================================
@@ -3361,43 +3206,6 @@ async def crm_quick_view_follow_ups(
         "by_doctor": by_doctor, "by_patient": by_patient, "by_outcome": by_outcome,
         "trend": trend,
     }
-
-
-@router.get("/quick-view/campaigns")
-async def crm_quick_view_campaigns(
-    db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user)):
-    verify_permission(current_user, Permission.VIEW_CRM_DASHBOARD)
-    hospital_id = current_user.get("hospital_id")
-    camp_base = select(Campaign)
-    if hospital_id:
-        camp_base = camp_base.where(Campaign.hospital_id == hospital_id)
-
-    campaigns = (await db.execute(camp_base.order_by(Campaign.created_at.desc()).limit(50))).scalars().all()
-    result = []
-    for c in campaigns:
-        c_pat_q = select(Patient.id).where(
-            Patient.source_campaign_name == c.name,
-            Patient.source_campaign_id == str(c.id))
-        if hospital_id:
-            c_pat_q = c_pat_q.where(Patient.hospital_id == hospital_id)
-        c_pids = [r[0] for r in (await db.execute(c_pat_q)).all()]
-        c_conv = 0
-        if c_pids:
-            c_conv = (await db.execute(
-                select(func.count(func.distinct(Case.patient_id))).where(Case.patient_id.in_(c_pids))
-            )).scalar() or 0
-        result.append({
-            "id": str(c.id), "name": c.name, "campaign_type": c.campaign_type,
-            "channel": c.channel, "target": c.target, "status": c.status,
-            "messages_sent": c.messages_sent or 0,
-            "patients_reached": len(c_pids),
-            "leads_generated": len(c_pids),
-            "appointments_generated": c_conv,
-            "start_date": c.start_date.isoformat() if c.start_date else None,
-            "end_date": c.end_date.isoformat() if c.end_date else None,
-        })
-    return {"campaigns": result}
 
 
 @router.get("/quick-view/patient-acquisition")
@@ -3930,3 +3738,636 @@ async def crm_revenue_by_doctor(
             "treatment_count": treatments, "avg_billing_value": avg_billing,
         })
     return data
+
+
+# =============================================================================
+# CRM COMMAND CENTER — Part 3C time-based enterprise analytics
+# -----------------------------------------------------------------------------
+# One aggregation endpoint powering the entire CRM Command Center dashboard.
+# Every metric is scoped to the requested period (full preset list incl.
+# yesterday/last_7_days/last_week/last_month/last_quarter/last_year) and
+# compared against the immediately preceding same-length window so KPI
+# deltas are computed on the backend with a single round trip.
+# =============================================================================
+
+TERMINAL_LEAD_STATUSES = ["CONVERTED", "LOST", "NOT_INTERESTED", "NO_RESPONSE"]
+OPEN_FOLLOW_UP_STATUSES = ["PENDING", "CONTACTED", "NO_RESPONSE", "SCHEDULED", "OPEN"]
+
+
+def _start_of_quarter(d: date) -> date:
+    return d.replace(month=((d.month - 1) // 3) * 3 + 1, day=1)
+
+
+def _add_months(d: date, months: int) -> date:
+    month = d.month - 1 + months
+    year = d.year + month // 12
+    month = month % 12 + 1
+    day = min(d.day, calendar.monthrange(year, month)[1])
+    return date(year, month, day)
+
+
+def _resolve_crm_range(period: str, start_date: Optional[str], end_date: Optional[str]):
+    """Resolve the inclusive date range + the same-length preceding window.
+
+    Ranges mirror frontend `resolvePeriodRange` (this_month/quarter/year are
+    full calendar windows) so every KPI drills down to exactly the same
+    records shown on the list pages.
+    """
+    today = date.today()
+    if period == "today":
+        s, e = today, today
+    elif period == "yesterday":
+        s, e = today - timedelta(days=1), today - timedelta(days=1)
+    elif period == "last_7_days":
+        s, e = today - timedelta(days=6), today
+    elif period == "last_30_days":
+        s, e = today - timedelta(days=29), today
+    elif period == "this_week":
+        s, e = today - timedelta(days=today.weekday()), today
+    elif period == "last_week":
+        s = today - timedelta(days=today.weekday() + 7)
+        e = s + timedelta(days=6)
+    elif period == "this_month":
+        s, e = today.replace(day=1), today
+    elif period == "last_month":
+        first = today.replace(day=1) - timedelta(days=1)
+        s, e = first.replace(day=1), first
+    elif period == "this_quarter":
+        s, e = _start_of_quarter(today), today
+    elif period == "last_quarter":
+        s = _add_months(_start_of_quarter(today), -3)
+        e = s + timedelta(days=(today - _start_of_quarter(today)).days)
+    elif period == "this_year":
+        s, e = today.replace(month=1, day=1), today
+    elif period == "last_year":
+        s, e = date(today.year - 1, 1, 1), date(today.year - 1, 12, 31)
+    elif period == "custom" and start_date and end_date:
+        s, e = date.fromisoformat(start_date), date.fromisoformat(end_date)
+    else:
+        s, e = today.replace(day=1), today
+    span = (e - s).days + 1
+    prev_e = s - timedelta(days=1)
+    prev_s = prev_e - timedelta(days=span - 1)
+    return s, e, prev_s, prev_e
+
+
+@router.get("/command-center")
+async def get_crm_command_center(
+    period: str = Query("this_month", description="today, yesterday, last_7_days, last_30_days, this_week, last_week, this_month, last_month, this_quarter, last_quarter, this_year, last_year, custom"),
+    start_date: Optional[str] = Query(None, description="Custom start date (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(None, description="Custom end date (YYYY-MM-DD)"),
+    doctor: Optional[str] = Query(None, description="Filter by doctor ID"),
+    source: Optional[str] = Query(None, description="Filter by lead source"),
+    campaign: Optional[str] = Query(None, description="Filter by campaign/source campaign"),
+    staff: Optional[str] = Query(None, description="Filter by staff ID"),
+    lead_status: Optional[str] = Query(None, description="Filter by lead status"),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.VIEW_CRM_DASHBOARD)
+    hospital_id = current_user.get("hospital_id")
+    today = date.today()
+
+    d_start, d_end, prev_start, prev_end = _resolve_crm_range(period, start_date, end_date)
+    s_dt = datetime.combine(d_start, datetime.min.time())
+    e_dt = datetime.combine(d_end, datetime.max.time())
+    ps_dt = datetime.combine(prev_start, datetime.min.time())
+    pe_dt = datetime.combine(prev_end, datetime.max.time())
+
+    # -------------------------------------------------------------
+    # Shared scoping helpers
+    # -------------------------------------------------------------
+    def lead_scope(q, start=None, end=None):
+        if hospital_id:
+            q = q.where(Lead.hospital_id == hospital_id)
+        if source:
+            q = q.where(Lead.source.ilike(f"%{source}%"))
+        if doctor:
+            q = q.where(Lead.assigned_doctor_id == doctor)
+        if staff:
+            q = q.where(Lead.assigned_staff_id == staff)
+        if lead_status:
+            q = q.where(Lead.status == lead_status)
+        if campaign:
+            q = q.where(Lead.source.ilike(f"%{campaign}%"))
+        if start is not None:
+            q = q.where(Lead.created_at >= start)
+        if end is not None:
+            q = q.where(Lead.created_at <= end)
+        return q
+
+    def fu_scope(q):
+        if hospital_id:
+            q = q.where(FollowUp.hospital_id == hospital_id)
+        if doctor:
+            q = q.where(FollowUp.doctor_id == doctor)
+        return q
+
+    def comm_scope(q):
+        if hospital_id:
+            q = q.where(CommunicationLog.hospital_id == hospital_id)
+        return q
+
+    async def count(q):
+        return (await db.execute(select(func.count()).select_from(q.subquery()))).scalar() or 0
+
+    # -------------------------------------------------------------
+    # KPI CORE (current + previous windows)
+    # -------------------------------------------------------------
+    async def lead_counts(start, end):
+        base = lead_scope(select(Lead), start, end)
+        new_leads = await count(base)
+        open_q = base.where(Lead.status.notin_(TERMINAL_LEAD_STATUSES))
+        open_leads = await count(open_q)
+        converted = await count(base.where(Lead.status == LeadStatus.CONVERTED.value, Lead.updated_at >= start, Lead.updated_at <= end))
+        return new_leads, open_leads, converted
+
+    cur_new, cur_open, cur_conv = await lead_counts(s_dt, e_dt)
+    prev_new, prev_open, prev_conv = await lead_counts(ps_dt, pe_dt)
+    cur_conv_rate = round(cur_conv / cur_new * 100, 1) if cur_new > 0 else 0.0
+    prev_conv_rate = round(prev_conv / prev_new * 100, 1) if prev_new > 0 else 0.0
+
+    # Response time: hours from lead creation to first outbound communication
+    async def avg_response_hours(start, end):
+        rows = (await db.execute(
+            select(Lead.id, Lead.created_at, func.min(LeadCommunication.created_at))
+            .join(LeadCommunication, LeadCommunication.lead_id == Lead.id)
+            .where(Lead.created_at >= start, Lead.created_at <= end, LeadCommunication.created_at >= Lead.created_at)
+            .group_by(Lead.id, Lead.created_at)
+        )).all()
+        total_h = 0.0
+        n = 0
+        for lead_id, created_at, first_comm in rows:
+            if created_at and first_comm:
+                total_h += (first_comm - created_at).total_seconds() / 3600
+                n += 1
+        return round(total_h / n, 1) if n > 0 else 0.0
+
+    cur_response = await avg_response_hours(s_dt, e_dt)
+    prev_response = await avg_response_hours(ps_dt, pe_dt)
+
+    # Lead age: average days open leads from this period have been in pipeline
+    async def avg_lead_age(start, end):
+        rows = (await db.execute(
+            select(Lead.created_at).where(Lead.created_at >= start, Lead.created_at <= end, Lead.status.notin_(TERMINAL_LEAD_STATUSES))
+        )).all()
+        if not rows:
+            return 0.0
+        now = datetime.now(timezone.utc)
+        return round(sum((now - r[0]).total_seconds() / 86400 for r in rows if r[0]) / len(rows), 1)
+
+    cur_age = await avg_lead_age(s_dt, e_dt)
+    prev_age = await avg_lead_age(ps_dt, pe_dt)
+
+    # Follow-ups due / overdue
+    async def follow_up_due(start, end):
+        base = fu_scope(select(FollowUp))
+        q = base.where(FollowUp.follow_up_date >= start, FollowUp.follow_up_date <= end, FollowUp.status.in_(OPEN_FOLLOW_UP_STATUSES))
+        return await count(q)
+
+    cur_fu = await follow_up_due(d_start, d_end)
+    prev_fu = await follow_up_due(prev_start, prev_end)
+    overdue = await count(fu_scope(select(FollowUp)).where(
+        FollowUp.follow_up_date < today, FollowUp.status.in_(OPEN_FOLLOW_UP_STATUSES)))
+
+    # Communication health
+    async def comm_stats(start, end):
+        base = comm_scope(select(CommunicationLog)).where(CommunicationLog.created_at >= start, CommunicationLog.created_at <= end)
+        rows = (await db.execute(
+            base.with_only_columns(CommunicationLog.status, func.count())
+            .group_by(CommunicationLog.status)
+        )).all()
+        totals = {r[0]: r[1] for r in rows}
+        sent = totals.get("SENT", 0)
+        delivered = totals.get("DELIVERED", 0)
+        read = totals.get("READ", 0)
+        failed = totals.get("FAILED", 0)
+        pending = totals.get("PENDING", 0)
+        whatsapp = await count(base.where(CommunicationLog.channel == CommunicationChannel.WHATSAPP.value))
+        attempts = sent + delivered + read + failed
+        success = delivered + read
+        rate = round(success / attempts * 100, 1) if attempts > 0 else 0.0
+        return sent, delivered, read, failed, pending, whatsapp, rate
+
+    cur_comm = await comm_stats(s_dt, e_dt)
+    prev_comm = await comm_stats(ps_dt, pe_dt)
+
+    # Calls
+    async def call_stats(start, end):
+        base = select(LeadCall).join(Lead, Lead.id == LeadCall.lead_id).where(LeadCall.created_at >= start, LeadCall.created_at <= end)
+        if hospital_id:
+            base = base.where(Lead.hospital_id == hospital_id)
+        rows = (await db.execute(base.with_only_columns(LeadCall.outcome, func.count()).group_by(LeadCall.outcome))).all()
+        by_outcome = {r[0]: r[1] for r in rows if r[0]}
+        total = sum(by_outcome.values())
+        missed = by_outcome.get("NO_ANSWER", 0) + by_outcome.get("BUSY", 0)
+        return total, missed, by_outcome
+
+    cur_calls, cur_missed, _ = await call_stats(s_dt, e_dt)
+    prev_calls, prev_missed, _ = await call_stats(ps_dt, pe_dt)
+
+    # -------------------------------------------------------------
+    # RECALLS / WELLNESS / APPOINTMENT REMINDERS (GeneratedEnquiry based)
+    # -------------------------------------------------------------
+    def enq_scope(q):
+        if hospital_id:
+            q = q.where(GeneratedEnquiry.hospital_id == hospital_id)
+        if doctor:
+            q = q.where(GeneratedEnquiry.doctor_id == doctor)
+        return q
+
+    RECALL_TYPES = ("RECALL",)
+    WELLNESS_TYPES = ("TREATMENT_WELLNESS", "CASE_WELLNESS")
+    APPT_REMINDER_TYPES = ("APPOINTMENT_REMINDER",)
+    ENQUIRY_TERMINAL = ["COMPLETED", "CANCELLED", "LOST", "CONVERTED"]
+
+    def due_scope(types, start, end):
+        return enq_scope(select(GeneratedEnquiry)).where(
+            GeneratedEnquiry.enquiry_type.in_(types),
+            GeneratedEnquiry.status.notin_(ENQUIRY_TERMINAL),
+            ((GeneratedEnquiry.due_date >= start) & (GeneratedEnquiry.due_date <= end))
+            | (GeneratedEnquiry.due_date < start),
+        )
+
+    async def enq_due_count(types, start, end):
+        return await count(due_scope(types, start, end))
+
+    cur_recalls = await enq_due_count(RECALL_TYPES, d_start, d_end)
+    prev_recalls = await enq_due_count(RECALL_TYPES, prev_start, prev_end)
+    cur_wellness = await enq_due_count(WELLNESS_TYPES, d_start, d_end)
+    prev_wellness = await enq_due_count(WELLNESS_TYPES, prev_start, prev_end)
+    cur_appt_reminders = await enq_due_count(APPT_REMINDER_TYPES, d_start, d_end)
+    prev_appt_reminders = await enq_due_count(APPT_REMINDER_TYPES, prev_start, prev_end)
+
+    # Leads ready for conversion (current state)
+    LEAD_READY_STATUSES = ["APPOINTMENT_BOOKED", "VISITED", "INTERESTED", "FOLLOW_UP_REQUIRED"]
+    leads_ready_now = await count(lead_scope(select(Lead).where(Lead.status.in_(LEAD_READY_STATUSES))))
+
+    # Unread / failed messages (current state)
+    cur_unread = await count(comm_scope(select(CommunicationLog)).where(CommunicationLog.status.in_(["SENT", "DELIVERED"])))
+    cur_failed = await count(comm_scope(select(CommunicationLog)).where(CommunicationLog.status == "FAILED"))
+
+    def pct(cur, prev):
+        if prev is None or prev == 0:
+            return None
+        return round((cur - prev) / prev * 100, 1)
+
+    def change(cur, prev, invert=False):
+        c = pct(cur, prev)
+        if c is None:
+            return None
+        return -c if invert else c
+
+    def drill(entity, params=None):
+        return {"entity": entity, "params": params or {}}
+
+    kpis = [
+        {"key": "new_leads", "label": "New Leads", "value": cur_new, "change": change(cur_new, prev_new), "positive_is_good": True, "raw": cur_new, "previous": prev_new, "drilldown": drill("leads")},
+        {"key": "open_leads", "label": "Open Leads", "value": cur_open, "change": change(cur_open, prev_open), "positive_is_good": True, "raw": cur_open, "previous": prev_open, "drilldown": drill("leads", {"open": "1"})},
+        {"key": "leads_ready_for_conversion", "label": "Ready for Conversion", "value": leads_ready_now, "change": None, "positive_is_good": True, "raw": leads_ready_now, "previous": None, "drilldown": drill("leads", {"statuses": ",".join(LEAD_READY_STATUSES)})},
+        {"key": "converted_leads", "label": "Conversions", "value": cur_conv, "change": change(cur_conv, prev_conv), "positive_is_good": True, "raw": cur_conv, "previous": prev_conv, "drilldown": drill("leads", {"status": LeadStatus.CONVERTED.value})},
+        {"key": "conversion_rate", "label": "Conversion Rate", "value": cur_conv_rate, "change": change(cur_conv_rate, prev_conv_rate), "positive_is_good": True, "raw": cur_conv_rate, "previous": prev_conv_rate, "suffix": "%", "drilldown": drill("leads")},
+        {"key": "pending_follow_ups", "label": "Follow-Ups Due", "value": cur_fu, "change": change(cur_fu, prev_fu), "positive_is_good": True, "raw": cur_fu, "previous": prev_fu, "drilldown": drill("enquiry-calendar")},
+        {"key": "overdue_follow_ups", "label": "Overdue Follow-Ups", "value": overdue, "change": None, "positive_is_good": False, "raw": overdue, "previous": None, "drilldown": drill("enquiry-calendar", {"overdue": "1"})},
+        {"key": "recalls_due", "label": "Recalls Due", "value": cur_recalls, "change": change(cur_recalls, prev_recalls), "positive_is_good": True, "raw": cur_recalls, "previous": prev_recalls, "drilldown": drill("enquiry-calendar", {"type": "RECALL"})},
+        {"key": "wellness_due", "label": "Wellness Check-ins", "value": cur_wellness, "change": change(cur_wellness, prev_wellness), "positive_is_good": True, "raw": cur_wellness, "previous": prev_wellness, "drilldown": drill("enquiry-calendar", {"type": "WELLNESS"})},
+        {"key": "appointment_reminders_due", "label": "Appointment Reminders", "value": cur_appt_reminders, "change": change(cur_appt_reminders, prev_appt_reminders), "positive_is_good": True, "raw": cur_appt_reminders, "previous": prev_appt_reminders, "drilldown": drill("enquiry-calendar", {"type": "APPOINTMENT_REMINDER"})},
+        {"key": "avg_response_hours", "label": "Response Time", "value": cur_response, "change": change(cur_response, prev_response, invert=True), "positive_is_good": False, "raw": cur_response, "previous": prev_response, "suffix": "h", "drilldown": drill("leads")},
+        {"key": "avg_lead_age", "label": "Lead Age", "value": cur_age, "change": change(cur_age, prev_age, invert=True), "positive_is_good": False, "raw": cur_age, "previous": prev_age, "suffix": "d", "drilldown": drill("leads", {"open": "1"})},
+        {"key": "whatsapp_sent", "label": "WhatsApp Sent", "value": cur_comm[5], "change": change(cur_comm[5], prev_comm[5]), "positive_is_good": True, "raw": cur_comm[5], "previous": prev_comm[5], "drilldown": drill("whatsapp")},
+        {"key": "communication_success_rate", "label": "Comm. Success", "value": cur_comm[6], "change": change(cur_comm[6], prev_comm[6]), "positive_is_good": True, "raw": cur_comm[6], "previous": prev_comm[6], "suffix": "%", "drilldown": drill("whatsapp")},
+        {"key": "unread_messages", "label": "Unread Messages", "value": cur_unread, "change": None, "positive_is_good": False, "raw": cur_unread, "previous": None, "drilldown": drill("whatsapp", {"status": "unread"})},
+        {"key": "failed_messages", "label": "Failed Messages", "value": cur_failed, "change": None, "positive_is_good": False, "raw": cur_failed, "previous": None, "drilldown": drill("whatsapp", {"status": "failed"})},
+        {"key": "calls_made", "label": "Calls Made", "value": cur_calls, "change": change(cur_calls, prev_calls), "positive_is_good": True, "raw": cur_calls, "previous": prev_calls, "drilldown": drill("leads", {"tab": "calls"})},
+        {"key": "missed_calls", "label": "Missed Calls", "value": cur_missed, "change": change(cur_missed, prev_missed, invert=True), "positive_is_good": False, "raw": cur_missed, "previous": prev_missed, "drilldown": drill("leads", {"tab": "calls"})},
+    ]
+
+    # -------------------------------------------------------------
+    # LEAD ANALYTICS
+    # -------------------------------------------------------------
+    in_range_leads = lead_scope(select(Lead), s_dt, e_dt)
+    lead_sub = in_range_leads.subquery()
+
+    # Growth trend bucketed by day/week/month depending on window length
+    span_days = (d_end - d_start).days + 1
+    key_fmt = "%Y-%m-%d" if span_days <= 31 else "%Y-%m"
+
+    from collections import OrderedDict
+    trend_map = OrderedDict()
+    if span_days <= 31:
+        day_rows = (await db.execute(
+            select(func.date_trunc("day", lead_sub.c.created_at), lead_sub.c.status)
+        )).all()
+        for created, status in day_rows:
+            key = created.strftime(key_fmt) if created else "?"
+            entry = trend_map.setdefault(key, {"label": key, "leads": 0, "converted": 0})
+            entry["leads"] += 1
+            if status == LeadStatus.CONVERTED.value:
+                entry["converted"] += 1
+    else:
+        raw_rows = (await db.execute(
+            select(lead_sub.c.created_at, lead_sub.c.status)
+        )).all()
+        for created, status in raw_rows:
+            if created is None:
+                key = "?"
+            elif span_days <= 120:
+                iso = created.isocalendar()
+                key = f"{iso[0]}-W{iso[1]:02d}"
+            else:
+                key = created.strftime(key_fmt)
+            entry = trend_map.setdefault(key, {"label": key, "leads": 0, "converted": 0})
+            entry["leads"] += 1
+            if status == LeadStatus.CONVERTED.value:
+                entry["converted"] += 1
+    growth_trend = list(trend_map.values())
+
+    by_source_rows = (await db.execute(
+        select(lead_sub.c.source, func.count()).group_by(lead_sub.c.source)
+    )).all()
+    by_source = [{"name": r[0].replace("_", " ").title(), "key": r[0], "value": r[1]} for r in by_source_rows]
+
+    by_status_rows = (await db.execute(
+        select(lead_sub.c.status, func.count()).group_by(lead_sub.c.status)
+    )).all()
+    by_status = [{"name": r[0].replace("_", " ").title(), "key": r[0], "value": r[1]} for r in by_status_rows]
+
+    by_priority_rows = (await db.execute(
+        select(lead_sub.c.priority, func.count()).group_by(lead_sub.c.priority)
+    )).all()
+    by_priority = [{"name": r[0].title(), "key": r[0], "value": r[1]} for r in by_priority_rows]
+
+    # Funnel (from leads created in the period)
+    total_funnel = cur_new
+    contacted_rows = (await db.execute(
+        in_range_leads.with_only_columns(Lead.id).where(
+            Lead.last_contacted_at.isnot(None) | Lead.status.in_(["CONTACTED", "INTERESTED", "FOLLOW_UP_REQUIRED", "APPOINTMENT_BOOKED", "VISITED", "CONVERTED", "LOST"])
+        )
+    )).all()
+    contacted = len(contacted_rows)
+    interested = await count(in_range_leads.where(Lead.status.in_(["INTERESTED", "FOLLOW_UP_REQUIRED", "APPOINTMENT_BOOKED", "VISITED", "CONVERTED"])))
+    booked = await count(in_range_leads.where(Lead.status.in_(["APPOINTMENT_BOOKED", "VISITED", "CONVERTED"])))
+    converted_in_range = await count(in_range_leads.where(Lead.status == LeadStatus.CONVERTED.value))
+    funnel = [
+        {"stage": "New", "value": total_funnel},
+        {"stage": "Contacted", "value": contacted},
+        {"stage": "Interested", "value": interested},
+        {"stage": "Appointment", "value": booked},
+        {"stage": "Converted", "value": converted_in_range},
+    ]
+
+    # Lead ageing buckets for open leads from the period
+    now_utc = datetime.now(timezone.utc)
+    ageing = {k: 0 for k in ["0-3d", "4-7d", "8-14d", "15-30d", "30+d"]}
+    open_rows = (await db.execute(
+        in_range_leads.with_only_columns(Lead.created_at).where(Lead.status.notin_(TERMINAL_LEAD_STATUSES))
+    )).all()
+    for row in open_rows:
+        days = (now_utc - row[0]).total_seconds() / 86400 if row[0] else 0
+        if days <= 3:
+            ageing["0-3d"] += 1
+        elif days <= 7:
+            ageing["4-7d"] += 1
+        elif days <= 14:
+            ageing["8-14d"] += 1
+        elif days <= 30:
+            ageing["15-30d"] += 1
+        else:
+            ageing["30+d"] += 1
+    ageing_buckets = [{"name": k, "value": v} for k, v in ageing.items()]
+
+    # -------------------------------------------------------------
+    # COMMUNICATION CENTER
+    # -------------------------------------------------------------
+    comm_range_base = comm_scope(select(CommunicationLog)).where(CommunicationLog.created_at >= s_dt, CommunicationLog.created_at <= e_dt)
+
+    by_channel_rows = (await db.execute(
+        comm_range_base.with_only_columns(CommunicationLog.channel, func.count()).group_by(CommunicationLog.channel)
+    )).all()
+    by_channel = [{"name": r[0], "value": r[1]} for r in by_channel_rows]
+
+    by_comm_status = [
+        {"name": "Pending", "value": cur_comm[4]},
+        {"name": "Sent", "value": cur_comm[0]},
+        {"name": "Delivered", "value": cur_comm[1]},
+        {"name": "Read", "value": cur_comm[2]},
+        {"name": "Failed", "value": cur_comm[3]},
+    ]
+
+    comm_trend_map = OrderedDict()
+    day_trunc = func.date_trunc("day", CommunicationLog.created_at)
+    comm_day_rows = (await db.execute(
+        comm_range_base.with_only_columns(day_trunc, func.count())
+        .group_by(day_trunc).order_by(day_trunc)
+    )).all()
+    for created, c in comm_day_rows:
+        key = created.strftime("%Y-%m-%d") if created else "?"
+        comm_trend_map[key] = c
+    comm_trend = [{"label": k, "messages": v} for k, v in comm_trend_map.items()]
+
+    # Recent communications (CommunicationLog + lead comms merged)
+    comm_recent_rows = (await db.execute(
+        comm_range_base.order_by(CommunicationLog.created_at.desc()).limit(8)
+    )).scalars().all()
+    recent_comm = []
+    for cl in comm_recent_rows:
+        pat = await db.get(Patient, cl.patient_id) if cl.patient_id else None
+        recent_comm.append({
+            "id": str(cl.id), "entity": "patient",
+            "name": pat.full_name if pat else "Patient",
+            "channel": cl.channel, "message_type": cl.message_type, "status": cl.status,
+            "created_at": cl.created_at.isoformat() if cl.created_at else None,
+            "link": f"/patients/{cl.patient_id}" if cl.patient_id else None,
+        })
+    lead_comm_base = select(LeadCommunication)
+    if hospital_id:
+        lead_comm_base = lead_comm_base.where(LeadCommunication.hospital_id == hospital_id)
+    lead_comm_rows = (await db.execute(
+        lead_comm_base.where(LeadCommunication.created_at >= s_dt, LeadCommunication.created_at <= e_dt)
+        .order_by(LeadCommunication.created_at.desc()).limit(6)
+    )).scalars().all()
+    for lc in lead_comm_rows:
+        lead = await db.get(Lead, lc.lead_id) if lc.lead_id else None
+        recent_comm.append({
+            "id": str(lc.id), "entity": "lead",
+            "name": lead.lead_name if lead else "Lead",
+            "channel": lc.channel, "message_type": lc.message_type, "status": lc.delivery_status or lc.status,
+            "created_at": lc.created_at.isoformat() if lc.created_at else None,
+            "link": f"/leads/{lc.lead_id}" if lc.lead_id else None,
+        })
+    recent_comm.sort(key=lambda x: x["created_at"] or "", reverse=True)
+    recent_comm = recent_comm[:10]
+
+    # -------------------------------------------------------------
+    # ENQUIRY ANALYTICS (recall / wellness / appointment reminders)
+    # -------------------------------------------------------------
+    enq_range_base = enq_scope(select(GeneratedEnquiry)).where(
+        GeneratedEnquiry.due_date >= d_start, GeneratedEnquiry.due_date <= d_end)
+
+    enq_by_type = [{"name": r[0].replace("_", " ").title(), "key": r[0], "value": r[1]} for r in (await db.execute(
+        enq_range_base.with_only_columns(GeneratedEnquiry.enquiry_type, func.count()).group_by(GeneratedEnquiry.enquiry_type)
+    )).all()]
+    enq_by_status = [{"name": r[0], "key": r[0], "value": r[1]} for r in (await db.execute(
+        enq_range_base.with_only_columns(GeneratedEnquiry.status, func.count()).group_by(GeneratedEnquiry.status)
+    )).all()]
+    enq_total = await count(enq_range_base)
+    enq_open = await count(enq_range_base.where(GeneratedEnquiry.status.notin_(ENQUIRY_TERMINAL)))
+    enq_completed = await count(enq_range_base.where(GeneratedEnquiry.status == "COMPLETED"))
+    enq_overdue = await count(enq_range_base.where(GeneratedEnquiry.due_date < today, GeneratedEnquiry.status.notin_(ENQUIRY_TERMINAL)))
+
+    enq_trend_map = OrderedDict()
+    enq_trunc = func.date_trunc("day", GeneratedEnquiry.due_date)
+    enq_day_rows = (await db.execute(
+        enq_range_base.with_only_columns(enq_trunc, func.count()).group_by(enq_trunc).order_by(enq_trunc)
+    )).all()
+    for created, c in enq_day_rows:
+        key = created.strftime("%Y-%m-%d") if created else "?"
+        enq_trend_map[key] = c
+    enq_trend = [{"label": k, "enquiries": v} for k, v in enq_trend_map.items()]
+
+    # Actionable recall / wellness / reminder list (due through period end)
+    rw_types = RECALL_TYPES + WELLNESS_TYPES + APPT_REMINDER_TYPES
+    rw_rows = (await db.execute(
+        enq_scope(select(GeneratedEnquiry)).where(
+            GeneratedEnquiry.enquiry_type.in_(rw_types),
+            GeneratedEnquiry.status.notin_(ENQUIRY_TERMINAL),
+            GeneratedEnquiry.due_date <= d_end)
+        .order_by(GeneratedEnquiry.due_date.asc()).limit(12)
+    )).scalars().all()
+    recall_wellness_list = []
+    for e in rw_rows:
+        pat = await db.get(Patient, e.patient_id) if e.patient_id else None
+        lead = await db.get(Lead, e.lead_id) if e.lead_id else None
+        recall_wellness_list.append({
+            "id": str(e.id),
+            "enquiry_type": e.enquiry_type,
+            "patient_id": str(e.patient_id) if e.patient_id else None,
+            "name": pat.full_name if pat else (lead.lead_name if lead else "—"),
+            "phone": pat.phone if pat else None,
+            "due_date": e.due_date.isoformat() if e.due_date else None,
+            "status": e.status,
+            "priority": e.priority,
+            "treatment_name": e.treatment_name,
+            "link": f"/crm/enquiry-calendar?focus={e.id}",
+        })
+
+    # -------------------------------------------------------------
+    # CONVERSIONS
+    # -------------------------------------------------------------
+    conv_rows = (await db.execute(
+        in_range_leads.where(Lead.status == LeadStatus.CONVERTED.value)
+        .order_by(Lead.updated_at.desc()).limit(8)
+    )).scalars().all()
+    conversions = [{
+        "id": str(l.id), "name": l.lead_name, "source": l.source,
+        "converted_at": (l.updated_at or l.created_at).isoformat(),
+        "link": f"/leads/{l.id}",
+        "converted_patient_id": str(l.converted_patient_id) if l.converted_patient_id else None,
+    } for l in conv_rows]
+
+    # -------------------------------------------------------------
+    # TODAY'S WORK QUEUE
+    # -------------------------------------------------------------
+    work_q = fu_scope(select(FollowUp)).where(
+        FollowUp.follow_up_date == today,
+        FollowUp.status.in_(OPEN_FOLLOW_UP_STATUSES)
+    ).order_by(FollowUp.follow_up_time).limit(25)
+    work_rows = (await db.execute(work_q)).scalars().all()
+    work_queue = []
+    for fu in work_rows:
+        pat = await db.get(Patient, fu.patient_id) if fu.patient_id else None
+        doc = await db.get(User, fu.doctor_id) if fu.doctor_id else None
+        work_queue.append({
+            "id": str(fu.id), "patient_id": str(fu.patient_id) if fu.patient_id else None,
+            "patient_name": pat.full_name if pat else "Unknown",
+            "op_number": pat.op_no if pat else None,
+            "patient_phone": pat.phone if pat else None,
+            "doctor_name": doc.full_name if doc else None,
+            "follow_up_type": fu.follow_up_type,
+            "treatment_name": fu.treatment_name,
+            "due_time": fu.follow_up_time.strftime("%H:%M") if fu.follow_up_time else None,
+            "status": fu.status,
+            "link": f"/crm/enquiry-calendar?focus={fu.id}",
+        })
+
+    # -------------------------------------------------------------
+    # RECENT ACTIVITY FEED
+    # -------------------------------------------------------------
+    activity = []
+    for cl in recent_comm[:5]:
+        activity.append({
+            "id": f"comm-{cl['id']}", "description": f"{cl['channel'].title()} {cl['message_type'].replace('_', ' ').title()} → {cl['name']}",
+            "date": cl["created_at"], "type": "communication", "link": cl["link"],
+        })
+    for l in conv_rows[:4]:
+        activity.append({
+            "id": f"conv-{l.id}", "description": f"{l.lead_name} converted to patient",
+            "date": (l.updated_at or l.created_at).isoformat(), "type": "conversion", "link": f"/leads/{l.id}",
+        })
+    for fu in work_rows[:4]:
+        activity.append({
+            "id": f"fu-{fu.id}", "description": f"{fu.follow_up_type.replace('_', ' ').title()} for {fu.patient_id or 'lead'}",
+            "date": datetime.combine(fu.follow_up_date, datetime.min.time()).isoformat(),
+            "type": "follow_up", "link": f"/crm/enquiry-calendar?focus={fu.id}",
+        })
+    activity.sort(key=lambda x: x["date"] or "", reverse=True)
+
+    # -------------------------------------------------------------
+    # TODAY'S COMMAND CENTER (what needs attention right now)
+    # -------------------------------------------------------------
+    follow_ups_due_today = await count(fu_scope(select(FollowUp)).where(
+        FollowUp.follow_up_date == today, FollowUp.status.in_(OPEN_FOLLOW_UP_STATUSES)))
+    converted_today = await count(lead_scope(select(Lead)).where(
+        Lead.status == LeadStatus.CONVERTED.value, Lead.updated_at >= s_dt, Lead.updated_at <= e_dt))
+
+    today_center = {
+        "date": today.isoformat(),
+        "follow_ups_due_today": follow_ups_due_today,
+        "overdue_follow_ups": overdue,
+        "recalls_due": await count(due_scope(RECALL_TYPES, today, today)),
+        "wellness_due": await count(due_scope(WELLNESS_TYPES, today, today)),
+        "appointment_reminders_due": await count(due_scope(APPT_REMINDER_TYPES, today, today)),
+        "leads_ready_for_conversion": leads_ready_now,
+        "converted_today": converted_today,
+        "unread_messages": cur_unread,
+        "failed_messages": cur_failed,
+        "calls_made": cur_calls,
+        "missed_calls": cur_missed,
+    }
+
+    return {
+        "meta": {
+            "period": period,
+            "date_start": d_start.isoformat(), "date_end": d_end.isoformat(),
+            "prev_start": prev_start.isoformat(), "prev_end": prev_end.isoformat(),
+            "generated_at": now_utc.isoformat(),
+        },
+        "kpis": kpis,
+        "today": today_center,
+        "lead_analytics": {
+            "growth_trend": growth_trend, "by_source": by_source, "by_status": by_status,
+            "by_priority": by_priority, "funnel": funnel, "ageing_buckets": ageing_buckets,
+        },
+        "enquiry_analytics": {
+            "by_type": enq_by_type,
+            "by_status": enq_by_status,
+            "total": enq_total,
+            "open": enq_open,
+            "completed": enq_completed,
+            "overdue": enq_overdue,
+            "trend": enq_trend,
+        },
+        "recall_wellness": {
+            "recalls": {"due": cur_recalls},
+            "wellness": {"due": cur_wellness},
+            "appointment_reminders": {"due": cur_appt_reminders},
+            "list": recall_wellness_list,
+        },
+        "communication": {
+            "by_channel": by_channel, "by_status": by_comm_status,
+            "calls": {"total": cur_calls, "missed": cur_missed},
+            "trend": comm_trend, "recent": recent_comm,
+        },
+        "conversions": {"recent": conversions, "count": cur_conv},
+        "work_queue": work_queue,
+        "activity": activity,
+    }

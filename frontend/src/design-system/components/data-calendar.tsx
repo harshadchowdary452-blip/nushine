@@ -165,7 +165,6 @@ export default function DataCalendar({
   }
 
   const weekStart = startOfWeek(cursor)
-  const weekDays = eachDayOfInterval({ start: weekStart, end: endOfWeek(cursor) })
 
   return (
     <div className={cn("flex flex-col gap-4", className)}>

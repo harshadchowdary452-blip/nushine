@@ -149,6 +149,17 @@ Warm Regards,
 {{hospital_name}}
 Patient Care Team"""
 
+MISSED_APPOINTMENT_TEMPLATE = """Hello {{patient_name}},
+
+We missed you at {{hospital_name}} for your scheduled appointment on {{appointment_date}}.
+
+Your health and treatment progress are important to us. Please call us at {{hospital_phone}} so we can help you reschedule at a time that is convenient for you.
+
+Warm Regards,
+
+{{hospital_name}}
+Patient Care Team"""
+
 DEFAULT_TEMPLATES_BY_TYPE = {
     "LEAD_FOLLOW_UP": LEAD_FOLLOW_UP_TEMPLATE,
     "APPOINTMENT_REMINDER": APPOINTMENT_REMINDER_TEMPLATE,
@@ -156,6 +167,7 @@ DEFAULT_TEMPLATES_BY_TYPE = {
     "TREATMENT_WELLNESS": TREATMENT_WELLNESS_TEMPLATE,
     "CASE_WELLNESS": CASE_WELLNESS_TEMPLATE,
     "RECALL": RECALL_TEMPLATE,
+    "MISSED_APPOINTMENT": MISSED_APPOINTMENT_TEMPLATE,
 }
 
 

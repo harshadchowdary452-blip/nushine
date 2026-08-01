@@ -86,8 +86,44 @@ interface MiniSparklineProps {
   className?: string
 }
 
+/**
+ * Measures the container with a ResizeObserver and feeds explicit numeric
+ * width/height into Recharts' ResponsiveContainer. Recharts warns with
+ * "width(-1)/height(-1)" whenever it self-measures a 0x0 container (first
+ * frame, collapsed collapsible, tab switch), so the chart is only rendered
+ * once it has positive dimensions and re-renders on every resize.
+ */
+export function useContainerSize<T extends HTMLElement>() {
+  const ref = React.useRef<T | null>(null)
+  const [size, setSize] = React.useState({ width: 0, height: 0 })
+
+  React.useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const update = () => {
+      const rect = el.getBoundingClientRect()
+      setSize((prev) =>
+        prev.width === rect.width && prev.height === rect.height
+          ? prev
+          : { width: rect.width, height: rect.height },
+      )
+    }
+    update()
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(update)
+      observer.observe(el)
+      return () => observer.disconnect()
+    }
+    window.addEventListener("resize", update)
+    return () => window.removeEventListener("resize", update)
+  }, [])
+
+  return { ref, size }
+}
+
 /** Tiny area sparkline for KPI and trend cards. Uses a unique gradient id. */
 export function MiniSparkline({ data, id, stroke = "var(--ds-primary)", fill = "var(--ds-primary)", height = 40, className }: MiniSparklineProps) {
+  const { ref, size } = useContainerSize<HTMLDivElement>()
   const points = data.map((value, index) => ({ index, value }))
   const gradientId = `ds-spark-${id}`
 
@@ -96,22 +132,24 @@ export function MiniSparkline({ data, id, stroke = "var(--ds-primary)", fill = "
   }
 
   return (
-    <div className={cn("w-full", className)} style={{ height }} aria-hidden="true">
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={points} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
-          <defs>
-            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={fill} stopOpacity={0.18} />
-              <stop offset="100%" stopColor={fill} stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <Tooltip
-            content={<ChartTooltip formatter={(value) => String(value)} />}
-            cursor={{ stroke: "var(--ds-border)", strokeDasharray: "3 3" }}
-          />
-          <Area type="monotone" dataKey="value" stroke={stroke} strokeWidth={1.75} fill={`url(#${gradientId})`} isAnimationActive={false} />
-        </AreaChart>
-      </ResponsiveContainer>
+    <div ref={ref} className={cn("w-full", className)} style={{ height }} aria-hidden="true">
+      {size.width > 0 && size.height > 0 && (
+        <ResponsiveContainer width={size.width} height={size.height}>
+          <AreaChart data={points} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
+            <defs>
+              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={fill} stopOpacity={0.18} />
+                <stop offset="100%" stopColor={fill} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <Tooltip
+              content={<ChartTooltip formatter={(value) => String(value)} />}
+              cursor={{ stroke: "var(--ds-border)", strokeDasharray: "3 3" }}
+            />
+            <Area type="monotone" dataKey="value" stroke={stroke} strokeWidth={1.75} fill={`url(#${gradientId})`} isAnimationActive={false} />
+          </AreaChart>
+        </ResponsiveContainer>
+      )}
     </div>
   )
 }

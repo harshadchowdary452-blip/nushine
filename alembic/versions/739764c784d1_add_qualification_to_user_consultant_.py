@@ -16,13 +16,22 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+def column_exists(table, column):
+    from sqlalchemy import inspect
+    bind = op.get_bind()
+    return column in [c["name"] for c in inspect(bind).get_columns(table)]
+
+
 def upgrade() -> None:
-    op.add_column('users', sa.Column('qualification', sa.String(length=255), nullable=True))
-    op.add_column('consultants', sa.Column('qualification', sa.String(length=255), nullable=True))
-    op.add_column('cases', sa.Column('doctor_qualification', sa.String(length=100), nullable=True))
+    if not column_exists('users', 'qualification'):
+        op.add_column('users', sa.Column('qualification', sa.String(length=255), nullable=True))
+    if not column_exists('consultants', 'qualification'):
+        op.add_column('consultants', sa.Column('qualification', sa.String(length=255), nullable=True))
+    if not column_exists('cases', 'doctor_qualification'):
+        op.add_column('cases', sa.Column('doctor_qualification', sa.String(length=100), nullable=True))
 
 
 def downgrade() -> None:
-    op.drop_column('cases', 'doctor_qualification')
-    op.drop_column('consultants', 'qualification')
-    op.drop_column('users', 'qualification')
+    for table, column in (('cases', 'doctor_qualification'), ('consultants', 'qualification'), ('users', 'qualification')):
+        if column_exists(table, column):
+            op.drop_column(table, column)

@@ -14,6 +14,14 @@ module.exports = {
     sourceType: 'module',
   },
   plugins: ['react-refresh'],
+  overrides: [
+    {
+      files: ['src/components/ui/**/*.tsx', 'src/design-system/**/*.tsx'],
+      rules: {
+        'react-refresh/only-export-components': 'off',
+      },
+    },
+  ],
   rules: {
     'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
     '@typescript-eslint/no-explicit-any': 'warn',

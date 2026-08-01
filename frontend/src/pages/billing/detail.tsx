@@ -187,25 +187,25 @@ export default function BillingDetail() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border border-blue-200">
+              <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
                 <p className="text-sm text-blue-600 font-medium">Original Amount</p>
                 <p className="text-2xl font-bold text-blue-800 mt-1">
                   {formatIndianRupees(billing.original_amount || billing.total_amount)}
                 </p>
               </div>
-              <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 border border-green-200">
+              <div className="bg-green-50 rounded-xl p-4 border border-green-200">
                 <p className="text-sm text-green-600 font-medium">Paid Amount</p>
                 <p className="text-2xl font-bold text-green-800 mt-1">
                   {formatIndianRupees(billing.paid_amount)}
                 </p>
               </div>
-              <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl p-4 border border-amber-200">
+              <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
                 <p className="text-sm text-amber-600 font-medium">Pending Amount</p>
                 <p className="text-2xl font-bold text-amber-800 mt-1">
                   {formatIndianRupees(billing.pending_amount)}
                 </p>
               </div>
-              <div className={`rounded-xl p-4 border ${billing.discount_percent > 0 || billing.discount_amount > 0 ? "bg-gradient-to-br from-[var(--ds-accent-50)] to-[var(--ds-accent-100)] border-[var(--ds-accent-200)]" : "bg-[var(--ds-background-subtle)] border-[var(--ds-border)]"}`}>
+              <div className={`rounded-xl p-4 border ${billing.discount_percent > 0 || billing.discount_amount > 0 ? "bg-[var(--ds-accent-50)] border-[var(--ds-accent-200)]" : "bg-[var(--ds-background-subtle)] border-[var(--ds-border)]"}`}>
                 <p className="text-sm text-[var(--ds-accent-600)] font-medium">Discount</p>
                 <p className="text-2xl font-bold mt-1">
                   {(billing.discount_percent > 0 || billing.discount_amount > 0) ? (
@@ -227,14 +227,14 @@ export default function BillingDetail() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-              <div className="bg-gradient-to-br from-[var(--ds-primary-50)] to-[var(--ds-primary-100)] rounded-xl p-4 border border-[var(--ds-primary-200)]">
+              <div className="bg-[var(--ds-primary-50)] rounded-xl p-4 border border-[var(--ds-primary-200)]">
                 <p className="text-sm text-[var(--ds-primary-600)] font-medium">Final Amount</p>
                 <p className="text-2xl font-bold text-[var(--ds-primary-800)] mt-1">
                   {formatIndianRupees(billing.total_amount)}
                 </p>
               </div>
               {billing.paid_at && (
-                <div className="bg-gradient-to-br from-teal-50 to-teal-100 rounded-xl p-4 border border-teal-200">
+                <div className="bg-teal-50 rounded-xl p-4 border border-teal-200">
                   <p className="text-sm text-teal-600 font-medium">Paid On</p>
                   <p className="text-xl font-bold text-teal-800 mt-1">
                     {new Date(billing.paid_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}

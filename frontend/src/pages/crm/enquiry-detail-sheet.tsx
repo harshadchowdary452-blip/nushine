@@ -3,9 +3,9 @@ import { useQuery } from "@tanstack/react-query"
 import {
   Phone, MessageCircle, CheckCircle, Calendar,
   FileText, History, RotateCcw, Clock, User, Stethoscope,
-  Activity, ChevronRight, MapPin, Mail, Building2, PhoneCall,
-  CalendarCheck, ClipboardList, Percent, BadgeCheck,
-  ArrowRight, BookOpen, Target, HeartPulse, AlertCircle,
+  Activity, ChevronRight, MapPin, Mail, Building2,
+  CalendarCheck, ClipboardList, BadgeCheck,
+  ArrowRight, Target, AlertCircle, FolderOpen,
   Loader2, ChevronDown,
 } from "lucide-react"
 import { format, parseISO } from "date-fns"
@@ -13,9 +13,7 @@ import { enquiriesApi } from "@/services/endpoints"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet"
-import {
-  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
-} from "@/components/ui/tooltip"
+import type { CalendarItem } from "./enquiry-calendar"
 
 const ENQUIRY_TYPE_LABELS: Record<string, string> = {
   LEAD_FOLLOW_UP: "Lead Follow-up",
@@ -114,10 +112,7 @@ interface EnquiryDetail {
   display_name?: string; display_phone?: string; display_email?: string
 }
 
-interface PreviousVisit {
-  date?: string; doctor?: string; treatment_name?: string; work_done?: string
-  sitting_number?: number; status?: string; type?: string
-}
+type EnquiryPayload = EnquiryDetail & CalendarItem
 
 function formatDate(d: string | undefined | null): string {
   if (!d) return "—"
@@ -175,20 +170,7 @@ function SectionCard({ title, icon, children, className = "" }: { title: string;
   )
 }
 
-function BadgeRow({ items }: { items: { label: string; value: string; color?: string }[] }) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {items.map((item, i) => (
-        <div key={i} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted/50 border text-xs">
-          <span className="text-muted-foreground">{item.label}:</span>
-          <span className={`font-semibold ${item.color || ""}`}>{item.value}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function QuickAction({ label, icon, onClick, variant = "default" }: { label: string; icon: React.ReactNode; onClick: () => void; variant?: string }) {
+function QuickAction({ label, icon, onClick }: { label: string; icon: React.ReactNode; onClick: () => void }) {
   return (
     <button
       type="button"
@@ -236,13 +218,13 @@ interface DetailSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   enquiryId: string | null
-  onCall?: (item: any) => void
-  onWhatsApp?: (item: any) => void
-  onFeedback?: (item: any) => void
+  onCall?: (item: EnquiryPayload) => void
+  onWhatsApp?: (item: EnquiryPayload) => void
+  onFeedback?: (item: EnquiryPayload) => void
   onReschedule?: (id: string, date: string) => void
   onComplete?: (id: string, source?: string) => void
-  onTimeline?: (item: any) => void
-  calendarItem?: any
+  onTimeline?: (item: EnquiryPayload) => void
+  calendarItem?: CalendarItem | null
 }
 
 export function EnquiryDetailSheet({
@@ -273,7 +255,7 @@ export function EnquiryDetailSheet({
     staleTime: 30_000,
   })
 
-  const item = detail || calendarItem
+  const item = (detail || calendarItem) as EnquiryPayload | undefined
   const isLead = item?.enquiry_type === "LEAD_FOLLOW_UP"
   const style = TYPE_STYLES[item?.enquiry_type || ""] || TYPE_STYLES["APPOINTMENT_REMINDER"]
 
@@ -287,13 +269,13 @@ export function EnquiryDetailSheet({
     }
   }, [enquiryId])
 
-  const createItemProxy = (extra?: Record<string, any>) => {
-    if (!item) return {}
+  const createItemProxy = (extra?: Record<string, unknown>): EnquiryPayload => {
+    if (!item) return {} as EnquiryPayload
     return {
       ...item,
       ...(detail || {}),
       ...(extra || {}),
-    }
+    } as EnquiryPayload
   }
 
   function toggleSection(key: string) {
@@ -852,6 +834,3 @@ export function EnquiryDetailSheet({
     </Sheet>
   )
 }
-
-// Missing lucide icon import
-import { FolderOpen } from "lucide-react"

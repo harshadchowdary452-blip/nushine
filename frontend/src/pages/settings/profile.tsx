@@ -88,7 +88,7 @@ export default function Settings() {
       <div className="grid gap-8 lg:grid-cols-3">
         <div className="lg:col-span-1">
           <div className="sticky top-24 space-y-6">
-            <Card className="overflow-hidden border-0 bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-xl shadow-blue-200">
+            <Card className="overflow-hidden border-0 bg-[var(--ds-primary)] text-white shadow-xl shadow-[color-mix(in_srgb,var(--ds-primary)_30%,transparent)]">
               <CardContent className="flex flex-col items-center p-8 text-center">
                 <Avatar className="mb-4 h-20 w-20 ring-4 ring-white/30">
                   <AvatarFallback className="bg-white/20 text-2xl text-white">{initials}</AvatarFallback>

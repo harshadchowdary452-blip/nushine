@@ -57,7 +57,6 @@ async def delete(self, hospital_id: str, user_id: str = None) -> bool:
     from app.models.patient import Patient
     from app.models.consultant import Consultant
     from app.models.hospital_monthly_expense import HospitalMonthlyExpense as Expense
-    from app.models.campaign import Campaign
     from app.models.lead import Lead
     logger = logging.getLogger(__name__)
     try:
@@ -67,7 +66,6 @@ async def delete(self, hospital_id: str, user_id: str = None) -> bool:
         counts["patients"] = (await self.db.execute(select(func.count()).select_from(Patient).where(Patient.hospital_id == hospital_id))).scalar()
         counts["consultants"] = (await self.db.execute(select(func.count()).select_from(Consultant).where(Consultant.hospital_id == hospital_id))).scalar()
         counts["expenses"] = (await self.db.execute(select(func.count()).select_from(Expense).where(Expense.hospital_id == hospital_id))).scalar()
-        counts["campaigns"] = (await self.db.execute(select(func.count()).select_from(Campaign).where(Campaign.hospital_id == hospital_id))).scalar()
         counts["leads"] = (await self.db.execute(select(func.count()).select_from(Lead).where(Lead.hospital_id == hospital_id))).scalar()
         active = {k: v for k, v in counts.items() if v > 0}
         if active:

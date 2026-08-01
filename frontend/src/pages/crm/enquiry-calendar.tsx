@@ -53,13 +53,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet"
 import { EnquiryDetailSheet } from "./enquiry-detail-sheet"
 import { FeedbackDrawer } from "@/components/crm/FeedbackDrawer"
 import {
@@ -72,7 +65,7 @@ import {
 } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
-interface CalendarItem {
+export interface CalendarItem {
   id: string
   source?: string
   enquiry_type?: string
@@ -255,6 +248,8 @@ interface TimelineEntry {
   response_summary?: string
   event_type?: string
   description?: string
+  enquiry_type?: string
+  due_date?: string
 }
 
 interface WhatsAppTemplate {
@@ -496,8 +491,20 @@ function getDefaultTemplate(enquiryType?: string): string {
   return DEFAULT_TEMPLATES.APPOINTMENT_REMINDER || ""
 }
 
-function replaceTemplateVars(template: string, vars: Record<string, string | undefined>): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] || "")
+function renderTemplateLocal(
+  template: string,
+  vars: Record<string, string>,
+): { message: string; unresolved: string[] } {
+  const unresolved: string[] = []
+  const message = template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+    const v = vars[key]
+    if (!v || !v.trim()) {
+      if (!unresolved.includes(key)) unresolved.push(key)
+      return ""
+    }
+    return v
+  })
+  return { message, unresolved }
 }
 
 function getTypeColor(enquiryType: string) {
@@ -563,6 +570,8 @@ export default function EnquiryCalendar() {
         priority: priorityFilter || undefined,
         include_terminal: includeTerminal || undefined,
       }),
+    refetchInterval: 15000,
+    refetchOnWindowFocus: true,
   })
 
   const apiItems: CalendarItem[] = useMemo(
@@ -599,6 +608,7 @@ export default function EnquiryCalendar() {
         end_date: dateRange.end,
         include_terminal: includeTerminal || undefined,
       }),
+    refetchInterval: 15000,
   })
 
   // --- Doctors ---
@@ -654,6 +664,8 @@ export default function EnquiryCalendar() {
     queryClient.invalidateQueries({ queryKey: ["enquiry-calendar-summary"] })
     queryClient.invalidateQueries({ queryKey: ["dash"] })
     queryClient.invalidateQueries({ queryKey: ["crm-enhanced-dashboard"] })
+    queryClient.invalidateQueries({ queryKey: ["crm-dashboard"] })
+    queryClient.invalidateQueries({ queryKey: ["crm-command-center"], refetchType: "all" })
   }, [queryClient])
 
   async function handleMarkCompleted(id: string, source?: string) {
@@ -735,18 +747,7 @@ export default function EnquiryCalendar() {
   const [waMessage, setWaMessage] = useState("")
   const [waLoading, setWaLoading] = useState(false)
   const [waTemplateError, setWaTemplateError] = useState("")
-  const [waPreviewOpen, setWaPreviewOpen] = useState(false)
-  const [waPreviewMsg, setWaPreviewMsg] = useState("")
-
-  const loadWaPreview = useCallback(async () => {
-    if (!detailItem?.id) return
-    try {
-      const r = await enquiriesApi.whatsappPreview(detailItem.id)
-      setWaPreviewMsg(r?.rendered_message || "No preview available")
-    } catch {
-      setWaPreviewMsg("Unable to load WhatsApp preview")
-    }
-  }, [detailItem?.id])
+  const [waUnresolved, setWaUnresolved] = useState<string[]>([])
 
   function buildWhatsAppVars(item: CalendarItem): Record<string, string> {
     if (item.template_variables && Object.keys(item.template_variables).length > 0) {
@@ -813,11 +814,23 @@ export default function EnquiryCalendar() {
     setWaItem(item)
     setWaOpen(item.id)
     setWaTemplateError("")
+    setWaUnresolved([])
     setWaLoading(true)
+
+    const applyPreview = (message: string, unresolved: string[]) => {
+      setWaMessage(message)
+      setWaUnresolved(unresolved)
+      if (unresolved.length > 0) {
+        setWaTemplateError(
+          `Some values are missing: ${unresolved.join(", ")}. Sending is blocked until they are filled.`,
+        )
+      }
+    }
+
     try {
       const resp = await enquiriesApi.whatsappPreview(item.id)
       if (resp?.rendered_message) {
-        setWaMessage(resp.rendered_message)
+        applyPreview(resp.rendered_message, resp.unresolved_variables || [])
       } else {
         throw new Error("no rendered_message")
       }
@@ -831,14 +844,17 @@ export default function EnquiryCalendar() {
           (t) => t.is_active !== false && t.enquiry_type === item.enquiry_type && t.message,
         )
         if (template?.message) {
-          setWaMessage(replaceTemplateVars(template.message, buildWhatsAppVars(item)))
+          const { message, unresolved } = renderTemplateLocal(template.message, buildWhatsAppVars(item))
+          applyPreview(message, unresolved)
         } else {
           const defaultMsg = getDefaultTemplate(item.enquiry_type)
-          setWaMessage(replaceTemplateVars(defaultMsg, buildWhatsAppVars(item)))
+          const { message, unresolved } = renderTemplateLocal(defaultMsg, buildWhatsAppVars(item))
+          applyPreview(message, unresolved)
         }
       } catch {
         const defaultMsg = getDefaultTemplate(item.enquiry_type)
-        setWaMessage(replaceTemplateVars(defaultMsg, buildWhatsAppVars(item)))
+        const { message, unresolved } = renderTemplateLocal(defaultMsg, buildWhatsAppVars(item))
+        applyPreview(message, unresolved)
       }
     }
     setWaLoading(false)
@@ -846,10 +862,11 @@ export default function EnquiryCalendar() {
 
   async function sendWhatsApp() {
     if (!waOpen || !waItem || !waMessage) return
-    const unresolved = waMessage.match(/\{\{(\w+)\}\}/g)
-    if (unresolved?.length) {
+    const rawTokens = waMessage.match(/\{\{(\w+)\}\}/g)
+    if (rawTokens?.length) {
+      setWaUnresolved(rawTokens.map((t) => t.replace(/\{\{|\}\}/g, "")))
       setWaTemplateError(
-        `Unresolved variables: ${unresolved.join(", ")}. Please replace them before sending.`,
+        `Unresolved variables: ${rawTokens.join(", ")}. Please replace them before sending.`,
       )
       return
     }
@@ -862,7 +879,27 @@ export default function EnquiryCalendar() {
       addToast({ title: "Mobile number is not available.", variant: "destructive" })
       return
     }
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(waMessage)}`, "_blank")
+
+    // Re-validate against live data so no blank/empty substitutions are ever sent.
+    let finalMessage = waMessage
+    try {
+      const check = await enquiriesApi.whatsappPreview(waOpen, { template_message: waMessage })
+      if (check?.rendered_message) {
+        const unresolved = check.unresolved_variables || []
+        if (unresolved.length > 0) {
+          setWaUnresolved(unresolved)
+          setWaTemplateError(
+            `Some values are missing: ${unresolved.join(", ")}. Sending is blocked until they are filled.`,
+          )
+          return
+        }
+        finalMessage = check.rendered_message
+      }
+    } catch {
+      /* keep the text as typed when the preview service is unavailable */
+    }
+
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(finalMessage)}`, "_blank")
     try {
       if (waItem.source === "generated_enquiry") {
         await enquiriesApi.updateStatus(waOpen, { status: "CONTACTED" })
@@ -870,7 +907,7 @@ export default function EnquiryCalendar() {
         await crmApi.followUps.update(waOpen, {
           status: "CONTACTED",
           contact_channel: "WHATSAPP",
-          whatsapp_message: waMessage,
+          whatsapp_message: finalMessage,
         })
       }
       invalidateCalendar()
@@ -880,11 +917,12 @@ export default function EnquiryCalendar() {
     setWaOpen(null)
     setWaMessage("")
     setWaTemplateError("")
+    setWaUnresolved([])
   }
 
   function handleCall(item: CalendarItem) {
     const phone =
-      item.patient_phone || item.lead?.mobile || item.patient?.phone || (item as any).display_phone
+      item.patient_phone || item.lead?.mobile || item.patient?.phone || (item as { display_phone?: string }).display_phone
     if (!phone) {
       addToast({ title: "No phone number available", variant: "destructive" })
       return
@@ -910,16 +948,7 @@ export default function EnquiryCalendar() {
     enabled: !!timelineItem?.patient_id && !isLeadTimeline && !detailData?.timeline,
   })
 
-  const timelineEntries: {
-    id?: string
-    enquiry_type?: string
-    status?: string
-    due_date?: string
-    created_at?: string
-    description?: string
-    action?: string
-    notes?: string
-  }[] = (detailData?.timeline as any[]) || (Array.isArray(timelineData) ? timelineData : [])
+  const timelineEntries: TimelineEntry[] = detailData?.timeline ?? (Array.isArray(timelineData) ? timelineData : [])
   // --- Navigation ---
   const navToday = useCallback(() => setSelectedDate(format(new Date(), "yyyy-MM-dd")), [])
   const handleNav = useCallback(
@@ -1842,6 +1871,7 @@ export default function EnquiryCalendar() {
             setWaOpen(null)
             setWaMessage("")
             setWaTemplateError("")
+            setWaUnresolved([])
           }
         }}
       >
@@ -1867,7 +1897,13 @@ export default function EnquiryCalendar() {
               ) : (
                 <Textarea
                   value={waMessage}
-                  onChange={(e) => setWaMessage(e.target.value)}
+                  onChange={(e) => {
+                    setWaMessage(e.target.value)
+                    if (waTemplateError) {
+                      setWaTemplateError("")
+                      setWaUnresolved([])
+                    }
+                  }}
                   rows={8}
                   className="text-sm font-mono"
                 />
@@ -1885,9 +1921,20 @@ export default function EnquiryCalendar() {
                 onClick={async () => {
                   if (!waItem) return
                   setWaLoading(true)
+                  setWaTemplateError("")
+                  setWaUnresolved([])
                   try {
                     const r = await enquiriesApi.whatsappPreview(waItem.id)
-                    if (r?.rendered_message) setWaMessage(r.rendered_message)
+                    if (r?.rendered_message) {
+                      setWaMessage(r.rendered_message)
+                      const unresolved = r.unresolved_variables || []
+                      setWaUnresolved(unresolved)
+                      if (unresolved.length > 0) {
+                        setWaTemplateError(
+                          `Some values are missing: ${unresolved.join(", ")}. Sending is blocked until they are filled.`,
+                        )
+                      }
+                    }
                   } catch (e) {
                     console.error("Preview failed", e)
                   }
@@ -1903,11 +1950,16 @@ export default function EnquiryCalendar() {
                   setWaOpen(null)
                   setWaMessage("")
                   setWaTemplateError("")
+                  setWaUnresolved([])
                 }}
               >
                 Cancel
               </Button>
-              <Button className="flex-1" onClick={sendWhatsApp} disabled={!waMessage || waLoading}>
+              <Button
+                className="flex-1"
+                onClick={sendWhatsApp}
+                disabled={!waMessage || waLoading || waUnresolved.length > 0}
+              >
                 <MessageCircle className="h-4 w-4 mr-2" /> Open WhatsApp
               </Button>
             </div>

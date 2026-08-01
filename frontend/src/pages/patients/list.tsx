@@ -2,7 +2,7 @@ import { useState, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import type { ColumnDef, SortingState } from "@tanstack/react-table"
-import { Plus, Eye, Edit, Trash2, Users, UserPlus, SlidersHorizontal } from "lucide-react"
+import { Plus, Eye, Trash2, Users, UserPlus, Phone, MessageSquare } from "lucide-react"
 import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,16 +13,13 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent } from "@/components/ui/card"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import SearchableSelect from "@/components/ui/searchable-select"
 import { patientsApi, doctorsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
 import QuickExport from "@/components/ui/quick-export"
 import { useServerFilters } from "@/hooks/useServerFilters"
-import { FilterChips } from "@/components/ui/filter-bar"
 import PatientFilterBar from "./filter-bar"
-import { PageHeader, DataTable } from "@/design-system"
+import { EnterpriseWorkspace, DataTable, DrawerSection } from "@/design-system"
 import type { Patient, PaginatedResponse, User } from "@/types"
 import { extractDetail } from "@/types"
 import { useAuthStore } from "@/store/authStore"
@@ -87,7 +84,9 @@ export default function PatientList() {
   const [form, setForm] = useState<PatientForm>(getEmptyForm)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deletingPatient, setDeletingPatient] = useState<Patient | null>(null)
-  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+  const [bulkTargets, setBulkTargets] = useState<Patient[]>([])
+  const [quickViewPatient, setQuickViewPatient] = useState<Patient | null>(null)
 
   useCreateParam(() => openDialog())
 
@@ -124,6 +123,11 @@ export default function PatientList() {
     return data?.items || []
   }, [data])
 
+  const totalCount = useMemo(() => {
+    if (Array.isArray(data)) return data.length
+    return data?.total ?? 0
+  }, [data])
+
   const totalPages = useMemo(() => {
     if (Array.isArray(data)) return 1
     return data?.total_pages || data?.pages || 1
@@ -143,8 +147,30 @@ export default function PatientList() {
     },
   })
 
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (ids: string[]) => Promise.all(ids.map((id) => patientsApi.delete(id))),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["patients"], refetchType: "all" })
+      queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" })
+      queryClient.invalidateQueries({ queryKey: ["crm"] })
+      addToast({ title: "Success", description: `${bulkTargets.length} patients deleted successfully`, variant: "success" })
+      setBulkDeleteOpen(false); setBulkTargets([])
+    },
+    onError: (err: unknown) => {
+      addToast({ title: "Error", description: extractDetail(err), variant: "destructive" })
+    },
+  })
+
   function confirmDelete(patient: Patient) { setDeletingPatient(patient); setDeleteDialogOpen(true) }
   function handleDelete() { if (deletingPatient) deleteMutation.mutate(deletingPatient.id) }
+  function handleBulkDelete() {
+    if (bulkTargets.length > 0) bulkDeleteMutation.mutate(bulkTargets.map((p) => p.id))
+  }
+
+  function applySavedFilters(saved: Record<string, string>) {
+    resetFilters()
+    for (const [k, v] of Object.entries(saved)) setFilter(k, v)
+  }
 
   const createMutation = useMutation({
     mutationFn: (data: Record<string, unknown>) => patientsApi.create(data),
@@ -224,20 +250,17 @@ export default function PatientList() {
         enableHiding: false,
         cell: ({ row }) => (
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); navigate(`/patients/${row.original.id}`) }}>
+            <Button variant="ghost" size="icon" aria-label={`Quick view ${row.original.full_name}`} onClick={(e) => { e.stopPropagation(); setQuickViewPatient(row.original) }}>
               <Eye className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
-              <Edit className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); confirmDelete(row.original) }}>
+            <Button variant="ghost" size="icon" aria-label={`Delete ${row.original.full_name}`} onClick={(e) => { e.stopPropagation(); confirmDelete(row.original) }}>
               <Trash2 className="h-4 w-4 text-[var(--ds-danger)]" />
             </Button>
           </div>
         ),
       },
     ],
-    [navigate]
+    []
   )
 
   function handleSortingChange(sorting: SortingState) {
@@ -254,93 +277,174 @@ export default function PatientList() {
     createMutation.mutate(stripEmptyFormFields(form))
   }
 
-  return (
-    <div className="space-y-6">
-      <PageHeader title="Patients" description="Manage patient records"
-        actions={<>
-          {currentUser?.role !== "DOCTOR" && (
-            <Button onClick={openDialog}><Plus className="h-4 w-4" /> Add Patient</Button>
-          )}
-          <QuickExport module="patients" label="patients" />
-        </>}
-      />
-
-      <Card className="mb-6">
-        <CardContent className="p-6">
-          {/* Mobile filter trigger */}
-          <div className="lg:hidden mb-4">
-            <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
-              <SheetTrigger asChild>
-                <Button variant="outline" className="w-full">
-                  <SlidersHorizontal className="h-4 w-4 mr-2" />
-                  Filters {activeFilters > 0 && `(${activeFilters})`}
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="w-[300px] sm:w-[360px] p-0">
-                <SheetHeader className="p-4 pb-2 border-b">
-                  <SheetTitle>Filters</SheetTitle>
-                </SheetHeader>
-                <div className="p-4 overflow-y-auto h-[calc(100%-60px)]">
-                  <PatientFilterBar
-                    filters={filters} setFilter={setFilter} resetFilters={resetFilters}
-                    activeCount={activeFilters} doctors={doctors}
-                  />
-                </div>
-              </SheetContent>
-            </Sheet>
+  const quickView = quickViewPatient ? {
+    open: true,
+    onClose: () => setQuickViewPatient(null),
+    title: quickViewPatient.full_name,
+    subtitle: [
+      quickViewPatient.op_no && `OP No. ${quickViewPatient.op_no}`,
+      quickViewPatient.age && `${quickViewPatient.age} yrs`,
+      quickViewPatient.gender,
+    ].filter(Boolean).join(" · ") || undefined,
+    eyebrow: `ID ${quickViewPatient.id.slice(0, 8)}`,
+    statusPill: <StatusBadge status={quickViewPatient.status} />,
+    onOpenFull: () => {
+      navigate(`/patients/${quickViewPatient.id}`)
+      setQuickViewPatient(null)
+    },
+    actions: quickViewPatient.phone ? (
+      <>
+        <a href={`tel:${quickViewPatient.phone}`} onClick={() => setQuickViewPatient(null)}>
+          <Button variant="outline" size="sm" aria-label="Call patient">
+            <Phone className="h-4 w-4" />
+            <span className="hidden sm:inline">Call</span>
+          </Button>
+        </a>
+        <a
+          href={`https://wa.me/${quickViewPatient.phone.replace(/[^0-9]/g, "")}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => setQuickViewPatient(null)}
+        >
+          <Button variant="outline" size="sm" aria-label="WhatsApp patient">
+            <MessageSquare className="h-4 w-4" />
+            <span className="hidden sm:inline">WhatsApp</span>
+          </Button>
+        </a>
+      </>
+    ) : undefined,
+    children: (
+      <>
+        <DrawerSection title="Contact">
+          <dl className="space-y-2 text-sm">
+            <div className="flex justify-between gap-3">
+              <dt className="text-[var(--ds-text-secondary)]">Phone</dt>
+              <dd className="font-medium">{quickViewPatient.phone || "—"}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-[var(--ds-text-secondary)]">Email</dt>
+              <dd className="font-medium">{quickViewPatient.email || "—"}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-[var(--ds-text-secondary)]">Address</dt>
+              <dd className="font-medium text-right">{quickViewPatient.address || "—"}</dd>
+            </div>
+          </dl>
+        </DrawerSection>
+        <DrawerSection title="Registration">
+          <dl className="space-y-2 text-sm">
+            <div className="flex justify-between gap-3">
+              <dt className="text-[var(--ds-text-secondary)]">OP No.</dt>
+              <dd className="font-medium">{quickViewPatient.op_no || "—"}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-[var(--ds-text-secondary)]">ABHA ID</dt>
+              <dd className="font-medium">{quickViewPatient.abha_id || "—"}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-[var(--ds-text-secondary)]">Source</dt>
+              <dd className="font-medium">{quickViewPatient.patient_source || "—"}</dd>
+            </div>
+          </dl>
+        </DrawerSection>
+        <DrawerSection title="Vitals">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {[
+              { label: "Height", value: quickViewPatient.height ? `${quickViewPatient.height} cm` : "—" },
+              { label: "Weight", value: quickViewPatient.weight ? `${quickViewPatient.weight} kg` : "—" },
+              { label: "BP", value: quickViewPatient.bp || "—" },
+              { label: "Sugar", value: quickViewPatient.sugar || "—" },
+              { label: "SpO2", value: quickViewPatient.spo2 ? `${quickViewPatient.spo2}%` : "—" },
+            ].map((item) => (
+              <div key={item.label} className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-border-light)] p-3">
+                <p className="ds-caption text-[var(--ds-text-tertiary)]">{item.label}</p>
+                <p className="ds-body-sm mt-0.5 font-medium text-[var(--ds-text)]">{item.value}</p>
+              </div>
+            ))}
           </div>
+        </DrawerSection>
+      </>
+    ),
+  } : undefined
 
-          {/* Desktop filter bar */}
-          <div className="hidden lg:block mb-4">
+  return (
+    <>
+      <EnterpriseWorkspace
+        title="Patients"
+        description="Manage patient records"
+        headerActions={
+          currentUser?.role !== "DOCTOR" && (
+            <Button onClick={openDialog}><Plus className="h-4 w-4" /> Add Patient</Button>
+          )
+        }
+        toolbarActions={<QuickExport module="patients" label="patients" />}
+        filters={{
+          fields: (
             <PatientFilterBar
               filters={filters} setFilter={setFilter} resetFilters={resetFilters}
               activeCount={activeFilters} doctors={doctors}
             />
-          </div>
-
-          {/* Active filter chips */}
-          <div className="mb-4">
-            <FilterChips chips={activeChips} onRemove={(k) => setFilter(k, "")} onClearAll={resetFilters} />
-          </div>
-
-          <DataTable
-            key={queryKey}
-            columns={columns}
-            data={patients}
-            loading={isLoading}
-            pagination
-            pageSize={10}
-            manualPagination
-            pageCount={totalPages}
-            onPageChange={(pageIndex) => setPage(pageIndex + 1)}
-            manualSorting
-            initialSorting={sortField ? [{ id: sortField, desc: sortDir === "desc" }] : []}
-            onSortingChange={handleSortingChange}
-            emptyIcon={Users}
-            emptyTitle={hasActiveFilters ? "No patients match your filters" : "No patients yet"}
-            emptyDescription={hasActiveFilters ? "Try adjusting or clearing your filters." : "Begin your patient journey by registering the first patient in your dental practice."}
-            emptyAction={
-              hasActiveFilters ? (
-                <Button variant="outline" onClick={resetFilters}>Clear Filters</Button>
-              ) : currentUser?.role !== "DOCTOR" ? (
-                <Button onClick={openDialog}><UserPlus className="h-4 w-4" /> Add Patient</Button>
-              ) : undefined
-            }
-            mobileCard={(row) => (
-              <div className="flex items-center justify-between gap-3">
-                <div className="ds-min-w-0">
-                  <p className="ds-body font-medium text-[var(--ds-text)]">{row.full_name}</p>
-                  <p className="ds-caption text-[var(--ds-text-secondary)]">
-                    {row.gender ?? "—"} · {row.phone ?? "—"}
-                  </p>
-                </div>
-                <StatusBadge status={row.status} />
+          ),
+          chips: activeChips,
+          activeCount: activeFilters,
+          onRemoveChip: (k) => setFilter(k, ""),
+          onClearAll: resetFilters,
+          savedStorageKey: "patient-list",
+          savedCurrent: filters,
+          onApplySaved: applySavedFilters,
+        }}
+        totalCount={totalCount}
+        totalLabel="patients"
+        quickView={quickView}
+      >
+        <DataTable
+          key={queryKey}
+          columns={columns}
+          data={patients}
+          loading={isLoading}
+          pagination
+          pageSize={10}
+          manualPagination
+          pageCount={totalPages}
+          onPageChange={(pageIndex) => setPage(pageIndex + 1)}
+          manualSorting
+          initialSorting={sortField ? [{ id: sortField, desc: sortDir === "desc" }] : []}
+          onSortingChange={handleSortingChange}
+          enableRowSelection
+          getRowId={(row) => row.id}
+          bulkActions={(rows) => (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => { setBulkTargets(rows); setBulkDeleteOpen(true) }}
+            >
+              <Trash2 className="h-4 w-4" /> Delete
+            </Button>
+          )}
+          emptyIcon={Users}
+          emptyTitle={hasActiveFilters ? "No patients match your filters" : "No patients yet"}
+          emptyDescription={hasActiveFilters ? "Try adjusting or clearing your filters." : "Begin your patient journey by registering the first patient in your dental practice."}
+          emptyAction={
+            hasActiveFilters ? (
+              <Button variant="outline" onClick={resetFilters}>Clear Filters</Button>
+            ) : currentUser?.role !== "DOCTOR" ? (
+              <Button onClick={openDialog}><UserPlus className="h-4 w-4" /> Add Patient</Button>
+            ) : undefined
+          }
+          mobileCard={(row) => (
+            <div className="flex items-center justify-between gap-3">
+              <div className="ds-min-w-0">
+                <p className="ds-body font-medium text-[var(--ds-text)]">{row.full_name}</p>
+                <p className="ds-caption text-[var(--ds-text-secondary)]">
+                  {row.gender ?? "—"} · {row.phone ?? "—"}
+                </p>
               </div>
-            )}
-            onRowClick={(row) => navigate(`/patients/${row.id}`)}
-          />
-        </CardContent>
-      </Card>
+              <StatusBadge status={row.status} />
+            </div>
+          )}
+          onRowClick={(row) => setQuickViewPatient(row)}
+        />
+      </EnterpriseWorkspace>
 
       {/* Create Dialog */}
       <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
@@ -472,6 +576,24 @@ export default function PatientList() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+
+      {/* Bulk Delete Dialog */}
+      <Dialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Delete Patients</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete {bulkTargets.length} selected patient{bulkTargets.length === 1 ? "" : "s"}? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setBulkDeleteOpen(false)}>Cancel</Button>
+            <Button type="button" variant="destructive" onClick={handleBulkDelete} disabled={bulkDeleteMutation.isPending}>
+              {bulkDeleteMutation.isPending ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

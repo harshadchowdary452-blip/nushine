@@ -23,8 +23,9 @@ from app.models.hospital_monthly_expense import HospitalMonthlyExpense
 from app.models.lead import Lead
 from app.config import settings
 from app.utils.dashboard_helpers import (
-    get_date_range, get_previous_date_range, calculate_revenue, calculate_expenses_for_date_range,
-    calculate_profit, calculate_profit_margin, revenue_trend_with_expenses
+    get_date_range, get_previous_date_range, calculate_revenue, calculate_revenue_for_range,
+    calculate_expenses_for_date_range, calculate_profit, calculate_profit_margin,
+    revenue_trend_with_expenses, revenue_trend_with_expenses_range
 )
 
 router = APIRouter(prefix="/dashboards", tags=["Dashboards"])
@@ -458,17 +459,15 @@ async def super_admin_dashboard(
     net_profit = await calculate_profit(period_revenue, total_expenses)
     profit_margin = await calculate_profit_margin(period_revenue, net_profit)
 
-    # Revenue trend (last 12 months)
-    revenue_trend = await _monthly_revenue_trend(db)
-
-    # Patient growth trend
-    patient_growth_trend = await _monthly_patient_trend(db)
+    # Revenue trend / patient growth trend (respect the active period filter)
+    revenue_trend = await _monthly_revenue_trend(db, date_start=date_start, date_end=date_end)
+    patient_growth_trend = await _monthly_patient_trend(db, date_start=date_start, date_end=date_end)
 
     # Get all case IDs for performance queries
     all_case_ids_r = await db.execute(select(Case.id).where())
     all_case_ids = [row[0] for row in all_case_ids_r.all()]
 
-    # Admin group performance by revenue
+    # Admin group performance by revenue (period-scoped)
     groups_r = await db.execute(select(AdminGroup.id, AdminGroup.name))
     admin_group_performance = []
     for gid, gname in groups_r.all():
@@ -478,7 +477,10 @@ async def super_admin_dashboard(
         rev = 0.0
         if cids:
             rev_r = await db.execute(
-                select(func.sum(Billing.paid_amount)).where(Billing.case_id.in_(cids))
+                select(func.sum(Billing.paid_amount)).where(
+                    Billing.case_id.in_(cids),
+                    Billing.updated_at >= date_start, Billing.updated_at < date_end,
+                )
             )
             rev = float(rev_r.scalar() or 0)
         g_exp = await calculate_expenses_for_date_range(db, hids, date_start=date_start, date_end=date_end)
@@ -501,7 +503,10 @@ async def super_admin_dashboard(
         rev = 0.0
         if h_cids:
             rev_r = await db.execute(
-                select(func.sum(Billing.paid_amount)).where(Billing.case_id.in_(h_cids))
+                select(func.sum(Billing.paid_amount)).where(
+                    Billing.case_id.in_(h_cids),
+                    Billing.updated_at >= date_start, Billing.updated_at < date_end,
+                )
             )
             rev = float(rev_r.scalar() or 0)
         h_exp = await calculate_expenses_for_date_range(db, [hid], date_start=date_start, date_end=date_end)
@@ -547,6 +552,11 @@ async def super_admin_dashboard(
 
     # Monthly growth trend with expenses (respect period)
     combined_trend = await revenue_trend_with_expenses(db, hospital_ids=None, period=period, start_date=start_date, end_date=end_date)
+    patient_by_bucket = {t["month"]: t["count"] for t in patient_growth_trend}
+    monthly_growth_trend = [
+        {"month": t["month"], "revenue": t["revenue"], "patients": patient_by_bucket.get(t["month"], 0)}
+        for t in combined_trend
+    ]
 
     total_pending_billing = float((await db.execute(
         select(func.coalesce(func.sum(Billing.pending_amount), 0))
@@ -561,12 +571,11 @@ async def super_admin_dashboard(
 
     # --- Period-over-period comparison ---
     prev_start, prev_end = get_previous_date_range(period, start_date, end_date)
-    prev_period_revenue = await calculate_revenue(db, period="custom", start_date=prev_start.isoformat(), end_date=prev_end.isoformat())
+    prev_period_revenue = await calculate_revenue_for_range(db, None, prev_start, prev_end)
 
     # Previous-period trend buckets for the comparison chart
-    previous_revenue_expense_trend = await revenue_trend_with_expenses(
-        db, hospital_ids=None, period="custom",
-        start_date=prev_start.isoformat(), end_date=prev_end.isoformat(),
+    previous_revenue_expense_trend = await revenue_trend_with_expenses_range(
+        db, None, None, prev_start, prev_end,
     )
 
     period_patients = (await db.execute(
@@ -630,7 +639,7 @@ async def super_admin_dashboard(
         "profit_margin": profit_margin,
         "revenue_trend": revenue_trend,
         "patient_growth_trend": patient_growth_trend,
-        "monthly_growth_trend": [{"month": t["month"], "revenue": t["revenue"], "patients": 0} for t in combined_trend],
+        "monthly_growth_trend": monthly_growth_trend,
         "revenue_expense_trend": combined_trend,
         "expense_trend": [{"month": t["month"], "expenses": t["expenses"]} for t in combined_trend],
         "profit_trend": [{"month": t["month"], "profit": t["profit"], "profit_margin": t["profit_margin"]} for t in combined_trend],
@@ -712,7 +721,10 @@ async def group_admin_dashboard(
 
     total_hospitals = len(hospital_ids)
     total_doctors = (await db.execute(
-        select(func.count(User.id)).where(User.role == Role.DOCTOR.value, User.admin_group_id == admin_group_id)
+        select(func.count(func.distinct(User.id))).where(
+            User.role == Role.DOCTOR.value,
+            User.hospital_id.in_(hospital_ids) if hospital_ids else text("false"),
+        )
     )).scalar() or 0
 
     patient_ids = await _get_patient_ids_for_hospitals(db, hospital_ids)
@@ -757,8 +769,8 @@ async def group_admin_dashboard(
     net_profit = await calculate_profit(period_revenue, total_expenses)
     profit_margin = await calculate_profit_margin(period_revenue, net_profit)
 
-    revenue_trend = await _monthly_revenue_trend(db, case_ids if case_ids else [])
-    patient_growth_trend = await _monthly_patient_trend(db, hospital_ids)
+    revenue_trend = await _monthly_revenue_trend(db, case_ids if case_ids else [], date_start=date_start, date_end=date_end)
+    patient_growth_trend = await _monthly_patient_trend(db, hospital_ids, date_start=date_start, date_end=date_end)
 
     # Hospital performance with expenses
     hospital_performance = []
@@ -770,7 +782,10 @@ async def group_admin_dashboard(
         rev = 0.0
         if h_cids:
             rev_r = await db.execute(
-                select(func.sum(Billing.paid_amount)).where(Billing.case_id.in_(h_cids))
+                select(func.sum(Billing.paid_amount)).where(
+                    Billing.case_id.in_(h_cids),
+                    Billing.updated_at >= date_start, Billing.updated_at < date_end,
+                )
             )
             rev = float(rev_r.scalar() or 0)
         h_exp = await calculate_expenses_for_date_range(db, [hid], date_start=date_start, date_end=date_end)
@@ -813,10 +828,14 @@ async def group_admin_dashboard(
                 dname_r = await db.execute(select(User.full_name).where(User.id == did))
                 dname = dname_r.scalar() or did
                 doctor_performance.append({"id": did, "name": dname, "value": rev})
-    filtered_doctor_count = len(doctor_performance)
 
     # Monthly growth trend with expenses (respect period)
     combined_trend = await revenue_trend_with_expenses(db, case_ids if case_ids else [], hospital_ids, period=period, start_date=start_date, end_date=end_date)
+    patient_by_bucket = {t["month"]: t["count"] for t in patient_growth_trend}
+    monthly_growth_trend = [
+        {"month": t["month"], "revenue": t["revenue"], "patients": patient_by_bucket.get(t["month"], 0)}
+        for t in combined_trend
+    ]
 
     total_pending_billing = float((await db.execute(
         select(func.coalesce(func.sum(Billing.pending_amount), 0)).where(
@@ -837,7 +856,7 @@ async def group_admin_dashboard(
 
     # --- Period-over-period comparison ---
     prev_start, prev_end = get_previous_date_range(period, start_date, end_date)
-    prev_period_revenue = await calculate_revenue(db, case_ids, period="custom", start_date=prev_start.isoformat(), end_date=prev_end.isoformat())
+    prev_period_revenue = await calculate_revenue_for_range(db, case_ids, prev_start, prev_end)
 
     period_patients = (await db.execute(
         select(func.count(Patient.id)).where(
@@ -904,7 +923,7 @@ async def group_admin_dashboard(
     return {
         "selected_hospital_id": hospital_id,
         "total_hospitals": len(group_hospital_ids),
-        "total_doctors": filtered_doctor_count,
+        "total_doctors": total_doctors,
         "total_patients": total_patients,
         "total_active_cases": total_active_cases,
         "total_appointments": total_appointments,
@@ -920,7 +939,7 @@ async def group_admin_dashboard(
         "profit_margin": profit_margin,
         "revenue_trend": revenue_trend,
         "patient_growth_trend": patient_growth_trend,
-        "monthly_growth_trend": [{"month": t["month"], "revenue": t["revenue"], "patients": 0} for t in combined_trend],
+        "monthly_growth_trend": monthly_growth_trend,
         "revenue_expense_trend": combined_trend,
         "expense_trend": [{"month": t["month"], "expenses": t["expenses"]} for t in combined_trend],
         "profit_trend": [{"month": t["month"], "profit": t["profit"], "profit_margin": t["profit_margin"]} for t in combined_trend],
@@ -939,10 +958,23 @@ async def group_admin_dashboard(
         "treatment_kpis": {
             "active_treatments": (await db.execute(select(func.count(TreatmentPlan.id)).where(TreatmentPlan.case_id.in_(case_ids) if case_ids else text("false"), TreatmentPlan.is_active == True, TreatmentPlan.status.in_(["ASSIGNED", "SCHEDULED", "IN_PROGRESS", "WAITING_PATIENT", "WAITING_LAB", "ON_HOLD"])))).scalar() or 0 if case_ids else 0,
             "overdue_treatments": (await db.execute(select(func.count(TreatmentPlan.id)).where(TreatmentPlan.case_id.in_(case_ids) if case_ids else text("false"), TreatmentPlan.is_active == True, TreatmentPlan.status == TreatmentPlanStatus.OVERDUE))).scalar() or 0 if case_ids else 0,
-            "completed_today": 0,
+            "completed_today": (await db.execute(select(func.count(TreatmentPlan.id)).where(
+                TreatmentPlan.case_id.in_(case_ids) if case_ids else text("false"),
+                TreatmentPlan.status == TreatmentPlanStatus.COMPLETED.value,
+                TreatmentPlan.completed_at >= now.replace(hour=0, minute=0, second=0, microsecond=0),
+            ))).scalar() or 0 if case_ids else 0,
             "waiting_patient": (await db.execute(select(func.count(TreatmentPlan.id)).where(TreatmentPlan.case_id.in_(case_ids) if case_ids else text("false"), TreatmentPlan.is_active == True, TreatmentPlan.status == TreatmentPlanStatus.WAITING_PATIENT))).scalar() or 0 if case_ids else 0,
             "waiting_lab": (await db.execute(select(func.count(TreatmentPlan.id)).where(TreatmentPlan.case_id.in_(case_ids) if case_ids else text("false"), TreatmentPlan.is_active == True, TreatmentPlan.status == TreatmentPlanStatus.WAITING_LAB))).scalar() or 0 if case_ids else 0,
-            "completion_rate": 0.0,
+            "completion_rate": round(
+                ((await db.execute(select(func.count(TreatmentPlan.id)).where(
+                    TreatmentPlan.case_id.in_(case_ids) if case_ids else text("false"),
+                    TreatmentPlan.status == TreatmentPlanStatus.COMPLETED.value,
+                ))).scalar() or 0)
+                / max((await db.execute(select(func.count(TreatmentPlan.id)).where(
+                    TreatmentPlan.case_id.in_(case_ids) if case_ids else text("false"),
+                ))).scalar() or 0, 1)
+                * 100, 1
+            ),
         },
     }
 
@@ -1135,7 +1167,7 @@ async def hospital_admin_dashboard(
             select(func.count(Case.id)).where(Case.id.in_(case_ids), Case.status.in_(active_case_statuses), Case.created_at >= prev_start, Case.created_at < prev_end)
         )).scalar() or 0
 
-    prev_period_revenue = await calculate_revenue(db, case_ids, period="custom", start_date=prev_start.isoformat(), end_date=prev_end.isoformat())
+    prev_period_revenue = await calculate_revenue_for_range(db, case_ids, prev_start, prev_end)
 
     def pct_change(current: float, previous: float) -> float:
         if previous == 0:
@@ -1153,6 +1185,11 @@ async def hospital_admin_dashboard(
 
     # Revenue vs expenses trend (period-filtered)
     combined_trend = await revenue_trend_with_expenses(db, case_ids if case_ids else [], [hospital_id], period=period, start_date=start_date, end_date=end_date)
+    patient_by_bucket = {t["month"]: t["count"] for t in patient_growth_trend}
+    monthly_growth_trend = [
+        {"month": t["month"], "revenue": t["revenue"], "patients": patient_by_bucket.get(t["month"], 0)}
+        for t in combined_trend
+    ]
 
     # --- Today's appointments list ---
     today_appt_list = []
@@ -1339,7 +1376,7 @@ async def hospital_admin_dashboard(
         "total_patients": total_patients, "total_cases": total_cases, "total_active_cases": total_active_cases,
         "revenue_trend": revenue_trend, "patient_growth_trend": patient_growth_trend,
         "appointment_count_trend": appointment_count_trend, "case_count_trend": case_count_trend,
-        "monthly_growth_trend": [{"month": t["month"], "revenue": t["revenue"], "patients": 0} for t in combined_trend],
+        "monthly_growth_trend": monthly_growth_trend,
         "revenue_expense_trend": combined_trend,
         "expense_trend": [{"month": t["month"], "expenses": t["expenses"]} for t in combined_trend],
         "profit_trend": [{"month": t["month"], "profit": t["profit"], "profit_margin": t["profit_margin"]} for t in combined_trend],
@@ -1510,11 +1547,11 @@ async def doctor_dashboard(
         completed_follow_ups / (completed_follow_ups + missed_follow_ups) * 100
     ) if (completed_follow_ups + missed_follow_ups) > 0 else 0
 
-    # Revenue trend
-    revenue_trend = await _monthly_revenue_trend(db, list(my_case_ids) if my_case_ids else [])
+    # Revenue trend (respect period filter)
+    revenue_trend = await _monthly_revenue_trend(db, list(my_case_ids) if my_case_ids else [], date_start=period_start, date_end=period_end)
 
-    # Case completion trend
-    case_completion_trend = await _monthly_case_trend(db, list(my_case_ids) if my_case_ids else [])
+    # Case completion trend (respect period filter)
+    case_completion_trend = await _monthly_case_trend(db, list(my_case_ids) if my_case_ids else [], date_start=period_start, date_end=period_end)
 
     # Treatment trend
     treatment_trend = []
@@ -1570,23 +1607,8 @@ async def doctor_dashboard(
     # ---- Period-aware KPIs (respect dashboard filter) ----
     period_start, period_end = get_date_range(period, start_date, end_date)
     prev_start, prev_end = get_previous_date_range(period, start_date, end_date)
-    period_revenue = 0.0
-    prev_period_revenue = 0.0
-    if my_case_ids:
-        period_revenue = float((await db.execute(
-            select(func.sum(Billing.paid_amount)).where(
-                Billing.case_id.in_(my_case_ids),
-                Billing.updated_at >= period_start,
-                Billing.updated_at < period_end,
-            )
-        )).scalar() or 0)
-        prev_period_revenue = float((await db.execute(
-            select(func.sum(Billing.paid_amount)).where(
-                Billing.case_id.in_(my_case_ids),
-                Billing.updated_at >= prev_start,
-                Billing.updated_at < prev_end,
-            )
-        )).scalar() or 0)
+    period_revenue = await calculate_revenue_for_range(db, my_case_ids, period_start, period_end)
+    prev_period_revenue = await calculate_revenue_for_range(db, my_case_ids, prev_start, prev_end)
     revenue_change = round(((period_revenue - prev_period_revenue) / prev_period_revenue * 100), 1) if prev_period_revenue > 0 else (100.0 if period_revenue > 0 else 0.0)
 
     patients_seen_period = (await db.execute(

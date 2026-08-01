@@ -263,25 +263,25 @@ export function DashboardSection({ title, description, icon: Icon, actions, defa
   const [open, setOpen] = useState(defaultOpen)
   return (
     <Collapsible open={open} onOpenChange={setOpen} className={cn("rounded-[var(--ds-card-radius)] border border-[var(--ds-border)] bg-[var(--ds-surface)] shadow-[var(--ds-shadow-card)]", className)}>
-      <CollapsibleTrigger asChild>
-        <button
-          type="button"
-          className="ds-focus-ring flex w-full items-center justify-between gap-3 rounded-t-[var(--ds-card-radius)] px-[var(--ds-card-padding)] py-3 text-left"
-          aria-expanded={open}
-        >
-          <span className="ds-min-w-0 flex items-center gap-2.5">
-            {Icon && <Icon className="h-4 w-4 shrink-0 text-[var(--ds-primary)]" aria-hidden="true" />}
-            <span className="ds-min-w-0">
-              <span className="ds-card-title block text-[var(--ds-text)]">{title}</span>
-              {description && <span className="ds-caption block text-[var(--ds-text-tertiary)]">{description}</span>}
+      <div className="flex items-center justify-between gap-3 rounded-t-[var(--ds-card-radius)] px-[var(--ds-card-padding)] py-3">
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="ds-focus-ring flex min-w-0 flex-1 items-center justify-between gap-3 rounded-[var(--ds-radius-lg)] text-left"
+            aria-expanded={open}
+          >
+            <span className="ds-min-w-0 flex items-center gap-2.5">
+              {Icon && <Icon className="h-4 w-4 shrink-0 text-[var(--ds-primary)]" aria-hidden="true" />}
+              <span className="ds-min-w-0">
+                <span className="ds-card-title block text-[var(--ds-text)]">{title}</span>
+                {description && <span className="ds-caption block text-[var(--ds-text-tertiary)]">{description}</span>}
+              </span>
             </span>
-          </span>
-          <span className="ds-cluster ds-cluster-sm shrink-0">
-            {actions}
-            <ChevronDown className={cn("h-4 w-4 text-[var(--ds-text-tertiary)] transition-transform", open && "rotate-180")} aria-hidden="true" />
-          </span>
-        </button>
-      </CollapsibleTrigger>
+            <ChevronDown className={cn("h-4 w-4 shrink-0 text-[var(--ds-text-tertiary)] transition-transform", open && "rotate-180")} aria-hidden="true" />
+          </button>
+        </CollapsibleTrigger>
+        {actions && <div className="ds-cluster ds-cluster-sm shrink-0">{actions}</div>}
+      </div>
       <CollapsibleContent>
         <div className="px-[var(--ds-card-padding)] pb-[var(--ds-card-padding)]">{children}</div>
       </CollapsibleContent>

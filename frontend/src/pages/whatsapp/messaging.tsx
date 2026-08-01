@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { motion } from "framer-motion"
-import { useQuery, useMutation } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   Send,
   MessageSquare,
@@ -171,6 +171,7 @@ export default function WhatsAppMessaging() {
   })
 
   const patientList: Patient[] = patients?.items || patients || []
+  const queryClient = useQueryClient()
 
   const previewMutation = useMutation({
     mutationFn: (data: { patient_id: string; message: string }) => whatsappV2Api.preview(data),
@@ -194,6 +195,10 @@ export default function WhatsAppMessaging() {
         window.open(data.wa_link, "_blank")
       }
       addToast({ title: "Sent!", description: "WhatsApp message sent", variant: "success" })
+      queryClient.invalidateQueries({ queryKey: ["whatsapp", "history"] })
+      queryClient.invalidateQueries({ queryKey: ["crm-dashboard"] })
+      queryClient.invalidateQueries({ queryKey: ["crm-enhanced-dashboard"] })
+      queryClient.invalidateQueries({ queryKey: ["crm-command-center"], refetchType: "all" })
       setShowPreview(false)
       setPreviewData(null)
       setSelectedPatient("")
@@ -230,6 +235,10 @@ export default function WhatsAppMessaging() {
         description: `${data.sent} sent, ${data.failed} failed`,
         variant: "success",
       })
+      queryClient.invalidateQueries({ queryKey: ["whatsapp", "history"] })
+      queryClient.invalidateQueries({ queryKey: ["crm-dashboard"] })
+      queryClient.invalidateQueries({ queryKey: ["crm-enhanced-dashboard"] })
+      queryClient.invalidateQueries({ queryKey: ["crm-command-center"], refetchType: "all" })
       setShowBulkPreview(false)
       setBulkPreviewData(null)
       setSelectedPatients([])

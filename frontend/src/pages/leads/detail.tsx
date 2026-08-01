@@ -9,6 +9,7 @@ import {
   CheckCircle2, XCircle, AlertTriangle, Plus, ChevronRight, Users,
   MessageCircle, FileText, User,
   RefreshCw, MoreHorizontal, ExternalLink,
+  Check,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -152,6 +153,8 @@ export default function LeadDetail() {
       queryClient.invalidateQueries({ queryKey: ["leads"] })
       queryClient.invalidateQueries({ queryKey: ["lead-analytics"] })
       queryClient.invalidateQueries({ queryKey: ["crm-dashboard"] })
+      queryClient.invalidateQueries({ queryKey: ["crm-enhanced-dashboard"] })
+      queryClient.invalidateQueries({ queryKey: ["crm-command-center"], refetchType: "all" })
       addToast({ title: "Status updated", variant: "success" })
       setStatusChangeOpen(false)
     },
@@ -225,6 +228,8 @@ export default function LeadDetail() {
       queryClient.invalidateQueries({ queryKey: ["leads"] })
       queryClient.invalidateQueries({ queryKey: ["lead-analytics"] })
       queryClient.invalidateQueries({ queryKey: ["crm-dashboard"] })
+      queryClient.invalidateQueries({ queryKey: ["crm-enhanced-dashboard"] })
+      queryClient.invalidateQueries({ queryKey: ["crm-command-center"], refetchType: "all" })
       addToast({ title: "Lead converted successfully", variant: "success" })
       setConvertOpen(false)
       const patientId = (result as Record<string, unknown>)?.patient_id as string
@@ -286,6 +291,8 @@ export default function LeadDetail() {
         queryClient.invalidateQueries({ queryKey: ["lead", lead.id] })
         queryClient.invalidateQueries({ queryKey: ["lead-analytics"] })
         queryClient.invalidateQueries({ queryKey: ["crm-dashboard"] })
+        queryClient.invalidateQueries({ queryKey: ["crm-enhanced-dashboard"] })
+      queryClient.invalidateQueries({ queryKey: ["crm-command-center"], refetchType: "all" })
       }).catch(() => {
         // Communication recording failed, but still open WhatsApp
       }).finally(() => {
@@ -382,7 +389,7 @@ export default function LeadDetail() {
           <div className="p-5">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div className="flex items-start gap-4">
-                <div className="h-14 w-14 rounded-full bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center shrink-0 ring-2 ring-white shadow-sm">
+                <div className="h-14 w-14 rounded-full bg-blue-50 flex items-center justify-center shrink-0 ring-2 ring-white shadow-sm">
                   <span className="text-xl font-bold text-blue-600">
                     {lead.lead_name.charAt(0).toUpperCase()}
                   </span>
@@ -1017,6 +1024,8 @@ export default function LeadDetail() {
                       queryClient.invalidateQueries({ queryKey: ["lead-communications", lead.id] })
                       queryClient.invalidateQueries({ queryKey: ["lead-analytics"] })
                       queryClient.invalidateQueries({ queryKey: ["crm-dashboard"] })
+                      queryClient.invalidateQueries({ queryKey: ["crm-enhanced-dashboard"] })
+      queryClient.invalidateQueries({ queryKey: ["crm-command-center"], refetchType: "all" })
                       addToast({ title: "Feedback recorded", variant: "success" })
                       setFeedbackRating(0)
                       setFeedbackComment("")
@@ -1145,7 +1154,7 @@ export default function LeadDetail() {
                 {statusOptions.map((s) => (
                   <SelectItem key={s} value={s} disabled={s === lead.status}>
                     <span className="flex items-center gap-2">
-                      {s === lead.status ? "✓ " : ""}{s.replace(/_/g, " ")}
+                      {s === lead.status && <Check className="h-3.5 w-3.5 text-green-600" />}{s.replace(/_/g, " ")}
                     </span>
                   </SelectItem>
                 ))}

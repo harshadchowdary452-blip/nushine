@@ -52,7 +52,7 @@ export default function EnterpriseHeader() {
       role="banner"
       className="sticky top-0 z-[var(--ds-z-header)] flex shrink-0 flex-col bg-[var(--ds-header-bg)] shadow-[var(--ds-header-shadow)] transition-all"
     >
-      {/* Brand accent edge — a thin Marine Teal → Gold strip that separates
+      {/* Brand accent edge — a thin solid Executive Navy strip that separates
           the header from content and anchors the NuShine identity. */}
       <div
         aria-hidden="true"

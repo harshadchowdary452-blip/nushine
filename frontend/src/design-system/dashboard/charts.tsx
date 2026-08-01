@@ -1,4 +1,4 @@
-/* eslint-disable react-refresh/only-export-components */
+ 
 import * as React from "react"
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart,
@@ -7,7 +7,9 @@ import {
 import { AlertTriangle, RotateCcw } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/design-system/components/button"
-import { ChartCard, ChartTooltip } from "@/design-system/components/charts"
+import { ChartCard, ChartTooltip, useContainerSize } from "@/design-system/components/charts"
+
+export { useContainerSize }
 import { Skeleton } from "@/design-system/components/skeleton"
 
 export interface ChartSeries {
@@ -16,6 +18,24 @@ export interface ChartSeries {
   /** CSS var token, e.g. "var(--ds-chart-1)". */
   color: string
   type?: "line" | "bar" | "area"
+}
+
+/**
+ * Measures the container with a ResizeObserver and feeds explicit numeric
+ * width/height into Recharts' ResponsiveContainer, so it never self-measures
+ * a 0x0 box (which triggers "width(-1)/height(-1)" warnings on first frame
+ * or when a collapsible/tab collapses the widget). The chart mounts only
+ * once the box has positive dimensions and re-renders on every resize.
+ */
+function ChartGate({ height, loading, title, children }: { height: number; loading?: boolean; title?: string; children: React.ReactNode }) {
+  const { ref, size } = useContainerSize<HTMLDivElement>()
+  return (
+    <div ref={ref} style={{ height }} aria-busy={loading} aria-label={title}>
+      {size.width > 0 && size.height > 0 ? (
+        <ResponsiveContainer width={size.width} height={size.height}>{children}</ResponsiveContainer>
+      ) : null}
+    </div>
+  )
 }
 
 export interface ChartPoint {
@@ -125,9 +145,8 @@ export function DashboardChart({
   const body = error ? (
     <ChartStateBlock error onRetry={onRetry} height={height} />
   ) : (
-    <div style={{ height }} aria-busy={loading} aria-label={title}>
-      <ResponsiveContainer width="100%" height="100%">
-        {(() => {
+    <ChartGate height={height} loading={loading} title={title}>
+      {(() => {
           const common = {
             data: chartData,
             margin: { top: 4, right: 8, bottom: 0, left: 0 },
@@ -217,8 +236,7 @@ export function DashboardChart({
                 </AreaChart>
               )
             })()}
-          </ResponsiveContainer>
-        </div>
+        </ChartGate>
       )
 
     const emptyCaption = empty && !loading && !error && (
@@ -302,6 +320,7 @@ export function DonutChart({
   bare,
 }: DonutChartProps) {
   const total = data.reduce((sum, d) => sum + d.value, 0)
+  const { ref, size } = useContainerSize<HTMLDivElement>()
 
   const body = error ? (
     <ChartStateBlock error onRetry={onRetry} height={height} />
@@ -311,8 +330,9 @@ export function DonutChart({
     </div>
   ) : (
     <div className="flex flex-col items-center gap-4 sm:flex-row" style={{ minHeight: height }}>
-          <div className="relative shrink-0" style={{ height, width: height }}>
-            <ResponsiveContainer width="100%" height="100%">
+          <div ref={ref} className="relative shrink-0" style={{ height, width: height }}>
+            {size.width > 0 && size.height > 0 && (
+              <ResponsiveContainer width={size.width} height={size.height}>
               <PieChart>
                 <Pie
                   data={data}
@@ -336,6 +356,7 @@ export function DonutChart({
                 <Tooltip content={<DefaultTooltip valueFormatter={valueFormatter ?? String} />} />
               </PieChart>
             </ResponsiveContainer>
+            )}
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
               <span className="ds-caption text-[var(--ds-text-tertiary)]">Total</span>
               <span className="ds-metric text-[var(--ds-text)]">{valueFormatter ? valueFormatter(total) : total}</span>

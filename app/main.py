@@ -18,8 +18,8 @@ from app.core.permissions import Role
 from app.core.logging import setup_logging, correlation_id, generate_correlation_id
 from app.core.middleware import RequestIDMiddleware
 from app.dependencies import verify_hospital_context
-from app.utils.scheduler import check_appointment_reminders, check_same_day_appointments, check_missed_appointments, check_overdue_treatments
-from app.routers import auth, admin_groups, hospitals, doctors, consultants, patients, cases, consultant_notes, treatment_plans, treatment_sittings, treatment_plan_items, appointments, billings, pre_ops, post_ops, dashboards, whatsapp_messaging, whatsapp_config, notifications, hospital_monthly_expenses, reports, crm, crm_v2, calendar, status_audit, campaigns, campaign_templates, leads, doctor_working_hours, doctor_availability, doctor_leaves, doctor_blocked_slots, consent_forms, enquiries, treatment_follow_ups, recalls, exports, treatment_types, doctor_queue, clinical_progress_notes, master_data, crm_rules, crm_config_settings, crm_feedback, users
+from app.utils.scheduler import check_appointment_reminders, check_same_day_appointments, check_missed_appointments, check_overdue_treatments, check_recurring_recalls
+from app.routers import auth, admin_groups, hospitals, doctors, consultants, patients, cases, consultant_notes, treatment_plans, treatment_sittings, treatment_plan_items, appointments, billings, pre_ops, post_ops, dashboards, whatsapp_messaging, whatsapp_config, notifications, hospital_monthly_expenses, reports, crm, crm_v2, calendar, status_audit, leads, doctor_working_hours, doctor_availability, doctor_leaves, doctor_blocked_slots, consent_forms, enquiries, treatment_follow_ups, recalls, exports, treatment_types, doctor_queue, clinical_progress_notes, master_data, crm_rules, crm_config_settings, crm_feedback, users
 from app.crm.routers import events as crm_events
 from app.crm.routers import event_test as crm_event_test
 
@@ -154,6 +154,7 @@ async def lifespan(app: FastAPI):
     same_day_task = asyncio.create_task(check_same_day_appointments())
     missed_task = asyncio.create_task(check_missed_appointments())
     overdue_task = asyncio.create_task(check_overdue_treatments())
+    recurring_recall_task = asyncio.create_task(check_recurring_recalls())
 
     logger.info("Application startup complete!")
     yield
@@ -162,7 +163,7 @@ async def lifespan(app: FastAPI):
     from app.utils.case_pdf import _cleanup
     await _cleanup()
 
-    for task in [reminder_task, same_day_task, missed_task, overdue_task]:
+    for task in [reminder_task, same_day_task, missed_task, overdue_task, recurring_recall_task]:
         task.cancel()
         try:
             await task
@@ -250,8 +251,6 @@ app.include_router(crm.router, prefix="/api/v1", dependencies=[Depends(verify_ho
 app.include_router(crm_v2.router, prefix="/api/v1", dependencies=[Depends(verify_hospital_context)])
 app.include_router(crm_events.router, prefix="/api/v1/crm", dependencies=[Depends(verify_hospital_context)])
 app.include_router(crm_event_test.router, prefix="/api/v1", dependencies=[Depends(verify_hospital_context)])
-app.include_router(campaigns.router, prefix="/api/v1", dependencies=[Depends(verify_hospital_context)])
-app.include_router(campaign_templates.router, prefix="/api/v1", dependencies=[Depends(verify_hospital_context)])
 app.include_router(calendar.router, prefix="/api/v1", dependencies=[Depends(verify_hospital_context)])
 app.include_router(leads.router, prefix="/api/v1", dependencies=[Depends(verify_hospital_context)])
 app.include_router(whatsapp_config.router, prefix="/api/v1", dependencies=[Depends(verify_hospital_context)])

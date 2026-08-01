@@ -1,6 +1,7 @@
 import { useState, useRef, useMemo, useEffect } from "react"
 import { createPortal } from "react-dom"
 import { useQuery } from "@tanstack/react-query"
+import { Branch } from "@radix-ui/react-dismissable-layer"
 import { Plus, X, Search, Check, Activity, IndianRupee, Stethoscope, Hash } from "lucide-react"
 import { useFixedPosition, useOverlayDismiss, resolveOverlayLayer } from "@/lib/overlay"
 import { cn } from "@/lib/utils"
@@ -153,9 +154,10 @@ export default function TreatmentPlanSection({
         </div>
         {showDropdown && search &&
           createPortal(
-            <div
+            <Branch
+              id="treatment-plan-dropdown"
               ref={popupRef}
-              style={position ? { top: position.top, left: position.left, width: position.width } : undefined}
+              style={position ? { top: position.top, left: position.left, width: position.width, pointerEvents: "auto" } : { pointerEvents: "auto" }}
               className={cn("fixed rounded-lg border border-[var(--ds-border)] bg-[var(--ds-surface)] shadow-lg", layer)}
             >
               <div className="max-h-56 overflow-y-auto p-1.5">
@@ -175,7 +177,7 @@ export default function TreatmentPlanSection({
                   ))
                 )}
               </div>
-            </div>,
+            </Branch>,
             document.body
           )}
         {customMode && (

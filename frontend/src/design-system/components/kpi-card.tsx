@@ -1,7 +1,7 @@
 import * as React from "react"
 import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
-import { TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight } from "lucide-react"
+import { ArrowUpRight, ArrowDownRight } from "lucide-react"
 import { Skeleton } from "@/design-system/components/skeleton"
 import { MiniSparkline } from "@/design-system/components/charts"
 
@@ -63,11 +63,24 @@ const NAMED_SOFT: Record<string, string> = {
   danger: "bg-[var(--ds-danger-subtle)]",
 }
 
-function resolveColor(color?: string): { text: string; soft: string } {
+/** Solid semantic accents for the thin edge strip on premium KPI cards. */
+const NAMED_STRIP: Record<string, string> = {
+  primary: "bg-[var(--ds-primary)]",
+  success: "bg-[var(--ds-success)]",
+  warning: "bg-[var(--ds-warning)]",
+  info: "bg-[var(--ds-info)]",
+  danger: "bg-[var(--ds-danger)]",
+}
+
+function resolveColor(color?: string): { text: string; soft: string; strip: string } {
   if (color && color in NAMED_TEXT) {
-    return { text: NAMED_TEXT[color], soft: NAMED_SOFT[color] }
+    return { text: NAMED_TEXT[color], soft: NAMED_SOFT[color], strip: NAMED_STRIP[color] }
   }
-  return { text: color ?? "text-[var(--ds-primary)]", soft: "bg-[var(--ds-surface-secondary)]" }
+  return {
+    text: color ?? "text-[var(--ds-primary)]",
+    soft: "bg-[var(--ds-surface-secondary)]",
+    strip: "bg-[var(--ds-primary)]",
+  }
 }
 
 export default function KpiCard({
@@ -101,7 +114,7 @@ export default function KpiCard({
 
   const showChange = change ?? (trend ? trend.value : undefined)
   const changePositive = positive ?? trend?.positive ?? true
-  const { text: colorText, soft: colorSoft } = resolveColor(color)
+  const { strip: colorStrip } = resolveColor(color)
 
   return (
     <motion.div
@@ -113,10 +126,12 @@ export default function KpiCard({
       onClick={onClick}
       onKeyDown={onClick ? (e) => e.key === "Enter" && onClick() : undefined}
       className={cn(
-        "ds-hover-lift group rounded-[var(--ds-card-radius)] border border-[var(--ds-border)] bg-[var(--ds-surface)] p-[var(--ds-card-padding)] shadow-[var(--ds-shadow-card)]",
+        "ds-hover-lift group relative overflow-hidden rounded-[var(--ds-card-radius)] border border-[var(--ds-border)] bg-[var(--ds-surface)] p-[var(--ds-card-padding)] shadow-[var(--ds-shadow-card)]",
         onClick && "cursor-pointer"
       )}
     >
+      {/* Thin semantic accent strip along the top edge */}
+      <div aria-hidden="true" className={cn("absolute inset-x-0 top-0 h-[3px]", colorStrip)} />
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="ds-min-w-0">
           <p className="ds-card-title text-[var(--ds-text-secondary)]">{title}</p>
@@ -127,7 +142,8 @@ export default function KpiCard({
             </span>
           )}
         </div>
-        <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--ds-radius-xl)] transition-transform duration-300 group-hover:scale-110", colorSoft, colorText)}>
+        {/* Neutral icon chip — keeps the premium white card calm */}
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--ds-radius-xl)] bg-[var(--ds-surface-secondary)] text-[var(--ds-text-secondary)] transition-transform duration-300 group-hover:scale-110">
           <Icon className="h-5 w-5" />
         </div>
       </div>

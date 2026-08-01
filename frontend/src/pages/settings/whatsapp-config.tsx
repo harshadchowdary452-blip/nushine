@@ -25,7 +25,6 @@ export default function WhatsAppConfigPage() {
   const [countryCode, setCountryCode] = useState("+91")
   const [defaultTemplates, setDefaultTemplates] = useState(true)
   const [broadcastEnabled, setBroadcastEnabled] = useState(false)
-  const [campaignEnabled, setCampaignEnabled] = useState(false)
 
   const { data: config, isLoading } = useQuery({
     queryKey: ["whatsapp-config", hospitalId],
@@ -41,7 +40,6 @@ export default function WhatsAppConfigPage() {
       setCountryCode(config.country_code)
       setDefaultTemplates(config.default_message_templates_enabled)
       setBroadcastEnabled(config.broadcast_enabled)
-      setCampaignEnabled(config.campaign_enabled)
     }
   }, [config])
 
@@ -67,7 +65,6 @@ export default function WhatsAppConfigPage() {
       country_code: countryCode,
       default_message_templates_enabled: defaultTemplates,
       broadcast_enabled: broadcastEnabled,
-      campaign_enabled: campaignEnabled,
     })
   }
 
@@ -179,15 +176,6 @@ export default function WhatsAppConfigPage() {
               </p>
             </div>
             <Switch checked={broadcastEnabled} onCheckedChange={setBroadcastEnabled} />
-          </div>
-          <div className="flex items-center justify-between rounded-lg border border-[var(--ds-border)] p-4">
-            <div>
-              <p className="font-medium text-[var(--ds-text)]">Campaign Messaging</p>
-              <p className="text-sm text-[var(--ds-text-secondary)]">
-                Allow WhatsApp campaigns (promotions, awareness)
-              </p>
-            </div>
-            <Switch checked={campaignEnabled} onCheckedChange={setCampaignEnabled} />
           </div>
         </CardContent>
       </Card>

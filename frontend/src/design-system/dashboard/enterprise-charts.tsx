@@ -1,4 +1,4 @@
-/* eslint-disable react-refresh/only-export-components */
+ 
 import * as React from "react"
 import { useState } from "react"
 import {
@@ -12,7 +12,7 @@ import { Skeleton } from "@/design-system/components/skeleton"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/design-system/components/dropdown-menu"
-import { ChartStateBlock, DefaultTooltip, downloadCSV } from "./charts"
+import { ChartStateBlock, DefaultTooltip, downloadCSV, useContainerSize } from "./charts"
 
 export type { ChartPoint } from "./charts"
 
@@ -115,6 +115,7 @@ export function StackedBarChart({
     const row = (payload ?? entry) as Record<string, unknown> | undefined
     if (row && row[xKey] !== undefined) onPointClick({ label: String(row[xKey]), data: row })
   }
+  const { ref, size } = useContainerSize<HTMLDivElement>()
 
   if (loading) {
     return (
@@ -128,8 +129,9 @@ export function StackedBarChart({
   if (error) return <ChartStateBlock error onRetry={onRetry} height={height} />
 
   return (
-    <div className={cn("w-full", className)} style={{ height }} aria-busy={loading}>
-      <ResponsiveContainer width="100%" height="100%">
+    <div ref={ref} className={cn("w-full", className)} style={{ height }} aria-busy={loading}>
+      {size.width > 0 && size.height > 0 && (
+      <ResponsiveContainer width={size.width} height={size.height}>
         <BarChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--ds-border-light)" vertical={false} />
           <XAxis dataKey={xKey} tick={axisTick} stroke="var(--ds-text-tertiary)" />
@@ -151,6 +153,7 @@ export function StackedBarChart({
           ))}
         </BarChart>
       </ResponsiveContainer>
+      )}
     </div>
   )
 }
@@ -177,6 +180,7 @@ export function RadarChartComponent({
   data, angleKey, series, height = 280, valueFormatter, loading, error, onRetry, onPointClick, className,
 }: RadarChartProps) {
   const axisTick = { fontSize: 11 }
+  const { ref, size } = useContainerSize<HTMLDivElement>()
 
   const clickableTick = onPointClick
     ? (tickProps: {
@@ -224,8 +228,9 @@ export function RadarChartComponent({
   if (error) return <ChartStateBlock error onRetry={onRetry} height={height} />
 
   return (
-    <div className={cn("w-full", className)} style={{ height }} aria-busy={loading}>
-      <ResponsiveContainer width="100%" height="100%">
+    <div ref={ref} className={cn("w-full", className)} style={{ height }} aria-busy={loading}>
+      {size.width > 0 && size.height > 0 && (
+      <ResponsiveContainer width={size.width} height={size.height}>
         <RadarChart data={data} outerRadius="70%">
           <PolarGrid stroke="var(--ds-border-light)" />
           <PolarAngleAxis dataKey={angleKey} tick={clickableTick} stroke="var(--ds-text-tertiary)" />
@@ -244,6 +249,7 @@ export function RadarChartComponent({
           ))}
         </RadarChart>
       </ResponsiveContainer>
+      )}
     </div>
   )
 }

@@ -220,13 +220,22 @@ export default function LeadList() {
 
   const { data: usersData } = useQuery({
     queryKey: ["users-list-for-leads"],
-    queryFn: () => usersApi.list({ page_size: 500 }),
+    queryFn: async (): Promise<Array<{ id: string; full_name?: string; name?: string; username?: string }>> => {
+      const pageSize = 200
+      const all: Array<{ id: string; full_name?: string; name?: string; username?: string }> = []
+      for (let page = 1; page <= 20; page++) {
+        const batch = await usersApi.list({ page, page_size: pageSize })
+        const items = (Array.isArray(batch) ? batch : (batch as { items?: Array<{ id: string; full_name?: string; name?: string; username?: string }> } | null)?.items || [])
+        all.push(...items)
+        if (items.length < pageSize) break
+      }
+      return all
+    },
     staleTime: 60000,
   })
 
   const userMap = useMemo(() => {
-    const users: Array<{ id: string; full_name?: string; name?: string; username?: string }> =
-      Array.isArray(usersData) ? usersData : usersData?.items || []
+    const users = usersData || []
     const map: Record<string, string> = {}
     for (const u of users) {
       map[u.id] = u.full_name || u.name || u.username || u.id.slice(0, 8)
@@ -278,6 +287,9 @@ export default function LeadList() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leads"] })
       queryClient.invalidateQueries({ queryKey: ["lead-analytics"] })
+      queryClient.invalidateQueries({ queryKey: ["crm-dashboard"] })
+      queryClient.invalidateQueries({ queryKey: ["crm-enhanced-dashboard"] })
+      queryClient.invalidateQueries({ queryKey: ["crm-command-center"], refetchType: "all" })
       addToast({ title: "Lead Created", variant: "success" })
       setCreateOpen(false)
       resetForm()
@@ -291,6 +303,9 @@ export default function LeadList() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leads"] })
       queryClient.invalidateQueries({ queryKey: ["lead-analytics"] })
+      queryClient.invalidateQueries({ queryKey: ["crm-dashboard"] })
+      queryClient.invalidateQueries({ queryKey: ["crm-enhanced-dashboard"] })
+      queryClient.invalidateQueries({ queryKey: ["crm-command-center"], refetchType: "all" })
       addToast({ title: "Lead deleted", variant: "success" })
       setDeleteOpen(false)
       setLeadToDelete(null)
@@ -306,6 +321,9 @@ export default function LeadList() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leads"] })
       queryClient.invalidateQueries({ queryKey: ["lead-analytics"] })
+      queryClient.invalidateQueries({ queryKey: ["crm-dashboard"] })
+      queryClient.invalidateQueries({ queryKey: ["crm-enhanced-dashboard"] })
+      queryClient.invalidateQueries({ queryKey: ["crm-command-center"], refetchType: "all" })
       addToast({ title: `${selectedLeads.size} leads deleted`, variant: "success" })
       setBulkDeleteOpen(false)
       setSelectedLeads(new Set())
@@ -799,7 +817,7 @@ export default function LeadList() {
                     {visibleColumns.includes("lead_name") && (
                       <td className="px-3 py-3">
                         <div className="flex items-center gap-2.5">
-                          <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center shrink-0">
+                          <div className="h-9 w-9 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
                             <Users className="h-4 w-4 text-blue-500" />
                           </div>
                           <div>

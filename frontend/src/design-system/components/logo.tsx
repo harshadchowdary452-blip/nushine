@@ -46,9 +46,7 @@ export default function Logo({ className, variant = "default", showTagline = fal
       <div>
         {isSidebar ? (
           <span className={cn("tracking-tight leading-tight", s.text)}>
-            <span className="bg-gradient-to-r from-[var(--ds-primary-300)] to-[var(--ds-primary-400)] bg-clip-text font-extrabold text-transparent">
-              NUSHINE
-            </span>{" "}
+            <span className="font-extrabold text-[var(--ds-primary-300)]">NUSHINE</span>{" "}
             <span className="font-bold text-[var(--ds-sidebar-text)]">Dental</span>
           </span>
         ) : (

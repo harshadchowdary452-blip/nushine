@@ -58,7 +58,6 @@ EVENT_TO_TRIGGER.update({
     "COMMUNICATION_SENT": None,
     "COMMUNICATION_FAILED": None,
     "FOLLOWUP_COMPLETED": None,
-    "CAMPAIGN_COMPLETED": None,
     "ENQUIRY_CREATED": None,
     "ENQUIRY_CONVERTED": None,
     "RECALL_COMPLETED": "RECALL_COMPLETED",
@@ -422,7 +421,7 @@ class RuleEngine:
         if status != "SCHEDULED":
             return None
 
-        # Business Rule: Appointment must be in the future
+        # Business Rule: Appointment must be in the future (same-day appointments do NOT get a reminder)
         if appointment_date:
             from datetime import datetime as dt
             if isinstance(appointment_date, str):
@@ -438,8 +437,8 @@ class RuleEngine:
             else:
                 appt_date = date.today()
 
-            if appt_date < date.today():
-                logger.debug("APPT_SKIP: date=%s is in the past", appt_date)
+            if appt_date <= date.today():
+                logger.debug("APPT_SKIP: date=%s is not in the future", appt_date)
                 return None
         else:
             appt_date = date.today()
@@ -468,7 +467,7 @@ class RuleEngine:
 
         decisions = [
             Decision(action="CANCEL", cancel_enquiry_types=["OPD_FOLLOW_UP"], cancel_reason="APPOINTMENT_CREATED", patient_id=patient_id, trigger_event="APPOINTMENT_CREATED"),
-            Decision(action="CREATE", enquiry_type="APPOINTMENT_REMINDER", due_date=due_date, priority="MEDIUM", patient_id=patient_id, appointment_id=appointment_id, treatment_plan_id=payload.get("treatment_plan_id"), doctor_id=payload.get("doctor_id"), assigned_staff_id=payload.get("assigned_staff_id"), treatment_type_id=payload.get("treatment_type_id"), trigger_event="APPOINTMENT_CREATED", description="Appointment reminder"),
+            Decision(action="CREATE", enquiry_type="APPOINTMENT_REMINDER", due_date=due_date, priority="MEDIUM", patient_id=patient_id, appointment_id=appointment_id, case_id=payload.get("case_id"), treatment_plan_id=payload.get("treatment_plan_id"), doctor_id=payload.get("doctor_id"), assigned_staff_id=payload.get("assigned_staff_id"), treatment_type_id=payload.get("treatment_type_id"), trigger_event="APPOINTMENT_CREATED", description="Appointment reminder"),
         ]
         return decisions
 
@@ -638,6 +637,11 @@ class RuleEngine:
             ]
 
         # No future appointment → create Treatment Wellness
+        # Business Rule: Same-day appointment does NOT generate an enquiry record
+        if await self._has_today_appointment(db, patient_id):
+            logger.debug("TREATMENT_WELLNESS_SKIP: patient=%s has same-day appointment", patient_id)
+            return None
+
         # Load treatment-specific config
         follow_up_config = None
         if treatment_type_id:
@@ -1110,7 +1114,7 @@ class RuleEngine:
             logger.info("LEAD_AUTOMATION_STOPPED: lead=%s reason=%s cancelled=%d", lead_id, reason, count)
 
     async def _has_future_appointment(self, db: AsyncSession, patient_id: str) -> bool:
-        """Check if patient has a future SCHEDULED appointment."""
+        """Check if patient has a future SCHEDULED appointment (after today)."""
         from app.models.appointment import Appointment, AppointmentStatus
         today = date.today()
         result = await db.execute(
@@ -1119,14 +1123,14 @@ class RuleEngine:
                     Appointment.patient_id == patient_id,
                     Appointment.status.in_(["SCHEDULED", "CONFIRMED"]),
                     Appointment.is_active == True,
-                    Appointment.appointment_date >= today,
+                    Appointment.appointment_date > today,
                 )
             ).limit(1)
         )
         return result.scalar_one_or_none() is not None
 
     async def _get_next_appointment(self, db: AsyncSession, patient_id: str):
-        """Get the next upcoming appointment for a patient."""
+        """Get the next upcoming appointment for a patient (after today)."""
         from app.models.appointment import Appointment, AppointmentStatus
         today = date.today()
         result = await db.execute(
@@ -1135,11 +1139,27 @@ class RuleEngine:
                     Appointment.patient_id == patient_id,
                     Appointment.status.in_(["SCHEDULED", "CONFIRMED"]),
                     Appointment.is_active == True,
-                    Appointment.appointment_date >= today,
+                    Appointment.appointment_date > today,
                 )
             ).order_by(Appointment.appointment_date.asc()).limit(1)
         )
         return result.scalar_one_or_none()
+
+    async def _has_today_appointment(self, db: AsyncSession, patient_id: str) -> bool:
+        """Check if patient has a non-terminal appointment today."""
+        from app.models.appointment import Appointment
+        today = date.today()
+        result = await db.execute(
+            select(Appointment).where(
+                and_(
+                    Appointment.patient_id == patient_id,
+                    Appointment.status.in_(["SCHEDULED", "CONFIRMED"]),
+                    Appointment.is_active == True,
+                    Appointment.appointment_date == today,
+                )
+            ).limit(1)
+        )
+        return result.scalar_one_or_none() is not None
 
     async def _auto_close_enquiries(
         self, db: AsyncSession, hospital_id: str, patient_id: str, enquiry_types: list

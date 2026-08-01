@@ -79,16 +79,20 @@ class TemplateVariableResolver:
         total_visits: Optional[int] = None,
         treatment_name: Optional[str] = None,
     ) -> str:
-        """Replace all {{variable}} placeholders with actual values, respecting type scope."""
+        """Replace every {{variable}} placeholder with its real value. Tokens that
+        cannot be resolved (out-of-scope or missing data) become "" so no raw
+        {{...}} placeholders ever leak into a rendered message."""
         variables = await self._build_variable_map(
             db, enquiry_type, patient_id, lead_id, hospital_id, doctor_id,
             appointment_id, treatment_type_id, case_id,
             treatment_plan_id, staff_id, visit_number, remaining_visits, total_visits,
             treatment_name=treatment_name,
         )
+        import re
         result = template_message
-        for key, value in variables.items():
-            result = result.replace("{{" + key + "}}", str(value))
+        for key in re.findall(r'\{\{(\w+)\}\}', template_message):
+            value = variables.get(key)
+            result = result.replace("{{" + key + "}}", "" if value is None else str(value))
         return result
 
     async def resolve_with_validation(
@@ -110,23 +114,29 @@ class TemplateVariableResolver:
         total_visits: Optional[int] = None,
         treatment_name: Optional[str] = None,
     ) -> tuple[str, list[str]]:
-        """Resolve template and validate no forbidden variables are used.
-        Returns (resolved_message, invalid_variables).
-        If invalid variables are found, they remain unresolved in the message.
-        """
-        available = get_available_variables(enquiry_type)
-        import re
-        found = re.findall(r'\{\{(\w+)\}\}', template_message)
-        invalid = [v for v in found if v not in available]
+        """Resolve a template and report every placeholder that could not be
+        filled with a real, non-empty value (out-of-scope or missing data).
 
-        result = await self.resolve(
-            db, template_message, enquiry_type,
-            patient_id, lead_id, hospital_id, doctor_id,
+        Returns (resolved_message, unresolved_variables). Every placeholder is
+        substituted — missing ones become "" — so no raw {{...}} tokens survive.
+        """
+        import re
+        available = get_available_variables(enquiry_type)
+        variables = await self._build_variable_map(
+            db, enquiry_type, patient_id, lead_id, hospital_id, doctor_id,
             appointment_id, treatment_type_id, case_id,
             treatment_plan_id, staff_id, visit_number, remaining_visits, total_visits,
             treatment_name=treatment_name,
         )
-        return result, invalid
+        result = template_message
+        unresolved: list[str] = []
+        for key in re.findall(r'\{\{(\w+)\}\}', template_message):
+            value = variables.get(key)
+            if key not in available or value is None or str(value).strip() == "":
+                if key not in unresolved:
+                    unresolved.append(key)
+            result = result.replace("{{" + key + "}}", "" if value is None else str(value))
+        return result, unresolved
 
     async def resolve_template_for_enquiry(
         self,

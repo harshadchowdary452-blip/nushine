@@ -33,7 +33,8 @@ const statusIcon = (ok: boolean) =>
 export default function WhatsAppPreviewModal({ open, onClose, preview, loading, onSend, sending }: Props) {
   if (!preview) return null
 
-  const isValid = preview.validation.patient_exists && preview.validation.has_phone
+  const noUnresolved = preview.validation.no_unresolved ?? preview.unresolved_variables.length === 0
+  const isValid = preview.validation.patient_exists && preview.validation.has_phone && noUnresolved
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
@@ -112,9 +113,9 @@ export default function WhatsAppPreviewModal({ open, onClose, preview, loading, 
                   ))}
                 </div>
                 {preview.unresolved_variables.length > 0 && (
-                  <div className="mt-2 flex items-start gap-1.5 rounded-lg bg-amber-50 p-2 text-xs text-amber-700">
+                  <div className="mt-2 flex items-start gap-1.5 rounded-lg bg-red-50 p-2 text-xs text-red-700">
                     <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                    <span>Unresolved variables: {preview.unresolved_variables.join(", ")}</span>
+                    <span>Unresolved variables: {preview.unresolved_variables.join(", ")}. Resolve or remove them before sending.</span>
                   </div>
                 )}
               </div>

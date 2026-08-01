@@ -11,6 +11,7 @@ import {
   type ArchPosition,
 } from "./toothPaths"
 import SurfaceOverlay from "./SurfaceOverlay"
+import { X } from "lucide-react"
 
 // ─── Types (spec-compliant) ───────────────────────────────────────
 
@@ -625,7 +626,7 @@ function RightPanel({
           background: "var(--ds-surface)", cursor: "pointer", display: "flex", alignItems: "center",
           justifyContent: "center", color: "var(--ds-text-secondary)", fontSize: 13, fontWeight: 500,
           transition: "all 0.15s",
-        }} title="Close">✕</button>
+        }} title="Close"><X size={14} /></button>
       </div>
 
       {/* Tooth Preview */}
@@ -675,7 +676,7 @@ function RightPanel({
                     <button onClick={() => removeFinding(f)} style={{
                       background: "none", border: "none", cursor: "pointer",
                       color: "var(--ds-danger)", fontSize: 12, padding: "0 4px", lineHeight: 1,
-                    }} title="Remove">✕</button>
+                    }} title="Remove"><X size={12} /></button>
                   )}
                 </div>
               )

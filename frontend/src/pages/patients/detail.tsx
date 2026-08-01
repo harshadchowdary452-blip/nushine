@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { patientsApi, casesApi, appointmentsApi, billingApi, treatmentApi, crmApi, doctorsApi, consentFormsApi } from "@/services/endpoints";
@@ -34,6 +34,13 @@ import { formatIndianRupees } from "@/lib/currency";
 import SearchableSelect from "@/components/ui/searchable-select";
 import type { Case, Appointment, Billing, TreatmentPlan, PatientTimelineEntry, DoctorListItem, ApiError, ConsentForm, FollowUpResponse } from "@/types";
 import { extractDetail } from "@/types";
+import { 
+  Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
+  EnterpriseDetailWorkspace, EnterpriseRecordHeader, ProductivityPanel, ProductivitySection,
+  Timeline, Badge, Avatar as DSAvatar, AvatarFallback as DSAvatarFallback,
+  type TimelineItem, type ProductivityInsight, type RecordHeaderMeta, type RecordStat
+} from "@/design-system";
+import { useWorkspaceMemory } from "@/hooks/useWorkspaceMemory";
 import {
   User,
   Phone,
@@ -91,7 +98,20 @@ export default function PatientDetail() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { addToast } = useToast();
-  const [activeTab, setActiveTab] = useState("overview");
+  
+  // Use workspace memory for persistent state
+  const { state: workspaceState, update: updateWorkspace } = useWorkspaceMemory(
+    `patients.detail.${id}`,
+    {
+      activeTab: "overview",
+      timelineModule: "all",
+      timelineSearch: "",
+      timelineStartDate: "",
+      timelineEndDate: "",
+    },
+    { version: 1 }
+  );
+  
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({
     full_name: "",
@@ -196,15 +216,12 @@ export default function PatientDetail() {
   });
   const consentFormsList: ConsentForm[] = Array.isArray(consentFormsData) ? consentFormsData : [];
 
-  const [timelineModule, setTimelineModule] = useState<string>("all");
-  const [timelineSearch, setTimelineSearch] = useState("");
-  const [timelineStartDate, setTimelineStartDate] = useState("");
-  const [timelineEndDate, setTimelineEndDate] = useState("");
+
   const timelineParams = {
-    ...(timelineModule && timelineModule !== "all" && { module: timelineModule }),
-    ...(timelineSearch && { search: timelineSearch }),
-    ...(timelineStartDate && { start_date: timelineStartDate }),
-    ...(timelineEndDate && { end_date: timelineEndDate }),
+    ...(workspaceState.timelineModule && workspaceState.timelineModule !== "all" && { module: workspaceState.timelineModule }),
+    ...(workspaceState.timelineSearch && { search: workspaceState.timelineSearch }),
+    ...(workspaceState.timelineStartDate && { start_date: workspaceState.timelineStartDate }),
+    ...(workspaceState.timelineEndDate && { end_date: workspaceState.timelineEndDate }),
   };
   const { data: timelineData } = useQuery({
     queryKey: ["patient-timeline", id, timelineParams],
@@ -265,16 +282,7 @@ export default function PatientDetail() {
     }
   }, [patient]);
 
-  const tabBarRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const container = tabBarRef.current;
-    if (!container) return;
-    const activeBtn = container.querySelector<HTMLButtonElement>('[data-active="true"]');
-    if (activeBtn) {
-      activeBtn.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
-    }
-  }, [activeTab]);
 
   if (isLoading) return <PatientSkeleton />;
   if (error || !patient) {
@@ -294,131 +302,126 @@ export default function PatientDetail() {
   const treatmentPlansList = Array.isArray(treatmentPlans) ? treatmentPlans : treatmentPlans?.items || treatmentPlans || [];
   const followUpResponsesList: FollowUpResponse[] = followUpResponses || [];
 
-  function renderTimeline() {
-    const timelineEntries: PatientTimelineEntry[] = Array.isArray(timelineData?.entries) ? timelineData.entries : [];
-    if (timelineEntries.length === 0) {
-      return (
-        <Card className="p-12 text-center border-border shadow-card">
-          <Clock className="h-12 w-12 text-text-muted mx-auto mb-3" />
-          <p className="text-text-secondary">No timeline events</p>
-        </Card>
-      );
-    }
-
-    return (
-      <div className="relative pl-8 border-l-2 border-border space-y-6">
-        {timelineEntries.map((ev) => (
-          <div key={ev.id} className="relative">
-            <div className="absolute -left-[25px] p-1 rounded-full border-2 border-[var(--ds-border)] bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]">
-              <div className="h-2 w-2 rounded-full bg-current" />
+  // Convert timeline entries to DS Timeline format
+  const timelineItems = useMemo<TimelineItem[]>(() => {
+    const entries: PatientTimelineEntry[] = Array.isArray(timelineData?.entries) ? timelineData.entries : [];
+    return entries.map(ev => ({
+      id: ev.id,
+      tone: ev.module === "billing" ? "success" : 
+            ev.module === "case" ? "warning" : 
+            ev.module === "appointment" ? "info" : "neutral",
+      date: ev.created_at ? new Date(ev.created_at) : new Date(),
+      title: ev.action,
+      description: ev.description || undefined,
+      metadata: [
+        ...(ev.user_name ? [`by ${ev.user_name}${ev.user_role ? ` (${ev.user_role})` : ""}`] : []),
+        ...(ev.hospital_name ? [ev.hospital_name] : []),
+        ...(ev.module ? [ev.module] : [])
+      ],
+      expandable: ev.changes && ev.changes.length > 0 ? (
+        <div className="space-y-1 mt-2">
+          {ev.changes.map((c, ci) => (
+            <div key={ci} className="text-xs bg-[var(--ds-background-subtle)] rounded px-2 py-1">
+              <span className="font-medium text-[var(--ds-text-primary)]">{c.field}: </span>
+              <span className="text-[var(--ds-text-tertiary)] line-through">{c.old_value ?? "—"}</span>
+              <span className="text-[var(--ds-text-tertiary)] mx-1">→</span>
+              <span className="text-[var(--ds-success)] font-medium">{c.new_value ?? "—"}</span>
             </div>
-            <div className="bg-card rounded-lg border border-border p-4 shadow-sm">
-              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{ev.module || "System"}</span>
-                <span className="text-xs text-text-muted">{ev.created_at ? new Date(ev.created_at).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" }) : ""}</span>
-                {ev.user_name && (
-                  <span className="text-xs text-text-muted ml-auto">
-                    by <span className="font-medium text-text-primary">{ev.user_name}</span>
-                    {ev.user_role && <span className="text-text-muted"> ({ev.user_role})</span>}
-                    {ev.hospital_name && <span className="text-text-muted"> — {ev.hospital_name}</span>}
-                  </span>
-                )}
-              </div>
-              <p className="text-sm font-medium text-text-primary">{ev.action}</p>
-              {ev.description && <p className="text-xs text-text-secondary mt-1">{ev.description}</p>}
-              {ev.changes && ev.changes.length > 0 && (
-                <div className="mt-2 space-y-1">
-                  {ev.changes.map((c, ci) => (
-                    <div key={ci} className="text-xs bg-muted/30 rounded px-2 py-1">
-                      <span className="font-medium text-text-primary">{c.field}: </span>
-                      <span className="text-text-muted line-through">{c.old_value ?? "—"}</span>
-                      <span className="text-text-muted mx-1">→</span>
-                      <span className="text-success font-medium">{c.new_value ?? "—"}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
+          ))}
+        </div>
+      ) : undefined
+    }));
+  }, [timelineData]);
 
-  const tabs: { value: string; label: string; icon: typeof User; getCount?: () => number | null }[] = [
-    { value: "overview", label: "Overview", icon: User },
-    { value: "cases", label: "Case Reports", icon: FileText, getCount: () => casesList.length },
-    { value: "appointments", label: "Appointments", icon: Calendar, getCount: () => appointmentsList.length },
-    { value: "treatments", label: "Treatments", icon: Activity, getCount: () => treatmentPlansList.length },
-    { value: "billing", label: "Billing", icon: CreditCard, getCount: () => billingsList.length },
-    { value: "images", label: "Images", icon: Camera },
-    { value: "responses", label: "Responses", icon: MessageSquare, getCount: () => followUpResponsesList.length },
-    { value: "consent-forms", label: "Consent Forms", icon: ScrollText, getCount: () => consentFormsList.length },
-    { value: "timeline", label: "Timeline", icon: Clock },
+  const pageTabs = [
+    { key: "overview", label: "Overview", icon: User },
+    { key: "cases", label: "Case Reports", icon: FileText, count: casesList.length || undefined },
+    { key: "appointments", label: "Appointments", icon: Calendar, count: appointmentsList.length || undefined },
+    { key: "treatments", label: "Treatments", icon: Activity, count: treatmentPlansList.length || undefined },
+    { key: "billing", label: "Billing", icon: CreditCard, count: billingsList.length || undefined },
+    { key: "images", label: "Images", icon: Camera },
+    { key: "responses", label: "Responses", icon: MessageSquare, count: followUpResponsesList.length || undefined },
+    { key: "consent-forms", label: "Consent Forms", icon: ScrollText, count: consentFormsList.length || undefined },
+    { key: "timeline", label: "Timeline", icon: Clock },
   ];
 
-  return (
-    <div className="animate-fade-in space-y-6">
-      {/* Back Button */}
-      <button
-        onClick={() => navigate("/patients")}
-        className="flex items-center gap-2 text-sm text-text-secondary hover:text-primary transition-colors"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back to Patients
-      </button>
+  // Build productivity insights
+  const productivityInsights = useMemo<ProductivityInsight[]>(() => {
+    const insights: ProductivityInsight[] = [];
+    
+    // Upcoming appointments
+    const upcomingAppts = appointmentsList.filter((a: Appointment) => 
+      a.status === "SCHEDULED" && new Date(a.appointment_date) > new Date()
+    );
+    if (upcomingAppts.length > 0) {
+      const next = upcomingAppts[0];
+      insights.push({
+        id: "upcoming-appt",
+        tone: "info",
+        icon: Calendar,
+        title: "Upcoming appointment",
+        description: `${next.appointment_date} at ${next.appointment_time}`
+      });
+    }
+    
+    // Outstanding balance
+    const totalPending = billingsList.reduce((sum: number, b: Billing) => sum + (b.pending_amount || 0), 0);
+    if (totalPending > 0) {
+      insights.push({
+        id: "outstanding-balance",
+        tone: "warning",
+        icon: CreditCard,
+        title: "Outstanding balance",
+        description: formatIndianRupees(totalPending)
+      });
+    }
+    
+    // Active treatments
+    const activeTreatments = treatmentPlansList.filter((t: TreatmentPlan) => 
+      t.status === "IN_PROGRESS" || t.status === "SCHEDULED"
+    );
+    if (activeTreatments.length > 0) {
+      insights.push({
+        id: "active-treatments",
+        tone: "info",
+        icon: Activity,
+        title: `${activeTreatments.length} active treatment${activeTreatments.length > 1 ? 's' : ''}`,
+        description: activeTreatments.map((t: TreatmentPlan) => t.treatment_name).join(", ")
+      });
+    }
+    
+    // Open cases
+    const openCases = casesList.filter((c: Case) => c.status !== "COMPLETED" && c.status !== "ARCHIVED");
+    if (openCases.length > 0) {
+      insights.push({
+        id: "open-cases",
+        tone: "neutral",
+        icon: FileText,
+        title: `${openCases.length} open case${openCases.length > 1 ? 's' : ''}`,
+        description: openCases[0].chief_complaint
+      });
+    }
+    
+    return insights;
+  }, [appointmentsList, billingsList, treatmentPlansList, casesList]);
 
-      {/* Patient Header */}
-      <Card className="p-6 border-border shadow-card">
-        <div className="flex flex-col md:flex-row md:items-center gap-6">
-          {/* Avatar */}
-          <Avatar className="h-20 w-20 ring-4 ring-primary-light">
-            <AvatarFallback className="bg-primary text-primary-foreground text-xl font-bold">
-              {getInitials(patient.full_name)}
-            </AvatarFallback>
-          </Avatar>
+  // Build record header props
+  const recordMeta: RecordHeaderMeta[] = [
+    { icon: Calendar, label: "Age", value: patient.age ? `${patient.age} yrs` : undefined },
+    { icon: User, label: "Gender", value: patient.gender },
+    { icon: Phone, label: "Phone", value: patient.phone },
+    { icon: Mail, label: "Email", value: patient.email },
+  ].filter(m => m.value);
 
-          {/* Info */}
-          <div className="flex-1 min-w-0">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-              <h1 className="text-2xl font-bold text-text-primary truncate">
-                {patient.full_name}
-              </h1>
-              <StatusBadge status={patient.status} />
-            </div>
-            <p className="text-sm text-text-muted mt-1">
-              ID: {patient.id.slice(0, 8)}...
-            </p>
-            <div className="flex flex-wrap gap-4 mt-3">
-              {patient.age && (
-                <div className="flex items-center gap-1.5 text-sm text-text-secondary">
-                  <Calendar className="h-4 w-4 text-primary" />
-                  {patient.age} yrs
-                </div>
-              )}
-              {patient.gender && (
-                <div className="flex items-center gap-1.5 text-sm text-text-secondary">
-                  <User className="h-4 w-4 text-primary" />
-                  {patient.gender}
-                </div>
-              )}
-              {patient.phone && (
-                <div className="flex items-center gap-1.5 text-sm text-text-secondary">
-                  <Phone className="h-4 w-4 text-primary" />
-                  {patient.phone}
-                </div>
-              )}
-              {patient.email && (
-                <div className="flex items-center gap-1.5 text-sm text-text-secondary">
-                  <Mail className="h-4 w-4 text-primary" />
-                  {patient.email}
-                </div>
-              )}
-            </div>
-          </div>
+  const recordStats: RecordStat[] = [
+    { label: "Total Cases", value: casesList.length },
+    { label: "Appointments", value: appointmentsList.length },
+    { label: "Treatments", value: treatmentPlansList.length },
+    { label: "Outstanding", value: formatIndianRupees(billingsList.reduce((sum: number, b: Billing) => sum + (b.pending_amount || 0), 0)) },
+  ];
 
-          {/* Actions */}
-          <div className="flex flex-col sm:flex-row gap-2">
+  const recordHeaderActions = (
+    <div className="flex flex-wrap gap-2">
             {/* Quick Create Appointment */}
             <Dialog open={apptOpen} onOpenChange={setApptOpen}>
               <DialogTrigger asChild>
@@ -814,87 +817,98 @@ export default function PatientDetail() {
               </DialogContent>
             </Dialog>
 
-            <Select
-              value={patient.status}
-              onValueChange={(v) => statusMutation.mutate(v)}
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="NEW">New</SelectItem>
-                <SelectItem value="ACTIVE">Active</SelectItem>
-                <SelectItem value="INACTIVE">Inactive</SelectItem>
-                <SelectItem value="UNDER_TREATMENT">Under Treatment</SelectItem>
-                <SelectItem value="TREATMENT_ONGOING">Treatment Ongoing</SelectItem>
-                <SelectItem value="FOLLOW_UP">Follow Up</SelectItem>
-                <SelectItem value="COMPLETED">Completed</SelectItem>
-                <SelectItem value="OPD">OPD</SelectItem>
-                <SelectItem value="LOST">Lost</SelectItem>
-                <SelectItem value="ARCHIVED">Archived</SelectItem>
-              </SelectContent>
-            </Select>
+      <Select
+        value={patient.status}
+        onValueChange={(v) => statusMutation.mutate(v)}
+      >
+        <SelectTrigger className="w-[180px]">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="NEW">New</SelectItem>
+          <SelectItem value="ACTIVE">Active</SelectItem>
+          <SelectItem value="INACTIVE">Inactive</SelectItem>
+          <SelectItem value="UNDER_TREATMENT">Under Treatment</SelectItem>
+          <SelectItem value="TREATMENT_ONGOING">Treatment Ongoing</SelectItem>
+          <SelectItem value="FOLLOW_UP">Follow Up</SelectItem>
+          <SelectItem value="COMPLETED">Completed</SelectItem>
+          <SelectItem value="OPD">OPD</SelectItem>
+          <SelectItem value="LOST">Lost</SelectItem>
+          <SelectItem value="ARCHIVED">Archived</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
+  // Build productivity panel
+  const productivityPanel = productivityInsights.length > 0 || patient.medical_history ? (
+    <ProductivityPanel
+      title="Patient Context"
+      insights={productivityInsights}
+      sticky={true}
+    >
+      {patient.medical_history && (
+        <ProductivitySection title="Medical History" icon={Activity}>
+          <p className="text-sm text-[var(--ds-text-secondary)] whitespace-pre-wrap">
+            {patient.medical_history}
+          </p>
+        </ProductivitySection>
+      )}
+      {patient.latest_feedback_date && (
+        <ProductivitySection title="Latest Feedback" icon={ThumbsUp}>
+          <div className="space-y-2 text-sm">
+            {patient.latest_satisfaction_rating != null && (
+              <div className="flex justify-between">
+                <span className="text-[var(--ds-text-tertiary)]">Rating</span>
+                <span className="font-medium">{patient.latest_satisfaction_rating}/5</span>
+              </div>
+            )}
+            {patient.latest_recommendation_status != null && (
+              <div className="flex justify-between">
+                <span className="text-[var(--ds-text-tertiary)]">Would Recommend</span>
+                <span className={patient.latest_recommendation_status ? "text-[var(--ds-success)]" : "text-[var(--ds-danger)]"}>
+                  {patient.latest_recommendation_status ? "Yes" : "No"}
+                </span>
+              </div>
+            )}
+            {patient.latest_feedback_comments && (
+              <p className="text-xs italic text-[var(--ds-text-secondary)] pt-2 border-t border-[var(--ds-border)]">
+                {patient.latest_feedback_comments}
+              </p>
+            )}
           </div>
-        </div>
-      </Card>
+        </ProductivitySection>
+      )}
+    </ProductivityPanel>
+  ) : undefined;
 
-      {/* Sticky Responsive Tab Navigation */}
-      <div className="sticky top-0 z-[var(--ds-z-sticky)] bg-[var(--ds-surface)] border-b border-[var(--ds-border)] -mx-6 px-6 mb-6 shadow-sm">
-        <div
-          ref={tabBarRef}
-          className="flex items-center gap-1 overflow-x-auto scrollbar-hide scroll-smooth py-2"
-          onWheel={(e) => {
-            const el = e.currentTarget;
-            if (el.scrollWidth > el.clientWidth) {
-              el.scrollLeft += e.deltaY;
-            }
-          }}
-          role="tablist"
-          aria-label="Patient section navigation"
-        >
-          {tabs.map((tab) => {
-            const count = tab.getCount?.();
-            const isActive = activeTab === tab.value;
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.value}
-                role="tab"
-                aria-selected={isActive}
-                aria-label={`${tab.label}${count != null && count > 0 ? ` (${count})` : ""}`}
-                data-active={isActive ? "true" : undefined}
-                onClick={() => setActiveTab(tab.value)}
-                className={`
-                  flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium
-                  whitespace-nowrap shrink-0 transition-all duration-200
-                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2
-                  ${isActive
-                    ? "bg-blue-600 text-white shadow-sm"
-                    : "text-[var(--ds-text-secondary)] hover:bg-[var(--ds-surface-hover)] hover:text-[var(--ds-text-secondary)]"
-                  }
-                `}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span className="truncate max-w-[100px] sm:max-w-none">{tab.label}</span>
-                {count != null && count > 0 && (
-                  <span
-                    className={`
-                      inline-flex items-center justify-center rounded-full text-xs font-semibold
-                      px-1.5 py-0.5 min-w-[20px] h-5 leading-none
-                      ${isActive ? "bg-white/20 text-white" : "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]"}
-                    `}
-                  >
-                    {count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Tab Content - Lazy Loaded */}
-      {activeTab === "overview" && (
+  return (
+    <EnterpriseDetailWorkspace
+      backLabel="Back to Patients"
+      onBack={() => navigate("/patients")}
+      header={{
+        profile: (
+          <DSAvatar className="h-16 w-16">
+            <DSAvatarFallback>{getInitials(patient.full_name)}</DSAvatarFallback>
+          </DSAvatar>
+        ),
+        eyebrow: `ID: ${patient.id.slice(0, 8)}`,
+        title: patient.full_name,
+        subtitle: patient.op_no ? `OP No: ${patient.op_no}` : undefined,
+        primaryStatus: <Badge variant={patient.status === "ACTIVE" ? "success" : "default"}>{patient.status}</Badge>,
+        meta: recordMeta,
+        stats: recordStats,
+        actions: recordHeaderActions,
+      }}
+      tabs={pageTabs}
+      activeTab={workspaceState.activeTab}
+      onTabChange={(tab) => updateWorkspace({ activeTab: tab })}
+      panel={productivityPanel}
+      loading={isLoading}
+      error={error ? "Failed to load patient" : undefined}
+    >
+      {/* Tab Content */}
+      {workspaceState.activeTab === "overview" && (
         <div className="overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 320px)" }}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card className="p-6 border-border shadow-card">
@@ -1003,7 +1017,7 @@ export default function PatientDetail() {
         </div>
       )}
 
-      {activeTab === "cases" && (
+      {workspaceState.activeTab === "cases" && (
         <div className="overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 320px)" }}>
           {casesList.length === 0 ? (
             <Card className="p-12 text-center border-border shadow-card">
@@ -1037,7 +1051,7 @@ export default function PatientDetail() {
         </div>
       )}
 
-      {activeTab === "appointments" && (
+      {workspaceState.activeTab === "appointments" && (
         <div className="overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 320px)" }}>
           {appointmentsList.length === 0 ? (
             <Card className="p-12 text-center border-border shadow-card">
@@ -1194,23 +1208,22 @@ export default function PatientDetail() {
                 <p className="text-text-secondary">No responses recorded yet</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">Date</th>
-                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">Enquiry Type</th>
-                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">Response</th>
-                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">Status</th>
-                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">Feedback</th>
-                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">Follow-Up</th>
-                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">Appointment</th>
-                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">Doctor</th>
-                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">Staff</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {followUpResponsesList.map((r: FollowUpResponse) => {
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Enquiry Type</TableHead>
+                    <TableHead>Response</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Feedback</TableHead>
+                    <TableHead>Follow-Up</TableHead>
+                    <TableHead>Appointment</TableHead>
+                    <TableHead>Doctor</TableHead>
+                    <TableHead>Staff</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {followUpResponsesList.map((r: FollowUpResponse) => {
                       const respColor: Record<string, string> = {
                         POSITIVE: "bg-green-100 text-green-700",
                         NEGATIVE: "bg-red-100 text-red-700",
@@ -1231,59 +1244,58 @@ export default function PatientDetail() {
                         "MANUAL": "Manual Follow-Up",
                       }
                       return (
-                        <tr key={r.id} className="border-b hover:bg-muted/50">
-                          <td className="px-3 py-2.5 text-xs whitespace-nowrap">
+                        <TableRow key={r.id}>
+                          <TableCell className="text-xs whitespace-nowrap">
                             {r.created_at ? new Date(r.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "-"}
-                          </td>
-                          <td className="px-3 py-2.5 text-xs">
+                          </TableCell>
+                          <TableCell className="text-xs">
                             <span className="font-medium">{typeLabel[r.follow_up_type || ""] || r.follow_up_type || "-"}</span>
-                          </td>
-                          <td className="px-3 py-2.5 text-xs max-w-[200px] truncate">
+                          </TableCell>
+                          <TableCell className="text-xs max-w-[200px] truncate">
                             {r.response_message || <span className="text-muted-foreground italic">No message</span>}
-                          </td>
-                          <td className="px-3 py-2.5">
-                            <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${respColor[r.response_status || ""] || "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]"}`}>
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            <span className={`inline-block rounded px-2 py-0.5 font-medium ${respColor[r.response_status || ""] || "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]"}`}>
                               {r.response_status}
                             </span>
-                          </td>
-                          <td className={`px-3 py-2.5 text-xs font-medium ${fbColor[r.feedback || ""] || ""}`}>
+                          </TableCell>
+                          <TableCell className={`text-xs font-medium ${fbColor[r.feedback || ""] || ""}`}>
                             {r.feedback || "-"}
-                          </td>
-                          <td className="px-3 py-2.5 text-xs">
+                          </TableCell>
+                          <TableCell className="text-xs">
                             {r.follow_up_required ? (
                               <span className="text-green-600 font-medium">YES</span>
                             ) : (
                               <span className="text-muted-foreground">NO</span>
                             )}
-                          </td>
-                          <td className="px-3 py-2.5 text-xs">
+                          </TableCell>
+                          <TableCell className="text-xs">
                             {r.appointment_id ? (
                               <span className="text-primary font-medium">APT-{r.appointment_id.slice(-5)}</span>
                             ) : "-"}
-                          </td>
-                          <td className="px-3 py-2.5 text-xs">Dr. {r.doctor_name || "-"}</td>
-                          <td className="px-3 py-2.5 text-xs">{r.created_by_name || "-"}</td>
-                        </tr>
+                          </TableCell>
+                          <TableCell className="text-xs">Dr. {r.doctor_name || "-"}</TableCell>
+                          <TableCell className="text-xs">{r.created_by_name || "-"}</TableCell>
+                        </TableRow>
                       )
                     })}
-                  </tbody>
-                </table>
-              </div>
+                </TableBody>
+              </Table>
             )}
           </Card>
         </div>
       )}
 
-      {activeTab === "timeline" && (
-        <div className="overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 320px)" }}>
+      {workspaceState.activeTab === "timeline" && (
+        <div>
           <div className="flex flex-wrap items-center gap-2 mb-4">
             <Input
               placeholder="Search timeline..."
-              value={timelineSearch}
-              onChange={(e) => setTimelineSearch(e.target.value)}
+              value={workspaceState.timelineSearch}
+              onChange={(e) => updateWorkspace({ timelineSearch: e.target.value })}
               className="w-48 h-8 text-xs"
             />
-            <Select value={timelineModule} onValueChange={(v) => setTimelineModule(v)}>
+            <Select value={workspaceState.timelineModule} onValueChange={(v) => updateWorkspace({ timelineModule: v })}>
               <SelectTrigger className="w-36 h-8 text-xs"><SelectValue placeholder="All modules" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All modules</SelectItem>
@@ -1297,15 +1309,41 @@ export default function PatientDetail() {
                 <SelectItem value="enquiry">Enquiry</SelectItem>
               </SelectContent>
             </Select>
-            <Input type="date" value={timelineStartDate} onChange={(e) => setTimelineStartDate(e.target.value)} className="w-36 h-8 text-xs" placeholder="From" />
-            <Input type="date" value={timelineEndDate} onChange={(e) => setTimelineEndDate(e.target.value)} className="w-36 h-8 text-xs" placeholder="To" />
-            {(timelineSearch || timelineModule !== "all" || timelineStartDate || timelineEndDate) && (
-              <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setTimelineSearch(""); setTimelineModule("all"); setTimelineStartDate(""); setTimelineEndDate(""); }}>
+            <Input 
+              type="date" 
+              value={workspaceState.timelineStartDate} 
+              onChange={(e) => updateWorkspace({ timelineStartDate: e.target.value })} 
+              className="w-36 h-8 text-xs" 
+              placeholder="From" 
+            />
+            <Input 
+              type="date" 
+              value={workspaceState.timelineEndDate} 
+              onChange={(e) => updateWorkspace({ timelineEndDate: e.target.value })} 
+              className="w-36 h-8 text-xs" 
+              placeholder="To" 
+            />
+            {(workspaceState.timelineSearch || workspaceState.timelineModule !== "all" || workspaceState.timelineStartDate || workspaceState.timelineEndDate) && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-8 text-xs" 
+                onClick={() => updateWorkspace({ 
+                  timelineSearch: "", 
+                  timelineModule: "all", 
+                  timelineStartDate: "", 
+                  timelineEndDate: "" 
+                })}
+              >
                 Clear
               </Button>
             )}
           </div>
-          {renderTimeline()}
+          <Timeline 
+            items={timelineItems} 
+            emptyTitle="No timeline events"
+            emptyDescription="Patient activity will appear here"
+          />
         </div>
       )}
 

@@ -148,3 +148,17 @@ export { default as Logo } from "./components/logo"
 
 // Enterprise Dashboard System (Part 3B-1)
 export * from "./dashboard"
+
+// Enterprise Workspace System (Part 3C)
+export { EnterpriseWorkspace, QuickPreviewDrawer } from "./components/enterprise-workspace"
+export type {
+  EnterpriseWorkspaceProps, WorkspaceSearchProps, WorkspaceFiltersProps, QuickViewProps,
+} from "./components/enterprise-workspace"
+export { EnterpriseRecordHeader } from "./components/enterprise-record-header"
+export type { EnterpriseRecordHeaderProps, RecordHeaderMeta, RecordStat } from "./components/enterprise-record-header"
+export { EnterpriseDetailWorkspace } from "./components/enterprise-detail-workspace"
+export type { EnterpriseDetailWorkspaceProps, EnterpriseDetailTab } from "./components/enterprise-detail-workspace"
+export { ProductivityPanel, ProductivitySection } from "./components/productivity-panel"
+export type { ProductivityPanelProps, ProductivitySectionProps, ProductivityInsight, ProductivityInsightTone } from "./components/productivity-panel"
+export { SplitViewWorkspace } from "./components/split-view"
+export type { SplitViewWorkspaceProps } from "./components/split-view"

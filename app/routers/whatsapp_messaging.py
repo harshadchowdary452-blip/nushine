@@ -266,14 +266,23 @@ def render_message(template: str, variables: Dict[str, str]) -> str:
     return rendered
 
 
-def strip_unresolved_vars(text: str) -> str:
-    import re
-    return re.sub(r'\{\{.*?\}\}', '', text).strip()
-
-
 def find_unresolved_vars(message: str) -> List[str]:
     import re
     return re.findall(r'\{\{(\w+)\}\}', message)
+
+
+def unresolved_in_message(rendered: str, resolved: Dict[str, str]) -> List[str]:
+    found = find_unresolved_vars(rendered)
+    return [f"{{{{{v}}}}}" for v in dict.fromkeys(found) if not resolved.get(v)]
+
+
+def ensure_no_unresolved(rendered: str, resolved: Dict[str, str]) -> None:
+    missing = unresolved_in_message(rendered, resolved)
+    if missing:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Cannot send: unresolved variables {', '.join(missing)}. Resolve or remove them before sending.",
+        )
 
 
 @router.post("/preview", response_model=PreviewResponse)
@@ -290,11 +299,14 @@ async def preview_message(
     validation = ctx["validation"]
 
     rendered = render_message(request.message, resolved)
-    clean = strip_unresolved_vars(rendered)
+    used_unresolved = unresolved_in_message(rendered, resolved)
 
-    template_unresolved = find_unresolved_vars(rendered)
-    remaining = [f"{{{{{v}}}}}" for v in template_unresolved if f"{{{{{v}}}}}" not in resolved or not resolved.get(f"{{{{{v}}}}}")]
-    all_unresolved = list(set(unresolved + remaining))
+    all_unresolved = list(dict.fromkeys(unresolved + used_unresolved))
+    validation = {
+        **validation,
+        "no_unresolved": len(used_unresolved) == 0,
+        "all_variables_resolved": len(used_unresolved) == 0,
+    }
 
     return PreviewResponse(
         patient_id=patient.id,
@@ -302,7 +314,7 @@ async def preview_message(
         patient_phone=patient.phone,
         doctor_name=resolved.get("doctor_name"),
         hospital_name=resolved.get("hospital_name"),
-        rendered_message=clean,
+        rendered_message=rendered,
         resolved_variables=resolved,
         unresolved_variables=all_unresolved,
         validation=validation,
@@ -324,7 +336,9 @@ async def send_whatsapp(
 
     ctx = await resolve_variables(db, request.patient_id, current_user.get("hospital_id"))
     rendered = render_message(request.message, ctx["resolved"])
-    clean = strip_unresolved_vars(rendered)
+    ensure_no_unresolved(rendered, ctx["resolved"])
+    if request.send_mode == "api" and not patient.phone:
+        raise HTTPException(status_code=400, detail="Patient has no phone number; cannot send via API")
 
     provider = WhatsAppProvider()
     hospital_id = current_user.get("hospital_id") or patient.hospital_id
@@ -335,7 +349,7 @@ async def send_whatsapp(
         doctor_id=current_user.get("id") or patient.doctor_id,
         channel="WHATSAPP",
         message_type=request.message_type,
-        message=clean,
+        message=rendered,
         status=CommunicationStatus.SENT.value if request.send_mode == "api" else CommunicationStatus.PENDING.value,
         sent_at=datetime.now(timezone.utc) if request.send_mode == "api" else None,
         template_id=request.template_id,
@@ -359,7 +373,7 @@ async def send_whatsapp(
     db.add(audit_entry)
 
     if request.send_mode == "api":
-        success = await provider.send_message(patient.phone, clean)
+        success = await provider.send_message(patient.phone, rendered)
         if success:
             log.status = CommunicationStatus.SENT.value
             log.sent_at = datetime.now(timezone.utc)
@@ -367,7 +381,7 @@ async def send_whatsapp(
             log.status = CommunicationStatus.FAILED.value
             raise HTTPException(status_code=500, detail="Failed to send WhatsApp message")
     else:
-        links = provider.generate_deep_link(patient.phone or "", clean)
+        links = provider.generate_deep_link(patient.phone or "", rendered)
         audit_entry2 = MessageAudit(
             communication_log_id=log.id,
             patient_id=patient.id,
@@ -388,7 +402,7 @@ async def send_whatsapp(
         module="Communication",
     )
 
-    links = provider.generate_deep_link(patient.phone or "", clean)
+    links = provider.generate_deep_link(patient.phone or "", rendered)
 
     return SendResponse(
         success=True,
@@ -410,20 +424,51 @@ async def broadcast_whatsapp_messages(
     patient_repo = PatientRepository(db)
     sent = 0
     failed = 0
+    skipped = 0
     provider = WhatsAppProvider()
+    hospital_id = current_user.get("hospital_id")
     for pid in request.patient_ids:
         patient = await patient_repo.get(pid)
         if not patient:
+            failed += 1
             continue
         await verify_tenant_access(current_user, patient, "patient", db)
-        if patient.phone:
-            msg = request.message.replace("{name}", patient.full_name)
-            ok = await provider.send_message(patient.phone, msg)
-            if ok:
-                sent += 1
-            else:
-                failed += 1
-    return {"success": True, "sent": sent, "failed": failed}
+        if not patient.phone:
+            skipped += 1
+            continue
+        ctx = await resolve_variables(db, pid, hospital_id or patient.hospital_id)
+        rendered = render_message(request.message, ctx["resolved"])
+        used_unresolved = unresolved_in_message(rendered, ctx["resolved"])
+        if used_unresolved:
+            skipped += 1
+            continue
+        ok = await provider.send_message(patient.phone, rendered)
+        log = CommunicationLog(
+            patient_id=patient.id,
+            hospital_id=hospital_id or patient.hospital_id,
+            doctor_id=current_user.get("id") or patient.doctor_id,
+            channel="WHATSAPP",
+            message_type="BROADCAST",
+            message=rendered,
+            status=CommunicationStatus.SENT.value if ok else CommunicationStatus.FAILED.value,
+            sent_at=datetime.now(timezone.utc) if ok else None,
+            sent_via="api",
+            approved_by=current_user.get("id"),
+            approved_at=datetime.now(timezone.utc),
+        )
+        db.add(log)
+        await record_timeline_event(
+            db, current_user=current_user, patient_id=patient.id,
+            action="WhatsApp Sent",
+            description="WhatsApp broadcast sent",
+            module="Communication",
+        )
+        if ok:
+            sent += 1
+        else:
+            failed += 1
+    await db.commit()
+    return {"success": True, "sent": sent, "failed": failed, "skipped": skipped}
 
 
 @router.post("/bulk-preview")
@@ -439,17 +484,17 @@ async def bulk_preview(
             ctx = await resolve_variables(db, pid, current_user.get("hospital_id"))
             patient = ctx["patient"]
             rendered = render_message(request.message, ctx["resolved"])
-            clean = strip_unresolved_vars(rendered)
+            used_unresolved = unresolved_in_message(rendered, ctx["resolved"])
             results.append({
                 "patient_id": pid,
                 "patient_name": patient.full_name or "Unknown",
                 "patient_phone": patient.phone,
-                "rendered_message": clean,
+                "rendered_message": rendered,
                 "resolved_variables": ctx["resolved"],
-                "unresolved_variables": ctx["unresolved"],
+                "unresolved_variables": list(dict.fromkeys(ctx["unresolved"] + used_unresolved)),
                 "validation": ctx["validation"],
                 "has_phone": bool(patient.phone),
-                "is_valid": ctx["validation"]["patient_exists"] and bool(patient.phone),
+                "is_valid": ctx["validation"]["patient_exists"] and bool(patient.phone) and len(used_unresolved) == 0,
             })
         except HTTPException:
             results.append({
@@ -499,6 +544,18 @@ async def bulk_send(
             failed += 1
             results.append({"patient_id": pid, "success": False, "error": "Patient not found"})
             continue
+        if not patient.phone:
+            failed += 1
+            results.append({"patient_id": pid, "success": False, "error": "Patient has no phone number"})
+            continue
+
+        ctx = await resolve_variables(db, pid, hospital_id or patient.hospital_id)
+        rendered = render_message(message, ctx["resolved"])
+        used_unresolved = unresolved_in_message(rendered, ctx["resolved"])
+        if used_unresolved:
+            failed += 1
+            results.append({"patient_id": pid, "success": False, "error": f"Unresolved variables: {', '.join(used_unresolved)}"})
+            continue
 
         log = CommunicationLog(
             patient_id=pid,
@@ -506,7 +563,7 @@ async def bulk_send(
             doctor_id=current_user.get("id") or patient.doctor_id,
             channel="WHATSAPP",
             message_type=msg_type,
-            message=message,
+            message=rendered,
             status=CommunicationStatus.PENDING.value,
             sent_via=send_mode,
             approved_by=current_user.get("id"),
@@ -516,7 +573,7 @@ async def bulk_send(
         await db.flush()
 
         if send_mode == "api":
-            ok = await provider.send_message(patient.phone, message)
+            ok = await provider.send_message(patient.phone, rendered)
             if ok:
                 log.status = CommunicationStatus.SENT.value
                 log.sent_at = datetime.now(timezone.utc)
@@ -527,9 +584,15 @@ async def bulk_send(
                 failed += 1
                 results.append({"patient_id": pid, "success": False, "error": "Send failed"})
         else:
-            links = provider.generate_deep_link(patient.phone or "", message)
+            links = provider.generate_deep_link(patient.phone, rendered)
             sent += 1
             results.append({"patient_id": pid, "success": True, "message_id": log.id, **links})
+        await record_timeline_event(
+            db, current_user=current_user, patient_id=pid,
+            action="WhatsApp Sent",
+            description=f"WhatsApp bulk {send_mode} sent: {msg_type}",
+            module="Communication",
+        )
 
     await db.commit()
     return {"success": True, "sent": sent, "failed": failed, "results": results}

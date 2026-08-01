@@ -1,33 +1,185 @@
-import { useState, useMemo } from "react"
+import { useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "react-router-dom"
 import {
-  CalendarDays, Phone, MessageCircle, CheckCircle, Clock, FileText, History,
-  User, Activity, TrendingUp, Users, IndianRupee,
-  BarChart3, Target, Send, Award, MessageSquare,
-  ChevronRight, BookOpen, AlertCircle,
-  HeartPulse, UserPlus, Filter, UserMinus,
+  AlertOctagon, Activity, Bell, CalendarCheck, CalendarDays, CheckCircle2,
+  ChevronRight, Clock, HeartPulse, Hourglass, Mail, MessageCircle,
+  MessageSquare, Phone, PhoneMissed, Radio, Send, Target, Timer, TrendingUp,
+  UserPlus, Users, Workflow,
 } from "lucide-react"
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart as RePieChart, Pie, Cell, type PieLabelRenderProps,
-} from "recharts"
 import { cn } from "@/lib/utils"
-import { formatIndianRupees, formatIndianNumber } from "@/lib/currency"
-import { crmApi, doctorsApi, leadsApi, enquiriesApi, whatsappV2Api } from "@/services/endpoints"
-import DashboardDateFilter, { type DateRangePreset } from "@/components/ui/dashboard-date-filter"
-import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
+import { formatIndianNumber } from "@/lib/currency"
+import { buildDrilldownPath, type DrilldownOptions } from "@/lib/dashboard-links"
+import { crmApi } from "@/services/endpoints"
+import { Badge } from "@/design-system/components/badge"
+import { Button } from "@/design-system/components/button"
+import {
+  DashboardShell, DashboardHeader, CommandCenter, WidgetCard, DashboardSection,
+  KpiGrid, type KpiDatum, type KpiTone,
+  AlertCenter, type AlertItem, QuickActionCenter, type QuickAction,
+  RecentActivity, type ActivityEvent,
+  DashboardChart, DonutChart, downloadCSV,
+  useDashboardFilter,
+} from "@/design-system/dashboard"
+import { Skeleton } from "@/design-system/components/skeleton"
 
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import DentalEmptyState from "@/components/ui/dental-empty-state"
-import ExpensesVsRevenueQuickView from "@/components/dashboard/expenses-vs-revenue-quick-view"
+/* ────────────────────────────────────────────────────────────────────────────
+   Types mirroring the backend `/crm/command-center` contract.
+   ──────────────────────────────────────────────────────────────────────────── */
 
-const COLORS = [
+interface CommandCenterKpi {
+  key: string
+  label: string
+  value: number
+  change: number | null
+  positive_is_good: boolean
+  raw: number
+  previous: number | null
+  suffix?: string
+  drilldown?: { entity: string; params: Record<string, string> }
+}
+
+interface NamedValue {
+  name: string
+  key?: string
+  value: number
+}
+
+interface RecallWellnessItem {
+  id: string
+  enquiry_type: string
+  patient_id: string | null
+  name: string
+  phone: string | null
+  due_date: string | null
+  status: string
+  priority: string | null
+  treatment_name: string | null
+  link: string
+}
+
+interface CommandCenterData {
+  meta: {
+    period: string
+    date_start: string
+    date_end: string
+    prev_start: string
+    prev_end: string
+    generated_at: string
+  }
+  kpis: CommandCenterKpi[]
+  today: {
+    date: string
+    follow_ups_due_today: number
+    overdue_follow_ups: number
+    recalls_due: number
+    wellness_due: number
+    appointment_reminders_due: number
+    leads_ready_for_conversion: number
+    converted_today: number
+    unread_messages: number
+    failed_messages: number
+    calls_made: number
+    missed_calls: number
+  }
+  lead_analytics: {
+    growth_trend: { label: string; leads: number; converted: number }[]
+    by_source: NamedValue[]
+    by_status: NamedValue[]
+    by_priority: NamedValue[]
+    funnel: { stage: string; value: number }[]
+    ageing_buckets: NamedValue[]
+  }
+  enquiry_analytics: {
+    by_type: NamedValue[]
+    by_status: NamedValue[]
+    total: number
+    open: number
+    completed: number
+    overdue: number
+    trend: { label: string; enquiries: number }[]
+  }
+  recall_wellness: {
+    recalls: { due: number }
+    wellness: { due: number }
+    appointment_reminders: { due: number }
+    list: RecallWellnessItem[]
+  }
+  communication: {
+    by_channel: NamedValue[]
+    by_status: NamedValue[]
+    calls: { total: number; missed: number }
+    trend: { label: string; messages: number }[]
+    recent: {
+      id: string
+      entity: string
+      name: string
+      channel: string
+      message_type: string
+      status: string
+      created_at: string | null
+      link: string | null
+    }[]
+  }
+  conversions: {
+    recent: {
+      id: string
+      name: string
+      source: string
+      converted_at: string
+      link: string
+      converted_patient_id: string | null
+    }[]
+    count: number
+  }
+  work_queue: {
+    id: string
+    patient_id: string | null
+    patient_name: string
+    op_number: string | null
+    patient_phone: string | null
+    doctor_name: string | null
+    follow_up_type: string
+    treatment_name: string | null
+    due_time: string | null
+    status: string
+    link: string
+  }[]
+  activity: { id: string; description: string; date: string | null; type: string; link: string | null }[]
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   KPI presentation metadata
+   ──────────────────────────────────────────────────────────────────────────── */
+
+interface KpiMeta {
+  icon: React.ElementType
+  tone: KpiTone
+  format?: (v: number) => string
+}
+
+const KPI_META: Record<string, KpiMeta> = {
+  new_leads: { icon: UserPlus, tone: "primary" },
+  open_leads: { icon: Users, tone: "info" },
+  leads_ready_for_conversion: { icon: Target, tone: "success" },
+  converted_leads: { icon: CheckCircle2, tone: "success" },
+  conversion_rate: { icon: TrendingUp, tone: "success", format: (v) => `${v}%` },
+  pending_follow_ups: { icon: Clock, tone: "accent" },
+  overdue_follow_ups: { icon: AlertOctagon, tone: "danger" },
+  recalls_due: { icon: Bell, tone: "warning" },
+  wellness_due: { icon: HeartPulse, tone: "success" },
+  appointment_reminders_due: { icon: CalendarCheck, tone: "info" },
+  avg_response_hours: { icon: Timer, tone: "warning", format: (v) => `${v}h` },
+  avg_lead_age: { icon: Hourglass, tone: "warning", format: (v) => `${v}d` },
+  whatsapp_sent: { icon: MessageCircle, tone: "info" },
+  communication_success_rate: { icon: Send, tone: "success", format: (v) => `${v}%` },
+  unread_messages: { icon: Mail, tone: "warning" },
+  failed_messages: { icon: AlertOctagon, tone: "danger" },
+  calls_made: { icon: Phone, tone: "primary" },
+  missed_calls: { icon: PhoneMissed, tone: "danger" },
+}
+
+const CHART_COLORS = [
   "var(--ds-chart-5)",
   "var(--ds-chart-4)",
   "var(--ds-chart-6)",
@@ -36,825 +188,863 @@ const COLORS = [
   "var(--ds-chart-13)",
   "var(--ds-chart-11)",
   "var(--ds-chart-12)",
-  "var(--ds-chart-1)",
-  "var(--ds-chart-14)",
 ]
-const GLASS = "bg-white/80 backdrop-blur-xl border border-white/20 shadow-[var(--ds-shadow-card)]"
 
-const fuTypeLabels: Record<string, string> = {
-  "1_DAY_FOLLOW_UP": "1-Day FU", "7_DAY_FOLLOW_UP": "7-Day FU",
-  "6_MONTH_RECALL": "6-Month Recall", "12_MONTH_RECALL": "12-Month Recall",
-  CUSTOM_FOLLOW_UP: "Custom FU", ENQUIRY: "Enquiry", MANUAL: "Manual",
-}
-const fuTypeColors: Record<string, string> = {
-  "1_DAY_FOLLOW_UP": "bg-[var(--ds-info-subtle)] text-[var(--ds-info)] border-[var(--ds-info)]",
-  "7_DAY_FOLLOW_UP": "bg-[var(--ds-accent-subtle)] text-[var(--ds-accent)] border-[var(--ds-accent)]",
-  "6_MONTH_RECALL": "bg-[var(--ds-warning-subtle)] text-[var(--ds-warning)] border-[var(--ds-warning)]",
-  "12_MONTH_RECALL": "bg-[var(--ds-success-subtle)] text-[var(--ds-success)] border-[var(--ds-success)]",
-  CUSTOM_FOLLOW_UP: "bg-[var(--ds-surface-secondary)] text-[var(--ds-text-secondary)] border-[var(--ds-border)]",
-  ENQUIRY: "bg-[var(--ds-primary-subtle)] text-[var(--ds-primary)] border-[var(--ds-primary-subtle)]",
-  MANUAL: "bg-[var(--ds-danger-subtle)] text-[var(--ds-danger)] border-[var(--ds-danger)]",
-}
-const statusColors: Record<string, string> = {
-  PENDING: "bg-[var(--ds-warning-subtle)] text-[var(--ds-warning)]", CONTACTED: "bg-[var(--ds-info-subtle)] text-[var(--ds-info)]",
-  INTERESTED: "bg-[var(--ds-success-subtle)] text-[var(--ds-success)]", APPOINTMENT_BOOKED: "bg-[var(--ds-primary-subtle)] text-[var(--ds-primary)]",
-  COMPLETED: "bg-[var(--ds-success-subtle)] text-[var(--ds-success)]", NO_RESPONSE: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
-  LOST: "bg-[var(--ds-danger-subtle)] text-[var(--ds-danger)]", APPOINTMENT_REQUIRED: "bg-[var(--ds-accent-subtle)] text-[var(--ds-accent)]",
+const FU_TYPE_COLORS: Record<string, string> = {
+  "1_DAY_FOLLOW_UP": "bg-[var(--ds-info-subtle)] text-[var(--ds-info)]",
+  "7_DAY_FOLLOW_UP": "bg-[var(--ds-accent-subtle)] text-[var(--ds-accent)]",
+  "6_MONTH_RECALL": "bg-[var(--ds-warning-subtle)] text-[var(--ds-warning)]",
+  "12_MONTH_RECALL": "bg-[var(--ds-success-subtle)] text-[var(--ds-success)]",
+  CUSTOM_FOLLOW_UP: "bg-[var(--ds-surface-secondary)] text-[var(--ds-text-secondary)]",
+  ENQUIRY: "bg-[var(--ds-primary-subtle)] text-[var(--ds-primary)]",
+  MANUAL: "bg-[var(--ds-danger-subtle)] text-[var(--ds-danger)]",
 }
 
-function KpiCard({ title, value, icon: Icon, color, onClick }: { title: string; value: string | number; icon: React.ComponentType<{ className?: string }>; color: string; onClick?: () => void }) {
-  const colorMap: Record<string, string> = {
-    primary: "from-[var(--ds-primary-500)] to-[var(--ds-primary-700)]", info: "from-blue-500 to-cyan-600",
-    success: "from-emerald-500 to-green-600", warning: "from-amber-500 to-yellow-600",
-    danger: "from-red-500 to-rose-600", purple: "from-[var(--ds-accent-500)] to-[var(--ds-accent-600)]",
-    pink: "from-pink-500 to-rose-600", teal: "from-teal-500 to-cyan-600",
+const RW_TYPE_COLORS: Record<string, string> = {
+  RECALL: "bg-[var(--ds-warning-subtle)] text-[var(--ds-warning)]",
+  TREATMENT_WELLNESS: "bg-[var(--ds-success-subtle)] text-[var(--ds-success)]",
+  CASE_WELLNESS: "bg-[var(--ds-success-subtle)] text-[var(--ds-success)]",
+  APPOINTMENT_REMINDER: "bg-[var(--ds-info-subtle)] text-[var(--ds-info)]",
+}
+
+const STATUS_COLORS: Record<string, string> = {
+  PENDING: "bg-[var(--ds-warning-subtle)] text-[var(--ds-warning)]",
+  CONTACTED: "bg-[var(--ds-info-subtle)] text-[var(--ds-info)]",
+  INTERESTED: "bg-[var(--ds-success-subtle)] text-[var(--ds-success)]",
+  APPOINTMENT_BOOKED: "bg-[var(--ds-primary-subtle)] text-[var(--ds-primary)]",
+  COMPLETED: "bg-[var(--ds-success-subtle)] text-[var(--ds-success)]",
+  NO_RESPONSE: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
+  LOST: "bg-[var(--ds-danger-subtle)] text-[var(--ds-danger)]",
+  SCHEDULED: "bg-[var(--ds-info-subtle)] text-[var(--ds-info)]",
+  OPEN: "bg-[var(--ds-accent-subtle)] text-[var(--ds-accent)]",
+  FAILED: "bg-[var(--ds-danger-subtle)] text-[var(--ds-danger)]",
+}
+
+function fuTypeLabel(type: string): string {
+  const map: Record<string, string> = {
+    "1_DAY_FOLLOW_UP": "1-Day FU",
+    "7_DAY_FOLLOW_UP": "7-Day FU",
+    "6_MONTH_RECALL": "6-Month Recall",
+    "12_MONTH_RECALL": "12-Month Recall",
+    CUSTOM_FOLLOW_UP: "Custom FU",
+    ENQUIRY: "Enquiry",
+    MANUAL: "Manual",
+  }
+  return map[type] ?? type.replace(/_/g, " ")
+}
+
+function enquiryTypeLabel(type: string): string {
+  const map: Record<string, string> = {
+    RECALL: "Recall",
+    TREATMENT_WELLNESS: "Treatment Wellness",
+    CASE_WELLNESS: "Case Wellness",
+    APPOINTMENT_REMINDER: "Appointment Reminder",
+    LEAD_FOLLOW_UP: "Lead Follow-Up",
+    ENQUIRY: "Enquiry",
+    FOLLOW_UP: "Follow-Up",
+  }
+  return map[type] ?? type.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+function enquiryTypeIcon(type: string) {
+  switch (type) {
+    case "RECALL":
+      return <Bell className="h-4 w-4" aria-hidden="true" />
+    case "TREATMENT_WELLNESS":
+    case "CASE_WELLNESS":
+      return <HeartPulse className="h-4 w-4" aria-hidden="true" />
+    case "APPOINTMENT_REMINDER":
+      return <CalendarCheck className="h-4 w-4" aria-hidden="true" />
+    default:
+      return <Clock className="h-4 w-4" aria-hidden="true" />
+  }
+}
+
+function statusBadgeClass(status: string): string {
+  return STATUS_COLORS[status] ?? "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]"
+}
+
+function formatCount(v: number | undefined | null): string {
+  return formatIndianNumber(Number(v ?? 0))
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Small stat pill used inside today / comm / enquiry panels.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+function StatPill({
+  label, value, tone = "primary", icon: Icon, onClick,
+}: {
+  label: string
+  value: string
+  tone?: KpiTone
+  icon?: React.ElementType
+  onClick?: () => void
+}) {
+  const toneText: Record<KpiTone, string> = {
+    primary: "text-[var(--ds-primary)]",
+    accent: "text-[var(--ds-accent)]",
+    success: "text-[var(--ds-success)]",
+    warning: "text-[var(--ds-warning)]",
+    danger: "text-[var(--ds-danger)]",
+    info: "text-[var(--ds-info)]",
+  }
+  const toneSoft: Record<KpiTone, string> = {
+    primary: "bg-[var(--ds-primary-subtle)]",
+    accent: "bg-[var(--ds-accent-subtle)]",
+    success: "bg-[var(--ds-success-subtle)]",
+    warning: "bg-[var(--ds-warning-subtle)]",
+    danger: "bg-[var(--ds-danger-subtle)]",
+    info: "bg-[var(--ds-info-subtle)]",
   }
   return (
-    <div onClick={onClick} className={cn(GLASS, "rounded-2xl p-4 cursor-pointer hover:shadow-xl transition-all duration-300 group border", onClick ? "cursor-pointer" : "")}>
-      <div className="flex items-start justify-between">
-        <div className="space-y-1">
-          <p className="text-[11px] font-medium text-[var(--ds-text-secondary)] uppercase tracking-wider">{title}</p>
-          <p className="text-2xl font-bold text-[var(--ds-text)]">{value}</p>
-        </div>
-        <div className={cn("rounded-xl p-2.5 text-white bg-gradient-to-br shadow-[var(--ds-shadow-card)]", colorMap[color] || colorMap.primary)}>
-          <Icon className="h-4 w-4" />
-        </div>
+    <div
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={onClick ? (e) => e.key === "Enter" && onClick() : undefined}
+      className={cn(
+        "rounded-[var(--ds-radius-xl)] border border-[var(--ds-border)] bg-[var(--ds-surface)] p-3",
+        onClick && "ds-focus-ring cursor-pointer transition-colors hover:bg-[var(--ds-surface-hover)]"
+      )}
+    >
+      <div className="flex items-center justify-between">
+        <p className="ds-caption text-[var(--ds-text-secondary)]">{label}</p>
+        {Icon && (
+          <span className={cn("flex h-6 w-6 items-center justify-center rounded-[var(--ds-radius-md)]", toneSoft[tone], toneText[tone])}>
+            <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+          </span>
+        )}
       </div>
+      <p className={cn("ds-metric mt-1 text-[var(--ds-text)]", toneText[tone])}>{value}</p>
     </div>
   )
 }
 
-function FunnelStep({ label, value, total, color, isLast }: { label: string; value: number; total: number; color: string; isLast?: boolean }) {
-  const pct = total > 0 ? Math.round((value / total) * 100) : 0
+/* ────────────────────────────────────────────────────────────────────────────
+   Lead funnel — horizontal staged bar (New → Contacted → Interested → Booked → Converted).
+   ──────────────────────────────────────────────────────────────────────────── */
+
+function FunnelBar({ funnel }: { funnel: { stage: string; value: number }[] }) {
+  const total = Math.max(funnel.reduce((s, f) => s + f.value, 0), 1)
+  const colors = [
+    "var(--ds-primary)",
+    "var(--ds-info)",
+    "var(--ds-success)",
+    "var(--ds-warning)",
+    "var(--ds-chart-5)",
+  ]
   return (
-    <div className="flex flex-col items-center gap-1.5 min-w-0 flex-1">
-      <div className={cn("w-full h-2 rounded-full", color)} style={{ opacity: Math.max(0.15, pct / 100) }} />
-      <p className="text-lg font-bold text-[var(--ds-text)]">{value}</p>
-      <p className="text-[10px] text-[var(--ds-text-secondary)] text-center leading-tight">{label}</p>
-      <p className="text-[10px] font-semibold text-[var(--ds-text-tertiary)]">{pct}%</p>
-      {!isLast && <ChevronRight className="h-3.5 w-3.5 text-[var(--ds-text-tertiary)] mt-0.5" />}
+    <div className="space-y-2">
+      {funnel.map((f, i) => {
+        const pct = Math.round((f.value / total) * 100)
+        return (
+          <div key={f.stage} className="flex items-center gap-3">
+            <span className="w-24 shrink-0 text-xs font-medium text-[var(--ds-text-secondary)]">{f.stage}</span>
+            <div className="relative h-4 flex-1 overflow-hidden rounded-[var(--ds-radius-lg)] bg-[var(--ds-background-subtle)]">
+              <div
+                className="h-full rounded-[var(--ds-radius-lg)] transition-all duration-500"
+                style={{ width: `${pct}%`, backgroundColor: colors[i % colors.length] }}
+              />
+            </div>
+            <span className="w-14 shrink-0 text-right text-xs font-bold text-[var(--ds-text)]">{formatCount(f.value)}</span>
+          </div>
+        )
+      })}
     </div>
   )
 }
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Recent communication row
+   ──────────────────────────────────────────────────────────────────────────── */
+
+function RecentCommList({ items }: { items: CommandCenterData["communication"]["recent"] }) {
+  if (items.length === 0) {
+    return <p className="ds-caption py-8 text-center text-[var(--ds-text-tertiary)]">No communications for this period.</p>
+  }
+  return (
+    <ul className="space-y-1.5" aria-label="Recent communications">
+      {items.map((m) => {
+        const channelIcon = m.channel === "EMAIL" ? Mail : m.channel === "SMS" ? MessageSquare : MessageCircle
+        const Icon = channelIcon
+        const failed = m.status === "FAILED"
+        const delivered = m.status === "DELIVERED" || m.status === "READ"
+        return (
+          <li key={m.id}>
+            <a
+              href={m.link ?? undefined}
+              onClick={m.link ? undefined : (e) => e.preventDefault()}
+              className={cn(
+                "flex items-center gap-3 rounded-[var(--ds-radius-lg)] px-2 py-2 transition-colors",
+                m.link && "ds-focus-ring hover:bg-[var(--ds-surface-hover)]"
+              )}
+            >
+              <span
+                className={cn(
+                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--ds-radius-lg)]",
+                  failed
+                    ? "bg-[var(--ds-danger-subtle)] text-[var(--ds-danger)]"
+                    : delivered
+                      ? "bg-[var(--ds-success-subtle)] text-[var(--ds-success)]"
+                      : "bg-[var(--ds-info-subtle)] text-[var(--ds-info)]"
+                )}
+              >
+                <Icon className="h-4 w-4" aria-hidden="true" />
+              </span>
+              <span className="ds-min-w-0 flex-1">
+                <span className="ds-body block truncate text-[var(--ds-text)]">{m.name}</span>
+                <span className="ds-caption block truncate text-[var(--ds-text-secondary)]">
+                  {m.message_type.replace(/_/g, " ").toLowerCase()}
+                </span>
+              </span>
+              <Badge className={cn("shrink-0", statusBadgeClass(m.status))}>{m.status}</Badge>
+            </a>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   CRM COMMAND CENTER — leads, follow-ups, recalls, wellness & communications.
+   ──────────────────────────────────────────────────────────────────────────── */
 
 export default function CrmDashboardPage() {
   const navigate = useNavigate()
-  const [period, setPeriod] = useState<DateRangePreset>("today")
-  const [startDate, setStartDate] = useState("")
-  const [endDate, setEndDate] = useState("")
-  const [doctorFilter, setDoctorFilter] = useState("")
-  const [typeFilter, setTypeFilter] = useState("")
-  const [statusFilter, setStatusFilter] = useState("")
-  const [upcomingTab, setUpcomingTab] = useState("tomorrow")
-  const [showFilters, setShowFilters] = useState(false)
+  const filter = useDashboardFilter("this_month")
+  const { period, startDate, endDate, apiParams, label, previousLabel, rangeSummary, isCustom } = filter
 
-  const { data: doctorsList } = useQuery({
-    queryKey: ["dashboard-doctors"],
-    queryFn: () => doctorsApi.list(),
-    staleTime: 60000,
-  })
-  const doctorOptions = Array.isArray(doctorsList) ? doctorsList : doctorsList?.items || []
-
-  const params = useMemo(() => {
-    const periodMap: Record<string, string> = {
-      today: "today", tomorrow: "tomorrow", week: "this_week", month: "this_month",
-      last_month: "last_month", quarter: "this_quarter", year: "this_year", custom: "custom",
-    }
-    const p: Record<string, string> = { period: periodMap[period] || period }
-    if (period === "custom" && startDate) p.start_date = startDate
-    if (period === "custom" && endDate) p.end_date = endDate
-    if (doctorFilter) p.doctor = doctorFilter
-    if (typeFilter) p.type = typeFilter
-    if (statusFilter) p.status = statusFilter
-    return p
-  }, [period, startDate, endDate, doctorFilter, typeFilter, statusFilter])
-
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["crm-enhanced-dashboard", params],
-    queryFn: () => crmApi.enhancedDashboard(params),
-    staleTime: 30000,
+  const { data, isLoading, isError, refetch, isFetching, dataUpdatedAt } = useQuery<CommandCenterData>({
+    queryKey: ["crm-command-center", apiParams],
+    queryFn: () => crmApi.commandCenter(apiParams),
+    staleTime: 20000,
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
   })
 
-  const { data: leadsData } = useQuery({
-    queryKey: ["crm-dashboard-leads"],
-    queryFn: () => leadsApi.list({ page: 1, page_size: 100 }),
-    staleTime: 30000,
-  })
+  const kpiByKey = useMemo(() => {
+    const map: Record<string, CommandCenterKpi> = {}
+    for (const k of data?.kpis ?? []) map[k.key] = k
+    return map
+  }, [data])
 
-  const { data: enquiriesData } = useQuery({
-    queryKey: ["crm-dashboard-enquiries"],
-    queryFn: () => enquiriesApi.list(),
-    staleTime: 30000,
-  })
-
-  const { data: whatsappHistory } = useQuery({
-    queryKey: ["crm-dashboard-whatsapp"],
-    queryFn: () => whatsappV2Api.history({ page: 1, page_size: 20 }),
-    staleTime: 30000,
-  })
-
-  const { data: leadAnalytics } = useQuery({
-    queryKey: ["crm-dashboard-lead-analytics"],
-    queryFn: () => leadsApi.analytics(),
-    staleTime: 30000,
-  })
-
-  const overview = useMemo(() => data?.overview ?? {}, [data])
+  const today = data?.today
+  const leadAnalytics = data?.lead_analytics
+  const enquiryAnalytics = data?.enquiry_analytics
+  const recallWellness = data?.recall_wellness
+  const communication = data?.communication
+  const conversions = data?.conversions
   const workQueue = useMemo(() => data?.work_queue ?? [], [data])
-  const fuSummary = useMemo(() => data?.follow_up_summary ?? {}, [data])
-  const funnel = useMemo(() => data?.conversion_funnel ?? {}, [data])
-  const conditions = useMemo(() => data?.patient_conditions ?? [], [data])
-  const treatmentPerf = useMemo(() => data?.treatment_performance ?? [], [data])
-  const doctorEngagement = useMemo(() => data?.doctor_engagement ?? [], [data])
-  const acquisition = useMemo(() => data?.patient_acquisition ?? [], [data])
-  const revenueBySource = useMemo(() => data?.revenue_by_source ?? [], [data])
-  const timeline = useMemo(() => data?.timeline ?? [], [data])
-  const upcomingWork = useMemo(() => data?.upcoming_work ?? {}, [data])
+  const activity = useMemo(() => data?.activity ?? [], [data])
 
-  if (isLoading) {
-    return (
-      <div className="space-y-4 p-6">
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-8 w-60 rounded-xl" />
-          <Skeleton className="h-9 w-36 rounded-xl" />
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
-          {[...Array(9)].map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
-        </div>
-        <Skeleton className="h-64 rounded-2xl" />
-        <div className="grid gap-4 md:grid-cols-2">
-          <Skeleton className="h-72 rounded-2xl" />
-          <Skeleton className="h-72 rounded-2xl" />
-        </div>
-      </div>
-    )
+  /* ── Drill-down builders ────────────────────────────────────────────────── */
+  const leadsPath = (opts: DrilldownOptions = {}) =>
+    buildDrilldownPath("leads", period, startDate, endDate, opts)
+
+  const enquiryPath = (params: Record<string, string> = {}) => {
+    const qs = new URLSearchParams(params)
+    const s = qs.toString()
+    return `/crm/enquiry-calendar${s ? `?${s}` : ""}`
   }
 
-  if (error) {
-    return (
-      <div className="p-6">
-        <DentalEmptyState icon={AlertCircle} title="Error Loading Dashboard"
-          description="Could not load CRM dashboard data. Try adjusting filters or check back later." />
-      </div>
-    )
+  const drill = (key: string) => {
+    const d = kpiByKey[key]?.drilldown
+    const p = d?.params ?? {}
+    switch (d?.entity) {
+      case "enquiry-calendar":
+        navigate(enquiryPath(p.overdue ? { overdue: "1", ...(p.type ? { type: p.type } : {}) } : p.type ? { type: p.type } : {}))
+        break
+      case "whatsapp":
+        navigate("/whatsapp")
+        break
+      case "leads":
+      default: {
+        const opts: DrilldownOptions = {}
+        if (p.status) opts.status = p.status
+        if (p.source) opts.source = p.source
+        navigate(leadsPath(opts))
+      }
+    }
   }
 
-  function navToCalendar(_filter?: string) {
-    navigate("/crm/enquiry-calendar")
+  const kpiItems: KpiDatum[] = useMemo(
+    () =>
+      (data?.kpis ?? []).map((k) => {
+        const meta = KPI_META[k.key] ?? { icon: Activity, tone: "info" as KpiTone }
+        const format = meta.format ?? formatCount
+        return {
+          id: k.key,
+          title: k.label,
+          value: format(k.value),
+          rawValue: k.value,
+          change: k.change,
+          positiveIsGood: k.positive_is_good,
+          previousLabel: previousLabel,
+          icon: meta.icon,
+          tone: meta.tone,
+          hint: k.previous !== null ? `Previous ${previousLabel}: ${format(k.previous)}` : undefined,
+          onClick: () => drill(k.key),
+        }
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [data, previousLabel, period],
+  )
+
+  /* ── Alerts ─────────────────────────────────────────────────────────────── */
+  const alerts: AlertItem[] = useMemo(() => {
+    const list: AlertItem[] = []
+    const overdueK = kpiByKey["overdue_follow_ups"]
+    if (overdueK && overdueK.value > 0) {
+      list.push({
+        id: "overdue",
+        title: `${formatCount(overdueK.value)} follow-ups overdue`,
+        description: "Patients are waiting for a call-back. Clear the overdue queue to protect retention.",
+        severity: "critical",
+        onClick: () => navigate(enquiryPath({ overdue: "1" })),
+      })
+    }
+    const failedK = kpiByKey["failed_messages"]
+    if (failedK && failedK.value > 0) {
+      list.push({
+        id: "comm-failed",
+        title: `${formatCount(failedK.value)} messages failed to deliver`,
+        description: "Check the WhatsApp provider status and retry failed sends.",
+        severity: "warning",
+        onClick: () => navigate("/whatsapp"),
+      })
+    }
+    const missedK = kpiByKey["missed_calls"]
+    if (missedK && missedK.value > 0) {
+      list.push({
+        id: "missed-calls",
+        title: `${formatCount(missedK.value)} calls unanswered`,
+        description: "No-answer and busy callbacks from this period still need a follow-up.",
+        severity: "warning",
+        onClick: () => navigate(leadsPath()),
+      })
+    }
+    const recallsK = kpiByKey["recalls_due"]
+    if (recallsK && recallsK.value > 0) {
+      list.push({
+        id: "recalls",
+        title: `${formatCount(recallsK.value)} recalls due`,
+        description: "Returning patients are due for a recall check-in in this period.",
+        severity: "info",
+        onClick: () => navigate(enquiryPath({ type: "RECALL" })),
+      })
+    }
+    const wellnessK = kpiByKey["wellness_due"]
+    if (wellnessK && wellnessK.value > 0) {
+      list.push({
+        id: "wellness",
+        title: `${formatCount(wellnessK.value)} wellness check-ins due`,
+        description: "Treatment and case wellness follow-ups are pending for this period.",
+        severity: "info",
+        onClick: () => navigate(enquiryPath({ type: "WELLNESS" })),
+      })
+    }
+    const stale = leadAnalytics?.ageing_buckets?.find((b) => b.name === "30+d")
+    if (stale && stale.value > 0) {
+      list.push({
+        id: "stale-leads",
+        title: `${formatCount(stale.value)} leads older than 30 days`,
+        description: "Stale leads cool quickly — re-engage or close them to keep the pipeline honest.",
+        severity: "info",
+        onClick: () => navigate(leadsPath()),
+      })
+    }
+    return list
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, kpiByKey, period, startDate, endDate])
+
+  /* ── Quick actions ──────────────────────────────────────────────────────── */
+  const quickActions: QuickAction[] = [
+    { id: "add-lead", label: "Add Lead", description: "Capture a new prospect", icon: UserPlus, tone: "primary", onClick: () => navigate("/leads?action=create") },
+    { id: "calendar", label: "Enquiry Calendar", description: "Today's work queue", icon: CalendarDays, tone: "accent", onClick: () => navigate("/crm/enquiry-calendar") },
+    { id: "recalls", label: "Recalls & Wellness", description: "Overdue check-ins", icon: HeartPulse, tone: "warning", onClick: () => navigate(enquiryPath({})) },
+    { id: "whatsapp", label: "Send WhatsApp", description: "Direct or broadcast", icon: Send, tone: "success", onClick: () => navigate("/whatsapp") },
+    { id: "templates", label: "Templates", description: "Approved message library", icon: MessageSquare, tone: "info", onClick: () => navigate("/whatsapp/templates") },
+    { id: "settings", label: "CRM Settings", description: "Rules & workflow settings", icon: Workflow, tone: "danger", onClick: () => navigate("/crm/settings") },
+  ]
+
+  /* ── Activity feed ──────────────────────────────────────────────────────── */
+  const activityEvents: ActivityEvent[] = useMemo(
+    () =>
+      activity.slice(0, 12).map((a) => {
+        const link = a.link
+        return {
+          id: a.id,
+          description: a.description,
+          date: a.date ?? undefined,
+          icon: a.type === "conversion" ? CheckCircle2 : a.type === "follow_up" ? Clock : MessageCircle,
+          tone: a.type === "conversion" ? "success" : a.type === "follow_up" ? "warning" : "info",
+          onClick: link ? () => navigate(link) : undefined,
+        }
+      }),
+    [activity, navigate],
+  )
+
+  /* ── Export ─────────────────────────────────────────────────────────────── */
+  const handleExport = () => {
+    if (!data) return
+    const rows = workQueue.map((w) => ({
+      Patient: w.patient_name,
+      "OP Number": w.op_number ?? "",
+      Phone: w.patient_phone ?? "",
+      "Follow-Up": fuTypeLabel(w.follow_up_type),
+      Doctor: w.doctor_name ?? "",
+      "Due Time": w.due_time ?? "",
+      Status: w.status,
+    }))
+    downloadCSV(`crm-command-center-work-queue-${period}`, rows, [
+      "Patient", "OP Number", "Phone", "Follow-Up", "Doctor", "Due Time", "Status",
+    ])
+  }
+
+  const todayDateLabel = today?.date
+    ? new Date(`${today.date}T00:00:00`).toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })
+    : "Today"
+
+  if (isError && !data) {
+    return (
+      <DashboardShell>
+        <div className="rounded-[var(--ds-card-radius)] border border-[var(--ds-border)] bg-[var(--ds-surface)] p-10 text-center">
+          <AlertOctagon className="mx-auto h-8 w-8 text-[var(--ds-danger)]" aria-hidden="true" />
+          <h2 className="ds-card-title mt-3 text-[var(--ds-text)]">Could not load the CRM Command Center</h2>
+          <p className="ds-caption mx-auto mt-1 max-w-md text-[var(--ds-text-secondary)]">
+            We could not reach the analytics service. Check your connection and try again.
+          </p>
+          <Button className="mt-4" onClick={() => void refetch()}>
+            Retry
+          </Button>
+        </div>
+      </DashboardShell>
+    )
   }
 
   return (
-    <div className="space-y-5 p-6">
-      {/* ── HEADER ── */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-[var(--ds-text)] tracking-tight">CRM Dashboard</h1>
-          <p className="text-sm text-[var(--ds-text-secondary)] mt-0.5">Patient Engagement & Retention · Real-time operational view</p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <DashboardDateFilter value={period} onChange={setPeriod} />
-          <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)}
-            className={cn("h-9 gap-1.5 text-xs", showFilters && "bg-primary text-primary-foreground border-primary")}>
-            <Filter className="h-3.5 w-3.5" /> Filters
-          </Button>
-          {period === "custom" && (
-            <>
-              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
-                className="h-9 w-[130px] rounded-xl text-xs" />
-              <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
-                className="h-9 w-[130px] rounded-xl text-xs" />
-            </>
-          )}
-        </div>
-      </div>
+    <DashboardShell>
+      {/* ── HERO ──────────────────────────────────────────────────────────── */}
+      <DashboardHeader
+        className="gradient-hero-crm"
+        eyebrow="Customer Relationship Management"
+        title="CRM Command Center"
+        subtitle={`Lead pipeline, follow-ups, recalls, wellness & communications · ${rangeSummary}`}
+        stats={[
+          { label: "New Leads", value: formatCount(kpiByKey["new_leads"]?.value) },
+          { label: "Conversions", value: formatCount(kpiByKey["converted_leads"]?.value), positive: true },
+          { label: "Conversion Rate", value: `${kpiByKey["conversion_rate"]?.value ?? 0}%` },
+          { label: "Follow-ups Due", value: formatCount(kpiByKey["pending_follow_ups"]?.value) },
+        ]}
+      />
 
-      {/* ── FILTERS ── */}
-      {showFilters && (
-        <div className={cn(GLASS, "rounded-2xl p-4 flex flex-wrap gap-3 items-end")}>
-          <div className="space-y-1">
-            <label className="text-[10px] font-semibold text-[var(--ds-text-secondary)] uppercase">Doctor</label>
-            <Select value={doctorFilter} onValueChange={(v) => setDoctorFilter(v === "__all__" ? "" : v)}>
-              <SelectTrigger className="h-8 w-40 text-xs rounded-xl"><SelectValue placeholder="All Doctors" /></SelectTrigger>
-              <SelectContent className="max-h-[200px]">
-                <SelectItem value="__all__" className="text-xs">All Doctors</SelectItem>
-                {doctorOptions.map((d: { id: string; full_name?: string; name?: string }) => (
-                  <SelectItem key={d.id} value={d.id} className="text-xs">{d.full_name || d.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-semibold text-[var(--ds-text-secondary)] uppercase">Follow-Up Type</label>
-            <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v === "__all__" ? "" : v)}>
-              <SelectTrigger className="h-8 w-36 text-xs rounded-xl"><SelectValue placeholder="All Types" /></SelectTrigger>
-              <SelectContent className="max-h-[200px]">
-                <SelectItem value="__all__" className="text-xs">All Types</SelectItem>
-                {Object.entries(fuTypeLabels).map(([k, v]) => (
-                  <SelectItem key={k} value={k} className="text-xs">{v}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-semibold text-[var(--ds-text-secondary)] uppercase">Status</label>
-            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
-              <SelectTrigger className="h-8 w-36 text-xs rounded-xl"><SelectValue placeholder="All Status" /></SelectTrigger>
-              <SelectContent className="max-h-[200px]">
-                <SelectItem value="__all__" className="text-xs">All Status</SelectItem>
-                {Object.entries(statusColors).map(([k]) => (
-                  <SelectItem key={k} value={k} className="text-xs">{k}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Button variant="ghost" size="sm" onClick={() => { setDoctorFilter(""); setTypeFilter(""); setStatusFilter("") }}
-            className="h-8 text-xs">Clear</Button>
+      {/* ── COMMAND CENTER (global period filter) ─────────────────────────── */}
+      <CommandCenter
+        period={period}
+        onPeriodChange={filter.setPeriod}
+        startDate={startDate}
+        endDate={endDate}
+        onStartDateChange={filter.setStartDate}
+        onEndDateChange={filter.setEndDate}
+        rangeSummary={rangeSummary}
+        onRefresh={() => void refetch()}
+        refreshing={isFetching}
+        onExport={handleExport}
+      />
+
+      {/* ── QUICK ACTIONS ─────────────────────────────────────────────────── */}
+      <QuickActionCenter
+        items={quickActions}
+        loading={isLoading}
+        title="Command Center Actions"
+        description="One-tap shortcuts to the most frequent CRM workflows"
+      />
+
+      {/* ── ALERTS ────────────────────────────────────────────────────────── */}
+      <AlertCenter items={alerts} loading={isLoading} title="Priority Alerts" description="Exceptions that need attention in this period" />
+
+      {/* ── KPI GRID ──────────────────────────────────────────────────────── */}
+      {isLoading ? (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="h-[150px] rounded-[var(--ds-card-radius)]" />
+          ))}
         </div>
+      ) : (
+        <KpiGrid items={kpiItems} cols={4} />
       )}
 
-      {/* ── QUICK ACTIONS ── */}
-      <div className={cn(GLASS, "rounded-2xl p-3 flex flex-wrap items-center gap-2")}>
-        <span className="text-[10px] font-bold text-[var(--ds-text-tertiary)] uppercase tracking-wider mr-1">Quick</span>
-        {[
-          { label: "Enquiry Calendar", icon: CalendarDays, path: "/crm/enquiry-calendar" },
-          { label: "Add Lead", icon: UserPlus, path: "/leads?action=create" },
-          { label: "Send WhatsApp", icon: Send, path: "/whatsapp" },
-        ].map((a) => (
-          <Button key={a.label} variant="outline" size="sm" onClick={() => navigate(a.path)}
-            className="h-8 text-xs gap-1.5 rounded-xl">
-            <a.icon className="h-3.5 w-3.5" />{a.label}
+      {/* ══════════════════════════════════════════════════════════════════
+         TODAY'S COMMAND CENTER — what needs attention right now
+         ══════════════════════════════════════════════════════════════════ */}
+      <DashboardSection
+        title="Today's Command Center"
+        description={`${todayDateLabel} — what needs attention right now`}
+        icon={CalendarDays}
+        actions={
+          <Button variant="outline" size="sm" onClick={() => navigate("/crm/enquiry-calendar")}>
+            Open calendar <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
           </Button>
-        ))}
-      </div>
-
-      {/* ════════════════════════════════════
-         SECTION 1: TODAY'S CRM OVERVIEW
-         ════════════════════════════════════ */}
-      <div>
-        <h2 className="text-sm font-bold text-[var(--ds-text)] mb-3 flex items-center gap-2">
-          <Activity className="h-4 w-4 text-[var(--ds-primary)]" /> Today's CRM Overview
-        </h2>
-        <div className="grid gap-3 grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-8">
-          <KpiCard title="CRM Tasks" value={formatIndianNumber(overview.crm_tasks ?? 0)} icon={Target} color="primary" onClick={navToCalendar} />
-          <KpiCard title="Follow-Ups Today" value={formatIndianNumber(overview.follow_ups_today ?? 0)} icon={Clock} color="info" onClick={navToCalendar} />
-          <KpiCard title="6-Month Recalls" value={formatIndianNumber(overview.six_month_recalls ?? 0)} icon={CalendarDays} color="warning" onClick={navToCalendar} />
-          <KpiCard title="12-Month Recalls" value={formatIndianNumber(overview.twelve_month_recalls ?? 0)} icon={CalendarDays} color="purple" onClick={navToCalendar} />
-          <KpiCard title="Contacted Today" value={formatIndianNumber(overview.patients_contacted ?? 0)} icon={Phone} color="success" />
-          <KpiCard title="Appts Created" value={formatIndianNumber(overview.appointments_created_today ?? 0)} icon={BookOpen} color="teal" />
-          <KpiCard title="CRM Appointments" value={formatIndianNumber(overview.appointments_from_crm ?? 0)} icon={CalendarDays} color="pink" />
-          <KpiCard title="Overdue" value={formatIndianNumber(overview.overdue_tasks ?? 0)} icon={AlertCircle} color="danger" />
+        }
+      >
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <StatPill label="Follow-ups Due Today" value={formatCount(today?.follow_ups_due_today)} icon={Clock} tone="accent" onClick={() => navigate(enquiryPath({}))} />
+          <StatPill label="Overdue Follow-ups" value={formatCount(today?.overdue_follow_ups)} icon={AlertOctagon} tone="danger" onClick={() => navigate(enquiryPath({ overdue: "1" }))} />
+          <StatPill label="Recalls Due" value={formatCount(today?.recalls_due)} icon={Bell} tone="warning" onClick={() => navigate(enquiryPath({ type: "RECALL" }))} />
+          <StatPill label="Wellness Check-ins" value={formatCount(today?.wellness_due)} icon={HeartPulse} tone="success" onClick={() => navigate(enquiryPath({ type: "WELLNESS" }))} />
+          <StatPill label="Appt Reminders" value={formatCount(today?.appointment_reminders_due)} icon={CalendarCheck} tone="info" onClick={() => navigate(enquiryPath({ type: "APPOINTMENT_REMINDER" }))} />
+          <StatPill label="Leads Ready" value={formatCount(today?.leads_ready_for_conversion)} icon={Target} tone="success" onClick={() => navigate(leadsPath())} />
+          <StatPill label="Converted Today" value={formatCount(today?.converted_today)} icon={CheckCircle2} tone="primary" onClick={() => navigate(leadsPath({ status: "CONVERTED" }))} />
+          <StatPill label="Unread Messages" value={formatCount(today?.unread_messages)} icon={Mail} tone="warning" onClick={() => navigate("/whatsapp")} />
+          <StatPill label="Failed Messages" value={formatCount(today?.failed_messages)} icon={AlertOctagon} tone="danger" onClick={() => navigate("/whatsapp")} />
+          <StatPill label="Calls · Missed" value={`${formatCount(today?.calls_made)} · ${formatCount(today?.missed_calls)}`} icon={PhoneMissed} tone="info" onClick={() => navigate(leadsPath())} />
         </div>
-      </div>
+      </DashboardSection>
 
-      {/* ════════════════════════════════════
-         SECTION 2: OPERATIONAL WIDGETS
-         ════════════════════════════════════ */}
-      <div>
-        <h2 className="text-sm font-bold text-[var(--ds-text)] mb-3 flex items-center gap-2">
-          <Activity className="h-4 w-4 text-[var(--ds-primary)]" /> Operations
-        </h2>
-        <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
-          <KpiCard
-            title="Today's Enquiries"
-            value={formatIndianNumber(enquiriesData?.items?.length ?? enquiriesData?.total ?? 0)}
-            icon={MessageCircle}
-            color="info"
-            onClick={() => navigate("/crm/enquiry-calendar")}
-          />
-          <KpiCard
-            title="Open Leads"
-            value={formatIndianNumber(leadsData?.items?.length ?? leadsData?.total ?? 0)}
-            icon={UserPlus}
-            color="primary"
-            onClick={() => navigate("/leads")}
-          />
-          <KpiCard
-            title="Lead Conversion Rate"
-            value={`${funnel.booking_rate ?? 0}%`}
-            icon={TrendingUp}
-            color="success"
-            onClick={() => navigate("/leads")}
-          />
-          <KpiCard
-            title="Missed Appointments"
-            value={formatIndianNumber(overview.missed_appointments ?? 0)}
-            icon={UserMinus}
-            color="danger"
-            onClick={() => navigate("/crm/enquiry-calendar")}
-          />
-          <KpiCard
-            title="Pending Payments"
-            value={formatIndianNumber(overview.pending_payments ?? 0)}
-            icon={IndianRupee}
-            color="warning"
-            onClick={() => navigate("/billing")}
-          />
-        </div>
-      </div>
-
-      {/* ════════════════════════════════════
-         SECTION 3: TODAY'S WORK QUEUE
-         ════════════════════════════════════ */}
-      <div className={cn(GLASS, "rounded-2xl overflow-hidden")}>
-        <div className="px-5 py-3 border-b border-[var(--ds-border-light)] flex items-center justify-between">
-          <h2 className="text-sm font-bold text-[var(--ds-text)] flex items-center gap-2">
-            <Clock className="h-4 w-4 text-amber-500" /> Today's Work Queue
-            <Badge variant="secondary" className="ml-2 text-[10px]">{workQueue.length}</Badge>
-          </h2>
-          <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => navToCalendar()}>
-            View All <ChevronRight className="h-3 w-3" />
+      {/* ══════════════════════════════════════════════════════════════════
+         SECTION 1: LEAD ACQUISITION & PIPELINE ANALYTICS
+         ══════════════════════════════════════════════════════════════════ */}
+      <DashboardSection
+        title="Lead Acquisition & Pipeline"
+        description={`Where ${label.toLowerCase()} leads come from and how they progress through the funnel`}
+        icon={Target}
+        actions={
+          <Button variant="outline" size="sm" onClick={() => navigate(leadsPath())}>
+            Open leads list <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
           </Button>
+        }
+      >
+        <div className="grid gap-4 lg:grid-cols-3">
+          <DashboardChart
+            className="lg:col-span-2"
+            data={leadAnalytics?.growth_trend ?? []}
+            xKey="label"
+            title="Lead Growth Trend"
+            description="New leads and conversions per bucket in the period"
+            loading={isLoading}
+            height={260}
+            series={[
+              { dataKey: "leads", name: "Leads", color: "var(--ds-chart-5)", type: "bar" },
+              { dataKey: "converted", name: "Converted", color: "var(--ds-success)", type: "line" },
+            ]}
+            onPointClick={() => navigate(leadsPath())}
+          />
+          <DonutChart
+            data={leadAnalytics?.by_source ?? []}
+            title="Leads by Source"
+            description="Acquisition channel split"
+            loading={isLoading}
+            colors={CHART_COLORS}
+            height={260}
+            onSliceClick={(d) => navigate(leadsPath({ source: (d as NamedValue).key }))}
+          />
         </div>
-        {workQueue.length > 0 ? (
-          <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
-            <Table>
-              <TableHeader className="sticky top-0 bg-white/95 backdrop-blur-sm z-[var(--ds-z-sticky)]">
-                <TableRow>
-                  <TableHead className="text-[10px]">Patient</TableHead>
-                  <TableHead className="text-[10px]">OP No</TableHead>
-                  <TableHead className="text-[10px]">Doctor</TableHead>
-                  <TableHead className="text-[10px]">Type</TableHead>
-                  <TableHead className="text-[10px]">Time</TableHead>
-                  <TableHead className="text-[10px]">Status</TableHead>
-                  <TableHead className="text-[10px] text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {workQueue.map((item: Record<string, string>) => (
-                  <TableRow key={item.id} className="group hover:bg-[var(--ds-surface-secondary)]/50">
-                    <TableCell className="font-medium text-xs">{item.patient_name}</TableCell>
-                    <TableCell className="text-xs text-[var(--ds-text-secondary)]">{item.op_number || "-"}</TableCell>
-                    <TableCell className="text-xs text-[var(--ds-text-secondary)]">{item.doctor_name || "-"}</TableCell>
-                    <TableCell>
-                      <Badge className={cn("text-[10px] font-medium", fuTypeColors[item.follow_up_type] || "bg-[var(--ds-surface-secondary)] text-[var(--ds-text-secondary)]")}>
-                        {fuTypeLabels[item.follow_up_type] || item.follow_up_type}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-xs text-[var(--ds-text-secondary)]">{item.due_time || "-"}</TableCell>
-                    <TableCell>
-                      <Badge className={cn("text-[10px]", statusColors[item.status] || "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]")}>{item.status}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1 justify-end opacity-60 group-hover:opacity-100 transition-opacity">
-                        {item.patient_phone && (
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 rounded-lg"
-                            onClick={() => window.open(`tel:${item.patient_phone}`, "_self")} title="Call">
-                            <Phone className="h-3.5 w-3.5 text-green-600" />
-                          </Button>
+
+        <div className="mt-4 grid gap-4 lg:grid-cols-3">
+          <DonutChart
+            data={leadAnalytics?.by_status ?? []}
+            title="Leads by Status"
+            description="Current pipeline stage distribution"
+            loading={isLoading}
+            colors={CHART_COLORS}
+            height={240}
+            onSliceClick={(d) => navigate(leadsPath({ status: (d as NamedValue).key }))}
+          />
+          <DonutChart
+            data={leadAnalytics?.by_priority ?? []}
+            title="Leads by Priority"
+            description="How many need urgent attention"
+            loading={isLoading}
+            colors={CHART_COLORS}
+            height={240}
+            onSliceClick={() => navigate(leadsPath())}
+          />
+          <DonutChart
+            data={leadAnalytics?.ageing_buckets ?? []}
+            title="Lead Ageing"
+            description="Open leads by age in pipeline"
+            loading={isLoading}
+            colors={CHART_COLORS}
+            height={240}
+            onSliceClick={() => navigate(leadsPath())}
+          />
+        </div>
+
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <WidgetCard title="Conversion Funnel" description="Leads created in the period that advanced through each stage">
+            {isLoading ? <Skeleton className="h-40 w-full" /> : <FunnelBar funnel={leadAnalytics?.funnel ?? []} />}
+          </WidgetCard>
+          <WidgetCard title="Pipeline Health" description="Rate-based summaries of the current period">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <StatPill label="Contacted" value={formatCount(leadAnalytics?.funnel?.[1]?.value)} icon={Phone} tone="info" onClick={() => navigate(leadsPath())} />
+              <StatPill label="Interested" value={formatCount(leadAnalytics?.funnel?.[2]?.value)} icon={Target} tone="success" onClick={() => navigate(leadsPath())} />
+              <StatPill label="Booked Appt" value={formatCount(leadAnalytics?.funnel?.[3]?.value)} icon={CalendarDays} tone="warning" onClick={() => navigate(leadsPath())} />
+              <StatPill label="Converted" value={formatCount(leadAnalytics?.funnel?.[4]?.value)} icon={CheckCircle2} tone="primary" onClick={() => navigate(leadsPath({ status: "CONVERTED" }))} />
+            </div>
+          </WidgetCard>
+        </div>
+      </DashboardSection>
+
+      {/* ══════════════════════════════════════════════════════════════════
+         SECTION 2: COMMUNICATION COMMAND CENTER
+         ══════════════════════════════════════════════════════════════════ */}
+      <DashboardSection
+        title="Communication Command Center"
+        description="Outreach volume, delivery health and the latest messages"
+        icon={MessageSquare}
+        actions={
+          <Button variant="outline" size="sm" onClick={() => navigate("/whatsapp")}>
+            Open WhatsApp <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+          </Button>
+        }
+      >
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatPill label="Messages Sent" value={formatCount(communication?.by_status.find((s) => s.name === "Sent")?.value)} icon={Send} tone="info" onClick={() => navigate("/whatsapp")} />
+          <StatPill label="Delivered" value={formatCount(communication?.by_status.find((s) => s.name === "Delivered")?.value)} icon={MessageCircle} tone="success" onClick={() => navigate("/whatsapp")} />
+          <StatPill label="Failed" value={formatCount(communication?.by_status.find((s) => s.name === "Failed")?.value)} icon={AlertOctagon} tone="danger" onClick={() => navigate("/whatsapp")} />
+          <StatPill label="Calls · Missed" value={`${formatCount(communication?.calls.total)} · ${formatCount(communication?.calls.missed)}`} icon={PhoneMissed} tone="warning" onClick={() => navigate(leadsPath())} />
+        </div>
+
+        <div className="mt-4 grid gap-4 lg:grid-cols-3">
+          <DonutChart
+            data={communication?.by_channel ?? []}
+            title="Messages by Channel"
+            description="WhatsApp, email and SMS split"
+            loading={isLoading}
+            colors={CHART_COLORS}
+            height={240}
+            onSliceClick={() => navigate("/whatsapp")}
+          />
+          <DonutChart
+            data={communication?.by_status ?? []}
+            title="Delivery Health"
+            description="Status distribution across channels"
+            loading={isLoading}
+            colors={CHART_COLORS}
+            height={240}
+            onSliceClick={() => navigate("/whatsapp")}
+          />
+          <WidgetCard title="Communication Volume" description="Messages per day in the period">
+            <DashboardChart
+              bare
+              data={communication?.trend ?? []}
+              xKey="label"
+              loading={isLoading}
+              height={220}
+              series={[{ dataKey: "messages", name: "Messages", color: "var(--ds-chart-5)", type: "area" }]}
+              onPointClick={() => navigate("/whatsapp")}
+            />
+          </WidgetCard>
+        </div>
+
+        <WidgetCard className="mt-4" title="Recent Communications" description="Latest outbound messages and their delivery state" flush>
+          <div className="p-[var(--ds-card-padding)]">
+            <RecentCommList items={communication?.recent ?? []} />
+          </div>
+        </WidgetCard>
+      </DashboardSection>
+
+      {/* ══════════════════════════════════════════════════════════════════
+         SECTION 3: RECALLS, WELLNESS & APPOINTMENT REMINDERS
+         ══════════════════════════════════════════════════════════════════ */}
+      <DashboardSection
+        title="Recalls, Wellness & Reminders"
+        description={`Scheduled check-ins, recalls and appointment reminders due in ${label.toLowerCase()}`}
+        icon={HeartPulse}
+        actions={
+          <Button variant="outline" size="sm" onClick={() => navigate("/crm/enquiry-calendar")}>
+            Open enquiry calendar <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+          </Button>
+        }
+      >
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <StatPill label="Recalls Due" value={formatCount(recallWellness?.recalls.due)} icon={Bell} tone="warning" onClick={() => navigate(enquiryPath({ type: "RECALL" }))} />
+          <StatPill label="Wellness" value={formatCount(recallWellness?.wellness.due)} icon={HeartPulse} tone="success" onClick={() => navigate(enquiryPath({ type: "WELLNESS" }))} />
+          <StatPill label="Appt Reminders" value={formatCount(recallWellness?.appointment_reminders.due)} icon={CalendarCheck} tone="info" onClick={() => navigate(enquiryPath({ type: "APPOINTMENT_REMINDER" }))} />
+          <StatPill label="Open Enquiries" value={formatCount(enquiryAnalytics?.open)} icon={Clock} tone="accent" onClick={() => navigate(enquiryPath({}))} />
+          <StatPill label="Completed" value={formatCount(enquiryAnalytics?.completed)} icon={CheckCircle2} tone="primary" onClick={() => navigate(enquiryPath({}))} />
+          <StatPill label="Overdue" value={formatCount(enquiryAnalytics?.overdue)} icon={AlertOctagon} tone="danger" onClick={() => navigate(enquiryPath({ overdue: "1" }))} />
+        </div>
+
+        <div className="mt-4 grid gap-4 lg:grid-cols-3">
+          <DonutChart
+            data={enquiryAnalytics?.by_type ?? []}
+            title="Enquiries by Type"
+            description="Recalls, wellness and reminders split"
+            loading={isLoading}
+            colors={CHART_COLORS}
+            height={240}
+            onSliceClick={(d) => navigate(enquiryPath({ type: (d as NamedValue).key ?? "" }))}
+          />
+          <DonutChart
+            data={enquiryAnalytics?.by_status ?? []}
+            title="Enquiry Status"
+            description="Open, completed and terminal states"
+            loading={isLoading}
+            colors={CHART_COLORS}
+            height={240}
+            onSliceClick={() => navigate(enquiryPath({}))}
+          />
+          <WidgetCard title="Enquiry Volume" description="Scheduled enquiries per day in the period">
+            <DashboardChart
+              bare
+              data={enquiryAnalytics?.trend ?? []}
+              xKey="label"
+              loading={isLoading}
+              height={220}
+              series={[{ dataKey: "enquiries", name: "Enquiries", color: "var(--ds-chart-5)", type: "area" }]}
+              onPointClick={() => navigate(enquiryPath({}))}
+            />
+          </WidgetCard>
+        </div>
+
+        <WidgetCard className="mt-4" title="Actionable Recalls & Check-ins" description="Highest-priority items due through the period" flush>
+          <div className="p-[var(--ds-card-padding)]">
+            {isLoading ? (
+              <Skeleton className="h-40 w-full" />
+            ) : (recallWellness?.list ?? []).length === 0 ? (
+              <p className="ds-caption py-8 text-center text-[var(--ds-text-tertiary)]">
+                No recalls, wellness check-ins or reminders due in this period.
+              </p>
+            ) : (
+              <ul className="space-y-1.5">
+                {(recallWellness?.list ?? []).map((item) => (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      onClick={() => navigate(item.link)}
+                      className="ds-focus-ring flex w-full items-center gap-3 rounded-[var(--ds-radius-lg)] px-2 py-2 text-left transition-colors hover:bg-[var(--ds-surface-hover)]"
+                    >
+                      <span
+                        className={cn(
+                          "flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--ds-radius-lg)]",
+                          RW_TYPE_COLORS[item.enquiry_type] ?? "bg-[var(--ds-surface-secondary)] text-[var(--ds-text-secondary)]"
                         )}
-                        {item.patient_phone && (
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 rounded-lg"
-                            onClick={() => window.open(`https://wa.me/${item.patient_phone.replace(/[^0-9]/g, "")}`, "_blank")} title="WhatsApp">
-                            <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
-                          </Button>
-                        )}
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 rounded-lg"
-                          onClick={() => navigate(`/crm/enquiry-calendar?focus=${item.id}`)} title="Record Feedback">
-                          <FileText className="h-3.5 w-3.5 text-blue-600" />
-                        </Button>
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 rounded-lg"
-                          onClick={() => navigate(`/crm/enquiry-calendar?focus=${item.id}`)} title="Create Appointment">
-                          <BookOpen className="h-3.5 w-3.5 text-[var(--ds-primary)]" />
-                        </Button>
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 rounded-lg"
-                          onClick={() => navigate(`/crm/enquiry-calendar?focus=${item.id}`)} title="View Timeline">
-                          <History className="h-3.5 w-3.5 text-[var(--ds-accent-600)]" />
-                        </Button>
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 rounded-lg"
-                          onClick={() => navigate(`/crm/enquiry-calendar?focus=${item.id}`)} title="Mark Completed">
-                          <CheckCircle className="h-3.5 w-3.5 text-green-600" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                      >
+                        {enquiryTypeIcon(item.enquiry_type)}
+                      </span>
+                      <span className="ds-min-w-0 flex-1">
+                        <span className="ds-body block truncate text-[var(--ds-text)]">{item.name}</span>
+                        <span className="ds-caption block truncate text-[var(--ds-text-secondary)]">
+                          {enquiryTypeLabel(item.enquiry_type)}
+                          {item.treatment_name ? ` · ${item.treatment_name}` : ""}
+                          {item.priority ? ` · ${item.priority.replace(/_/g, " ")}` : ""}
+                        </span>
+                      </span>
+                      <span className="ds-caption shrink-0 text-[var(--ds-text-tertiary)]">
+                        {item.due_date ? new Date(item.due_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) : "—"}
+                      </span>
+                    </button>
+                  </li>
                 ))}
-              </TableBody>
-            </Table>
+              </ul>
+            )}
           </div>
-        ) : (
-          <div className="text-center py-10 text-sm text-[var(--ds-text-tertiary)]">
-            <CheckCircle className="h-8 w-8 mx-auto mb-2 text-[var(--ds-text-tertiary)]" />
-            All caught up! No pending tasks for today.
-          </div>
-        )}
-      </div>
+        </WidgetCard>
+      </DashboardSection>
 
-      {/* ════════════════════════════════════
-         SECTIONS 4+5: FOLLOW-UP SUMMARY + FUNNEL (side by side)
-         ════════════════════════════════════ */}
-      <div className="grid gap-4 md:grid-cols-2">
-        {/* SECTION 3: Follow-Up Summary */}
-        <div className={cn(GLASS, "rounded-2xl p-5")}>
-          <h2 className="text-sm font-bold text-[var(--ds-text)] mb-3 flex items-center gap-2">
-            <BarChart3 className="h-4 w-4 text-[var(--ds-primary)]" /> Follow-Up Summary
-          </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {[
-              { label: "1-Day FU", value: fuSummary["1_day_due"] ?? 0, color: "text-blue-600", bg: "bg-blue-50" },
-              { label: "7-Day FU", value: fuSummary["7_day_due"] ?? 0, color: "text-[var(--ds-accent-600)]", bg: "bg-[var(--ds-accent-50)]" },
-              { label: "6-Month Recall", value: fuSummary["6_month_due"] ?? 0, color: "text-amber-600", bg: "bg-amber-50" },
-              { label: "12-Month Recall", value: fuSummary["12_month_due"] ?? 0, color: "text-green-600", bg: "bg-green-50" },
-              { label: "Custom FU", value: fuSummary["custom_due"] ?? 0, color: "text-[var(--ds-text-secondary)]", bg: "bg-[var(--ds-surface-secondary)]" },
-              { label: "Completed Today", value: fuSummary["completed_today"] ?? 0, color: "text-emerald-600", bg: "bg-emerald-50" },
-              { label: "Overdue", value: fuSummary["overdue"] ?? 0, color: "text-red-600", bg: "bg-red-50" },
-            ].map((s) => (
-              <div key={s.label} className={cn("rounded-xl p-3 text-center", s.bg)}>
-                <p className="text-[10px] text-[var(--ds-text-secondary)]">{s.label}</p>
-                <p className={cn("text-lg font-bold", s.color)}>{s.value}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* SECTION 4: Appointment Conversion Funnel */}
-        <div className={cn(GLASS, "rounded-2xl p-5")}>
-          <h2 className="text-sm font-bold text-[var(--ds-text)] mb-3 flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-emerald-500" /> Appointment Conversion
-          </h2>
-          <div className="flex items-start gap-1">
-        <FunnelStep label="CRM Tasks" value={funnel.total_due ?? 0} total={funnel.total_due || 1} color="bg-[var(--ds-primary)]" />
-        <FunnelStep label="Contacted" value={funnel.contacted ?? 0} total={funnel.total_due || 1} color="bg-[var(--ds-info)]" />
-        <FunnelStep label="Positive" value={funnel.positive ?? 0} total={funnel.total_due || 1} color="bg-[var(--ds-success)]" />
-        <FunnelStep label="Booked" value={funnel.appointments_booked ?? 0} total={funnel.total_due || 1} color="bg-[var(--ds-warning)]" />
-        <FunnelStep label="Completed" value={funnel.appointments_completed ?? 0} total={funnel.total_due || 1} color="bg-[var(--ds-success)]" isLast />
-          </div>
-          <div className="grid grid-cols-4 gap-2 mt-3">
-            <div className="text-center"><p className="text-[10px] text-[var(--ds-text-tertiary)]">Contact Rate</p><p className="text-sm font-bold text-blue-600">{funnel.contact_rate ?? 0}%</p></div>
-            <div className="text-center"><p className="text-[10px] text-[var(--ds-text-tertiary)]">Positive Rate</p><p className="text-sm font-bold text-emerald-600">{funnel.positive_rate ?? 0}%</p></div>
-            <div className="text-center"><p className="text-[10px] text-[var(--ds-text-tertiary)]">Booking Rate</p><p className="text-sm font-bold text-amber-600">{funnel.booking_rate ?? 0}%</p></div>
-            <div className="text-center"><p className="text-[10px] text-[var(--ds-text-tertiary)]">Completion Rate</p><p className="text-sm font-bold text-green-600">{funnel.completion_rate ?? 0}%</p></div>
-          </div>
-        </div>
-      </div>
-
-      {/* ════════════════════════════════════
-         SECTIONS 6+7: PATIENT RESPONSE + CONDITION (side by side)
-         ════════════════════════════════════ */}
-      <div className="grid gap-4 md:grid-cols-2">
-        {/* SECTION 5: Recent WhatsApp Activity */}
-        <div className={cn(GLASS, "rounded-2xl p-5")}>
-          <h2 className="text-sm font-bold text-[var(--ds-text)] mb-3 flex items-center gap-2">
-            <MessageSquare className="h-4 w-4 text-emerald-500" /> Recent WhatsApp Activity
-            <Badge variant="secondary" className="ml-1 text-[10px]">{whatsappHistory?.items?.length ?? 0}</Badge>
-          </h2>
-          {whatsappHistory?.items?.length > 0 ? (
-            <div className="space-y-1.5 max-h-[260px] overflow-y-auto">
-              {whatsappHistory.items.slice(0, 10).map((msg: Record<string, string>) => (
-                <div key={msg.id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-[var(--ds-surface-secondary)] transition-colors">
-                  <div className={cn("rounded-lg p-1.5",
-                    msg.status === "SENT" ? "bg-green-50 text-green-600" :
-                    msg.status === "FAILED" ? "bg-red-50 text-red-600" :
-                    msg.status === "DELIVERED" ? "bg-blue-50 text-blue-600" :
-                    "bg-[var(--ds-surface-secondary)] text-[var(--ds-text-secondary)]"
-                  )}>
-                    <MessageSquare className="h-3.5 w-3.5" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-[var(--ds-text)] truncate">{msg.patient_name || msg.recipient || "-"}</p>
-                    <p className="text-[10px] text-[var(--ds-text-secondary)] truncate">{msg.message_type || "Message"}</p>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <Badge className={cn("text-[9px]",
-                      msg.status === "SENT" ? "bg-green-100 text-green-700" :
-                      msg.status === "FAILED" ? "bg-red-100 text-red-700" :
-                      msg.status === "DELIVERED" ? "bg-blue-100 text-blue-700" :
-                      "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]"
-                    )}>{msg.status || "—"}</Badge>
-                  </div>
-                </div>
+      {/* ══════════════════════════════════════════════════════════════════
+         SECTION 4: RECENT CONVERSIONS + TODAY'S WORK QUEUE
+         ══════════════════════════════════════════════════════════════════ */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <WidgetCard
+          title="Recent Conversions"
+          description={`Leads converted in ${label.toLowerCase()}`}
+          actions={
+            <Button variant="ghost" size="sm" onClick={() => navigate(leadsPath({ status: "CONVERTED" }))}>
+              View all <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+            </Button>
+          }
+        >
+          {(conversions?.recent ?? []).length === 0 ? (
+            <p className="ds-caption py-8 text-center text-[var(--ds-text-tertiary)]">No conversions in this period.</p>
+          ) : (
+            <ul className="space-y-1.5">
+              {(conversions?.recent ?? []).map((c) => (
+                <li key={c.id}>
+                  <button
+                    type="button"
+                    onClick={() => navigate(c.link)}
+                    className="ds-focus-ring flex w-full items-center gap-3 rounded-[var(--ds-radius-lg)] px-2 py-2 text-left transition-colors hover:bg-[var(--ds-surface-hover)]"
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--ds-radius-lg)] bg-[var(--ds-success-subtle)] text-[var(--ds-success)]">
+                      <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                    <span className="ds-min-w-0 flex-1">
+                      <span className="ds-body block truncate text-[var(--ds-text)]">{c.name}</span>
+                      <span className="ds-caption block text-[var(--ds-text-secondary)]">{c.source.replace(/_/g, " ").toLowerCase()}</span>
+                    </span>
+                    <span className="ds-caption shrink-0 text-[var(--ds-text-tertiary)]">
+                      {c.converted_at ? new Date(c.converted_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) : ""}
+                    </span>
+                  </button>
+                </li>
               ))}
+            </ul>
+          )}
+        </WidgetCard>
+
+        <WidgetCard
+          title="Today's Work Queue"
+          description="Follow-ups due today that need action"
+          actions={
+            <Button variant="ghost" size="sm" onClick={() => navigate("/crm/enquiry-calendar")}>
+              View all <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+            </Button>
+          }
+        >
+          {workQueue.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-10 text-center">
+              <CheckCircle2 className="h-8 w-8 text-[var(--ds-success)]" aria-hidden="true" />
+              <p className="ds-caption text-[var(--ds-text-tertiary)]">All caught up — no pending follow-ups today.</p>
             </div>
           ) : (
-            <p className="text-sm text-[var(--ds-text-tertiary)] text-center py-12">No recent WhatsApp activity</p>
-          )}
-          <Button variant="ghost" size="sm" className="w-full mt-2 h-7 text-xs gap-1" onClick={() => navigate("/whatsapp")}>
-            View All <ChevronRight className="h-3 w-3" />
-          </Button>
-        </div>
-
-        {/* SECTION 6: Patient Condition Analytics */}
-        <div className={cn(GLASS, "rounded-2xl p-5")}>
-          <h2 className="text-sm font-bold text-[var(--ds-text)] mb-3 flex items-center gap-2">
-            <HeartPulse className="h-4 w-4 text-rose-500" /> Patient Condition Analytics
-          </h2>
-          {conditions.length > 0 ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={conditions}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--ds-border-light)" />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip />
-                <Bar dataKey="count" fill="var(--ds-chart-10)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <p className="text-sm text-[var(--ds-text-tertiary)] text-center py-12">No condition data for this period</p>
-          )}
-        </div>
-      </div>
-
-      {/* ════════════════════════════════════
-         SECTIONS 8+9: TREATMENT TYPE + DOCTOR (side by side)
-         ════════════════════════════════════ */}
-      <div className="grid gap-4 md:grid-cols-2">
-        {/* SECTION 7: Treatment Type Performance */}
-        <div className={cn(GLASS, "rounded-2xl p-5")}>
-          <h2 className="text-sm font-bold text-[var(--ds-text)] mb-3 flex items-center gap-2">
-            <Activity className="h-4 w-4 text-[var(--ds-primary)]" /> Treatment Type Performance
-          </h2>
-          {treatmentPerf.length > 0 ? (
-            <div className="space-y-3">
-              {treatmentPerf.slice(0, 8).map((t: Record<string, string | number>, i: number) => {
-                const fu = Number(t.follow_ups) || 0
-                const ap = Number(t.appointments) || 0
-                const pct = Math.max(fu, ap, 1)
-                const fw = (fu / pct) * 100
-                const aw = (ap / pct) * 100
-                return (
-                  <div key={i}>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="font-medium text-[var(--ds-text-secondary)]">{t.name}</span>
-                      <span className="text-[var(--ds-text-tertiary)]">{t.follow_ups} FU · {t.appointments} Appts</span>
-                    </div>
-                    <div className="flex gap-0.5 h-2 rounded-full overflow-hidden bg-[var(--ds-background-subtle)]">
-                      <div style={{ width: `${fw}%` }} className="bg-[var(--ds-primary)] transition-all" />
-                      <div style={{ width: `${aw}%` }} className="bg-[var(--ds-success)] transition-all" />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <p className="text-sm text-[var(--ds-text-tertiary)] text-center py-12">No treatment data</p>
-          )}
-        </div>
-
-        {/* SECTION 8: Doctor Engagement Leaderboard */}
-        <div className={cn(GLASS, "rounded-2xl p-5")}>
-          <h2 className="text-sm font-bold text-[var(--ds-text)] mb-3 flex items-center gap-2">
-            <Award className="h-4 w-4 text-amber-500" /> Doctor Engagement Leaderboard
-          </h2>
-          {doctorEngagement.length > 0 ? (
-            <div className="space-y-2 max-h-[300px] overflow-y-auto">
-              {doctorEngagement.map((d: Record<string, string | number>, i: number) => (
-                <div key={d.doctor_id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-[var(--ds-surface-secondary)] transition-colors">
-                  <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white",
-                    i === 0 ? "bg-[var(--ds-warning)]" : i === 1 ? "bg-[var(--ds-text-tertiary)]" : i === 2 ? "bg-[var(--ds-danger)]" : "bg-[var(--ds-border)] text-[var(--ds-text-secondary)]")}>
-                    {i + 1}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-[var(--ds-text)] truncate">{d.doctor_name}</p>
-                    <div className="flex gap-3 text-[10px] text-[var(--ds-text-tertiary)]">
-                      <span>{d.patients_contacted} contacted</span>
-                      <span>{d.appointments_generated} appts</span>
-                      <span>{d.follow_ups_completed} done</span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs font-bold text-[var(--ds-primary)]">{d.positive_feedback}</p>
-                    <p className="text-[9px] text-[var(--ds-text-tertiary)]">positive</p>
-                  </div>
-                </div>
+            <ul className="max-h-[380px] space-y-1 overflow-y-auto pr-1">
+              {workQueue.map((item) => (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    onClick={() => navigate(item.link)}
+                    className="ds-focus-ring flex w-full items-center gap-3 rounded-[var(--ds-radius-lg)] px-2 py-2 text-left transition-colors hover:bg-[var(--ds-surface-hover)]"
+                  >
+                    <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--ds-radius-lg)]", FU_TYPE_COLORS[item.follow_up_type] ?? "bg-[var(--ds-surface-secondary)] text-[var(--ds-text-secondary)]")}>
+                      <Clock className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                    <span className="ds-min-w-0 flex-1">
+                      <span className="ds-body block truncate text-[var(--ds-text)]">{item.patient_name}</span>
+                      <span className="ds-caption block truncate text-[var(--ds-text-secondary)]">
+                        {fuTypeLabel(item.follow_up_type)}
+                        {item.doctor_name ? ` · ${item.doctor_name}` : ""}
+                      </span>
+                    </span>
+                    <span className="ds-caption shrink-0 text-[var(--ds-text-tertiary)]">{item.due_time ?? "—"}</span>
+                  </button>
+                </li>
               ))}
-            </div>
-          ) : (
-            <p className="text-sm text-[var(--ds-text-tertiary)] text-center py-12">No doctor engagement data</p>
+            </ul>
           )}
-        </div>
+        </WidgetCard>
       </div>
 
-      {/* ════════════════════════════════════
-         SECTION 10: EXPENSES VS REVENUE QUICK VIEW
-         ════════════════════════════════════ */}
-      <ExpensesVsRevenueQuickView className={cn(GLASS, "rounded-2xl p-5")} />
+      {/* ══════════════════════════════════════════════════════════════════
+         SECTION 5: RECENT ACTIVITY
+         ══════════════════════════════════════════════════════════════════ */}
+      <RecentActivity
+        items={activityEvents}
+        loading={isLoading}
+        title="CRM Activity"
+        description="Latest communications, conversions and follow-ups across the practice"
+      />
 
-      {/* ════════════════════════════════════
-         SECTION 11: PATIENT ACQUISITION & REVENUE
-         ════════════════════════════════════ */}
-      <div className={cn(GLASS, "rounded-2xl p-5")}>
-        <h2 className="text-sm font-bold text-[var(--ds-text)] mb-3 flex items-center gap-2">
-          <Users className="h-4 w-4 text-[var(--ds-primary)]" /> Patient Acquisition & Revenue by Source
-        </h2>
-        <div className="grid gap-4 md:grid-cols-2">
-          <div>
-            <p className="text-[10px] font-semibold text-[var(--ds-text-secondary)] uppercase mb-2">Acquisition Source</p>
-            {acquisition.length > 0 ? (
-              <ResponsiveContainer width="100%" height={220}>
-                <RePieChart>
-                  <Pie data={acquisition} dataKey="patients" nameKey="source" cx="50%" cy="50%" outerRadius={80} label={(props: PieLabelRenderProps) => { const { name, percent } = props as unknown as { name: string; percent: number }; return `${name ?? ""} ${((percent ?? 0) * 100).toFixed(0)}%` }}>
-                    {acquisition.map((_: Record<string, unknown>, i: number) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip />
-                </RePieChart>
-              </ResponsiveContainer>
-            ) : <p className="text-sm text-[var(--ds-text-tertiary)] text-center py-10">No acquisition data</p>}
-          </div>
-          <div>
-            <p className="text-[10px] font-semibold text-[var(--ds-text-secondary)] uppercase mb-2">Revenue by Source</p>
-            {revenueBySource.length > 0 ? (
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={revenueBySource}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--ds-border-light)" />
-                  <XAxis dataKey="source" tick={{ fontSize: 9 }} />
-                  <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip formatter={(value) => formatIndianRupees(Number(value))} />
-                  <Bar dataKey="revenue" fill="var(--ds-chart-5)" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : <p className="text-sm text-[var(--ds-text-tertiary)] text-center py-10">No revenue data</p>}
-          </div>
-        </div>
-        {acquisition.length > 0 && (
-          <div className="overflow-x-auto mt-3">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-[10px]">Source</TableHead>
-                  <TableHead className="text-[10px] text-right">Patients</TableHead>
-                  <TableHead className="text-[10px] text-right">Conversion Rate</TableHead>
-                  <TableHead className="text-[10px] text-right">Revenue</TableHead>
-                  <TableHead className="text-[10px] text-right">Avg/Patient</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {acquisition.slice(0, 6).map((s: Record<string, string | number>) => (
-                  <TableRow key={s.source}>
-                    <TableCell className="text-xs font-medium">{s.source}</TableCell>
-                    <TableCell className="text-xs text-right">{s.patients}</TableCell>
-                    <TableCell className="text-xs text-right">{s.conversion_rate}%</TableCell>
-                    <TableCell className="text-xs text-right font-semibold">{formatIndianRupees(Number(s.revenue))}</TableCell>
-                    <TableCell className="text-xs text-right">{formatIndianRupees(Number(s.avg_revenue))}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </div>
-
-      {/* ════════════════════════════════════
-         SECTION 12: LEAD ANALYTICS
-         ════════════════════════════════════ */}
-      {leadAnalytics && (
-        <div className={cn(GLASS, "rounded-2xl p-5")}>
-          <h2 className="text-sm font-bold text-[var(--ds-text)] mb-3 flex items-center gap-2">
-            <Users className="h-4 w-4 text-[var(--ds-primary)]" /> Lead Analytics
-            <Badge variant="secondary" className="ml-1 text-[10px]">{leadAnalytics.total ?? 0} total</Badge>
-          </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4">
-            <div className="rounded-xl bg-[var(--ds-primary-subtle)] p-3 text-center">
-              <p className="text-[10px] text-[var(--ds-text-secondary)]">Total Leads</p>
-              <p className="text-xl font-bold text-[var(--ds-primary)]">{leadAnalytics.total ?? 0}</p>
-            </div>
-            <div className="rounded-xl bg-emerald-50 p-3 text-center">
-              <p className="text-[10px] text-[var(--ds-text-secondary)]">Converted</p>
-              <p className="text-xl font-bold text-emerald-600">{leadAnalytics.converted ?? 0}</p>
-            </div>
-            <div className="rounded-xl bg-red-50 p-3 text-center">
-              <p className="text-[10px] text-[var(--ds-text-secondary)]">Lost</p>
-              <p className="text-xl font-bold text-red-600">{leadAnalytics.lost ?? 0}</p>
-            </div>
-            <div className="rounded-xl bg-amber-50 p-3 text-center">
-              <p className="text-[10px] text-[var(--ds-text-secondary)]">Conversion Rate</p>
-              <p className="text-xl font-bold text-amber-600">{leadAnalytics.conversion_rate ?? 0}%</p>
-            </div>
-            <div className="rounded-xl bg-[var(--ds-accent-50)] p-3 text-center">
-              <p className="text-[10px] text-[var(--ds-text-secondary)]">Avg Score</p>
-              <p className="text-xl font-bold text-[var(--ds-accent-600)]">{leadAnalytics.avg_score ?? 0}</p>
-            </div>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <p className="text-[10px] font-semibold text-[var(--ds-text-secondary)] uppercase mb-2">Leads by Source</p>
-              {leadAnalytics.by_source && Object.keys(leadAnalytics.by_source).length > 0 ? (
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={Object.entries(leadAnalytics.by_source).map(([name, count]) => ({ name: name.replace(/_/g, " "), count }))}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--ds-border-light)" />
-                    <XAxis dataKey="name" tick={{ fontSize: 9 }} />
-                    <YAxis tick={{ fontSize: 10 }} />
-                    <Tooltip />
-                    <Bar dataKey="count" fill="var(--ds-chart-5)" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : <p className="text-sm text-[var(--ds-text-tertiary)] text-center py-10">No source data</p>}
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold text-[var(--ds-text-secondary)] uppercase mb-2">Leads by Status</p>
-              {leadAnalytics.by_status && Object.keys(leadAnalytics.by_status).length > 0 ? (
-                <ResponsiveContainer width="100%" height={220}>
-                  <RePieChart>
-                    <Pie data={Object.entries(leadAnalytics.by_status).map(([name, count]) => ({ name: name.replace(/_/g, " "), value: count }))}
-                      dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80}
-                      label={(props: PieLabelRenderProps) => { const { name, percent } = props as unknown as { name: string; percent: number }; return `${name ?? ""} ${((percent ?? 0) * 100).toFixed(0)}%` }}>
-                      {Object.entries(leadAnalytics.by_status).map((_: [string, unknown], i: number) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                    </Pie>
-                    <Tooltip />
-                  </RePieChart>
-                </ResponsiveContainer>
-              ) : <p className="text-sm text-[var(--ds-text-tertiary)] text-center py-10">No status data</p>}
-            </div>
-          </div>
-          {leadAnalytics.high_priority > 0 && (
-            <div className="mt-3 text-center">
-              <Badge className="bg-red-50 text-red-700 border-red-200 text-xs">
-                {leadAnalytics.high_priority} high priority leads need attention
-              </Badge>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ════════════════════════════════════
-         SECTION 13: CRM TIMELINE
-         ════════════════════════════════════ */}
-      <div className={cn(GLASS, "rounded-2xl p-5")}>
-        <h2 className="text-sm font-bold text-[var(--ds-text)] mb-3 flex items-center gap-2">
-          <Activity className="h-4 w-4 text-blue-500" /> CRM Activity Timeline
-          <Badge variant="secondary" className="ml-1 text-[10px]">{timeline.length}</Badge>
-        </h2>
-        {timeline.length > 0 ? (
-          <div className="space-y-1 max-h-[350px] overflow-y-auto">
-            {timeline.slice(0, 25).map((entry: Record<string, string>) => {
-              const iconMap: Record<string, { icon: React.ComponentType<{ className?: string }>; color: string }> = {
-                CALL: { icon: Phone, color: "text-green-500 bg-green-50" },
-                WHATSAPP: { icon: MessageCircle, color: "text-emerald-500 bg-emerald-50" },
-                SMS: { icon: MessageCircle, color: "text-blue-500 bg-blue-50" },
-                EMAIL: { icon: Send, color: "text-[var(--ds-accent-500)] bg-[var(--ds-accent-50)]" },
-                IN_PERSON: { icon: User, color: "text-amber-500 bg-amber-50" },
-                STATUS_UPDATE: { icon: Activity, color: "text-[var(--ds-text-secondary)] bg-[var(--ds-surface-secondary)]" },
-                APPOINTMENT_BOOKED: { icon: CalendarDays, color: "text-[var(--ds-primary)] bg-[var(--ds-primary-subtle)]" },
-                COMPLETED: { icon: CheckCircle, color: "text-green-500 bg-green-50" },
-              }
-              const meta = iconMap[entry.activity] || iconMap.STATUS_UPDATE
-              const Icon = meta.icon
-              return (
-                <div key={entry.id} className="flex items-start gap-3 p-2 rounded-xl hover:bg-[var(--ds-surface-secondary)] transition-colors">
-                  <div className={cn("rounded-lg p-1.5 mt-0.5", meta.color)}>
-                    <Icon className="h-3.5 w-3.5" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-[var(--ds-text)]">{entry.patient_name}</p>
-                    <p className="text-[10px] text-[var(--ds-text-secondary)]">{entry.description}</p>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <Badge className={cn("text-[9px]", statusColors[entry.status] || "bg-[var(--ds-background-subtle)]")}>{entry.status}</Badge>
-                    <p className="text-[9px] text-[var(--ds-text-tertiary)] mt-0.5">
-                      {entry.timestamp ? new Date(entry.timestamp).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}
-                    </p>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        ) : (
-          <p className="text-sm text-[var(--ds-text-tertiary)] text-center py-10">No activity for this period</p>
-        )}
-      </div>
-
-      {/* ════════════════════════════════════
-         SECTION 14: UPCOMING WORK
-         ════════════════════════════════════ */}
-      <div className={cn(GLASS, "rounded-2xl p-5")}>
-        <h2 className="text-sm font-bold text-[var(--ds-text)] mb-3 flex items-center gap-2">
-          <Clock className="h-4 w-4 text-amber-500" /> Upcoming Work
-        </h2>
-        <Tabs value={upcomingTab} onValueChange={setUpcomingTab}>
-          <TabsList className="mb-3">
-            <TabsTrigger value="tomorrow" className="text-xs">Tomorrow</TabsTrigger>
-            <TabsTrigger value="next_7_days" className="text-xs">Next 7 Days</TabsTrigger>
-            <TabsTrigger value="next_30_days" className="text-xs">Next 30 Days</TabsTrigger>
-          </TabsList>
-          {["tomorrow", "next_7_days", "next_30_days"].map((tab) => {
-            const uw = upcomingWork[tab] ?? {}
-            return (
-              <TabsContent key={tab} value={tab}>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                  <div className="rounded-xl bg-[var(--ds-primary-subtle)] p-3 text-center">
-                    <p className="text-[10px] text-[var(--ds-text-secondary)]">Total</p>
-                    <p className="text-xl font-bold text-[var(--ds-primary)]">{uw.total ?? 0}</p>
-                  </div>
-                  <div className="rounded-xl bg-blue-50 p-3 text-center">
-                    <p className="text-[10px] text-[var(--ds-text-secondary)]">1-Day FU</p>
-                    <p className="text-xl font-bold text-blue-600">{uw["1_day"] ?? 0}</p>
-                  </div>
-                  <div className="rounded-xl bg-[var(--ds-accent-50)] p-3 text-center">
-                    <p className="text-[10px] text-[var(--ds-text-secondary)]">7-Day FU</p>
-                    <p className="text-xl font-bold text-[var(--ds-accent-600)]">{uw["7_day"] ?? 0}</p>
-                  </div>
-                  <div className="rounded-xl bg-amber-50 p-3 text-center">
-                    <p className="text-[10px] text-[var(--ds-text-secondary)]">6-Month Recall</p>
-                    <p className="text-xl font-bold text-amber-600">{uw["6_month"] ?? 0}</p>
-                  </div>
-                  <div className="rounded-xl bg-green-50 p-3 text-center">
-                    <p className="text-[10px] text-[var(--ds-text-secondary)]">12-Month Recall</p>
-                    <p className="text-xl font-bold text-green-600">{uw["12_month"] ?? 0}</p>
-                  </div>
-                </div>
-              </TabsContent>
-            )
-          })}
-        </Tabs>
-      </div>
-    </div>
+      {/* ── REAL-TIME SYNC FOOTER ─────────────────────────────────────────── */}
+      <p className="ds-caption flex items-center gap-1.5 text-[var(--ds-text-tertiary)]">
+        <Radio className="h-3.5 w-3.5 text-[var(--ds-success)]" aria-hidden="true" />
+        Auto-refreshes every 30 seconds
+        {dataUpdatedAt ? ` · last updated ${new Date(dataUpdatedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}` : ""}
+        {isCustom ? ` · ${rangeSummary}` : ` · ${label}`}
+      </p>
+    </DashboardShell>
   )
 }

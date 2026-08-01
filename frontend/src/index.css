@@ -260,6 +260,13 @@ body {
   background: var(--ds-hero-gradient-accent);
 }
 
+/* CRM Command Center hero — warm amber/orange identity distinct from the
+   hospital admin (navy/teal) hero. Declared after .gradient-hero so it wins
+   when both classes are applied to the same element. */
+.gradient-hero-crm {
+  background: linear-gradient(135deg, var(--ds-orange-600) 0%, var(--ds-orange-800) 55%, var(--ds-orange-950) 100%);
+}
+
 .gradient-hero-subtle {
   background: var(--ds-hero-gradient-subtle);
 }

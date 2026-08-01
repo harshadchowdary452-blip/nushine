@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import DateFilterBar from "@/components/ui/date-filter-bar"
 import { formatIndianRupees } from "@/lib/currency"
 import { cn } from "@/lib/utils"
+import { useContainerSize } from "@/design-system/components/charts"
 
 interface ExpensesVsRevenueQuickViewProps {
   className?: string
@@ -57,6 +58,8 @@ function ExpensesVsRevenueQuickView({ className }: ExpensesVsRevenueQuickViewPro
     staleTime: 10000,
     gcTime: 60000,
   })
+
+  const { ref, size } = useContainerSize<HTMLDivElement>()
 
   if (!user) return null
 
@@ -124,8 +127,9 @@ function ExpensesVsRevenueQuickView({ className }: ExpensesVsRevenueQuickViewPro
           </div>
 
           {periodRevenue > 0 || totalExpenses > 0 ? (
-            <div className="h-32">
-              <ResponsiveContainer width="100%" height="100%">
+            <div ref={ref} className="h-32">
+              {size.width > 0 && size.height > 0 && (
+              <ResponsiveContainer width={size.width} height={size.height}>
                 <BarChart data={compareData} barCategoryGap="40%">
                   <XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
                   <YAxis hide />
@@ -133,6 +137,7 @@ function ExpensesVsRevenueQuickView({ className }: ExpensesVsRevenueQuickViewPro
                   <Bar dataKey="amount" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
+              )}
             </div>
           ) : (
             <p className="text-center text-xs text-[var(--ds-text-tertiary)] py-3">No data for this period</p>

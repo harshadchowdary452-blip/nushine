@@ -34,10 +34,6 @@ export const LEAD_STATUSES = [
   "VISITED", "CONVERTED", "LOST", "NOT_INTERESTED", "NO_RESPONSE",
 ] as const;
 
-export const CAMPAIGN_STATUSES = [
-  "DRAFT", "SCHEDULED", "SENDING", "SENT", "PAUSED", "CANCELLED", "COMPLETED",
-] as const;
-
 export const FOLLOW_UP_TYPES = [
   "OPD_FOLLOW_UP", "TREATMENT_FOLLOW_UP", "RECALL", "POST_SURGERY",
   "CUSTOM_FOLLOW_UP", "LEAD_FOLLOW_UP", "ENQUIRY_FOLLOW_UP",
@@ -94,16 +90,6 @@ export const leadStatusColors: Record<string, string> = {
   LOST: "bg-red-50 text-red-700",
   NOT_INTERESTED: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
   NO_RESPONSE: "bg-orange-50 text-orange-700",
-};
-
-export const campaignStatusColors: Record<string, string> = {
-  DRAFT: "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]",
-  SCHEDULED: "bg-blue-50 text-blue-700",
-  SENDING: "bg-amber-50 text-amber-700",
-  SENT: "bg-green-50 text-green-700",
-  PAUSED: "bg-orange-50 text-orange-700",
-  CANCELLED: "bg-red-50 text-red-700",
-  COMPLETED: "bg-green-100 text-green-800",
 };
 
 export function formatLabel(str: string): string {

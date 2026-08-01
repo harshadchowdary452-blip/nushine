@@ -95,9 +95,15 @@ def get_date_range(period: str = "this_month", start_date: Optional[str] = None,
         return month_start, next_month
 
 
-async def calculate_revenue(db: AsyncSession, case_ids: list[str] = None, period: str = "this_month",
-                            start_date: Optional[str] = None, end_date: Optional[str] = None) -> float:
-    date_start, date_end = get_date_range(period, start_date, end_date)
+async def calculate_revenue_for_range(db: AsyncSession, case_ids: list[str] = None,
+                                      date_start: datetime | None = None,
+                                      date_end: datetime | None = None) -> float:
+    if date_start is None:
+        now = datetime.now(timezone.utc)
+        date_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    if date_end is None:
+        date_start = date_start.replace(day=1)
+        date_end = date_start.replace(month=date_start.month % 12 + 1, day=1) if date_start.month < 12 else date_start.replace(year=date_start.year + 1, month=1, day=1)
     query = select(func.sum(Billing.paid_amount)).where(
         Billing.updated_at >= date_start, Billing.updated_at < date_end,
     )
@@ -105,6 +111,12 @@ async def calculate_revenue(db: AsyncSession, case_ids: list[str] = None, period
         query = query.where(Billing.case_id.in_(case_ids))
     result = await db.execute(query)
     return float(result.scalar() or 0)
+
+
+async def calculate_revenue(db: AsyncSession, case_ids: list[str] = None, period: str = "this_month",
+                            start_date: Optional[str] = None, end_date: Optional[str] = None) -> float:
+    date_start, date_end = get_date_range(period, start_date, end_date)
+    return await calculate_revenue_for_range(db, case_ids, date_start, date_end)
 
 
 async def calculate_expenses(db: AsyncSession, hospital_ids: list[str] = None, period: str = "this_month",
@@ -161,12 +173,16 @@ async def calculate_profit_margin(revenue: float, profit: float) -> float:
     return round((profit / revenue) * 100, 2)
 
 
-async def revenue_trend_with_expenses(db: AsyncSession, case_ids: list[str] = None,
-                                      hospital_ids: list[str] = None,
-                                      period: str = "this_month",
-                                      start_date: Optional[str] = None,
-                                      end_date: Optional[str] = None) -> list:
-    date_start, date_end = get_date_range(period, start_date, end_date)
+async def revenue_trend_with_expenses_range(db: AsyncSession, case_ids: list[str] = None,
+                                            hospital_ids: list[str] = None,
+                                            date_start: datetime | None = None,
+                                            date_end: datetime | None = None) -> list:
+    if date_start is None:
+        now = datetime.now(timezone.utc)
+        date_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    if date_end is None:
+        date_start = date_start.replace(day=1)
+        date_end = date_start.replace(month=date_start.month % 12 + 1, day=1) if date_start.month < 12 else date_start.replace(year=date_start.year + 1, month=1, day=1)
     range_days = (date_end - date_start).days
 
     if range_days <= 1:
@@ -256,3 +272,12 @@ async def revenue_trend_with_expenses(db: AsyncSession, case_ids: list[str] = No
         return [{"month": date_start.strftime(date_format), "revenue": 0, "expenses": 0, "profit": 0, "profit_margin": 0}]
 
     return result
+
+
+async def revenue_trend_with_expenses(db: AsyncSession, case_ids: list[str] = None,
+                                      hospital_ids: list[str] = None,
+                                      period: str = "this_month",
+                                      start_date: Optional[str] = None,
+                                      end_date: Optional[str] = None) -> list:
+    date_start, date_end = get_date_range(period, start_date, end_date)
+    return await revenue_trend_with_expenses_range(db, case_ids, hospital_ids, date_start, date_end)

@@ -1,4 +1,4 @@
-/* eslint-disable react-refresh/only-export-components */
+ 
 import * as React from "react"
 import { motion } from "framer-motion"
 import { ArrowDownRight, ArrowUpRight } from "lucide-react"

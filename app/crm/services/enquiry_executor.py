@@ -261,15 +261,22 @@ class EnquiryExecutor:
         else:
             conditions.append(GeneratedEnquiry.patient_id.is_(None))
 
-        if case_id:
-            conditions.append(GeneratedEnquiry.case_id == case_id)
-        else:
-            conditions.append(GeneratedEnquiry.case_id.is_(None))
+        # APPOINTMENT_REMINDER is unique per appointment — the same appointment can be
+        # reached via different events (APPOINTMENT_CREATED, TREATMENT_COMPLETED, ...)
+        # that may or may not carry case_id/treatment_type_id. Ignore those context keys
+        # so all paths resolve to the same idempotency key and we never get duplicates.
+        is_appointment_reminder = enquiry_type == "APPOINTMENT_REMINDER" and bool(appointment_id)
 
-        if treatment_type_id:
-            conditions.append(GeneratedEnquiry.treatment_type_id == treatment_type_id)
-        else:
-            conditions.append(GeneratedEnquiry.treatment_type_id.is_(None))
+        if not is_appointment_reminder:
+            if case_id:
+                conditions.append(GeneratedEnquiry.case_id == case_id)
+            else:
+                conditions.append(GeneratedEnquiry.case_id.is_(None))
+
+            if treatment_type_id:
+                conditions.append(GeneratedEnquiry.treatment_type_id == treatment_type_id)
+            else:
+                conditions.append(GeneratedEnquiry.treatment_type_id.is_(None))
 
         if appointment_id:
             conditions.append(GeneratedEnquiry.appointment_id == appointment_id)

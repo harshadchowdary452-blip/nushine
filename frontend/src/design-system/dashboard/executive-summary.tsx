@@ -1,4 +1,4 @@
-/* eslint-disable react-refresh/only-export-components */
+ 
 import * as React from "react"
 import { AlertTriangle, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -123,7 +123,7 @@ export function ExecutiveSummary({
       )}
 
       {caution && (
-        <p className="ds-caption flex items-start gap-2 rounded-[var(--ds-radius-lg)] border border-[var(--ds-warning)]/30 bg-[var(--ds-warning)]/10 px-3 py-2.5 text-[var(--ds-warning-foreground)]">
+        <p className="ds-caption flex items-start gap-2 rounded-[var(--ds-radius-lg)] border border-[var(--ds-warning)]/30 bg-[var(--ds-warning)]/10 px-3 py-2.5 text-[var(--ds-warning)]">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--ds-warning)]" aria-hidden="true" />
           <span>{caution}</span>
         </p>

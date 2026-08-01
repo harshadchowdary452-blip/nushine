@@ -53,16 +53,36 @@ class WhatsAppProvider:
 whatsapp_provider = WhatsAppProvider()
 
 
-async def send_appointment_reminder(phone: str, patient_name: str, appointment_date: str, appointment_time: str):
-    message = f"Reminder: Dear {patient_name}, you have a dental appointment on {appointment_date} at {appointment_time}. Please arrive 15 minutes early. - NuShine Dental"
+def _brand(hospital_name: Optional[str] = None) -> str:
+    name = hospital_name or "NuShine Dental"
+    return f"Warm Regards,\n{name}\nPatient Care Team | 9704702601"
+
+
+async def send_appointment_reminder(phone: str, patient_name: str, appointment_date: str, appointment_time: str, hospital_name: Optional[str] = None, doctor_name: Optional[str] = None):
+    doctor_line = f" with Dr. {doctor_name}" if doctor_name else ""
+    message = (
+        f"Dear {patient_name},\n\n"
+        f"This is a friendly reminder about your upcoming dental appointment{doctor_line} on {appointment_date} at {appointment_time}.\n\n"
+        f"Please arrive 15 minutes early for a smooth experience. If you need to reschedule, kindly inform us in advance.\n\n"
+        f"{_brand(hospital_name)}"
+    )
     return await whatsapp_provider.send_message(phone, message)
 
 
-async def send_missed_appointment(phone: str, patient_name: str):
-    message = f"Dear {patient_name}, you missed your dental appointment. Please reschedule at your earliest convenience. - NuShine Dental"
+async def send_missed_appointment(phone: str, patient_name: str, hospital_name: Optional[str] = None):
+    message = (
+        f"Dear {patient_name},\n\n"
+        f"We noticed you missed your recent dental appointment. Your health is important to us, so please call us to reschedule at your earliest convenience.\n\n"
+        f"{_brand(hospital_name)}"
+    )
     return await whatsapp_provider.send_message(phone, message)
 
 
-async def send_follow_up_reminder(phone: str, patient_name: str, next_date: str):
-    message = f"Dear {patient_name}, this is a follow-up reminder for your next dental visit on {next_date}. - NuShine Dental"
+async def send_follow_up_reminder(phone: str, patient_name: str, next_date: str, hospital_name: Optional[str] = None, doctor_name: Optional[str] = None):
+    doctor_line = f" with Dr. {doctor_name}" if doctor_name else ""
+    message = (
+        f"Dear {patient_name},\n\n"
+        f"This is a gentle follow-up reminder for your next dental visit{doctor_line} on {next_date}. Please confirm your appointment with us.\n\n"
+        f"{_brand(hospital_name)}"
+    )
     return await whatsapp_provider.send_message(phone, message)

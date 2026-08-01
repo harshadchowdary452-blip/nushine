@@ -51,6 +51,7 @@ export function useEscalateFollowUp() {
     mutationFn: (id: string) => crmV2Api.escalate(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["crm-v2"] });
+      queryClient.invalidateQueries({ queryKey: ["crm-command-center"], refetchType: "all" });
     },
   });
 }

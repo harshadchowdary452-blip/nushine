@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react'
+import { X, Pencil } from 'lucide-react'
 import type { ToothFinding } from './types'
 import {
   FINDING_TYPES, QUICK_FINDINGS,
@@ -290,7 +291,7 @@ function RightPanel({ n, fings, ro, onAdd, onRemove, onUpdateFinding, onClose }:
             width: 22, height: 22, borderRadius: '50%', border: '1px solid #E5E7EB',
             background: 'var(--ds-surface)', cursor: 'pointer', fontSize: 11, color: 'var(--ds-text-secondary)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>✕</button>
+          }}><X size={11} /></button>
         </div>
       </div>
 
@@ -322,12 +323,12 @@ function RightPanel({ n, fings, ro, onAdd, onRemove, onUpdateFinding, onClose }:
                       <button type="button" onClick={() => startEdit(f)} style={{
                         background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ds-primary-600)',
                         fontSize: 10, padding: 0,
-                      }}>✎</button>
+                      }}><Pencil size={11} /></button>
                     )}
                     <button type="button" onClick={() => onRemove(f.id)} style={{
                       background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444',
                       fontSize: 11, padding: 0,
-                    }}>✕</button>
+                    }}><X size={12} /></button>
                   </div>
                 )}
               </div>

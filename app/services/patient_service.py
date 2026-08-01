@@ -146,8 +146,6 @@ class PatientService:
             await self.db.execute(sa_delete(PatientTimeline).where(PatientTimeline.patient_id == patient_id))
             await self.db.execute(sa_delete(GeneratedEnquiry).where(GeneratedEnquiry.patient_id == patient_id))
             await self.db.execute(sa_delete(FollowUpResponse).where(FollowUpResponse.patient_id == patient_id))
-            from app.models.campaign import CampaignRecipient
-            await self.db.execute(sa_delete(CampaignRecipient).where(CampaignRecipient.patient_id == patient_id))
             cases = (await self.db.execute(select(Case).where(Case.patient_id == patient_id))).scalars().all()
             for c in cases:
                 await self.db.execute(sa_delete(PreOp).where(PreOp.case_id == c.id))

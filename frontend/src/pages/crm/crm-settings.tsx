@@ -40,11 +40,11 @@ import { cn } from "@/lib/utils";
 import { crmSettingsApi } from "@/services/endpoints";
 
 const TABS = [
-  { key: "general", label: "General", icon: Zap, color: "from-blue-600 to-[var(--ds-primary-600)]", desc: "Global CRM automation behavior and business hours" },
-  { key: "lead", label: "Lead", icon: Users, color: "from-emerald-500 to-teal-600", desc: "New lead follow-up automation" },
-  { key: "opd", label: "OPD", icon: Stethoscope, color: "from-[var(--ds-accent-500)] to-[var(--ds-accent-600)]", desc: "Post-consultation follow-up" },
-  { key: "treatment", label: "Treatment", icon: ClipboardList, color: "from-amber-500 to-orange-600", desc: "Treatment completion wellness checks" },
-  { key: "case", label: "Case", icon: HeartPulse, color: "from-rose-500 to-pink-600", desc: "Case recovery and periodic recall" },
+  { key: "general", label: "General", icon: Zap, color: "bg-[var(--ds-primary)]", desc: "Global CRM automation behavior and business hours" },
+  { key: "lead", label: "Lead", icon: Users, color: "bg-[var(--ds-secondary)]", desc: "New lead follow-up automation" },
+  { key: "opd", label: "OPD", icon: Stethoscope, color: "bg-[var(--ds-accent)]", desc: "Post-consultation follow-up" },
+  { key: "treatment", label: "Treatment", icon: ClipboardList, color: "bg-[var(--ds-warning)]", desc: "Treatment completion wellness checks" },
+  { key: "case", label: "Case", icon: HeartPulse, color: "bg-[var(--ds-danger)]", desc: "Case recovery and periodic recall" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -265,7 +265,7 @@ export default function CrmSettingsPage() {
                   className={cn(
                     "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap",
                     isActive
-                      ? "bg-gradient-to-r text-white shadow-sm " + tab.color
+                      ? "text-white shadow-sm " + tab.color
                       : "text-[var(--ds-text-secondary)] hover:text-[var(--ds-text)] hover:bg-[var(--ds-surface-hover)]"
                   )}
                 >

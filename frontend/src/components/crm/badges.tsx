@@ -4,7 +4,6 @@ import {
   priorityColors,
   followUpStatusColors,
   leadStatusColors,
-  campaignStatusColors,
   formatLabel,
 } from ".";
 
@@ -42,15 +41,6 @@ export function FollowUpStatusBadge({ value, className = "" }: BadgeProps) {
 
 export function LeadStatusBadge({ value, className = "" }: BadgeProps) {
   const colors = leadStatusColors[value] || "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]";
-  return (
-    <Badge className={`text-[10px] font-medium ${colors} ${className}`}>
-      {formatLabel(value)}
-    </Badge>
-  );
-}
-
-export function CampaignStatusBadge({ value, className = "" }: BadgeProps) {
-  const colors = campaignStatusColors[value] || "bg-[var(--ds-background-subtle)] text-[var(--ds-text-secondary)]";
   return (
     <Badge className={`text-[10px] font-medium ${colors} ${className}`}>
       {formatLabel(value)}

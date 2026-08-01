@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
+import { Branch } from "@radix-ui/react-dismissable-layer"
 import { Check, ChevronsUpDown, Search } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useFixedPosition, useOverlayDismiss, resolveOverlayLayer } from "@/lib/overlay"
@@ -86,12 +87,12 @@ export default function SearchableSelect({
       </Button>
       {open &&
         createPortal(
-          <div
+          <Branch
             id="searchable-select-popup"
             ref={popupRef}
             role="listbox"
             aria-label={placeholder}
-            style={position ? { top: position.top, left: position.left, width: position.width } : undefined}
+            style={{ pointerEvents: "auto", ...position }}
             onKeyDown={handleListKey}
             className={cn(
               "fixed overflow-hidden rounded-[var(--ds-radius-xl)] border border-[var(--ds-menu-border)] bg-[var(--ds-menu-bg)] shadow-[var(--ds-shadow-dropdown)]",
@@ -136,7 +137,7 @@ export default function SearchableSelect({
                 ))
               )}
             </div>
-          </div>,
+          </Branch>,
           document.body
         )}
     </div>

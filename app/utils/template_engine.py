@@ -3,12 +3,33 @@ from typing import Optional, Dict, Any
 from datetime import date, time
 
 
+class TemplateValidationError(ValueError):
+    def __init__(self, message: str, unresolved: Optional[list] = None):
+        super().__init__(message)
+        self.unresolved = list(unresolved or [])
+
+
 class TemplateEngine:
     VARIABLE_PATTERN = re.compile(r"\{\{(\w+)\}\}")
+    UNRESOLVED_PATTERN = re.compile(r"\{\{[^}]*\}\}")
 
     @staticmethod
     def get_variables(template: str) -> list[str]:
         return TemplateEngine.VARIABLE_PATTERN.findall(template)
+
+    @staticmethod
+    def find_unresolved(template: str) -> list[str]:
+        return TemplateEngine.UNRESOLVED_PATTERN.findall(template)
+
+    @staticmethod
+    def assert_resolved(template: str) -> None:
+        unresolved = TemplateEngine.find_unresolved(template)
+        if unresolved:
+            raise TemplateValidationError(
+                f"Message contains unresolved variables: {', '.join(unresolved)}. "
+                f"Resolve or remove them before sending.",
+                unresolved=unresolved,
+            )
 
     @staticmethod
     def validate_variables(template: str) -> dict[str, list[str]]:
@@ -30,6 +51,12 @@ class TemplateEngine:
             key = m.group(1)
             return variables.get(key, m.group(0))
         return TemplateEngine.VARIABLE_PATTERN.sub(replacer, template)
+
+    @staticmethod
+    def render_strict(template: str, variables: Dict[str, str]) -> str:
+        rendered = TemplateEngine.render_template(template, variables)
+        TemplateEngine.assert_resolved(rendered)
+        return rendered
 
     @staticmethod
     def build_variables(

@@ -16,13 +16,22 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+def column_exists(table, column):
+    from sqlalchemy import inspect
+    bind = op.get_bind()
+    return column in [c["name"] for c in inspect(bind).get_columns(table)]
+
+
 def upgrade() -> None:
-    op.add_column('clinical_findings', sa.Column('dentition_type', sa.String(length=5), nullable=True))
-    op.add_column('clinical_findings', sa.Column('surface', sa.String(length=50), nullable=True))
-    op.add_column('clinical_findings', sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True))
+    if not column_exists('clinical_findings', 'dentition_type'):
+        op.add_column('clinical_findings', sa.Column('dentition_type', sa.String(length=5), nullable=True))
+    if not column_exists('clinical_findings', 'surface'):
+        op.add_column('clinical_findings', sa.Column('surface', sa.String(length=50), nullable=True))
+    if not column_exists('clinical_findings', 'updated_at'):
+        op.add_column('clinical_findings', sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True))
 
 
 def downgrade() -> None:
-    op.drop_column('clinical_findings', 'updated_at')
-    op.drop_column('clinical_findings', 'surface')
-    op.drop_column('clinical_findings', 'dentition_type')
+    for column in ('updated_at', 'surface', 'dentition_type'):
+        if column_exists('clinical_findings', column):
+            op.drop_column('clinical_findings', column)

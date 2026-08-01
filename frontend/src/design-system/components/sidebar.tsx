@@ -236,7 +236,7 @@ function NavItemInner({ item, isActive, isExpanded, isFavorite, onToggleFavorite
         "min-h-[var(--ds-sidebar-item-h)]",
         isExpanded ? "px-3" : "px-0 justify-center",
         isActive
-          ? "bg-[var(--ds-sidebar-active-bg)] text-[var(--ds-sidebar-text-active)] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+          ? "bg-[var(--ds-sidebar-active-bg)] text-[var(--ds-sidebar-text-active)]"
           : "text-[var(--ds-sidebar-text)] hover:bg-[var(--ds-sidebar-hover)] hover:text-white"
       )}
       title={!isExpanded ? item.label : undefined}
@@ -362,7 +362,6 @@ export default function EnterpriseSidebar() {
   const sidebarContent = (
     <div
       className="relative flex h-full flex-col overflow-hidden bg-[var(--ds-sidebar-bg)] text-[var(--ds-sidebar-text)] select-none"
-      style={{ backgroundImage: "var(--ds-sidebar-edge), var(--ds-sidebar-glow)" }}
     >
 
       {/* ═══ BRAND AREA ═══ */}

@@ -21,27 +21,6 @@ type DialogTemplateProps = {
   className?: string
 }
 
-function TemplateContent({
-  open,
-  onOpenChange,
-  title,
-  description,
-  children,
-  className,
-}: DialogTemplateProps) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={cn("w-full", className)} aria-describedby={description ? undefined : undefined}>
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          {description && <DialogDescription>{description}</DialogDescription>}
-        </DialogHeader>
-        {children && <DialogBody>{children}</DialogBody>}
-      </DialogContent>
-    </Dialog>
-  )
-}
-
 interface ConfirmDialogProps extends DialogTemplateProps {
   tone?: "primary" | "danger" | "success" | "warning"
   confirmLabel?: string

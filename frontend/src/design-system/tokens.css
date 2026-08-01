@@ -1,30 +1,33 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    DESIGN SYSTEM TOKENS  —  NuShine Enterprise Dental Platform
-   Version 3.0  ·  August 2026  ·  Enterprise Healthcare Design Language
+   Version 3.1  ·  August 2026  ·  Executive Healthcare Design Language
 
    Color strategy
    ──────────────
    · All raw hex lives HERE. Components must only consume --ds-* semantic tokens.
-   · Primary  = "Marine Teal" — deep, premium healthcare teal (calm, clinical,
-     modern-dental). Strong CTAs carry white text at AA; the scale is tuned so
-     the 600 step anchors buttons and the 300/700 steps carry dark-mode UI.
-   · Secondary = "Steel Slate" — cool supporting tone for icons and neutrals.
-   · Accent   = "Champagne Gold" — reserved for premium highlights, active
+   · Primary  = "Executive Navy" — deep, authoritative navy (#1E3A5F). Strong
+     CTAs carry white text at 11.4:1; the scale is tuned so the 600 step
+     anchors buttons and the 300/700 steps carry dark-mode UI.
+   · Secondary = "Medical Teal" — calm clinical teal for supporting roles.
+   · Accent   = "Royal Indigo" — reserved for premium highlights, active
      states, billing and charts. Used sparingly.
-   · Neutrals = "Cool Canvas" — refined cool-grey canvas with a faint teal
-     undertone; every step is visibly separated from its neighbour so cards,
-     tables and dialogs layer instead of flattening, even after 8–10 hours.
+   · Neutrals = "Cool Slate" — refined blue-grey scaffold; every step is
+     visibly separated from its neighbour so cards, tables and dialogs layer
+     instead of flattening, even after 8–10 hours.
    · Status   = desaturated, WCAG AA-verified semantic families. Workflow
-     states are differentiated (completed = green, progress = teal, planned =
-     blue, pending = amber, cancelled = red) so no two statuses read alike.
-   · Dark theme is intentionally designed (not inverted) on teal-tinted deep
-     charcoal surfaces with brightened mid-tone text for AA compliance.
+     states are differentiated (completed = emerald, progress = navy, planned =
+     blue, pending = amber, cancelled = crimson) so no two statuses read alike.
+   · Chart    = one centralized semantic palette (revenue emerald, patients
+     blue, doctors purple, appointments teal, CRM orange, billing indigo,
+     cancelled muted red, pending amber) consumed via --ds-chart-*.
+   · Dark theme is intentionally designed (not inverted) on deep slate
+     surfaces with brightened mid-tone text for AA compliance.
 
    Tailwind v4 interop
    ───────────────────
    The @theme block at the bottom remaps Tailwind's default palette scales to
-   this system (gray/slate/zinc/neutral/stone → Warm Stone; blue/sky/cyan/
-   teal → Primary; red/rose/pink → Danger; green/emerald/lime → Success;
+   this system (gray/slate/zinc/neutral/stone → Cool Slate; blue/sky/cyan/
+   teal → Primary Navy; red/rose/pink → Danger; green/emerald/lime → Success;
    amber/yellow/orange → Warning; indigo/violet/purple/fuchsia → Plum).
    Because every mapping references --ds-* variables, the SAME mapping adapts
    automatically in dark mode — legacy pages inherit the full identity.
@@ -36,125 +39,141 @@
        RAW COLOR SCALES  —  light theme
        ───────────────────────────────────────────────────────────────────── */
 
-    /* Primary · Marine Teal (premium healthcare teal; calm, clinical, modern) */
-    --ds-primary-50:  #EEF7F6;
-    --ds-primary-100: #D8EFEC;
-    --ds-primary-200: #B3E0DC;
-    --ds-primary-300: #86CAC4;
-    --ds-primary-400: #4FAEA6;
-    --ds-primary-500: #258F87;
-    --ds-primary-600: #16736C;
-    --ds-primary-700: #125B56;
-    --ds-primary-800: #124A46;
-    --ds-primary-900: #113B38;
-    --ds-primary-950: #082320;
+    /* Primary · Executive Navy (deep, authoritative navy; the executive
+       anchor for CTAs, headers and identity. White on 600 = 11.4:1.) */
+    --ds-primary-50:  #EEF2F7;
+    --ds-primary-100: #DDE5EE;
+    --ds-primary-200: #BBCBDE;
+    --ds-primary-300: #94ABCB;
+    --ds-primary-400: #6A88AD;
+    --ds-primary-500: #466A92;
+    --ds-primary-600: #1E3A5F;
+    --ds-primary-700: #19334F;
+    --ds-primary-800: #152A41;
+    --ds-primary-900: #0F2034;
+    --ds-primary-950: #081527;
 
-    /* Secondary · Steel Slate (cool supporting tone) */
-    --ds-secondary-50:  #F3F6F9;
-    --ds-secondary-100: #E6EDF2;
-    --ds-secondary-200: #CFDAE3;
-    --ds-secondary-300: #ADC0CE;
-    --ds-secondary-400: #84A0B3;
-    --ds-secondary-500: #62839A;
-    --ds-secondary-600: #4E6B80;
-    --ds-secondary-700: #40586B;
-    --ds-secondary-800: #35495A;
-    --ds-secondary-900: #2C3C49;
-    --ds-secondary-950: #1B2730;
+    /* Secondary · Medical Teal (calm clinical teal for supporting roles) */
+    --ds-secondary-50:  #EFF7F6;
+    --ds-secondary-100: #D9EFEC;
+    --ds-secondary-200: #B4DFDA;
+    --ds-secondary-300: #8AC8C1;
+    --ds-secondary-400: #5BA8A0;
+    --ds-secondary-500: #2E8C84;
+    --ds-secondary-600: #0F766E;
+    --ds-secondary-700: #0E635D;
+    --ds-secondary-800: #0D4F4B;
+    --ds-secondary-900: #0C3F3C;
+    --ds-secondary-950: #062523;
 
-    /* Accent · Champagne Gold (deepened midtones for legible accents) */
-    --ds-accent-50:  #FBF7EE;
-    --ds-accent-100: #F6EDD6;
-    --ds-accent-200: #ECDAAC;
-    --ds-accent-300: #E0C27F;
-    --ds-accent-400: #D6A957;
-    --ds-accent-500: #C78F3E;
-    --ds-accent-600: #A87232;
-    --ds-accent-700: #875A2A;
-    --ds-accent-800: #6B4824;
-    --ds-accent-900: #553A1F;
-    --ds-accent-950: #302014;
+    /* Accent · Royal Indigo (premium highlight; reserved for active states,
+       billing, CRM accents and charts. Used sparingly.) */
+    --ds-accent-50:  #EFF0FD;
+    --ds-accent-100: #E0E3FB;
+    --ds-accent-200: #C7CDF7;
+    --ds-accent-300: #A5B0F2;
+    --ds-accent-400: #8188EA;
+    --ds-accent-500: #6468E0;
+    --ds-accent-600: #4F46E5;
+    --ds-accent-700: #4338CA;
+    --ds-accent-800: #3730A3;
+    --ds-accent-900: #312E81;
+    --ds-accent-950: #1E1B4B;
 
-    /* Neutral · Cool Canvas (teal-undertone; 500 = 4.65:1 tertiary text on
+    /* Neutral · Cool Slate (blue-grey scaffold; 500 = 4.9:1 tertiary text on
        white, every step visibly separated from its neighbour for layering) */
     --ds-neutral-0:   #FFFFFF;
-    --ds-neutral-25:  #FBFDFD;
-    --ds-neutral-50:  #F4F6F7;
-    --ds-neutral-100: #EBEFF1;
-    --ds-neutral-200: #DFE5E8;
-    --ds-neutral-300: #C7D0D4;
-    --ds-neutral-400: #A3AEB4;
-    --ds-neutral-500: #69767D;
-    --ds-neutral-600: #566269;
-    --ds-neutral-700: #414B51;
-    --ds-neutral-800: #2F373C;
-    --ds-neutral-900: #22292E;
-    --ds-neutral-950: #161B1F;
+    --ds-neutral-25:  #FFFFFF;
+    --ds-neutral-50:  #F5F7FA;
+    --ds-neutral-100: #EEF2F7;
+    --ds-neutral-150: #E2E8F0;
+    --ds-neutral-200: #E5E7EB;
+    --ds-neutral-300: #CBD5E1;
+    --ds-neutral-400: #94A3B8;
+    --ds-neutral-500: #64748B;
+    --ds-neutral-600: #475569;
+    --ds-neutral-700: #334155;
+    --ds-neutral-800: #1E293B;
+    --ds-neutral-900: #0F172A;
+    --ds-neutral-950: #0B1220;
 
-    /* Success · Clinic Green (yellow-green, distinct from brand teal) */
-    --ds-success-50:  #EFF7F0;
-    --ds-success-100: #DCEEE0;
-    --ds-success-200: #BBDDC5;
-    --ds-success-300: #8FC5A0;
-    --ds-success-400: #62A97A;
-    --ds-success-500: #3E8F5A;
-    --ds-success-600: #2F7A4B;
-    --ds-success-700: #2A6240;
-    --ds-success-800: #244F36;
-    --ds-success-900: #1F402C;
-    --ds-success-950: #10241A;
+    /* Success · Emerald (clear, trustworthy revenue/clinical green) */
+    --ds-success-50:  #ECFDF5;
+    --ds-success-100: #D1FAE5;
+    --ds-success-200: #A7F3D0;
+    --ds-success-300: #6EE7B7;
+    --ds-success-400: #34D399;
+    --ds-success-500: #10B981;
+    --ds-success-600: #059669;
+    --ds-success-700: #047857;
+    --ds-success-800: #065F46;
+    --ds-success-900: #064E3B;
+    --ds-success-950: #022C22;
 
-    /* Warning · Amber Ember */
-    --ds-warning-50:  #FCF8EE;
-    --ds-warning-100: #F9EED4;
-    --ds-warning-200: #F2DBA6;
-    --ds-warning-300: #E9C475;
-    --ds-warning-400: #E0AD4E;
-    --ds-warning-500: #D29134;
-    --ds-warning-600: #B57527;
-    --ds-warning-700: #935A21;
-    --ds-warning-800: #764A20;
-    --ds-warning-900: #603C1D;
-    --ds-warning-950: #38210F;
+    /* Warning · Amber */
+    --ds-warning-50:  #FFFBEB;
+    --ds-warning-100: #FEF3C7;
+    --ds-warning-200: #FDE68A;
+    --ds-warning-300: #FCD34D;
+    --ds-warning-400: #FBBF24;
+    --ds-warning-500: #F59E0B;
+    --ds-warning-600: #D97706;
+    --ds-warning-700: #B45309;
+    --ds-warning-800: #92400E;
+    --ds-warning-900: #78350F;
+    --ds-warning-950: #451A03;
 
-    /* Danger · Clinic Red */
-    --ds-danger-50:  #FBF1F1;
-    --ds-danger-100: #F6DFDF;
-    --ds-danger-200: #ECBCBC;
-    --ds-danger-300: #DE9191;
-    --ds-danger-400: #CF6A6A;
-    --ds-danger-500: #BD4A4A;
-    --ds-danger-600: #A83A3A;
-    --ds-danger-700: #8B3030;
-    --ds-danger-800: #702828;
-    --ds-danger-900: #582222;
-    --ds-danger-950: #321313;
+    /* Danger · Executive Crimson */
+    --ds-danger-50:  #FEF2F2;
+    --ds-danger-100: #FEE2E2;
+    --ds-danger-200: #FECACA;
+    --ds-danger-300: #FCA5A5;
+    --ds-danger-400: #F87171;
+    --ds-danger-500: #EF4444;
+    --ds-danger-600: #DC2626;
+    --ds-danger-700: #B91C1C;
+    --ds-danger-800: #991B1B;
+    --ds-danger-900: #7F1D1D;
+    --ds-danger-950: #450A0A;
 
-    /* Info · Azure Sky (supporting tech blue — distinct from brand teal) */
-    --ds-info-50:  #EEF5FB;
-    --ds-info-100: #D9E9F7;
-    --ds-info-200: #B3D3EE;
-    --ds-info-300: #84B6E2;
-    --ds-info-400: #5598D3;
-    --ds-info-500: #307DBE;
-    --ds-info-600: #2466A3;
-    --ds-info-700: #205386;
-    --ds-info-800: #1E446C;
-    --ds-info-900: #1B3958;
-    --ds-info-950: #102138;
+    /* Info · Professional Blue (supporting tech blue, distinct from navy) */
+    --ds-info-50:  #EFF6FF;
+    --ds-info-100: #DBEAFE;
+    --ds-info-200: #BFDBFE;
+    --ds-info-300: #93C5FD;
+    --ds-info-400: #60A5FA;
+    --ds-info-500: #3B82F6;
+    --ds-info-600: #2563EB;
+    --ds-info-700: #1D4ED8;
+    --ds-info-800: #1E40AF;
+    --ds-info-900: #1E3A8A;
+    --ds-info-950: #172554;
 
-    /* Plum · Graphite Violet (CRM / coordination, used sparingly) */
-    --ds-plum-50:  #F5F3F9;
-    --ds-plum-100: #EBE7F2;
-    --ds-plum-200: #D8D1E6;
-    --ds-plum-300: #BCB0D2;
-    --ds-plum-400: #9B8BB9;
-    --ds-plum-500: #7D6C9E;
-    --ds-plum-600: #67598A;
-    --ds-plum-700: #534872;
-    --ds-plum-800: #42395C;
-    --ds-plum-900: #342E48;
-    --ds-plum-950: #1D1A2A;
+    /* Plum · Graphite Violet (CRM / doctor coordination, used sparingly) */
+    --ds-plum-50:  #F5F3FF;
+    --ds-plum-100: #EDE9FE;
+    --ds-plum-200: #DDD6FE;
+    --ds-plum-300: #C4B5FD;
+    --ds-plum-400: #A78BFA;
+    --ds-plum-500: #8B5CF6;
+    --ds-plum-600: #7C3AED;
+    --ds-plum-700: #6D28D9;
+    --ds-plum-800: #5B21B6;
+    --ds-plum-900: #4C1D95;
+    --ds-plum-950: #2E1065;
+
+    /* Orange · CRM (distinct warm hue for leads/marketing channels) */
+    --ds-orange-50:  #FFF7ED;
+    --ds-orange-100: #FFEDD5;
+    --ds-orange-200: #FED7AA;
+    --ds-orange-300: #FDBA74;
+    --ds-orange-400: #FB923C;
+    --ds-orange-500: #F97316;
+    --ds-orange-600: #EA580C;
+    --ds-orange-700: #C2410C;
+    --ds-orange-800: #9A3412;
+    --ds-orange-900: #7C2D12;
+    --ds-orange-950: #431407;
 
     /* ─────────────────────────────────────────────────────────────────────
        BRAND  —  semantic tokens (WCAG AA: white on primary-600 = 5.65:1,
@@ -179,7 +198,7 @@
     --ds-accent-active: var(--ds-accent-800);
     --ds-accent-subtle: var(--ds-accent-50);
     --ds-accent-light: var(--ds-accent-100);
-    --ds-accent-foreground: var(--ds-accent-950);
+    --ds-accent-foreground: #FFFFFF;
 
     /* ─────────────────────────────────────────────────────────────────────
        BACKGROUNDS
@@ -187,7 +206,7 @@
     --ds-background: var(--ds-neutral-50);
     --ds-background-elevated: var(--ds-neutral-25);
     --ds-background-subtle: var(--ds-neutral-100);
-    --ds-background-overlay: rgba(8, 29, 28, 0.55);
+    --ds-background-overlay: rgba(15, 23, 42, 0.55);
 
     /* ─────────────────────────────────────────────────────────────────────
        SURFACES
@@ -217,10 +236,10 @@
        BORDERS
        ───────────────────────────────────────────────────────────────────── */
     --ds-border: var(--ds-neutral-200);
-    --ds-border-light: var(--ds-neutral-100);
+    --ds-border-light: var(--ds-neutral-150);
     --ds-border-hover: var(--ds-neutral-300);
     --ds-border-strong: var(--ds-neutral-300);
-    --ds-border-subtle: var(--ds-neutral-100);
+    --ds-border-subtle: var(--ds-neutral-150);
     --ds-focus-ring: var(--ds-primary-500);
 
     /* ─────────────────────────────────────────────────────────────────────
@@ -231,8 +250,8 @@
     --ds-success-subtle: var(--ds-success-50);
     --ds-success-foreground: #FFFFFF;
 
-    --ds-warning: var(--ds-warning-700);
-    --ds-warning-hover: var(--ds-warning-800);
+    --ds-warning: var(--ds-warning-600);
+    --ds-warning-hover: var(--ds-warning-700);
     --ds-warning-subtle: var(--ds-warning-50);
     --ds-warning-foreground: #FFFFFF;
 
@@ -307,8 +326,8 @@
     --ds-domain-billing-subtle: var(--ds-accent-50);
     --ds-domain-case: var(--ds-secondary-500);
     --ds-domain-case-subtle: var(--ds-secondary-50);
-    --ds-domain-crm: var(--ds-plum-500);
-    --ds-domain-crm-subtle: var(--ds-plum-50);
+    --ds-domain-crm: var(--ds-orange-600);
+    --ds-domain-crm-subtle: var(--ds-orange-50);
     --ds-domain-prescription: var(--ds-warning-500);
     --ds-domain-prescription-subtle: var(--ds-warning-50);
 
@@ -333,60 +352,62 @@
     --ds-role-patient-subtle: var(--ds-primary-50);
 
     /* ─────────────────────────────────────────────────────────────────────
-       CHART PALETTE  —  color-blind informed, 8 series max
+       CHART PALETTE  —  centralized semantic series (revenue emerald,
+       patients blue, doctors purple, appointments teal, CRM orange, billing
+       indigo, cancelled muted red, pending amber). Color-blind informed.
        ───────────────────────────────────────────────────────────────────── */
-    --ds-chart-1: var(--ds-primary-500);
-    --ds-chart-1-tint: var(--ds-primary-100);
-    --ds-chart-2: var(--ds-accent-500);
-    --ds-chart-2-tint: var(--ds-accent-100);
-    --ds-chart-3: var(--ds-info-500);
-    --ds-chart-3-tint: var(--ds-info-100);
-    --ds-chart-4: var(--ds-success-500);
-    --ds-chart-4-tint: var(--ds-success-100);
-    --ds-chart-5: var(--ds-plum-500);
-    --ds-chart-5-tint: var(--ds-plum-100);
-    --ds-chart-6: var(--ds-warning-500);
-    --ds-chart-6-tint: var(--ds-warning-100);
-    --ds-chart-7: var(--ds-secondary-500);
-    --ds-chart-7-tint: var(--ds-secondary-100);
-    --ds-chart-8: var(--ds-danger-500);
-    --ds-chart-8-tint: var(--ds-danger-100);
-    --ds-chart-9: var(--ds-secondary-600);
-    --ds-chart-9-tint: var(--ds-secondary-100);
-    --ds-chart-10: var(--ds-plum-400);
+    --ds-chart-1: var(--ds-success-600);
+    --ds-chart-1-tint: var(--ds-success-100);
+    --ds-chart-2: var(--ds-info-600);
+    --ds-chart-2-tint: var(--ds-info-100);
+    --ds-chart-3: var(--ds-plum-600);
+    --ds-chart-3-tint: var(--ds-plum-100);
+    --ds-chart-4: var(--ds-secondary-600);
+    --ds-chart-4-tint: var(--ds-secondary-100);
+    --ds-chart-5: var(--ds-orange-600);
+    --ds-chart-5-tint: var(--ds-orange-100);
+    --ds-chart-6: var(--ds-accent-600);
+    --ds-chart-6-tint: var(--ds-accent-100);
+    --ds-chart-7: var(--ds-danger-400);
+    --ds-chart-7-tint: var(--ds-danger-100);
+    --ds-chart-8: var(--ds-warning-500);
+    --ds-chart-8-tint: var(--ds-warning-100);
+    --ds-chart-9: var(--ds-primary-600);
+    --ds-chart-9-tint: var(--ds-primary-100);
+    --ds-chart-10: var(--ds-plum-500);
     --ds-chart-10-tint: var(--ds-plum-100);
-    --ds-chart-11: var(--ds-info-400);
+    --ds-chart-11: var(--ds-info-500);
     --ds-chart-11-tint: var(--ds-info-100);
-    --ds-chart-12: var(--ds-warning-400);
+    --ds-chart-12: var(--ds-warning-600);
     --ds-chart-12-tint: var(--ds-warning-100);
-    --ds-chart-13: var(--ds-danger-400);
+    --ds-chart-13: var(--ds-danger-500);
     --ds-chart-13-tint: var(--ds-danger-100);
-    --ds-chart-14: var(--ds-success-400);
+    --ds-chart-14: var(--ds-success-500);
     --ds-chart-14-tint: var(--ds-success-100);
-    --ds-chart-15: var(--ds-accent-400);
+    --ds-chart-15: var(--ds-accent-500);
     --ds-chart-15-tint: var(--ds-accent-100);
-    --ds-chart-16: var(--ds-primary-300);
+    --ds-chart-16: var(--ds-primary-500);
     --ds-chart-16-tint: var(--ds-primary-100);
 
     /* ─────────────────────────────────────────────────────────────────────
-       SIDEBAR  —  "Deep Marine" teal-tinted navy brand surface (both themes).
-       The teal undertone ties the rail to the Marine Teal identity while
-       the gold active indicator provides the premium warm accent.
+       SIDEBAR  —  "Executive Matte" charcoal-navy rail. Premium matte only:
+       no glass, gloss, neon or gradients. A solid Professional Blue active
+       pill with a subtle lighter-blue edge mark anchors the current section.
        ───────────────────────────────────────────────────────────────────── */
-    --ds-sidebar-bg: #0B1A1E;
-    --ds-sidebar-surface: #10242A;
-    --ds-sidebar-border: #1C3339;
-    --ds-sidebar-text: #90A6AB;
-    --ds-sidebar-text-active: #F2F8F8;
-    --ds-sidebar-hover: rgba(255, 255, 255, 0.06);
-    --ds-sidebar-active-bg: rgba(255, 255, 255, 0.09);
-    --ds-sidebar-active-indicator: var(--ds-accent);
-    --ds-sidebar-icon: #65848A;
-    --ds-sidebar-icon-active: var(--ds-accent);
-    --ds-sidebar-glow: radial-gradient(120% 55% at 50% 0%, rgba(134, 202, 196, 0.10) 0%, rgba(134, 202, 196, 0.03) 42%, transparent 68%);
-    --ds-sidebar-edge: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 36%);
+    --ds-sidebar-bg: #1F2937;
+    --ds-sidebar-surface: #273549;
+    --ds-sidebar-border: #374151;
+    --ds-sidebar-text: #9CA3AF;
+    --ds-sidebar-text-active: #FFFFFF;
+    --ds-sidebar-hover: #273549;
+    --ds-sidebar-active-bg: #2563EB;
+    --ds-sidebar-active-indicator: #60A5FA;
+    --ds-sidebar-icon: #9CA3AF;
+    --ds-sidebar-icon-active: #FFFFFF;
+    --ds-sidebar-glow: transparent;
+    --ds-sidebar-edge: transparent;
     --ds-sidebar-logo-grad-1: #FFFFFF;
-    --ds-sidebar-logo-grad-2: #A8DCD6;
+    --ds-sidebar-logo-grad-2: #FFFFFF;
     --ds-sidebar-width: 252px;
     --ds-sidebar-collapsed-width: 64px;
     --ds-sidebar-brand-h: 56px;
@@ -395,12 +416,12 @@
     --ds-sidebar-section-gap: 20px;
     --ds-sidebar-padding-x: 10px;
 
-    /* ─── Header — white surface, brand accent edge + soft elevation ─── */
+    /* ─── Header — white surface, solid navy accent edge + soft elevation ─── */
     --ds-header-bg: var(--ds-surface);
     --ds-header-border: var(--ds-border);
     --ds-header-height: 50px;
-    --ds-header-accent: linear-gradient(90deg, var(--ds-primary-500) 0%, var(--ds-primary-600) 45%, var(--ds-accent-500) 130%);
-    --ds-header-shadow: 0 1px 0 rgba(22, 35, 38, 0.04), 0 1px 3px rgba(22, 35, 38, 0.03);
+    --ds-header-accent: var(--ds-primary-600);
+    --ds-header-shadow: 0 1px 0 rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.05);
 
     /* ─────────────────────────────────────────────────────────────────────
        COMPONENT COLOR MAPPINGS
@@ -410,7 +431,7 @@
     --ds-button-primary-fg: var(--ds-primary-foreground);
     /* Premium primary: inner top sheen + soft coloured glow that lifts the
        CTA off the canvas without shouting. */
-    --ds-button-primary-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 -1px 0 rgba(8, 35, 32, 0.16), 0 1px 2px rgba(8, 35, 32, 0.18), 0 2px 6px rgba(37, 143, 135, 0.20);
+    --ds-button-primary-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 -1px 0 rgba(8, 21, 39, 0.20), 0 1px 2px rgba(8, 21, 39, 0.18), 0 2px 6px rgba(30, 58, 95, 0.22);
     --ds-button-secondary-bg: var(--ds-surface);
     --ds-button-secondary-hover-bg: var(--ds-surface-hover);
     --ds-button-secondary-fg: var(--ds-text);
@@ -421,7 +442,7 @@
     --ds-button-ghost-hover-bg: var(--ds-surface-hover);
 
     /* Soft halo used by 2-step focus rings (inputs, tabs, triggers). */
-    --ds-focus-ring-alpha: rgba(37, 143, 135, 0.16);
+    --ds-focus-ring-alpha: rgba(30, 58, 95, 0.16);
 
     --ds-input-bg: var(--ds-surface);
     --ds-input-text: var(--ds-text);
@@ -451,9 +472,9 @@
     /* ─────────────────────────────────────────────────────────────────────
        HERO GRADIENTS  —  premium page-identity gradients (token-driven)
        ───────────────────────────────────────────────────────────────────── */
-    --ds-hero-gradient: linear-gradient(135deg, var(--ds-primary-600) 0%, var(--ds-primary-800) 55%, var(--ds-primary-950) 100%);
-    --ds-hero-gradient-accent: linear-gradient(135deg, var(--ds-primary-700) 0%, var(--ds-primary-900) 55%, var(--ds-accent-700) 135%);
-    --ds-hero-gradient-subtle: linear-gradient(135deg, var(--ds-primary-50) 0%, var(--ds-info-100) 55%, var(--ds-accent-50) 100%);
+    --ds-hero-gradient: linear-gradient(135deg, var(--ds-primary-600) 0%, var(--ds-primary-700) 55%, var(--ds-primary-950) 100%);
+    --ds-hero-gradient-accent: linear-gradient(135deg, var(--ds-primary-600) 0%, var(--ds-accent-900) 55%, var(--ds-accent-950) 135%);
+    --ds-hero-gradient-subtle: linear-gradient(135deg, var(--ds-neutral-100) 0%, var(--ds-info-50) 55%, var(--ds-accent-50) 100%);
     --ds-hero-grid: linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
                     linear-gradient(90deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
 
@@ -568,8 +589,8 @@
        ───────────────────────────────────────────────────────────────────── */
 
     /* ── Families ── */
-    --ds-font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
-    --ds-font-family-heading: 'Plus Jakarta Sans', 'DM Sans', system-ui, sans-serif;
+    --ds-font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    --ds-font-family-heading: 'Inter', system-ui, -apple-system, sans-serif;
     --ds-font-family-mono: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
 
     /* ── Primitive: size scale (closed set — 11 steps) ── */
@@ -885,9 +906,9 @@
     --ds-shadow-card: 0 0 0 1px rgba(23, 42, 48, 0.03), 0 1px 2px rgba(23, 42, 48, 0.04), 0 2px 8px rgba(23, 42, 48, 0.05);
     --ds-shadow-card-hover: 0 0 0 1px rgba(23, 42, 48, 0.04), 0 4px 14px rgba(23, 42, 48, 0.10);
 
-    /* ─── App canvas wash — faint teal halo at the top of the workspace so the
-       page never reads as flat grey; stays comfortably subtle for 8–10h use ─── */
-    --ds-app-wash: radial-gradient(120% 55% at 50% 0%, color-mix(in oklab, var(--ds-primary-100) 45%, transparent) 0%, color-mix(in oklab, var(--ds-primary-50) 18%, transparent) 46%, transparent 70%);
+    /* ─── App canvas — flat matte workspace. Gradients are reserved for hero,
+       welcome, brand and premium CTA moments only (see hero-gradient-*). ─── */
+    --ds-app-wash: transparent;
 
     /* ═════════════════════════════════════════════════════════════════════
        MOTION
@@ -1073,120 +1094,133 @@
   }
 
   /* ═══════════════════════════════════════════════════════════════════════════
-     DARK THEME  —  intentionally designed, not inverted
-     Warm charcoal surfaces · marine midnight · brightened mid-tone text
+   DARK THEME  —  intentionally designed, not inverted
+   Deep slate surfaces · executive navy · brightened mid-tone text
      ═══════════════════════════════════════════════════════════════════════════ */
   .dark {
-    /* Raw scales shift darker; same 50 → 950 orientation (50 lightest) */
-     --ds-primary-50:  #E7F4F2;
-     --ds-primary-100: #C9E9E5;
-     --ds-primary-200: #A1D6D0;
-     --ds-primary-300: #7AC1BA;
-     --ds-primary-400: #55A8A0;
-     --ds-primary-500: #3C8B84;
-     --ds-primary-600: #2E726C;
-     --ds-primary-700: #285B57;
-     --ds-primary-800: #224744;
-     --ds-primary-900: #1A3332;
-     --ds-primary-950: #0D2020;
+    /* Raw scales shift brighter; same 50 → 950 orientation (50 lightest) */
+     --ds-primary-50:  #EEF3F9;
+     --ds-primary-100: #DDE6F0;
+     --ds-primary-200: #B9C9E0;
+     --ds-primary-300: #94ABCB;
+     --ds-primary-400: #6487B5;
+     --ds-primary-500: #466A92;
+     --ds-primary-600: #2E5180;
+     --ds-primary-700: #1E3A5F;
+     --ds-primary-800: #163050;
+     --ds-primary-900: #102641;
+     --ds-primary-950: #0A1829;
 
-    --ds-secondary-50:  #EEF2F6;
-    --ds-secondary-100: #D8E0E9;
-    --ds-secondary-200: #B3C1D0;
-    --ds-secondary-300: #8FA1B3;
-    --ds-secondary-400: #6F8295;
-    --ds-secondary-500: #566778;
-    --ds-secondary-600: #435061;
-    --ds-secondary-700: #343E4B;
-    --ds-secondary-800: #292F38;
-    --ds-secondary-900: #202429;
-    --ds-secondary-950: #171A1F;
+    --ds-secondary-50:  #EDF7F6;
+    --ds-secondary-100: #D6EEEA;
+    --ds-secondary-200: #AFDCD5;
+    --ds-secondary-300: #82C4BB;
+    --ds-secondary-400: #55A79E;
+    --ds-secondary-500: #2E8B82;
+    --ds-secondary-600: #167069;
+    --ds-secondary-700: #0F766E;
+    --ds-secondary-800: #0B514D;
+    --ds-secondary-900: #0A3F3C;
+    --ds-secondary-950: #062624;
 
-    --ds-accent-50:  #F7EFDE;
-    --ds-accent-100: #EDDDB5;
-    --ds-accent-200: #DCC48C;
-    --ds-accent-300: #C4A66B;
-    --ds-accent-400: #A4884E;
-    --ds-accent-500: #846C3A;
-    --ds-accent-600: #66542C;
-    --ds-accent-700: #4F4223;
-    --ds-accent-800: #3C331D;
-    --ds-accent-900: #2C2616;
-    --ds-accent-950: #1D190F;
+    --ds-accent-50:  #EFF0FE;
+    --ds-accent-100: #E0E3FC;
+    --ds-accent-200: #C5CBF8;
+    --ds-accent-300: #A6AEF2;
+    --ds-accent-400: #848BE9;
+    --ds-accent-500: #656ADF;
+    --ds-accent-600: #4F46E5;
+    --ds-accent-700: #4338CA;
+    --ds-accent-800: #3730A3;
+    --ds-accent-900: #312E81;
+    --ds-accent-950: #1E1B4B;
 
      --ds-neutral-0:   #FFFFFF;
-     --ds-neutral-25:  #161C1E;
-     --ds-neutral-50:  #101617;
-     --ds-neutral-100: #171E20;
-     --ds-neutral-200: #1F282B;
-     --ds-neutral-300: #283336;
-     --ds-neutral-400: #384447;
-     --ds-neutral-500: #505D61;
-     --ds-neutral-600: #7A8689;
-     --ds-neutral-700: #9AA5A8;
-     --ds-neutral-800: #C6CED0;
-     --ds-neutral-900: #E8EDEE;
-     --ds-neutral-950: #F6FAFA;
+     --ds-neutral-25:  #111827;
+     --ds-neutral-50:  #0F172A;
+     --ds-neutral-100: #111827;
+     --ds-neutral-150: #16202F;
+     --ds-neutral-200: #1E293B;
+     --ds-neutral-300: #273549;
+     --ds-neutral-400: #334155;
+     --ds-neutral-500: #475569;
+     --ds-neutral-600: #64748B;
+     --ds-neutral-700: #94A3B8;
+     --ds-neutral-800: #CBD5E1;
+     --ds-neutral-900: #F8FAFC;
+     --ds-neutral-950: #FFFFFF;
 
-     --ds-success-50:  #0F1E14;
-     --ds-success-100: #13281B;
-     --ds-success-200: #1A3524;
-     --ds-success-300: #224530;
-     --ds-success-400: #2C5A3E;
-     --ds-success-500: #3A7550;
-     --ds-success-600: #50946A;
-     --ds-success-700: #7CBB98;
-     --ds-success-800: #A6D7BD;
-     --ds-success-900: #D2EBDD;
-     --ds-success-950: #EFF8F3;
+     --ds-success-50:  #022C22;
+     --ds-success-100: #043628;
+     --ds-success-200: #06432F;
+     --ds-success-300: #075438;
+     --ds-success-400: #0A6A46;
+     --ds-success-500: #059669;
+     --ds-success-600: #2FAF7C;
+     --ds-success-700: #6BC99C;
+     --ds-success-800: #A6E3C1;
+     --ds-success-900: #D4F2E1;
+     --ds-success-950: #F1FAF5;
 
-    --ds-warning-50:  #221C12;
-    --ds-warning-100: #2B2315;
-    --ds-warning-200: #372C1A;
-    --ds-warning-300: #47391F;
-    --ds-warning-400: #5C4B28;
-    --ds-warning-500: #796432;
-    --ds-warning-600: #9C813E;
-    --ds-warning-700: #BEA252;
-    --ds-warning-800: #D9C27E;
-    --ds-warning-900: #EBDBA8;
-    --ds-warning-950: #F8F2DE;
+    --ds-warning-50:  #2B1003;
+    --ds-warning-100: #3A1703;
+    --ds-warning-200: #4D2005;
+    --ds-warning-300: #632D08;
+    --ds-warning-400: #7C3D0B;
+    --ds-warning-500: #D97706;
+    --ds-warning-600: #F59E0B;
+    --ds-warning-700: #FBBF24;
+    --ds-warning-800: #FCD34D;
+    --ds-warning-900: #FDE68A;
+    --ds-warning-950: #FFFBEB;
 
-    --ds-danger-50:  #211414;
-    --ds-danger-100: #2B1A1A;
-    --ds-danger-200: #382020;
-    --ds-danger-300: #4A2A2A;
-    --ds-danger-400: #623737;
-    --ds-danger-500: #7E4545;
-    --ds-danger-600: #9E5858;
-    --ds-danger-700: #C88585;
-    --ds-danger-800: #D89E9E;
-    --ds-danger-900: #E9C6C6;
-    --ds-danger-950: #F8ECEC;
+    --ds-danger-50:  #2A0606;
+    --ds-danger-100: #3B0A0A;
+    --ds-danger-200: #4D0F0F;
+    --ds-danger-300: #631717;
+    --ds-danger-400: #7C2020;
+    --ds-danger-500: #DC2626;
+    --ds-danger-600: #EF4444;
+    --ds-danger-700: #F87171;
+    --ds-danger-800: #FCA5A5;
+    --ds-danger-900: #FECACA;
+    --ds-danger-950: #FEF2F2;
 
-     --ds-info-50:  #0E1B29;
-     --ds-info-100: #132233;
-     --ds-info-200: #192E45;
-     --ds-info-300: #213D5B;
-     --ds-info-400: #2A5077;
-     --ds-info-500: #386797;
-     --ds-info-600: #4F83B4;
-     --ds-info-700: #7CA9D1;
-     --ds-info-800: #ACCCE6;
-     --ds-info-900: #D6E6F3;
-     --ds-info-950: #F0F6FB;
+     --ds-info-50:  #0A1628;
+     --ds-info-100: #10213C;
+     --ds-info-200: #162D51;
+     --ds-info-300: #1D3B6E;
+     --ds-info-400: #1E4FA3;
+     --ds-info-500: #2563EB;
+     --ds-info-600: #4D85F2;
+     --ds-info-700: #7FA8F6;
+     --ds-info-800: #ACC9F9;
+     --ds-info-900: #D4E3FC;
+     --ds-info-950: #EFF5FE;
 
-    --ds-plum-50:  #1E1C2B;
-    --ds-plum-100: #252232;
-    --ds-plum-200: #2F2B3F;
-    --ds-plum-300: #3C3750;
-    --ds-plum-400: #4D4667;
-    --ds-plum-500: #615881;
-    --ds-plum-600: #7A6F9C;
-    --ds-plum-700: #9C90B8;
-    --ds-plum-800: #C0B8D4;
-    --ds-plum-900: #E0DCE9;
-    --ds-plum-950: #F2F0F6;
+    --ds-plum-50:  #1E0E4D;
+    --ds-plum-100: #291668;
+    --ds-plum-200: #351F84;
+    --ds-plum-300: #4329A0;
+    --ds-plum-400: #5436BD;
+    --ds-plum-500: #7C3AED;
+    --ds-plum-600: #9B5FF2;
+    --ds-plum-700: #B88FF6;
+    --ds-plum-800: #D2B9FA;
+    --ds-plum-900: #E8DCFC;
+    --ds-plum-950: #F6F1FE;
+
+    --ds-orange-50:  #260E03;
+    --ds-orange-100: #331607;
+    --ds-orange-200: #43200A;
+    --ds-orange-300: #572C0E;
+    --ds-orange-400: #6E3B12;
+    --ds-orange-500: #EA580C;
+    --ds-orange-600: #F97316;
+    --ds-orange-700: #FB923C;
+    --ds-orange-800: #FDBA74;
+    --ds-orange-900: #FED7AA;
+    --ds-orange-950: #FFF7ED;
 
     /* ─── Brand semantic ─── */
     --ds-primary: var(--ds-primary-300);
@@ -1322,8 +1356,8 @@
     --ds-domain-billing-subtle: var(--ds-accent-800);
     --ds-domain-case: var(--ds-secondary-300);
     --ds-domain-case-subtle: var(--ds-secondary-800);
-    --ds-domain-crm: var(--ds-plum-300);
-    --ds-domain-crm-subtle: var(--ds-plum-800);
+    --ds-domain-crm: var(--ds-orange-500);
+    --ds-domain-crm-subtle: var(--ds-orange-200);
     --ds-domain-prescription: var(--ds-warning-700);
     --ds-domain-prescription-subtle: var(--ds-warning-200);
 
@@ -1346,62 +1380,68 @@
     --ds-role-patient-subtle: var(--ds-primary-800);
 
     /* ─── Charts ─── */
-    --ds-chart-1: var(--ds-primary-400);
-    --ds-chart-1-tint: var(--ds-primary-800);
-    --ds-chart-2: var(--ds-accent-300);
-    --ds-chart-2-tint: var(--ds-accent-800);
-    --ds-chart-3: var(--ds-info-600);
-    --ds-chart-3-tint: var(--ds-info-200);
-    --ds-chart-4: var(--ds-success-600);
-    --ds-chart-4-tint: var(--ds-success-200);
-    --ds-chart-5: var(--ds-plum-300);
-    --ds-chart-5-tint: var(--ds-plum-800);
-    --ds-chart-6: var(--ds-warning-600);
-    --ds-chart-6-tint: var(--ds-warning-200);
-    --ds-chart-7: var(--ds-secondary-400);
-    --ds-chart-7-tint: var(--ds-secondary-800);
-    --ds-chart-8: var(--ds-danger-600);
-    --ds-chart-8-tint: var(--ds-danger-200);
-    --ds-chart-9: var(--ds-secondary-300);
-    --ds-chart-9-tint: var(--ds-secondary-800);
+    --ds-chart-1: var(--ds-success-600);
+    --ds-chart-1-tint: var(--ds-success-200);
+    --ds-chart-2: var(--ds-info-600);
+    --ds-chart-2-tint: var(--ds-info-200);
+    --ds-chart-3: var(--ds-plum-500);
+    --ds-chart-3-tint: var(--ds-plum-200);
+    --ds-chart-4: var(--ds-secondary-400);
+    --ds-chart-4-tint: var(--ds-secondary-800);
+    --ds-chart-5: var(--ds-orange-500);
+    --ds-chart-5-tint: var(--ds-orange-200);
+    --ds-chart-6: var(--ds-accent-400);
+    --ds-chart-6-tint: var(--ds-accent-800);
+    --ds-chart-7: var(--ds-danger-500);
+    --ds-chart-7-tint: var(--ds-danger-200);
+    --ds-chart-8: var(--ds-warning-500);
+    --ds-chart-8-tint: var(--ds-warning-200);
+    --ds-chart-9: var(--ds-primary-400);
+    --ds-chart-9-tint: var(--ds-primary-800);
     --ds-chart-10: var(--ds-plum-400);
-    --ds-chart-10-tint: var(--ds-plum-800);
-    --ds-chart-11: var(--ds-info-300);
+    --ds-chart-10-tint: var(--ds-plum-200);
+    --ds-chart-11: var(--ds-info-500);
     --ds-chart-11-tint: var(--ds-info-200);
-    --ds-chart-12: var(--ds-warning-400);
+    --ds-chart-12: var(--ds-warning-600);
     --ds-chart-12-tint: var(--ds-warning-200);
     --ds-chart-13: var(--ds-danger-400);
     --ds-chart-13-tint: var(--ds-danger-200);
     --ds-chart-14: var(--ds-success-500);
     --ds-chart-14-tint: var(--ds-success-200);
-    --ds-chart-15: var(--ds-accent-300);
+    --ds-chart-15: var(--ds-accent-400);
     --ds-chart-15-tint: var(--ds-accent-800);
-    --ds-chart-16: var(--ds-primary-200);
+    --ds-chart-16: var(--ds-primary-300);
     --ds-chart-16-tint: var(--ds-primary-800);
 
-    /* ─── Sidebar — deep marine ─── */
-     --ds-sidebar-bg: #09171B;
-     --ds-sidebar-surface: #0F2228;
-     --ds-sidebar-border: #1A3238;
-     --ds-sidebar-text: #8AA1A6;
-     --ds-sidebar-text-active: #F2F8F8;
-     --ds-sidebar-hover: rgba(255, 255, 255, 0.06);
-     --ds-sidebar-active-bg: rgba(255, 255, 255, 0.09);
-     --ds-sidebar-active-indicator: var(--ds-accent);
-     --ds-sidebar-icon: #5F7E84;
-     --ds-sidebar-icon-active: var(--ds-accent);
-     --ds-sidebar-glow: radial-gradient(120% 55% at 50% 0%, rgba(122, 193, 186, 0.10) 0%, rgba(122, 193, 186, 0.03) 42%, transparent 68%);
-     --ds-sidebar-edge: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 36%);
+    /* ─── Sidebar — executive matte charcoal-navy ─── */
+     --ds-sidebar-bg: #020617;
+     --ds-sidebar-surface: #111827;
+     --ds-sidebar-border: #1E293B;
+     --ds-sidebar-text: #94A3B8;
+     --ds-sidebar-text-active: #FFFFFF;
+     --ds-sidebar-hover: #1E293B;
+     --ds-sidebar-active-bg: #2563EB;
+     --ds-sidebar-active-indicator: #60A5FA;
+     --ds-sidebar-icon: #64748B;
+     --ds-sidebar-icon-active: #FFFFFF;
+     --ds-sidebar-glow: transparent;
+     --ds-sidebar-edge: transparent;
      --ds-sidebar-logo-grad-1: #FFFFFF;
-     --ds-sidebar-logo-grad-2: #A8DCD6;
+     --ds-sidebar-logo-grad-2: #FFFFFF;
+
+     /* ─── Header — deep slate surface, solid accent edge ─── */
+     --ds-header-bg: #111827;
+     --ds-header-border: var(--ds-border);
+     --ds-header-accent: var(--ds-primary-400);
+     --ds-header-shadow: 0 1px 0 rgba(0, 0, 0, 0.30), 0 1px 3px rgba(0, 0, 0, 0.25);
 
      /* ─── Component mappings ─── */
      --ds-tooltip-bg: var(--ds-neutral-900);
      --ds-tooltip-fg: var(--ds-neutral-50);
 
-     --ds-button-primary-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10), inset 0 -1px 0 rgba(0, 0, 0, 0.25), 0 1px 2px rgba(0, 0, 0, 0.30);
-     --ds-focus-ring-alpha: rgba(122, 193, 186, 0.18);
-     --ds-app-wash: radial-gradient(120% 55% at 50% 0%, color-mix(in oklab, var(--ds-primary-800) 42%, transparent) 0%, transparent 62%);
+     --ds-button-primary-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), inset 0 -1px 0 rgba(0, 0, 0, 0.28), 0 1px 2px rgba(0, 0, 0, 0.30), 0 2px 8px rgba(30, 58, 95, 0.28);
+     --ds-focus-ring-alpha: rgba(148, 171, 203, 0.20);
+     --ds-app-wash: transparent;
 
     --ds-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.25);
     --ds-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.25), 0 1px 2px rgba(0, 0, 0, 0.2);
@@ -1421,11 +1461,11 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    TAILWIND v4 PALETTE REMAP  —  brand scales replace default Tailwind colors.
    Plain :root overrides (unlayered) beat Tailwind's @layer theme defaults, so
-   utilities like bg-gray-500 resolve to var(--color-gray-500) → Warm Stone.
+   utilities like bg-gray-500 resolve to var(--color-gray-500) → Cool Slate.
    Every mapping references --ds-* so the SAME declaration adapts in dark mode.
    ═══════════════════════════════════════════════════════════════════════════ */
 :root {
-  /* Neutral families → Warm Stone */
+  /* Neutral families → Cool Slate */
   --color-gray-50: var(--ds-neutral-50);
   --color-gray-100: var(--ds-neutral-100);
   --color-gray-200: var(--ds-neutral-200);

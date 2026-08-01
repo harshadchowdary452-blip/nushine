@@ -16,10 +16,18 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+def column_exists(table, column):
+    from sqlalchemy import inspect
+    bind = op.get_bind()
+    return column in [c["name"] for c in inspect(bind).get_columns(table)]
+
+
 def upgrade() -> None:
-    op.add_column('follow_ups', sa.Column('interested_to_visit_again', sa.String(length=10), nullable=True))
+    if not column_exists('follow_ups', 'interested_to_visit_again'):
+        op.add_column('follow_ups', sa.Column('interested_to_visit_again', sa.String(length=10), nullable=True))
 
 
 def downgrade() -> None:
-    op.drop_column('follow_ups', 'interested_to_visit_again')
+    if column_exists('follow_ups', 'interested_to_visit_again'):
+        op.drop_column('follow_ups', 'interested_to_visit_again')
     # ### end Alembic commands ###

@@ -468,80 +468,6 @@ export const whatsappV2Api = {
   confirmDelivery: (id: string) => api.post(`/whatsapp/confirm-delivery/${id}`).then((r) => r.data),
 }
 
-export const campaignsApi = {
-  list: (params?: { skip?: number; limit?: number; status?: string; campaign_type?: string }) =>
-    api.get("/campaigns", { params }).then((r) => r.data),
-  get: (id: string) => api.get(`/campaigns/${id}`).then((r) => r.data),
-  create: (data: Record<string, unknown>) => api.post("/campaigns", data).then((r) => r.data),
-  update: (id: string, data: Record<string, unknown>) =>
-    api.put(`/campaigns/${id}`, data).then((r) => r.data),
-  delete: (id: string) => api.delete(`/campaigns/${id}`).then((r) => r.data),
-  launch: (id: string) => api.post(`/campaigns/${id}/launch`).then((r) => r.data),
-  duplicate: (id: string) => api.post(`/campaigns/${id}/duplicate`).then((r) => r.data),
-  archive: (id: string) => api.post(`/campaigns/${id}/archive`).then((r) => r.data),
-  resend: (id: string) => api.post(`/campaigns/${id}/resend`).then((r) => r.data),
-  progress: (id: string) => api.get(`/campaigns/${id}/progress`).then((r) => r.data),
-  recipients: (id: string, params?: { skip?: number; limit?: number; status?: string }) =>
-    api.get(`/campaigns/${id}/recipients`, { params }).then((r) => r.data),
-  previewAudience: (data: {
-    target: string
-    filters?: Record<string, unknown>
-    hospital_id?: string
-  }) => api.post("/campaigns/preview-audience", data).then((r) => r.data),
-  recordResponse: (
-    campaignId: string,
-    recipientId: string,
-    data: { message: string; is_lead?: boolean },
-  ) =>
-    api
-      .post(`/campaigns/${campaignId}/recipients/${recipientId}/response`, data)
-      .then((r) => r.data),
-  responses: (params?: {
-    campaign_id?: string
-    search?: string
-    status?: string
-    skip?: number
-    limit?: number
-  }) => api.get("/campaigns/responses", { params }).then((r) => r.data),
-  convertLead: (
-    campaignId: string,
-    data: { lead_id: string; patient_data: Record<string, unknown> },
-  ) => api.post(`/campaigns/${campaignId}/convert-lead`, data).then((r) => r.data),
-  createAppointment: (
-    campaignId: string,
-    data: {
-      patient_id: string
-      doctor_id: string
-      appointment_date: string
-      appointment_time: string
-      notes?: string
-    },
-  ) => api.post(`/campaigns/${campaignId}/create-appointment`, data).then((r) => r.data),
-  availableDoctors: (params: { date: string; hospital_id?: string }) =>
-    api.get("/campaigns/available-doctors", { params }).then((r) => r.data),
-  analytics: {
-    overview: () => api.get("/campaigns/analytics/overview").then((r) => r.data),
-    detailed: () => api.get("/campaigns/analytics/detailed").then((r) => r.data),
-    retention: () => api.get("/campaigns/analytics/retention").then((r) => r.data),
-    followUpSuggestions: () =>
-      api.get("/campaigns/analytics/follow-up-suggestions").then((r) => r.data),
-    followUpCalendar: (start: string, end: string) =>
-      api
-        .get("/campaigns/analytics/follow-up-calendar", { params: { start, end } })
-        .then((r) => r.data),
-    patientInteractions: (patientId: string) =>
-      api.get(`/campaigns/analytics/patient-interactions/${patientId}`).then((r) => r.data),
-  },
-  roi: (campaignId: string) => api.get(`/campaigns/${campaignId}/roi`).then((r) => r.data),
-  dashboardWidgets: () => api.get("/campaigns/dashboard/widgets").then((r) => r.data),
-  patientTimeline: (patientId: string, campaignId?: string) =>
-    api
-      .get(`/campaigns/patients/${patientId}/timeline`, {
-        params: campaignId ? { campaign_id: campaignId } : {},
-      })
-      .then((r) => r.data),
-}
-
 export const whatsappConfigApi = {
   get: (hospitalId: string) => api.get(`/whatsapp-config/${hospitalId}`).then((r) => r.data),
   update: (hospitalId: string, data: Record<string, unknown>) =>
@@ -556,26 +482,6 @@ export const whatsappTemplatesApi = {
   update: (id: string, data: { name?: string; message?: string; is_active?: boolean }) =>
     api.put(`/crm/whatsapp-templates/${id}`, data).then((r) => r.data),
   delete: (id: string) => api.delete(`/crm/whatsapp-templates/${id}`).then((r) => r.data),
-}
-
-export const campaignTemplatesApi = {
-  list: (params?: { channel?: string; category?: string }) =>
-    api.get("/campaign-templates", { params }).then((r) => r.data),
-  get: (id: string) => api.get(`/campaign-templates/${id}`).then((r) => r.data),
-  create: (data: { name: string; channel: string; category: string; message: string }) =>
-    api.post("/campaign-templates", data).then((r) => r.data),
-  update: (
-    id: string,
-    data: {
-      name?: string
-      channel?: string
-      category?: string
-      message?: string
-      is_active?: boolean
-    },
-  ) => api.put(`/campaign-templates/${id}`, data).then((r) => r.data),
-  delete: (id: string) => api.delete(`/campaign-templates/${id}`).then((r) => r.data),
-  duplicate: (id: string) => api.post(`/campaign-templates/${id}/duplicate`).then((r) => r.data),
 }
 
 export const leadsApi = {
@@ -711,11 +617,6 @@ export const crmApi = {
   recalls: () => api.get("/crm/recalls").then((r) => r.data),
   patientFollowUpHistory: (patientId: string) =>
     api.get(`/crm/patients/${patientId}/follow-up-history`).then((r) => r.data),
-  campaignSendWhatsApp: (data: {
-    campaign_id: string
-    template_id?: string
-    custom_message?: string
-  }) => api.post("/crm/campaigns/send-whatsapp", data).then((r) => r.data),
   whatsappTemplates: {
     list: () => api.get("/crm/whatsapp-templates").then((r) => r.data),
     create: (data: { name: string; message: string }) =>
@@ -830,7 +731,6 @@ export const crmApi = {
       api.get("/crm/quick-view/converted-leads", { params }).then((r) => r.data),
     followUps: (params?: { period?: string; start_date?: string; end_date?: string }) =>
       api.get("/crm/quick-view/follow-ups", { params }).then((r) => r.data),
-    campaigns: () => api.get("/crm/quick-view/campaigns").then((r) => r.data),
     patientAcquisition: (params?: { period?: string; start_date?: string; end_date?: string }) =>
       api.get("/crm/quick-view/patient-acquisition", { params }).then((r) => r.data),
     leadSources: (params?: { period?: string; start_date?: string; end_date?: string }) =>
@@ -846,6 +746,16 @@ export const crmApi = {
     status?: string
     source?: string
   }) => api.get("/crm/enhanced-dashboard", { params }).then((r) => r.data),
+  commandCenter: (params?: {
+    period?: string
+    start_date?: string
+    end_date?: string
+    doctor?: string
+    source?: string
+    campaign?: string
+    staff?: string
+    lead_status?: string
+  }) => api.get("/crm/command-center", { params }).then((r) => r.data),
 }
 
 export const enquiriesApi = {
@@ -876,9 +786,9 @@ export const enquiriesApi = {
   ) => api.post(`/crm/enquiries/${id}/follow-ups`, data).then((r) => r.data),
   listFollowUps: (id: string) => api.get(`/crm/enquiries/${id}/follow-ups`).then((r) => r.data),
   getDetail: (id: string) => api.get(`/crm/enquiries/${id}/detail`).then((r) => r.data),
-  whatsappPreview: (id: string, templateId?: string) =>
+  whatsappPreview: (id: string, body?: { template_message?: string; template_id?: string }) =>
     api
-      .post(`/crm/enquiries/${id}/whatsapp-preview`, templateId ? { template_id: templateId } : {})
+      .post(`/crm/enquiries/${id}/whatsapp-preview`, body ?? {})
       .then((r) => r.data),
   calendar: (params: {
     start_date: string

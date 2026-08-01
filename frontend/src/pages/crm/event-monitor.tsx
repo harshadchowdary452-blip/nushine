@@ -102,7 +102,6 @@ const SOURCE_MODULES = [
   "TREATMENT",
   "BILLING",
   "WHATSAPP",
-  "CAMPAIGN",
   "LEAD",
   "ENQUIRY",
   "FOLLOW_UP",

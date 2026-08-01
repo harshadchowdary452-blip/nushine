@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react'
+import { X } from 'lucide-react'
 import {
   type ToothFinding,
   type ToothCondition,
@@ -255,7 +256,7 @@ export default function ToothGrid({
               <button onClick={() => setSelectedId(null)} style={{
                 width: 24, height: 24, borderRadius: '50%', border: '1px solid #E5E7EB',
                 background: '#FFF', cursor: 'pointer', fontSize: 12, color: '#6B7280', lineHeight: 1,
-              }}>✕</button>
+              }}><X size={12} /></button>
             </div>
           </div>
 
@@ -285,7 +286,7 @@ export default function ToothGrid({
                     </div>
                     <button onClick={() => removeFinding(f.id)} style={{
                       background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444', fontSize: 12, padding: '0 4px',
-                    }}>✕</button>
+                    }}><X size={13} /></button>
                   </div>
                 ))}
               </div>

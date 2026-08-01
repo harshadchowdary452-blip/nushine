@@ -176,6 +176,7 @@ export default function SuperAdminDashboard() {
     queryFn: () => dashboardApi.superAdmin(dashParams),
     staleTime: 30000,
     gcTime: 60000,
+    refetchInterval: 30000,
   })
 
   const { items: activityFeed, loading: activityLoading } = useDashboardActivity()

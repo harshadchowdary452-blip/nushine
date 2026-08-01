@@ -16,19 +16,39 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+def fk_exists(table, name):
+    from sqlalchemy import inspect
+    bind = op.get_bind()
+    return name in [fk["name"] for fk in inspect(bind).get_foreign_keys(table)]
+
+
+def column_nullable(table, column):
+    from sqlalchemy import inspect
+    bind = op.get_bind()
+    for c in inspect(bind).get_columns(table):
+        if c["name"] == column:
+            return c["nullable"]
+    return None
+
+
 def upgrade() -> None:
-    op.drop_constraint('billing_histories_billing_id_fkey', 'billing_histories', type_='foreignkey')
-    op.alter_column('billing_histories', 'billing_id',
-                    existing_type=sa.String(36),
-                    nullable=True)
-    op.create_foreign_key('billing_histories_billing_id_fkey', 'billing_histories', 'billings',
-                          ['billing_id'], ['id'], ondelete='SET NULL')
+    if not column_nullable('billing_histories', 'billing_id'):
+        if fk_exists('billing_histories', 'billing_histories_billing_id_fkey'):
+            op.drop_constraint('billing_histories_billing_id_fkey', 'billing_histories', type_='foreignkey')
+        op.alter_column('billing_histories', 'billing_id',
+                        existing_type=sa.String(36),
+                        nullable=True)
+    if not fk_exists('billing_histories', 'billing_histories_billing_id_fkey'):
+        op.create_foreign_key('billing_histories_billing_id_fkey', 'billing_histories', 'billings',
+                              ['billing_id'], ['id'], ondelete='SET NULL')
 
 
 def downgrade() -> None:
-    op.drop_constraint('billing_histories_billing_id_fkey', 'billing_histories', type_='foreignkey')
+    if fk_exists('billing_histories', 'billing_histories_billing_id_fkey'):
+        op.drop_constraint('billing_histories_billing_id_fkey', 'billing_histories', type_='foreignkey')
     op.alter_column('billing_histories', 'billing_id',
                     existing_type=sa.String(36),
                     nullable=False)
-    op.create_foreign_key('billing_histories_billing_id_fkey', 'billing_histories', 'billings',
-                          ['billing_id'], ['id'])
+    if not fk_exists('billing_histories', 'billing_histories_billing_id_fkey'):
+        op.create_foreign_key('billing_histories_billing_id_fkey', 'billing_histories', 'billings',
+                              ['billing_id'], ['id'])
