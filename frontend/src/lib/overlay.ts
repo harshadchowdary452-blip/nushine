@@ -47,12 +47,27 @@ export function useFixedPosition(
     const el = triggerRef.current
     if (!el) return
     const rect = el.getBoundingClientRect()
-    const popupWidth = popupRef?.current?.offsetWidth ?? 0
+    const popupEl = popupRef?.current ?? null
+    const popupWidth = popupEl?.offsetWidth ?? 0
+    const popupHeight = popupEl?.offsetHeight ?? 0
     const width = popupWidth || rect.width
-    let left = align === "end" ? rect.right - width : rect.left
     const margin = 8
+    let left = align === "end" ? rect.right - width : rect.left
     left = Math.max(margin, Math.min(left, window.innerWidth - width - margin))
-    setPosition({ top: rect.bottom + gap, left, width })
+
+    // Prefer opening below the trigger; flip above (or clamp on-screen) when the
+    // popup would overflow the viewport bottom — otherwise it becomes unreachable.
+    let top = rect.bottom + gap
+    if (popupHeight > 0) {
+      const fitsBelow = rect.bottom + gap + popupHeight <= window.innerHeight - margin
+      const fitsAbove = rect.top - gap - popupHeight >= margin
+      if (!fitsBelow) {
+        top = fitsAbove
+          ? rect.top - gap - popupHeight
+          : Math.max(margin, window.innerHeight - margin - popupHeight)
+      }
+    }
+    setPosition({ top, left, width })
   }, [gap, align, popupRef, triggerRef])
 
   useEffect(() => {

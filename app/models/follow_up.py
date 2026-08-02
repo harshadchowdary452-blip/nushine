@@ -53,8 +53,8 @@ class FollowUpOutcome(str, Enum):
 class FollowUp(Base):
     __tablename__ = "follow_ups"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    patient_id: Mapped[str] = mapped_column(String(36), ForeignKey("patients.id"), nullable=False)
-    hospital_id: Mapped[str] = mapped_column(String(36), ForeignKey("hospitals.id"), nullable=True)
+    patient_id: Mapped[str] = mapped_column(String(36), ForeignKey("patients.id"), nullable=False, index=True)
+    hospital_id: Mapped[str] = mapped_column(String(36), ForeignKey("hospitals.id"), nullable=True, index=True)
     doctor_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
     case_id: Mapped[str] = mapped_column(String(36), ForeignKey("cases.id"), nullable=True)
     appointment_id: Mapped[str] = mapped_column(String(36), ForeignKey("appointments.id"), nullable=True)
@@ -68,7 +68,7 @@ class FollowUp(Base):
     treatment_name: Mapped[str] = mapped_column(String(255), nullable=True)
     treatment_completed_date: Mapped[date] = mapped_column(Date, nullable=True)
     notes: Mapped[str] = mapped_column(Text, nullable=True)
-    status: Mapped[str] = mapped_column(String(20), default=FollowUpStatus.PENDING.value, server_default=FollowUpStatus.PENDING.value)
+    status: Mapped[str] = mapped_column(String(20), default=FollowUpStatus.PENDING.value, server_default=FollowUpStatus.PENDING.value, index=True)
     reminder_sent: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     completed_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_by: Mapped[str] = mapped_column(String(36), nullable=True)

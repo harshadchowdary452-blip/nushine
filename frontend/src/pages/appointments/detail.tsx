@@ -45,6 +45,7 @@ import { Separator } from "@/components/ui/separator"
 import { PageHeader } from "@/design-system"
 import { appointmentsApi, casesApi, doctorsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
+import { useTrackRecent } from "@/hooks/useTrackRecent"
 import type {
   AppointmentFullDetail,
   User as UserType,
@@ -132,6 +133,18 @@ export default function AppointmentDetail() {
     queryFn: () => appointmentsApi.fullDetail(id!),
     enabled: !!id,
   })
+
+  useTrackRecent(
+    "appointment",
+    detail?.appointment?.id,
+    detail,
+    (d) => d?.patient?.full_name || "Appointment",
+    (d) => {
+      const a = d?.appointment
+      if (!a) return undefined
+      return [a.appointment_date, a.appointment_time].filter(Boolean).join(" · ") || undefined
+    }
+  )
 
   const { data: doctors } = useQuery({
     queryKey: ["doctors", "reassign"],

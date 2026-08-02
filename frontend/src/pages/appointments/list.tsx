@@ -1,10 +1,10 @@
 import { useState, useMemo, useRef, useEffect } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import type { ColumnDef, SortingState } from "@tanstack/react-table"
 import {
   Plus, Search, Eye, Trash2, Calendar, List, ChevronLeft, ChevronRight,
-  CalendarDays, User as UserIcon, X, SlidersHorizontal,
+  CalendarDays, User as UserIcon, X,
 } from "lucide-react"
 import { format, eachDayOfInterval, startOfMonth, endOfMonth, getDay, isSameDay } from "date-fns"
 import { Button } from "@/components/ui/button"
@@ -17,15 +17,13 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { appointmentsApi, patientsApi, doctorsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
 import QuickExport from "@/components/ui/quick-export"
 import { useServerFilters } from "@/hooks/useServerFilters"
-import { FilterChips } from "@/components/ui/filter-bar"
 import AppointmentFilterBar from "./filter-bar"
 import AppointmentScheduler from "@/components/appointments/AppointmentScheduler"
-import { PageHeader, DataTable, StatusBadge } from "@/design-system"
+import { EnterpriseWorkspace, DataTable, StatusBadge, WorkflowSummaryPanel } from "@/design-system"
 import type { Appointment, Patient, User, PaginatedResponse } from "@/types"
 import { extractDetail } from "@/types"
 import { cn } from "@/lib/utils"
@@ -74,7 +72,9 @@ export default function AppointmentList() {
   const patientSearchRef = useRef<HTMLInputElement>(null)
   const [, setAvailability] = useState<{ available: boolean; current_count: number; max_allowed: number; message?: string } | null>(null)
   const [, setCheckingAvailability] = useState(false)
-  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
+  const [contextPatient, setContextPatient] = useState<Patient | null>(null)
+  const prefillHandledRef = useRef(false)
+  const [searchParams] = useSearchParams()
 
   useCreateParam(() => openDialog())
 
@@ -115,6 +115,11 @@ export default function AppointmentList() {
     return data?.total_pages || data?.pages || 1
   }, [data])
 
+  const totalCount = useMemo(() => {
+    if (Array.isArray(data)) return data.length
+    return data?.total ?? 0
+  }, [data])
+
   // Patient data for create dialog
   const { data: patientsData } = useQuery<PaginatedResponse<Patient>>({
     queryKey: ["patients", "dropdown"],
@@ -135,6 +140,22 @@ export default function AppointmentList() {
   }, [patients, patientSearch])
 
   const selectedPatient = useMemo(() => patients.find((p) => p.id === form.patient_id), [patients, form.patient_id])
+
+  // Context-aware forms: opening /appointments?patient_id=X (e.g. from a
+  // patient's "Schedule Appointment" action) auto-fills the patient and opens
+  // the create dialog with the inherited record.
+  useEffect(() => {
+    const pid = searchParams.get("patient_id")
+    if (!pid || prefillHandledRef.current) return
+    const patient = patients.find((p) => p.id === pid)
+    if (!patient) return
+    prefillHandledRef.current = true
+    setContextPatient(patient)
+    const doctorId = searchParams.get("doctor_id")
+    setForm((f) => ({ ...f, patient_id: pid, doctor_id: doctorId ?? f.doctor_id }))
+    setPatientSearch("")
+    setDialogOpen(true)
+  }, [searchParams, patients])
 
   useEffect(() => {
     if (form.doctor_id && form.appointment_date && form.appointment_time) {
@@ -176,6 +197,11 @@ export default function AppointmentList() {
   function confirmDelete(appointment: Appointment) { setDeletingAppointment(appointment); setDeleteDialogOpen(true) }
   function handleDelete() { if (deletingAppointment) deleteMutation.mutate(deletingAppointment.id) }
 
+  function applySavedFilters(saved: Record<string, string>) {
+    resetFilters()
+    for (const [k, v] of Object.entries(saved)) setFilter(k, v)
+  }
+
   const createMutation = useMutation({
     mutationFn: (data: Record<string, unknown>) => appointmentsApi.create(data),
     onSuccess: () => {
@@ -191,8 +217,8 @@ export default function AppointmentList() {
     },
   })
 
-  function resetForm() { setForm(getEmptyAppointmentForm()); setPatientSearch(""); setDialogOpen(false) }
-  function openDialog() { setForm(getEmptyAppointmentForm()); setPatientSearch(""); setDialogOpen(true) }
+  function resetForm() { setForm(getEmptyAppointmentForm()); setPatientSearch(""); setContextPatient(null); prefillHandledRef.current = false; setDialogOpen(false) }
+  function openDialog() { setForm(getEmptyAppointmentForm()); setPatientSearch(""); setContextPatient(null); setDialogOpen(true) }
   function handleDialogOpenChange(open: boolean) { if (!open) resetForm(); setDialogOpen(open) }
 
   const columns = useMemo<ColumnDef<Appointment>[]>(
@@ -282,66 +308,42 @@ export default function AppointmentList() {
   )
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Appointments" description="Manage appointments"
-        actions={<>
-          {currentUser?.role !== "DOCTOR" && (
+    <>
+      <EnterpriseWorkspace
+        title="Appointments"
+        description="Manage appointments"
+        headerActions={
+          currentUser?.role !== "DOCTOR" && (
             <Button onClick={openDialog}><Plus className="h-4 w-4" /> New Appointment</Button>
-          )}
+          )
+        }
+        toolbarActions={<>
+          <div className="flex items-center gap-2">
+            <Button variant={view === "list" ? "default" : "outline"} size="sm" onClick={() => setView("list")} aria-label="List view">
+              <List className="h-4 w-4" />
+            </Button>
+            <Button variant={view === "calendar" ? "default" : "outline"} size="sm" onClick={() => setView("calendar")} aria-label="Calendar view">
+              <Calendar className="h-4 w-4" />
+            </Button>
+          </div>
           <QuickExport module="appointments" label="appointments" />
         </>}
-      />
-
-      <Card>
-        <CardContent className="p-6">
-          {/* Mobile filter trigger */}
-          <div className="lg:hidden mb-4">
-            <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
-              <SheetTrigger asChild>
-                <Button variant="outline" className="w-full">
-                  <SlidersHorizontal className="h-4 w-4 mr-2" />
-                  Filters {activeFilters > 0 && `(${activeFilters})`}
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="w-[300px] sm:w-[360px] p-0">
-                <SheetHeader className="p-4 pb-2 border-b">
-                  <SheetTitle>Filters</SheetTitle>
-                </SheetHeader>
-                <div className="p-4 overflow-y-auto h-[calc(100%-60px)]">
-                  <AppointmentFilterBar
-                    filters={filters} setFilter={setFilter} resetFilters={resetFilters}
-                    activeCount={activeFilters} doctors={doctors}
-                  />
-                </div>
-              </SheetContent>
-            </Sheet>
-          </div>
-
-          {/* Desktop filter bar */}
-          <div className="hidden lg:block mb-4">
-            {FilterBarDesktop}
-          </div>
-
-          {/* Active filter chips */}
-          <div className="mb-4">
-            <FilterChips chips={activeChips} onRemove={(k) => setFilter(k, "")} onClearAll={resetFilters} />
-          </div>
-
-          {/* View toggle */}
-          <div className="flex items-center justify-end mb-4">
-            <div className="flex items-center gap-2">
-              <Button variant={view === "list" ? "default" : "outline"} size="sm" onClick={() => setView("list")}>
-                <List className="h-4 w-4" />
-              </Button>
-              <Button variant={view === "calendar" ? "default" : "outline"} size="sm" onClick={() => setView("calendar")}>
-                <Calendar className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Calendar View */}
-          {view === "calendar" && (
-            <div className="mb-6">
+        filters={{
+          fields: FilterBarDesktop,
+          chips: activeChips,
+          activeCount: activeFilters,
+          onRemoveChip: (k) => setFilter(k, ""),
+          onClearAll: resetFilters,
+          savedStorageKey: "appointments-list",
+          savedCurrent: filters,
+          onApplySaved: applySavedFilters,
+        }}
+        totalCount={totalCount}
+        totalLabel="appointments"
+      >
+        {view === "calendar" ? (
+          <Card>
+            <CardContent className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">{format(currentMonth, "MMMM yyyy")}</h3>
                 <div className="flex items-center gap-1">
@@ -378,50 +380,47 @@ export default function AppointmentList() {
                   )
                 })}
               </div>
-            </div>
-          )}
-
-          {/* List View */}
-          {view === "list" && (
-            <DataTable
-              key={queryKey}
-              columns={columns}
-              data={appointments}
-              loading={isLoading}
-              pagination
-              pageSize={10}
-              manualPagination
-              pageCount={totalPages}
-              onPageChange={(pageIndex) => setPage(pageIndex + 1)}
-              manualSorting
-              initialSorting={sortField ? [{ id: sortField, desc: sortDir === "desc" }] : []}
-              onSortingChange={handleSortingChange}
-              emptyIcon={CalendarDays}
-              emptyTitle="No appointments found"
-              emptyDescription={hasActiveFilters ? "Try adjusting your filters." : "Schedule your first appointment."}
-              emptyAction={
-                hasActiveFilters ? (
-                  <Button variant="outline" onClick={resetFilters}>Clear Filters</Button>
-                ) : currentUser?.role !== "DOCTOR" ? (
-                  <Button onClick={openDialog}><Plus className="h-4 w-4" /> New Appointment</Button>
-                ) : undefined
-              }
-              mobileCard={(row) => (
-                <div className="flex items-center justify-between gap-3">
-                  <div className="ds-min-w-0">
-                    <p className="ds-body font-medium text-[var(--ds-text)]">{row.patient_name || "—"}</p>
-                    <p className="ds-caption text-[var(--ds-text-secondary)]">
-                      {row.doctor_name || "—"} · {format(new Date(row.appointment_date), "dd MMM")} {row.appointment_time || ""}
-                    </p>
-                  </div>
-                  <StatusBadge status={row.status} />
+            </CardContent>
+          </Card>
+        ) : (
+          <DataTable
+            key={queryKey}
+            columns={columns}
+            data={appointments}
+            loading={isLoading}
+            pagination
+            pageSize={10}
+            manualPagination
+            pageCount={totalPages}
+            onPageChange={(pageIndex) => setPage(pageIndex + 1)}
+            manualSorting
+            initialSorting={sortField ? [{ id: sortField, desc: sortDir === "desc" }] : []}
+            onSortingChange={handleSortingChange}
+            emptyIcon={CalendarDays}
+            emptyTitle="No appointments found"
+            emptyDescription={hasActiveFilters ? "Try adjusting your filters." : "Schedule your first appointment."}
+            emptyAction={
+              hasActiveFilters ? (
+                <Button variant="outline" onClick={resetFilters}>Clear Filters</Button>
+              ) : currentUser?.role !== "DOCTOR" ? (
+                <Button onClick={openDialog}><Plus className="h-4 w-4" /> New Appointment</Button>
+              ) : undefined
+            }
+            mobileCard={(row) => (
+              <div className="flex items-center justify-between gap-3">
+                <div className="ds-min-w-0">
+                  <p className="ds-body font-medium text-[var(--ds-text)]">{row.patient_name || "—"}</p>
+                  <p className="ds-caption text-[var(--ds-text-secondary)]">
+                    {row.doctor_name || "—"} · {format(new Date(row.appointment_date), "dd MMM")} {row.appointment_time || ""}
+                  </p>
                 </div>
-              )}
-              onRowClick={(row) => navigate(`/appointments/${row.id}`)}
-            />
-          )}
-        </CardContent>
-      </Card>
+                <StatusBadge status={row.status} />
+              </div>
+            )}
+            onRowClick={(row) => navigate(`/appointments/${row.id}`)}
+          />
+        )}
+      </EnterpriseWorkspace>
 
       {/* Create Dialog */}
       <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
@@ -432,6 +431,19 @@ export default function AppointmentList() {
           </DialogHeader>
           <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
             <div className="overflow-y-auto px-6 py-4 space-y-4 flex-1">
+              {contextPatient && (
+                <WorkflowSummaryPanel
+                  title="Opened from patient context"
+                  items={[
+                    { label: "Patient", value: contextPatient.full_name },
+                    { label: "Phone", value: contextPatient.phone || "—" },
+                    { label: "Age", value: contextPatient.age ? `${contextPatient.age} yrs` : "—" },
+                    { label: "Appointment type", value: APPOINTMENT_TYPES.find((t) => t.value === form.appointment_type)?.label ?? form.appointment_type },
+                    { label: "Doctor", value: doctors.find((d) => d.id === form.doctor_id)?.full_name || "Not selected" },
+                    { label: "Date", value: form.appointment_date || "Not selected" },
+                  ]}
+                />
+              )}
               <div className="grid gap-2">
                 <Label>Patient</Label>
                 {selectedPatient ? (
@@ -566,6 +578,6 @@ export default function AppointmentList() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   )
 }

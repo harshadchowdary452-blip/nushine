@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
-import { Search, Command, History, ArrowRight, User, CalendarClock, FolderOpen, PhoneCall, Loader2 } from "lucide-react"
+import { Search, Command, History, ArrowRight, User, CalendarClock, FolderOpen, PhoneCall, Loader2, UserPlus, CalendarPlus, FolderPlus, ClipboardPlus, ClipboardList, Receipt, ListChecks, CalendarDays, Stethoscope, Building2, MessageSquare, ListTodo } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useAuthStore } from "@/store/authStore"
 import { useSearchStore } from "@/store/searchStore"
-import { patientsApi, appointmentsApi, casesApi, leadsApi } from "@/services/endpoints"
+import { useRecentItemsStore } from "@/store/recentItemsStore"
+import { patientsApi, appointmentsApi, casesApi, leadsApi, treatmentApi, doctorsApi, hospitalsApi, billingApi } from "@/services/endpoints"
 import type { Patient, Appointment, Case, Lead } from "@/types"
 
 const roleNav: Record<string, { label: string; path: string; keywords?: string[] }[]> = {
@@ -58,14 +59,54 @@ const roleNav: Record<string, { label: string; path: string; keywords?: string[]
 const RECENTS_KEY = "global-search-recents"
 const MAX_RECENTS = 5
 
+const ALL_ROLES = ["SUPER_ADMIN", "GROUP_ADMIN", "HOSPITAL_ADMIN", "DOCTOR"]
+const LEAD_ROLES = ["SUPER_ADMIN", "GROUP_ADMIN", "HOSPITAL_ADMIN"]
+
+interface QuickActionDef {
+  title: string
+  subtitle: string
+  path: string
+  icon: React.ElementType
+  keywords: string[]
+  roles?: string[]
+}
+
+const QUICK_ACTIONS: QuickActionDef[] = [
+  { title: "Create Patient", subtitle: "Register a new patient", path: "/patients", icon: UserPlus, keywords: ["new", "add", "register", "create"] },
+  { title: "New Appointment", subtitle: "Book an appointment", path: "/appointments", icon: CalendarPlus, keywords: ["book", "schedule", "create"] },
+  { title: "New Case", subtitle: "Open a patient case", path: "/cases", icon: FolderPlus, keywords: ["create", "open case"] },
+  { title: "New Treatment", subtitle: "Create a treatment plan", path: "/treatments", icon: ClipboardPlus, keywords: ["plan", "procedure", "create"] },
+  { title: "Create Invoice", subtitle: "Generate a bill / invoice", path: "/billing", icon: Receipt, keywords: ["bill", "payment", "charge"] },
+  { title: "New Lead", subtitle: "Capture an enquiry", path: "/leads", icon: PhoneCall, keywords: ["enquiry", "add lead"], roles: LEAD_ROLES },
+  { title: "Convert Lead", subtitle: "Convert an enquiry to a patient", path: "/leads", icon: UserPlus, keywords: ["convert", "enquiry"], roles: LEAD_ROLES },
+  { title: "Open CRM", subtitle: "Leads, follow-ups & campaigns", path: "/crm/dashboard2", icon: MessageSquare, keywords: ["crm", "marketing", "campaign"], roles: LEAD_ROLES },
+  { title: "Open Billing", subtitle: "Invoices & payments", path: "/billing", icon: Receipt, keywords: ["billing", "invoice", "payment"] },
+  { title: "Open Calendar", subtitle: "Appointments schedule", path: "/appointments", icon: CalendarClock, keywords: ["calendar", "schedule", "appointments"] },
+  { title: "Open Reports", subtitle: "Export center & reports", path: "/exports", icon: ListTodo, keywords: ["reports", "exports", "download"], roles: LEAD_ROLES },
+  { title: "Open Task Center", subtitle: "Today, overdue & upcoming tasks", path: "/tasks", icon: ListChecks, keywords: ["tasks", "todo", "reminders"] },
+  { title: "Set Availability", subtitle: "Update doctor schedule", path: "/doctors/availability", icon: CalendarDays, keywords: ["schedule", "slots", "off days"], roles: ["DOCTOR"] },
+]
+
 interface SearchResult {
   id: string
-  section: "Recent" | "Pages" | "Patients" | "Appointments" | "Cases" | "Leads"
+  section: "Quick Actions" | "Recent" | "Pages" | "Patients" | "Appointments" | "Cases" | "Leads" | "Treatments" | "Doctors" | "Hospitals" | "Invoices"
   title: string
   subtitle?: string
   path: string
   icon: React.ElementType
   keywords?: string[]
+}
+
+function iconForKind(kind: string): React.ElementType {
+  switch (kind) {
+    case "patient": return User
+    case "appointment": return CalendarClock
+    case "case": return FolderOpen
+    case "treatment": return ClipboardPlus
+    case "billing": return Receipt
+    case "lead": return PhoneCall
+    default: return History
+  }
 }
 
 function loadRecents(): { title: string; path: string }[] {
@@ -121,6 +162,39 @@ export default function GlobalSearch() {
   const user = useAuthStore((s) => s.user)
   const role = user?.role || "DOCTOR"
   const pages = roleNav[role] || roleNav.DOCTOR
+  const recentStoreItems = useRecentItemsStore((s) => s.items)
+
+  const quickActions = useMemo<SearchResult[]>(() => {
+    return QUICK_ACTIONS
+      .filter((d) => (d.roles ?? ALL_ROLES).includes(role))
+      .filter((d) => matchQuery(query, d.title, d.keywords))
+      .map((d) => ({
+        id: `action-${d.title}`,
+        section: "Quick Actions" as const,
+        title: d.title,
+        subtitle: d.subtitle,
+        path: d.path,
+        icon: d.icon,
+        keywords: d.keywords,
+      }))
+  }, [role, query])
+
+  const recentResults = useMemo<SearchResult[]>(() => {
+    const seen = new Set<string>()
+    const out: SearchResult[] = []
+    const push = (path: string, title: string, subtitle: string | undefined, icon: React.ElementType) => {
+      if (!path || seen.has(path)) return
+      seen.add(path)
+      out.push({ id: `recent-${path}`, section: "Recent" as const, title, subtitle, path, icon })
+    }
+    for (const item of recentStoreItems) {
+      push(item.path, item.title, item.subtitle || undefined, iconForKind(item.kind))
+    }
+    for (const r of recents) {
+      push(r.path, r.title, r.path, History)
+    }
+    return out
+  }, [recentStoreItems, recents])
 
   const buildPageResults = useCallback((): SearchResult[] =>
     pages
@@ -137,11 +211,15 @@ export default function GlobalSearch() {
 
   const fetchContent = useCallback(async (q: string): Promise<SearchResult[]> => {
     const opts = { page_size: 4, search: q }
-    const [p, a, c, l] = await Promise.all([
+    const [p, a, c, l, t, d, h, b] = await Promise.all([
       patientsApi.search(opts).catch(() => ({ items: [] as Patient[] })),
       appointmentsApi.list(opts).catch(() => ({ items: [] as Appointment[] })),
       casesApi.list(opts).catch(() => ({ items: [] as Case[] })),
       leadsApi.list(opts).catch(() => ({ items: [] as Lead[] })),
+      treatmentApi.list({ limit: 4, search: q }).catch(() => ({ items: [] })),
+      doctorsApi.list({ limit: 4, search: q }).catch(() => ({ items: [] })),
+      hospitalsApi.list({ limit: 4, search: q }).catch(() => ({ items: [] })),
+      billingApi.list({ page_size: 4, search: q }).catch(() => ({ items: [] })),
     ])
     const out: SearchResult[] = []
     for (const patient of p?.items ?? []) {
@@ -163,7 +241,7 @@ export default function GlobalSearch() {
         section: "Appointments",
         title: appt.patient_name || "Appointment",
         subtitle: appt.doctor_name ? `with ${appt.doctor_name} · ${appt.appointment_date}` : appt.appointment_date,
-        path: "/appointments",
+        path: `/appointments/${appt.id}`,
         icon: CalendarClock,
       })
     }
@@ -174,7 +252,7 @@ export default function GlobalSearch() {
         section: "Cases",
         title: caseItem.patient_name || "Case",
         subtitle: [caseItem.case_number, caseItem.chief_complaint].filter(Boolean).join(" · ") || undefined,
-        path: `/cases`,
+        path: `/cases/${caseItem.id}`,
         icon: FolderOpen,
       })
     }
@@ -185,37 +263,81 @@ export default function GlobalSearch() {
         section: "Leads",
         title: lead.lead_name || "Lead",
         subtitle: lead.mobile || lead.interested_treatment || undefined,
-        path: "/leads",
+        path: `/leads/${lead.id}`,
         icon: PhoneCall,
+      })
+    }
+    for (const plan of t?.items ?? []) {
+      const name = plan.treatment_name || "Treatment"
+      if (!matchQuery(q, name, [plan.patient_name || "", plan.treatment_number || ""])) continue
+      out.push({
+        id: `treatment-${plan.id}`,
+        section: "Treatments",
+        title: name,
+        subtitle: [plan.patient_name, plan.treatment_number].filter(Boolean).join(" · ") || undefined,
+        path: `/treatments/${plan.id}`,
+        icon: ClipboardList,
+      })
+    }
+    for (const doc of d?.items ?? []) {
+      const name = doc.full_name || doc.name || "Doctor"
+      if (!matchQuery(q, name, [doc.specialization || "", doc.email || ""])) continue
+      out.push({
+        id: `doctor-${doc.id}`,
+        section: "Doctors",
+        title: name,
+        subtitle: doc.specialization || doc.email || undefined,
+        path: "/admin/doctors",
+        icon: Stethoscope,
+      })
+    }
+    for (const hospital of h?.items ?? []) {
+      if (!matchQuery(q, hospital.name || "", [])) continue
+      out.push({
+        id: `hospital-${hospital.id}`,
+        section: "Hospitals",
+        title: hospital.name || "Hospital",
+        subtitle: "Hospital",
+        path: "/admin/hospitals",
+        icon: Building2,
+      })
+    }
+    for (const billing of b?.items ?? []) {
+      const title = billing.invoice_number ? `Invoice ${billing.invoice_number}` : "Invoice"
+      if (!matchQuery(q, title, [billing.patient_name || "", billing.invoice_number || ""])) continue
+      out.push({
+        id: `billing-${billing.id}`,
+        section: "Invoices",
+        title,
+        subtitle: billing.patient_name || undefined,
+        path: `/billing/${billing.id}`,
+        icon: Receipt,
       })
     }
     return out
   }, [])
 
   const debouncedQuery = query.trim()
+  // Guards against a stale response overwriting newer results when the user
+  // types faster than the 250ms debounce (prevents out-of-order flicker).
+  const fetchGen = useRef(0)
 
   useEffect(() => {
-    if (!debouncedQuery) {
-      const recentResults: SearchResult[] = recents.map((r) => ({
-        id: `recent-${r.path}`,
-        section: "Recent" as const,
-        title: r.title,
-        subtitle: r.path,
-        path: r.path,
-        icon: History,
-      }))
-      setResults([...recentResults, ...buildPageResults()])
+    const gen = ++fetchGen.current
+    if (!debouncedQuery || !open) {
+      setResults([...quickActions, ...recentResults, ...buildPageResults()])
       setLoading(false)
       return
     }
     setLoading(true)
     const timer = setTimeout(async () => {
       const content = await fetchContent(debouncedQuery)
-      setResults([...content, ...buildPageResults()])
+      if (gen !== fetchGen.current) return
+      setResults([...content, ...quickActions, ...buildPageResults()])
       setLoading(false)
     }, 250)
     return () => clearTimeout(timer)
-  }, [debouncedQuery, fetchContent, buildPageResults, recents])
+  }, [debouncedQuery, fetchContent, buildPageResults, quickActions, recentResults, open])
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -253,10 +375,18 @@ export default function GlobalSearch() {
   }, [navigate, setOpen])
 
   const grouped = useMemo(() => {
-    const order: SearchResult["section"][] = ["Recent", "Pages", "Patients", "Appointments", "Cases", "Leads"]
-    return order
-      .map((section) => ({ section, items: results.filter((r) => r.section === section) }))
-      .filter((g) => g.items.length > 0)
+    const order: SearchResult["section"][] = [
+      "Quick Actions", "Recent", "Pages",
+      "Patients", "Appointments", "Cases", "Treatments", "Invoices", "Leads", "Doctors", "Hospitals",
+    ]
+    let flatIndex = 0
+    const out: { section: SearchResult["section"]; items: { item: SearchResult; flatIndex: number }[] }[] = []
+    for (const section of order) {
+      const items = results.filter((r) => r.section === section)
+      if (items.length === 0) continue
+      out.push({ section, items: items.map((item) => ({ item, flatIndex: flatIndex++ })) })
+    }
+    return out
   }, [results])
 
   const handleKey = (e: React.KeyboardEvent) => {
@@ -292,7 +422,7 @@ export default function GlobalSearch() {
                 <input
                   ref={inputRef}
                   type="text"
-                  placeholder="Search patients, appointments, cases, pages…"
+                  placeholder="Search patients, doctors, invoices, pages…"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   onKeyDown={handleKey}
@@ -305,12 +435,7 @@ export default function GlobalSearch() {
                   <kbd className="hidden h-5 items-center rounded-[var(--ds-radius-sm)] border border-[var(--ds-border)] bg-[var(--ds-surface-secondary)] px-1.5 text-[10px] font-medium text-[var(--ds-text-tertiary)] sm:inline-flex">ESC</kbd>
                 )}
               </div>
-              <div ref={listRef} className="max-h-[min(420px,60vh)] overflow-y-auto py-1.5">
-                {!debouncedQuery && recents.length === 0 && (
-                  <p className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--ds-text-tertiary)]">
-                    Pages
-                  </p>
-                )}
+              <div ref={listRef} className="max-h-[min(420px,60vh)] overflow-y-auto py-1.5" aria-live="polite">
                 {grouped.length === 0 ? (
                   <p className="px-4 py-10 text-center text-sm text-[var(--ds-text-tertiary)]">
                     {loading ? "Searching…" : "No results found"}
@@ -322,8 +447,7 @@ export default function GlobalSearch() {
                         {group.section}
                         <span className="ml-1.5 font-normal text-[var(--ds-text-tertiary)]/70">{group.items.length}</span>
                       </p>
-                      {group.items.map((item) => {
-                        const flatIndex = results.indexOf(item)
+                      {group.items.map(({ item, flatIndex }) => {
                         const Icon = item.icon
                         const selected = flatIndex === selectedIndex
                         return (
@@ -365,7 +489,7 @@ export default function GlobalSearch() {
               <div className="hidden items-center gap-3 border-t border-[var(--ds-border)] bg-[var(--ds-surface-secondary)] px-4 py-1.5 text-[10px] text-[var(--ds-text-tertiary)] sm:flex">
                 <span><kbd className="rounded-[var(--ds-radius-sm)] border border-[var(--ds-border)] bg-[var(--ds-surface)] px-1">↑</kbd><kbd className="ml-0.5 rounded-[var(--ds-radius-sm)] border border-[var(--ds-border)] bg-[var(--ds-surface)] px-1">↓</kbd> navigate</span>
                 <span><kbd className="rounded-[var(--ds-radius-sm)] border border-[var(--ds-border)] bg-[var(--ds-surface)] px-1">↵</kbd> open</span>
-                <span className="ml-auto">Search across {pages.length} modules + records</span>
+                <span className="ml-auto">Actions, records & {pages.length} modules</span>
               </div>
             </div>
           </motion.div>

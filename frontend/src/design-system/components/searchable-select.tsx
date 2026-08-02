@@ -29,7 +29,7 @@ export default function SearchableSelect({
   const [highlighted, setHighlighted] = useState(0)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const popupRef = useRef<HTMLDivElement>(null)
-  const { position } = useFixedPosition(open, triggerRef)
+  const { position } = useFixedPosition(open, triggerRef, { popupRef })
   useOverlayDismiss(open, () => setOpen(false), triggerRef, popupRef)
   const layer = resolveOverlayLayer(triggerRef.current)
 

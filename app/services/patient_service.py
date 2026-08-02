@@ -11,7 +11,7 @@ from app.repositories.billing_repository import BillingRepository
 from app.repositories.treatment_plan_repository import TreatmentPlanRepository
 from app.repositories.appointment_repository import AppointmentRepository
 from app.repositories.audit_log_repository import AuditLogRepository
-from app.models.patient import Patient, PatientStatus
+from app.models.patient import Patient, PatientStatus, PatientType
 from app.models.case import Case, CaseStatus, ClinicalFinding
 from app.models.billing import Billing, PaymentStatus
 from app.models.appointment import Appointment
@@ -45,6 +45,8 @@ class PatientService:
     async def create(self, data: dict, user_id: str = None) -> Patient:
         try:
             logger.info("CREATE_PATIENT - Request data: %s", data)
+            if "patient_type" in data and data["patient_type"]:
+                data["patient_type"] = PatientType(data["patient_type"])
             clean_data = {k: v for k, v in data.items() if v is not None and v != ""}
             patient = await self.repo.create(**clean_data)
             logger.info("CREATE_PATIENT - Success: %s", patient.id)
@@ -86,6 +88,8 @@ class PatientService:
         try:
             if "status" in data and data["status"]:
                 data["status"] = PatientStatus(data["status"])
+            if "patient_type" in data and data["patient_type"]:
+                data["patient_type"] = PatientType(data["patient_type"])
             clean_data = {k: v for k, v in data.items() if v is not None and v != ""}
             patient = await self.repo.update(patient_id, **clean_data)
             if patient:

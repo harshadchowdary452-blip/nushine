@@ -72,6 +72,7 @@ import DentalEmptyState from "@/components/ui/dental-empty-state"
 import QuickExport from "@/components/ui/quick-export"
 
 import type { Lead, LeadSource, LeadStatus } from "@/types"
+import { extractDetail } from "@/types"
 import { useCreateParam } from "@/lib/use-create-param"
 
 const priorityColors: Record<string, string> = {
@@ -430,12 +431,12 @@ export default function LeadList() {
           message: msg,
           template_name: "GREETING",
         })
-        .catch(() => {})
+        .catch((err: unknown) => addToast({ title: "Could not log greeting", description: extractDetail(err), variant: "destructive" }))
         .finally(() => {
           window.open(`https://wa.me/${phone}?text=${encodedMsg}`, "_blank")
         })
     }
-  }, [])
+  }, [addToast])
 
   const SortHeader = useCallback(
     ({ field, children }: { field: string; children: React.ReactNode }) => (

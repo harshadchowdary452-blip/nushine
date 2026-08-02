@@ -17,28 +17,40 @@ interface Props {
   patientDateOfBirth?: string
 }
 
-// ─── Responsive box size ──────────────────────────────────────────────
+// ─── Responsive layout ────────────────────────────────────────────────
+//
+// `box` is the MAXIMUM tooth size. `minTooth` is the floor teeth can shrink
+// to. On desktop/tablet teeth stay comfortably large and, when even the floor
+// doesn't fit, the arch scrolls horizontally (start-aligned, so every tooth
+// stays reachable). On phones teeth shrink to fit the screen so the complete
+// dentition is always visible without scrolling.
+//
+// When the width is < 768px the finding panel stacks below the chart as a
+// bottom sheet instead of stealing width from it.
 
-function useBoxSize(): number {
-  const [size, setSize] = useState(() => {
-    if (window.matchMedia('(min-width: 1024px)').matches) return 48
-    if (window.matchMedia('(min-width: 768px)').matches) return 42
-    return 36
+function useChartLayout(): { box: number; stacked: boolean; minTooth: number } {
+  const [layout, setLayout] = useState(() => {
+    if (window.matchMedia('(min-width: 1024px)').matches) return { box: 46, stacked: false, minTooth: 24 }
+    if (window.matchMedia('(min-width: 768px)').matches) return { box: 40, stacked: false, minTooth: 24 }
+    return { box: 34, stacked: true, minTooth: 12 }
   })
   useEffect(() => {
-    const desk = window.matchMedia('(min-width: 1024px)')
-    const tab = window.matchMedia('(min-width: 768px)')
-    const handler = () => {
-      if (desk.matches) setSize(48)
-      else if (tab.matches) setSize(42)
-      else setSize(36)
+    const lg = window.matchMedia('(min-width: 1024px)')
+    const md = window.matchMedia('(min-width: 768px)')
+    const update = () => {
+      if (lg.matches) setLayout({ box: 46, stacked: false, minTooth: 24 })
+      else if (md.matches) setLayout({ box: 40, stacked: false, minTooth: 24 })
+      else setLayout({ box: 34, stacked: true, minTooth: 12 })
     }
-    desk.addEventListener('change', handler)
-    tab.addEventListener('change', handler)
-    return () => { desk.removeEventListener('change', handler); tab.removeEventListener('change', handler) }
+    update()
+    lg.addEventListener('change', update)
+    md.addEventListener('change', update)
+    return () => { lg.removeEventListener('change', update); md.removeEventListener('change', update) }
   }, [])
-  return size
+  return layout
 }
+
+const EMPTY_FINDINGS: ToothFinding[] = []
 
 // ─── FDI numbering ────────────────────────────────────────────────────
 
@@ -69,10 +81,10 @@ function findingColor(f: ToothFinding): string {
 
 // ─── ToothBox ─────────────────────────────────────────────────────────
 
-function ToothBox({ n, findings, sel, sz, onClick }: {
-  n: number; findings: ToothFinding[]; sel: boolean; sz: number; onClick: () => void
+function ToothBox({ n, findings, sel, sz, minW, showDots, onClick }: {
+  n: number; findings: ToothFinding[]; sel: boolean; sz: number; minW: number; showDots: boolean; onClick: () => void
 }) {
-  const tf = findings.filter((f) => f.toothNumber === n)
+  const tf = findings
   const max = 4
   const miss = tf.some((f) => f.condition === 'Missing')
   const impl = tf.some((f) => f.condition === 'Implant')
@@ -89,9 +101,16 @@ function ToothBox({ n, findings, sel, sz, onClick }: {
   return (
     <div
       onClick={onClick}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } }}
+      role="button"
+      tabIndex={0}
+      aria-pressed={sel}
+      aria-label={`Tooth ${n}`}
       title={`Tooth ${n} — ${tf.map((f) => findingLabel(f)).join(', ') || 'Healthy'}`}
+      data-tooth={n}
       style={{
-        width: sz, minWidth: sz, height: sz, borderRadius: 8, cursor: 'pointer',
+        flex: '1 1 0', minWidth: minW, maxWidth: sz, aspectRatio: '1',
+        borderRadius: 8, cursor: 'pointer',
         background: bg, border: `${sel ? 2 : 1}px solid ${bd}`,
         boxShadow: sel ? '0 0 0 2px var(--ds-primary-200)' : 'none',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -100,18 +119,18 @@ function ToothBox({ n, findings, sel, sz, onClick }: {
       onMouseEnter={(e) => { if (!sel && !miss) { e.currentTarget.style.background = 'var(--ds-primary-50)'; e.currentTarget.style.borderColor = 'var(--ds-primary-300)' } }}
       onMouseLeave={(e) => { if (!sel) { e.currentTarget.style.background = bg; e.currentTarget.style.borderColor = bd } }}
     >
-      <span style={{ fontSize: Math.max(10, sz * 0.27), fontWeight: 700, lineHeight: 1.2,
+      <span style={{ fontSize: Math.max(9, Math.min(sz, 46) * 0.26), fontWeight: 700, lineHeight: 1.2,
         color: sel ? 'var(--ds-primary-500)' : miss ? 'var(--ds-neutral-400)' : 'var(--ds-text)' }}>{n}</span>
-      {tf.length > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 2, height: 10 }}>
+      {showDots && tf.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2, height: 9 }}>
           {dots.map((d, i) => (
             <span key={i} style={{
-              width: 6, height: 6, borderRadius: '50%',
+              width: 5, height: 5, borderRadius: '50%',
               background: (i === max - 1 && over > 0) ? 'transparent' : d.color,
               border: `1px solid ${d.color}`, flexShrink: 0,
             }} />
           ))}
-          {over > 0 && <span style={{ fontSize: 7, fontWeight: 700, color: 'var(--ds-text-secondary)' }}>+{over}</span>}
+          {over > 0 && <span style={{ fontSize: 6, fontWeight: 700, color: 'var(--ds-text-secondary)' }}>+{over}</span>}
         </div>
       )}
     </div>
@@ -224,12 +243,13 @@ const SURF_LABEL: Record<string, string> = { Mesial: 'M', Distal: 'D', Buccal: '
 
 // ─── Right Panel ──────────────────────────────────────────────────────
 
-function RightPanel({ n, fings, ro, onAdd, onRemove, onUpdateFinding, onClose }: {
+function RightPanel({ n, fings, ro, onAdd, onRemove, onUpdateFinding, onClose, stacked }: {
   n: number; fings: ToothFinding[]; ro: boolean
   onAdd: (ft: string, desc: string) => void
   onRemove: (id: string) => void
   onUpdateFinding: (id: string, updates: Partial<ToothFinding>) => void
   onClose: () => void
+  stacked: boolean
 }) {
   const [findingType, setFindingType] = useState('')
   const [desc, setDesc] = useState('')
@@ -275,8 +295,17 @@ function RightPanel({ n, fings, ro, onAdd, onRemove, onUpdateFinding, onClose }:
 
   return (
     <div style={{
-      width: 260, flexShrink: 0, background: 'var(--ds-surface)', borderLeft: '1px solid #E5E7EB',
+      width: stacked ? '100%' : 260,
+      maxHeight: stacked ? '46%' : undefined,
+      flexShrink: 0, flexGrow: stacked ? 0 : undefined,
+      background: 'var(--ds-surface)',
+      borderLeft: stacked ? 'none' : '1px solid #E5E7EB',
+      borderTop: stacked ? '1px solid var(--ds-border)' : 'none',
+      borderTopLeftRadius: stacked ? 12 : 0,
+      borderTopRightRadius: stacked ? 12 : 0,
+      boxShadow: stacked ? '0 -6px 16px rgba(0,0,0,0.06)' : 'none',
       display: 'flex', flexDirection: 'column', overflowY: 'auto', fontSize: 11,
+      WebkitOverflowScrolling: 'touch',
     }}>
       <div style={{ padding: '8px 12px', borderBottom: '1px solid #E5E7EB', background: 'var(--ds-background-subtle)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -341,10 +370,18 @@ function RightPanel({ n, fings, ro, onAdd, onRemove, onUpdateFinding, onClose }:
       {!ro && (
         <div style={{ padding: '8px 12px', borderBottom: '1px solid #E5E7EB' }}>
           <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--ds-text)', marginBottom: 5, letterSpacing: '0.03em' }}>QUICK FINDINGS</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+          <div style={{
+            display: 'flex',
+            flexWrap: stacked ? 'nowrap' : 'wrap',
+            gap: 2,
+            overflowX: stacked ? 'auto' : 'visible',
+            paddingBottom: stacked ? 2 : 0,
+            WebkitOverflowScrolling: 'touch',
+          }}>
             {QUICK_FINDINGS.map((ft) => (
               <button type="button" key={ft.name} onClick={() => handleQuick(ft.name)} style={{
-                fontSize: 8, fontWeight: 500, padding: '1px 5px', borderRadius: 3, lineHeight: '16px',
+                fontSize: stacked ? 9 : 8, fontWeight: 500, padding: stacked ? '3px 8px' : '1px 5px',
+                borderRadius: 4, lineHeight: stacked ? '20px' : '16px', flexShrink: 0,
                 border: `1px solid ${ft.color}40`, background: 'var(--ds-surface)', color: ft.color, cursor: 'pointer', whiteSpace: 'nowrap',
               }}
                 onMouseEnter={(e) => { e.currentTarget.style.background = ft.color + '15' }}
@@ -440,11 +477,46 @@ export default function ProfessionalOdontogram(props: Props) {
 
   const upper = isChild ? FDI_UPPER_C : FDI_UPPER
   const lower = isChild ? FDI_LOWER_C : FDI_LOWER
-  const box = useBoxSize()
+  const { box, stacked, minTooth } = useChartLayout()
 
   // ── Ref holds the CURRENT findings (both controlled & uncontrolled) ──
   const ref = useRef(findings)
   ref.current = findings
+
+  // Pre-index findings by tooth so each render never re-filters the full list
+  // per tooth (32 lookups per render → one pass).
+  const byTooth = useMemo(() => {
+    const map = new Map<number, ToothFinding[]>()
+    for (const f of findings) {
+      const arr = map.get(f.toothNumber)
+      if (arr) arr.push(f)
+      else map.set(f.toothNumber, [f])
+    }
+    return map
+  }, [findings])
+
+  // Detect horizontal overflow of the chart body. When the arch can't fit even
+  // at minimum tooth width, teeth stay reachable: the row aligns start-aligned
+  // (never `justify-content:center`, which makes the left overflow unscrollable)
+  // and the body scrolls horizontally. When it fits, the arch centers.
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const [archOverflow, setArchOverflow] = useState(false)
+  useEffect(() => {
+    const el = bodyRef.current
+    if (!el) return
+    const check = () => setArchOverflow(el.scrollWidth > el.clientWidth + 1)
+    const ro = new ResizeObserver(check)
+    ro.observe(el)
+    check()
+    return () => ro.disconnect()
+  }, [])
+
+  // On phones the panel stacks below the chart; keep the selected tooth in view.
+  useEffect(() => {
+    if (!stacked || sel === null || !bodyRef.current) return
+    const el = bodyRef.current.querySelector(`[data-tooth="${sel}"]`)
+    el?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' })
+  }, [sel, stacked])
 
   const emit = (updated: ToothFinding[]) => {
     if (props.findings === undefined) setLocal(updated)
@@ -477,23 +549,21 @@ export default function ProfessionalOdontogram(props: Props) {
     emit(cur.map((f) => f.id === id ? { ...f, ...updates } : f))
   }
 
-  const selFindings = findings.filter((f) => f.toothNumber === sel)
+  const selFindings = sel !== null ? (byTooth.get(sel) || []) : []
 
   function arch(teeth: number[], label: string, sz: number) {
     const mid = teeth.length / 2
     const left = teeth.slice(0, mid)
     const right = teeth.slice(mid)
+    const toothBoxes = (list: number[]) =>
+      list.map((n) => <ToothBox key={n} n={n} findings={byTooth.get(n) || EMPTY_FINDINGS} sel={sel === n} sz={sz} minW={minTooth} showDots={!stacked} onClick={() => setSel(n === sel ? null : n)} />)
     return (
-      <div style={{ marginBottom: 8 }}>
-        <div style={{ fontSize: 8, color: 'var(--ds-text-tertiary)', textAlign: 'center', marginBottom: 5, letterSpacing: '0.05em', textTransform: 'uppercase', fontWeight: 600 }}>{label}</div>
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 0 }}>
-          <div style={{ display: 'flex', gap: 4 }}>
-            {left.map((n) => <ToothBox key={n} n={n} findings={findings} sel={sel === n} sz={sz} onClick={() => setSel(n === sel ? null : n)} />)}
-          </div>
-          <div style={{ width: 12, textAlign: 'center', color: 'var(--ds-border-hover)', fontSize: 11, fontWeight: 300, lineHeight: `${sz}px` }}>|</div>
-          <div style={{ display: 'flex', gap: 4 }}>
-            {right.map((n) => <ToothBox key={n} n={n} findings={findings} sel={sel === n} sz={sz} onClick={() => setSel(n === sel ? null : n)} />)}
-          </div>
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 9, color: 'var(--ds-text-tertiary)', textAlign: 'center', marginBottom: 6, letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 600 }}>{label}</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: archOverflow ? 'flex-start' : 'center' }}>
+          {toothBoxes(left)}
+          <div aria-hidden="true" style={{ width: 12, flexShrink: 0, alignSelf: 'stretch', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ds-border-hover)', fontSize: 12, fontWeight: 300 }}>|</div>
+          {toothBoxes(right)}
         </div>
       </div>
     )
@@ -501,15 +571,19 @@ export default function ProfessionalOdontogram(props: Props) {
 
   return (
     <div style={{
-      fontFamily: 'Inter, system-ui, sans-serif', display: 'flex', minHeight: 380, borderRadius: 8,
-      overflow: 'hidden', border: '1px solid #E5E7EB', background: 'var(--ds-surface)',
-    }}>
+      fontFamily: 'Inter, system-ui, sans-serif',
+      display: 'flex', flexDirection: stacked ? 'column' : 'row',
+      height: 'min(62vh, 580px)', minHeight: stacked ? 320 : 380,
+      borderRadius: 10, overflow: 'hidden',
+      border: '1px solid var(--ds-border)', background: 'var(--ds-surface)',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+    }} role="region" aria-label="Dental chart — select a tooth to record a clinical finding">
       {/* Left: chart */}
-      <div style={{ flex: 1, minWidth: 0, background: 'var(--ds-background-subtle)', display: 'flex', flexDirection: 'column' }}>
-        {/* Header */}
+      <div style={{ flex: 1, minWidth: 0, minHeight: 0, background: 'var(--ds-background-subtle)', display: 'flex', flexDirection: 'column' }}>
+        {/* Header (always visible) */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '8px 14px', background: 'var(--ds-surface)', borderBottom: '1px solid #E5E7EB', flexWrap: 'wrap', gap: 5,
+          padding: '9px 14px', background: 'var(--ds-surface)', borderBottom: '1px solid var(--ds-border)', flexWrap: 'wrap', gap: 5,
         }}>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ds-text)' }}>Clinical Findings</div>
@@ -531,25 +605,34 @@ export default function ProfessionalOdontogram(props: Props) {
           </div>
         </div>
 
-        {/* Chart body */}
-        <div style={{ flex: 1, overflow: 'auto', padding: 10 }}>
-          <div style={{ background: 'var(--ds-surface)', borderRadius: 8, border: '1px solid #E5E7EB', padding: '12px 10px 8px', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
-            {arch(upper, isChild ? 'Upper Arch (Maxillary — Primary)' : 'Upper Arch (Maxillary — Permanent)', box)}
-            <div style={{ borderTop: '1px dashed #D1D5DB', margin: '0 20px 6px' }} />
-            {arch(lower, isChild ? 'Lower Arch (Mandibular — Primary)' : 'Lower Arch (Mandibular — Permanent)', box)}
+        {/* Chart body (scrolls internally when space is tight) */}
+        <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          {archOverflow && (
+            <>
+              <div aria-hidden="true" style={{ pointerEvents: 'none', position: 'absolute', left: 0, top: 0, bottom: 0, width: 16, zIndex: 2, background: 'linear-gradient(90deg, var(--ds-background-subtle) 0%, rgba(255,255,255,0) 100%)' }} />
+              <div aria-hidden="true" style={{ pointerEvents: 'none', position: 'absolute', right: 0, top: 0, bottom: 0, width: 16, zIndex: 2, background: 'linear-gradient(270deg, var(--ds-background-subtle) 0%, rgba(255,255,255,0) 100%)' }} />
+            </>
+          )}
+          <div ref={bodyRef} style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 12, overscrollBehavior: 'contain' }}>
+            <div style={{ background: 'var(--ds-surface)', borderRadius: 10, border: '1px solid var(--ds-border)', padding: '14px 12px 10px', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
+              {arch(upper, isChild ? 'Upper Arch (Maxillary — Primary)' : 'Upper Arch (Maxillary — Permanent)', box)}
+              <div style={{ borderTop: '1px dashed #D1D5DB', margin: '0 24px 8px' }} />
+              {arch(lower, isChild ? 'Lower Arch (Mandibular — Primary)' : 'Lower Arch (Mandibular — Permanent)', box)}
+            </div>
+            <div style={{ textAlign: 'center', fontSize: 8, color: 'var(--ds-text-tertiary)', marginTop: 6, marginBottom: 8 }}>
+              {findings.length} finding{findings.length !== 1 ? 's' : ''} · {isChild ? 'Primary' : 'Permanent'} dentition
+              {sel !== null && <> · Selected: #{sel} — {toothName(sel)}</>}
+              {archOverflow && <><br />Scroll the arch horizontally to see every tooth</>}
+            </div>
+            <div style={{ marginBottom: 6 }}><Legend findings={findings} /></div>
+            <Summary findings={findings} onUpdate={emit} />
           </div>
-          <div style={{ textAlign: 'center', fontSize: 8, color: 'var(--ds-text-tertiary)', marginTop: 5, marginBottom: 8 }}>
-            {findings.length} finding{findings.length !== 1 ? 's' : ''} · {isChild ? 'Primary' : 'Permanent'} dentition
-            {sel !== null && <> · Selected: #{sel} — {toothName(sel)}</>}
-          </div>
-          <div style={{ marginBottom: 6 }}><Legend findings={findings} /></div>
-          <Summary findings={findings} onUpdate={emit} />
         </div>
       </div>
 
       {/* Right panel */}
       {sel !== null && (
-        <RightPanel n={sel} fings={selFindings} ro={!!ro} onAdd={add} onRemove={remove} onUpdateFinding={updateFinding} onClose={() => setSel(null)} />
+        <RightPanel stacked={stacked} n={sel} fings={selFindings} ro={!!ro} onAdd={add} onRemove={remove} onUpdateFinding={updateFinding} onClose={() => setSel(null)} />
       )}
     </div>
   )

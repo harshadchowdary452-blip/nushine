@@ -11,7 +11,6 @@ from sqlalchemy import select, func, desc
 from app.database import get_db
 
 logger = logging.getLogger("crm-router")
-logging.basicConfig(level=logging.DEBUG)
 from app.dependencies import get_current_user
 
 

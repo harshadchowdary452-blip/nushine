@@ -69,6 +69,7 @@ async def get_billings(skip: int = Query(0, ge=0), limit: int = Query(100, ge=1,
                         case_id: Optional[str] = Query(None),
                         hospital_id: Optional[str] = Query(None),
                         patient_id: Optional[str] = Query(None),
+                        search: Optional[str] = Query(None),
                         db: AsyncSession = Depends(get_db),
                         current_user: dict = Depends(get_current_user)):
     try:
@@ -77,11 +78,15 @@ async def get_billings(skip: int = Query(0, ge=0), limit: int = Query(100, ge=1,
         filters = {}
         if case_id:
             filters["case_id"] = case_id
+        if search and search.strip():
+            filters["search"] = search.strip()
 
+        # The explicit patient_id filter must ALWAYS be honoured. It is
+        # intersected with the role-scoped case set below, never dropped.
         patient_case_ids = None
         if patient_id:
             case_result = await db.execute(select(Case.id).where(Case.patient_id == patient_id))
-            patient_case_ids = [row[0] for row in case_result.all()]
+            patient_case_ids = {row[0] for row in case_result.all()}
             if not patient_case_ids:
                 return []
 
@@ -99,13 +104,13 @@ async def get_billings(skip: int = Query(0, ge=0), limit: int = Query(100, ge=1,
             if not pids:
                 return []
             case_result = await db.execute(select(Case.id).where(Case.patient_id.in_(pids)))
-            role_allowed_case_ids = [row[0] for row in case_result.all()]
+            role_allowed_case_ids = {row[0] for row in case_result.all()}
             if not role_allowed_case_ids:
                 return []
             filters["case_id__in"] = role_allowed_case_ids
         elif role == Role.DOCTOR.value:
             case_result = await db.execute(select(Case.id).where(Case.doctor_id == current_user.get("sub")))
-            role_allowed_case_ids = [row[0] for row in case_result.all()]
+            role_allowed_case_ids = {row[0] for row in case_result.all()}
             if not role_allowed_case_ids:
                 return []
             filters["case_id__in"] = role_allowed_case_ids
@@ -120,19 +125,27 @@ async def get_billings(skip: int = Query(0, ge=0), limit: int = Query(100, ge=1,
                 if not pids:
                     return []
                 case_result = await db.execute(select(Case.id).where(Case.patient_id.in_(pids)))
-                role_allowed_case_ids = [row[0] for row in case_result.all()]
+                role_allowed_case_ids = {row[0] for row in case_result.all()}
                 if not role_allowed_case_ids:
                     return []
                 filters["case_id__in"] = role_allowed_case_ids
+
+        # Enforce the patient_id filter on top of role scoping.
+        if patient_case_ids is not None:
+            scoped = filters.get("case_id__in")
+            if scoped is None:
+                filters["case_id__in"] = patient_case_ids
+            else:
+                filters["case_id__in"] = scoped & patient_case_ids
+                if not filters["case_id__in"]:
+                    return []
 
         return await service.get_all(skip=skip, limit=limit, filters=filters or None)
     except HTTPException:
         raise
     except Exception as e:
-        import traceback
-        print("=== BILLINGS LIST ERROR ===", flush=True)
-        traceback.print_exc()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Internal Server Error: {str(e)}")
+        logger.exception("Billing list failed: %s", e)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 
 @router.get("/by-case/{case_id}")

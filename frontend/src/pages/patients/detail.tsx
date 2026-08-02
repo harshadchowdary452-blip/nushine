@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { patientsApi, casesApi, appointmentsApi, billingApi, treatmentApi, crmApi, doctorsApi, consentFormsApi } from "@/services/endpoints";
@@ -36,11 +36,12 @@ import type { Case, Appointment, Billing, TreatmentPlan, PatientTimelineEntry, D
 import { extractDetail } from "@/types";
 import { 
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
-  EnterpriseDetailWorkspace, EnterpriseRecordHeader, ProductivityPanel, ProductivitySection,
+  EnterpriseDetailWorkspace, ProductivityPanel, ProductivitySection,
   Timeline, Badge, Avatar as DSAvatar, AvatarFallback as DSAvatarFallback,
   type TimelineItem, type ProductivityInsight, type RecordHeaderMeta, type RecordStat
 } from "@/design-system";
 import { useWorkspaceMemory } from "@/hooks/useWorkspaceMemory";
+import { useTrackRecent } from "@/hooks/useTrackRecent";
 import {
   User,
   Phone,
@@ -49,7 +50,6 @@ import {
   Activity,
   FileText,
   Clock,
-  ArrowLeft,
   Edit,
   ChevronRight,
   Camera,
@@ -179,6 +179,14 @@ export default function PatientDetail() {
     enabled: !!id,
   });
 
+  useTrackRecent(
+    "patient",
+    patient?.id,
+    patient,
+    (p) => p?.full_name || "Patient",
+    (p) => (p?.op_no ? `OP No: ${p.op_no}` : p?.phone || undefined)
+  );
+
   const { data: cases } = useQuery({
     queryKey: ["patient-cases", id],
     queryFn: () => casesApi.list({ patient_id: id }),
@@ -303,35 +311,36 @@ export default function PatientDetail() {
   const followUpResponsesList: FollowUpResponse[] = followUpResponses || [];
 
   // Convert timeline entries to DS Timeline format
-  const timelineItems = useMemo<TimelineItem[]>(() => {
+  const timelineItems: TimelineItem[] = (() => {
     const entries: PatientTimelineEntry[] = Array.isArray(timelineData?.entries) ? timelineData.entries : [];
-    return entries.map(ev => ({
-      id: ev.id,
-      tone: ev.module === "billing" ? "success" : 
-            ev.module === "case" ? "warning" : 
-            ev.module === "appointment" ? "info" : "neutral",
-      date: ev.created_at ? new Date(ev.created_at) : new Date(),
-      title: ev.action,
-      description: ev.description || undefined,
-      metadata: [
-        ...(ev.user_name ? [`by ${ev.user_name}${ev.user_role ? ` (${ev.user_role})` : ""}`] : []),
-        ...(ev.hospital_name ? [ev.hospital_name] : []),
-        ...(ev.module ? [ev.module] : [])
-      ],
-      expandable: ev.changes && ev.changes.length > 0 ? (
-        <div className="space-y-1 mt-2">
-          {ev.changes.map((c, ci) => (
-            <div key={ci} className="text-xs bg-[var(--ds-background-subtle)] rounded px-2 py-1">
-              <span className="font-medium text-[var(--ds-text-primary)]">{c.field}: </span>
-              <span className="text-[var(--ds-text-tertiary)] line-through">{c.old_value ?? "—"}</span>
-              <span className="text-[var(--ds-text-tertiary)] mx-1">→</span>
-              <span className="text-[var(--ds-success)] font-medium">{c.new_value ?? "—"}</span>
-            </div>
-          ))}
-        </div>
-      ) : undefined
-    }));
-  }, [timelineData]);
+    return entries.map(ev => {
+      const dt = ev.created_at ? new Date(ev.created_at) : null;
+      return {
+        id: ev.id,
+        tone: ev.module === "billing" ? "success" : 
+              ev.module === "case" ? "warning" : 
+              ev.module === "appointment" ? "info" : "neutral",
+        date: dt ? dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : undefined,
+        time: dt ? dt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : undefined,
+        title: ev.action,
+        description: ev.description || undefined,
+        status: ev.module || undefined,
+        actor: ev.user_name ? (ev.user_role ? `${ev.user_name} (${ev.user_role})` : ev.user_name) : undefined,
+        details: ev.changes && ev.changes.length > 0 ? (
+          <div className="space-y-1 mt-2">
+            {ev.changes.map((c, ci) => (
+              <div key={ci} className="text-xs bg-[var(--ds-background-subtle)] rounded px-2 py-1">
+                <span className="font-medium text-[var(--ds-text-primary)]">{c.field}: </span>
+                <span className="text-[var(--ds-text-tertiary)] line-through">{c.old_value ?? "—"}</span>
+                <span className="text-[var(--ds-text-tertiary)] mx-1">→</span>
+                <span className="text-[var(--ds-success)] font-medium">{c.new_value ?? "—"}</span>
+              </div>
+            ))}
+          </div>
+        ) : undefined
+      };
+    });
+  })();
 
   const pageTabs = [
     { key: "overview", label: "Overview", icon: User },
@@ -346,7 +355,7 @@ export default function PatientDetail() {
   ];
 
   // Build productivity insights
-  const productivityInsights = useMemo<ProductivityInsight[]>(() => {
+  const productivityInsights: ProductivityInsight[] = (() => {
     const insights: ProductivityInsight[] = [];
     
     // Upcoming appointments
@@ -391,7 +400,7 @@ export default function PatientDetail() {
     }
     
     // Open cases
-    const openCases = casesList.filter((c: Case) => c.status !== "COMPLETED" && c.status !== "ARCHIVED");
+    const openCases = casesList.filter((c: Case) => c.status !== "COMPLETED" && c.status !== "CANCELLED");
     if (openCases.length > 0) {
       insights.push({
         id: "open-cases",
@@ -403,7 +412,7 @@ export default function PatientDetail() {
     }
     
     return insights;
-  }, [appointmentsList, billingsList, treatmentPlansList, casesList]);
+  })();
 
   // Build record header props
   const recordMeta: RecordHeaderMeta[] = [
@@ -1078,7 +1087,7 @@ export default function PatientDetail() {
         </div>
       )}
 
-      {activeTab === "treatments" && (
+      {workspaceState.activeTab === "treatments" && (
         <div className="overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 320px)" }}>
           {treatmentPlansList.length === 0 ? (
             <Card className="p-12 text-center border-border shadow-card">
@@ -1123,7 +1132,7 @@ export default function PatientDetail() {
         </div>
       )}
 
-      {activeTab === "billing" && (
+      {workspaceState.activeTab === "billing" && (
         <div className="overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 320px)" }}>
           {billingsList.length === 0 ? (
             <Card className="p-12 text-center border-border shadow-card">
@@ -1153,7 +1162,7 @@ export default function PatientDetail() {
         </div>
       )}
 
-      {activeTab === "responses" && (
+      {workspaceState.activeTab === "responses" && (
         <div className="overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 320px)" }}>
           {patient?.latest_feedback_date && (
             <Card className="p-4 border-border shadow-card mb-4">
@@ -1347,7 +1356,7 @@ export default function PatientDetail() {
         </div>
       )}
 
-      {activeTab === "images" && (
+      {workspaceState.activeTab === "images" && (
         <div className="overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 320px)" }}>
           <div className="space-y-6">
             {casesList.length === 0 ? (
@@ -1364,12 +1373,10 @@ export default function PatientDetail() {
         </div>
       )}
 
-      {activeTab === "consent-forms" && (
-        <div className="overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 320px)" }}>
-          <ConsentFormsSection patientId={patient.id} />
-        </div>
+      {workspaceState.activeTab === "consent-forms" && (
+        <ConsentFormsSection patientId={patient.id} />
       )}
-    </div>
+    </EnterpriseDetailWorkspace>
   );
 }
 

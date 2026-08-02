@@ -35,8 +35,10 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { leadsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
+import { useTrackRecent } from "@/hooks/useTrackRecent"
 import LeadTimeline from "./components/lead-timeline"
 import type { Lead, LeadCall, LeadCommunication, LeadCallOutcome, ApiError } from "@/types"
+import { extractDetail } from "@/types"
 
 const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
   NEW: { bg: "bg-blue-500", text: "text-white", label: "New" },
@@ -133,6 +135,14 @@ export default function LeadDetail() {
     queryFn: () => leadsApi.get(id!),
     enabled: !!id,
   })
+
+  useTrackRecent(
+    "lead",
+    lead?.id,
+    lead,
+    (l) => l?.lead_name || "Lead",
+    (l) => l?.mobile || l?.email || undefined
+  )
 
   const { data: calls } = useQuery({
     queryKey: ["lead-calls", id],
@@ -293,13 +303,13 @@ export default function LeadDetail() {
         queryClient.invalidateQueries({ queryKey: ["crm-dashboard"] })
         queryClient.invalidateQueries({ queryKey: ["crm-enhanced-dashboard"] })
       queryClient.invalidateQueries({ queryKey: ["crm-command-center"], refetchType: "all" })
-      }).catch(() => {
-        // Communication recording failed, but still open WhatsApp
+      }).catch((err: unknown) => {
+        addToast({ title: "Could not log WhatsApp message", description: extractDetail(err), variant: "destructive" })
       }).finally(() => {
         window.open(`https://wa.me/${phone}?text=${encodedMsg}`, "_blank")
       })
     }
-  }, [lead, queryClient])
+  }, [lead, queryClient, addToast])
 
   const handleEmail = useCallback(() => {
     if (lead?.email) {

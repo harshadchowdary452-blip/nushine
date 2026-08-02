@@ -7,6 +7,8 @@ import { LeadFeedbackForm } from "./LeadFeedbackForm"
 import { PatientFeedbackForm } from "./PatientFeedbackForm"
 import { NotesTimeline } from "./NotesTimeline"
 import { crmApi } from "../../services/endpoints"
+import { useToast } from "../ui/toast"
+import { extractDetail } from "../../types"
 
 interface FeedbackEnquiry {
   id: string
@@ -50,8 +52,9 @@ interface Props {
 }
 
 export function FeedbackDrawer({ open, onOpenChange, enquiry, onSaved }: Props) {
-  const isLead = enquiry?.enquiry_type === "LEAD_FOLLOW_UP"
+  const { addToast } = useToast()
   const [tab, setTab] = useState("form")
+  const isLead = enquiry?.enquiry_type === "LEAD_FOLLOW_UP"
   const [summary, setSummary] = useState<FeedbackSummary | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [feedbackId, setFeedbackId] = useState<string | null>(null)
@@ -69,9 +72,9 @@ export function FeedbackDrawer({ open, onOpenChange, enquiry, onSaved }: Props) 
           setFeedbackId(data.feedback.id as string)
         }
       })
-      .catch(() => {})
+      .catch((err: unknown) => addToast({ title: "Could not load feedback summary", description: extractDetail(err), variant: "destructive" }))
       .finally(() => setSummaryLoading(false))
-  }, [open, enquiry])
+  }, [open, enquiry, addToast])
 
   function handleSaved() {
     // Re-fetch summary after save
@@ -81,7 +84,7 @@ export function FeedbackDrawer({ open, onOpenChange, enquiry, onSaved }: Props) 
         if (data?.feedback && "id" in data.feedback) {
           setFeedbackId(data.feedback.id as string)
         }
-      }).catch(() => {})
+      }).catch((err: unknown) => addToast({ title: "Could not refresh summary", description: extractDetail(err), variant: "destructive" }))
     }
     onSaved()
   }

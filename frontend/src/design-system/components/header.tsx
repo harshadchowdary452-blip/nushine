@@ -43,8 +43,16 @@ export default function EnterpriseHeader() {
 
   useEffect(() => {
     fetchUnreadCount()
+    // Pause polling while the tab is hidden to avoid pointless network work.
     const interval = setInterval(fetchUnreadCount, 60000)
-    return () => clearInterval(interval)
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") fetchUnreadCount()
+    }
+    document.addEventListener("visibilitychange", onVisibility)
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener("visibilitychange", onVisibility)
+    }
   }, [fetchUnreadCount])
 
   return (

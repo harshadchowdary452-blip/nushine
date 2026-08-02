@@ -1,8 +1,8 @@
 import { useState, useMemo } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import type { ColumnDef } from "@tanstack/react-table"
-import { Plus, Search, Eye, Edit, UserCog } from "lucide-react"
-import { PageHeader, DataTable } from "@/design-system"
+import type { ColumnDef, SortingState } from "@tanstack/react-table"
+import { Plus, UserCog } from "lucide-react"
+import { EnterpriseWorkspace, DataTable } from "@/design-system"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -24,6 +24,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { consultantsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
+import { useServerFilters } from "@/hooks/useServerFilters"
 import type { Consultant, PaginatedResponse } from "@/types"
 import { extractDetail } from "@/types"
 
@@ -42,13 +43,17 @@ function getEmptyConsultantForm(): ConsultantForm {
 export default function ConsultantList() {
   const queryClient = useQueryClient()
   const { addToast } = useToast()
-  const [globalFilter, setGlobalFilter] = useState("")
   const [dialogOpen, setDialogOpen] = useState(false)
   const [form, setForm] = useState<ConsultantForm>(getEmptyConsultantForm)
 
+  const {
+    filters, setFilter, resetFilters, queryParams, queryKey, activeFilters,
+    hasActiveFilters, page, setPage, sortField, sortDir, setSort, activeChips,
+  } = useServerFilters({ defaultSort: "full_name" })
+
   const { data, isLoading } = useQuery<PaginatedResponse<Consultant>>({
-    queryKey: ["consultants", { search: globalFilter }],
-    queryFn: () => consultantsApi.list({ search: globalFilter, page_size: 100 }),
+    queryKey: ["consultants", queryKey, page],
+    queryFn: () => consultantsApi.list({ ...queryParams, page, page_size: 10 }),
   })
 
   const createMutation = useMutation({
@@ -88,6 +93,26 @@ export default function ConsultantList() {
     [data],
   )
 
+  const totalCount = useMemo(() => {
+    if (Array.isArray(data)) return data.length
+    return data?.total ?? 0
+  }, [data])
+
+  const totalPages = useMemo(() => {
+    if (Array.isArray(data)) return 1
+    return data?.total_pages || data?.pages || 1
+  }, [data])
+
+  function applySavedFilters(saved: Record<string, string>) {
+    resetFilters()
+    for (const [k, v] of Object.entries(saved)) setFilter(k, v)
+  }
+
+  function handleSortingChange(sorting: SortingState) {
+    const f = sorting[0]
+    setSort(f?.id ?? "", f?.desc ? "desc" : "asc")
+  }
+
   const columns = useMemo<ColumnDef<Consultant>[]>(
     () => [
       {
@@ -119,20 +144,6 @@ export default function ConsultantList() {
           </Badge>
         ),
       },
-      {
-        id: "actions",
-        header: "Actions",
-        cell: () => (
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon">
-              <Eye className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon">
-              <Edit className="h-4 w-4" />
-            </Button>
-          </div>
-        ),
-      },
     ],
     [],
   )
@@ -143,56 +154,73 @@ export default function ConsultantList() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
+    <>
+      <EnterpriseWorkspace
         title="Consultants"
         description="Manage consultants"
-        actions={
+        headerActions={
           <Button onClick={() => setDialogOpen(true)}>
             <Plus className="h-4 w-4" /> Add Consultant
           </Button>
         }
-      />
-
-      <DataTable
-        columns={columns}
-        data={consultants}
-        loading={isLoading}
-        pagination
-        pageSize={10}
-        toolbar={
-          <div className="relative w-full sm:w-72">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ds-text-tertiary)]" />
-            <Input
-              placeholder="Search consultants..."
-              value={globalFilter}
-              onChange={(e) => setGlobalFilter(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        }
-        emptyIcon={UserCog}
-        emptyTitle="No consultants yet"
-        emptyDescription="Add your first consultant to get started."
-        emptyAction={
-          <Button onClick={() => setDialogOpen(true)}>
-            <UserCog className="h-4 w-4" /> Add Consultant
-          </Button>
-        }
-        mobileCard={(row) => (
-          <div className="flex items-center justify-between gap-3">
-            <div className="ds-min-w-0">
-              <p className="ds-body font-medium text-[var(--ds-text)]">{row.full_name}</p>
-              <p className="ds-caption text-[var(--ds-text-secondary)]">
-                {row.specialization || "—"} · {row.email || "—"}
-              </p>
+        search={{
+          value: filters.search || "",
+          onChange: (v) => setFilter("search", v),
+          placeholder: "Search consultants...",
+          ariaLabel: "Search consultants",
+        }}
+        filters={{
+          chips: activeChips,
+          activeCount: activeFilters,
+          onRemoveChip: (k) => setFilter(k, ""),
+          onClearAll: resetFilters,
+          savedStorageKey: "consultants-list",
+          savedCurrent: filters,
+          onApplySaved: applySavedFilters,
+        }}
+        totalCount={totalCount}
+        totalLabel="consultants"
+      >
+        <DataTable
+          key={queryKey}
+          columns={columns}
+          data={consultants}
+          loading={isLoading}
+          pagination
+          pageSize={10}
+          manualPagination
+          pageCount={totalPages}
+          onPageChange={(pageIndex) => setPage(pageIndex + 1)}
+          manualSorting
+          initialSorting={sortField ? [{ id: sortField, desc: sortDir === "desc" }] : []}
+          onSortingChange={handleSortingChange}
+          emptyIcon={UserCog}
+          emptyTitle={hasActiveFilters ? "No consultants match your filters" : "No consultants yet"}
+          emptyDescription={hasActiveFilters ? "Try adjusting or clearing your filters." : "Add your first consultant to get started."}
+          emptyAction={
+            hasActiveFilters ? (
+              <Button variant="outline" onClick={resetFilters}>Clear Filters</Button>
+            ) : (
+              <Button onClick={() => setDialogOpen(true)}>
+                <UserCog className="h-4 w-4" /> Add Consultant
+              </Button>
+            )
+          }
+          mobileCard={(row) => (
+            <div className="flex items-center justify-between gap-3">
+              <div className="ds-min-w-0">
+                <p className="ds-body font-medium text-[var(--ds-text)]">{row.full_name}</p>
+                <p className="ds-caption text-[var(--ds-text-secondary)]">
+                  {row.specialization || "—"} · {row.email || "—"}
+                </p>
+              </div>
+              <Badge variant={row.is_active ? "success" : "default"} className="shrink-0">
+                {row.is_active ? "Active" : "Inactive"}
+              </Badge>
             </div>
-            <Badge variant={row.is_active ? "success" : "default"} className="shrink-0">
-              {row.is_active ? "Active" : "Inactive"}
-            </Badge>
-          </div>
-        )}
-      />
+          )}
+        />
+      </EnterpriseWorkspace>
 
       <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
         <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
@@ -269,6 +297,6 @@ export default function ConsultantList() {
           </form>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   )
 }

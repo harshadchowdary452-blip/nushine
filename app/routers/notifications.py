@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc, and_
+from typing import Optional
 from datetime import datetime, timezone, date
 from app.database import get_db
 from app.dependencies import get_current_user
@@ -17,15 +18,28 @@ router = APIRouter(prefix="/notifications", tags=["Notifications"])
 async def get_notifications(
     limit: int = Query(50, le=100),
     offset: int = Query(0),
+    type_filter: Optional[str] = Query(None, alias="type"),
+    unread_only: Optional[bool] = Query(False, alias="unread"),
+    entity_type: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
     uid = current_user.get("sub")
     query = select(Notification).where(Notification.user_id == uid)
+    if type_filter:
+        query = query.where(Notification.type == type_filter)
+    if unread_only:
+        query = query.where(Notification.is_read == False)
+    if entity_type:
+        query = query.where(Notification.entity_type == entity_type)
     query = query.order_by(desc(Notification.created_at)).offset(offset).limit(limit)
     result = await db.execute(query)
     items = result.scalars().all()
     count_q = select(func.count(Notification.id)).where(Notification.user_id == uid)
+    if type_filter:
+        count_q = count_q.where(Notification.type == type_filter)
+    if unread_only:
+        count_q = count_q.where(Notification.is_read == False)
     total = (await db.execute(count_q)).scalar() or 0
     unread_q = select(func.count(Notification.id)).where(
         and_(Notification.user_id == uid, Notification.is_read == False)
@@ -94,9 +108,7 @@ async def delete_notification(
     n = await db.get(Notification, notification_id)
     if not n or n.user_id != current_user.get("sub"):
         raise HTTPException(status_code=404, detail="Notification not found")
-    n
-    n.deleted_at = datetime.now(timezone.utc)
-    n.deleted_by = current_user.get("sub")
+    await db.delete(n)
     await db.commit()
     return {"success": True}
 
@@ -111,9 +123,7 @@ async def delete_all_notifications(
         select(Notification).where(Notification.user_id == uid)
     )
     for n in result.scalars().all():
-        n
-        n.deleted_at = datetime.now(timezone.utc)
-        n.deleted_by = uid
+        await db.delete(n)
     await db.commit()
     return {"success": True}
 

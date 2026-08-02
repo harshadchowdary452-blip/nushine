@@ -15,7 +15,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table"
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody
 } from "@/components/ui/dialog"
 import { useToast } from "@/components/ui/toast"
 import CaseReportForm from "@/components/cases/CaseReportForm"
@@ -63,7 +63,7 @@ export default function CaseReportsList() {
 
   useCreateParam(() => setCreateOpen(true))
 
-  const { data: items, isFetching } = useQuery({
+  const { data: resp, isFetching } = useQuery({
     queryKey: ["case-history-list", page, pageSize, search, statusFilter, doctorFilter, dateFrom, dateTo, sortBy, sortDesc],
     queryFn: () => casesApi.list({
       skip: page * pageSize,
@@ -77,7 +77,8 @@ export default function CaseReportsList() {
       sort_desc: sortDesc,
     }),
   })
-  const cases: Case[] = Array.isArray(items) ? items : []
+  const cases: Case[] = Array.isArray(resp) ? resp : resp?.items ?? []
+  const totalCount = Array.isArray(resp) ? resp.length : resp?.total ?? 0
 
   const { data: doctors } = useQuery({
     queryKey: ["doctors-for-filter"],
@@ -91,7 +92,8 @@ export default function CaseReportsList() {
   })
   const doctorsList: CaseDoctor[] = Array.isArray(doctors) ? doctors : []
 
-  const totalPages = Math.ceil((cases.length || 1) / pageSize)
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
+  const isLastPage = page >= totalPages - 1
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => casesApi.delete(id),
@@ -224,7 +226,7 @@ export default function CaseReportsList() {
 
       {/* Pagination */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">{cases.length} case(s)</p>
+        <p className="text-sm text-muted-foreground">{totalCount} case(s)</p>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(0)}>
             <ChevronsLeft className="h-4 w-4" />
@@ -232,11 +234,11 @@ export default function CaseReportsList() {
           <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(page - 1)}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="text-sm px-2">Page {page + 1}</span>
-          <Button variant="outline" size="sm" onClick={() => setPage(page + 1)}>
+          <span className="text-sm px-2">Page {page + 1} of {totalPages}</span>
+          <Button variant="outline" size="sm" disabled={isLastPage} onClick={() => setPage(page + 1)}>
             <ChevronRight className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setPage(totalPages - 1)}>
+          <Button variant="outline" size="sm" disabled={isLastPage} onClick={() => setPage(totalPages - 1)}>
             <ChevronsRight className="h-4 w-4" />
           </Button>
         </div>
@@ -244,17 +246,20 @@ export default function CaseReportsList() {
 
       {/* Create Dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-4xl">
           <DialogHeader><DialogTitle>New Case Report</DialogTitle></DialogHeader>
-          <CaseReportForm
-            mode="create"
-            onSubmit={async (payload) => {
-              await casesApi.create(payload)
-              addToast({ title: "Case report created", variant: "success" })
-              setCreateOpen(false)
-              queryClient.invalidateQueries({ queryKey: ["case-history-list"] })
-            }}
-          />
+          <DialogBody>
+            <CaseReportForm
+              mode="create"
+              onCancel={() => setCreateOpen(false)}
+              onSubmit={async (payload) => {
+                await casesApi.create(payload)
+                addToast({ title: "Case report created", variant: "success" })
+                setCreateOpen(false)
+                queryClient.invalidateQueries({ queryKey: ["case-history-list"] })
+              }}
+            />
+          </DialogBody>
         </DialogContent>
       </Dialog>
     </div>

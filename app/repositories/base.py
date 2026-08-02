@@ -33,7 +33,7 @@ class BaseRepository(Generic[ModelType]):
             for key, value in filters.items():
                 if value is None:
                     continue
-                if key.endswith("__in") and isinstance(value, (list, tuple)):
+                if key.endswith("__in") and isinstance(value, (list, tuple, set)):
                     attr_name = key[:-4]
                     if hasattr(self.model, attr_name):
                         query = query.where(getattr(self.model, attr_name).in_(value))

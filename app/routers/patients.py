@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List, Optional
-import os, shutil, uuid
 from datetime import date
 from app.database import get_db
 from app.dependencies import get_current_user
@@ -16,6 +15,7 @@ from app.services.timeline_helper import record_timeline_event, build_changes
 from app.schemas.patient import PatientCreate, PatientUpdate, PatientResponse
 from app.schemas.common import MessageResponse
 from app.config import settings
+from app.utils.uploads import save_upload
 
 router = APIRouter(prefix="/patients", tags=["Patients"])
 
@@ -196,6 +196,7 @@ async def search_patients_advanced(
     doctor_id: Optional[str] = Query(None),
     op_no: Optional[str] = Query(None),
     phone: Optional[str] = Query(None),
+    email: Optional[str] = Query(None),
     abha_id: Optional[str] = Query(None),
     patient_source: Optional[str] = Query(None),
     age_from: Optional[int] = Query(None),
@@ -228,6 +229,8 @@ async def search_patients_advanced(
         filters["op_no"] = op_no
     if phone:
         filters["phone"] = phone
+    if email:
+        filters["email"] = email
     if abha_id:
         filters["abha_id"] = abha_id
     if patient_source:
@@ -305,6 +308,49 @@ async def search_patients_advanced(
         "size": page_size,
         "pages": total_pages,
     }
+
+
+@router.get("/duplicates")
+async def check_patient_duplicates(
+    full_name: Optional[str] = Query(None),
+    phone: Optional[str] = Query(None),
+    email: Optional[str] = Query(None),
+    hospital_id: Optional[str] = Query(None),
+    limit: int = Query(10, ge=1, le=25),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    verify_permission(current_user, Permission.MANAGE_PATIENTS, Permission.VIEW_ALL_PATIENTS)
+    if not any([full_name, phone, email]):
+        return {"candidates": [], "total": 0, "checked": False}
+    from app.services.duplicate_service import find_duplicate_patients
+    from app.models.hospital import Hospital
+
+    role = current_user.get("role")
+    effective_hospital_id = hospital_id
+    hospital_ids_in = None
+    if role == Role.DOCTOR.value:
+        if not effective_hospital_id and current_user.get("hospital_id"):
+            effective_hospital_id = current_user.get("hospital_id")
+    elif role == Role.HOSPITAL_ADMIN.value:
+        if not effective_hospital_id and current_user.get("hospital_id"):
+            effective_hospital_id = current_user.get("hospital_id")
+    elif role == Role.GROUP_ADMIN.value:
+        agid = current_user.get("admin_group_id")
+        if agid:
+            hospital_result = await db.execute(select(Hospital.id).where(Hospital.admin_group_id == agid))
+            hospital_ids_in = [row[0] for row in hospital_result.all()]
+
+    candidates = await find_duplicate_patients(
+        db,
+        full_name=full_name,
+        phone=phone,
+        email=email,
+        hospital_id=effective_hospital_id,
+        hospital_ids_in=hospital_ids_in,
+        limit=limit,
+    )
+    return {"candidates": candidates, "total": len(candidates), "checked": True}
 
 
 @router.get("/{patient_id}", response_model=PatientResponse)
@@ -428,13 +474,8 @@ async def upload_patient_photo(patient_id: str, file: UploadFile = File(...), db
     if not patient:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
     await verify_tenant_access(current_user, patient, "patient", db)
-    ext = os.path.splitext(file.filename)[1] if file.filename else ".jpg"
-    filename = f"{uuid.uuid4()}{ext}"
-    upload_path = os.path.join(settings.UPLOAD_DIR, "patient_photos")
-    os.makedirs(upload_path, exist_ok=True)
-    with open(os.path.join(upload_path, filename), "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    patient = await service.update(patient_id, {"photo_url": f"/uploads/patient_photos/{filename}"}, user_id=current_user.get("sub"))
+    photo_url = await save_upload(file, "patient_photos")
+    patient = await service.update(patient_id, {"photo_url": photo_url}, user_id=current_user.get("sub"))
     await record_timeline_event(db, patient_id=patient_id, action="Photo Uploaded",
         module="patient", description="Patient photo uploaded",
         current_user=current_user)

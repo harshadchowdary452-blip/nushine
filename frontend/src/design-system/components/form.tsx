@@ -1,5 +1,5 @@
 import * as React from "react"
-import { AlertCircle, CheckCircle2 } from "lucide-react"
+import { AlertCircle, AlertTriangle, CheckCircle2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/design-system/components/button"
 import { Label } from "@/design-system/components/label"
@@ -18,6 +18,7 @@ function FormField({
   error,
   hint,
   success,
+  warning,
   className,
   children,
 }: {
@@ -27,6 +28,7 @@ function FormField({
   error?: React.ReactNode
   hint?: React.ReactNode
   success?: React.ReactNode
+  warning?: React.ReactNode
   className?: string
   children: React.ReactNode
 }) {
@@ -55,6 +57,11 @@ function FormField({
             <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
             <span className="ds-break-anywhere">{success}</span>
           </p>
+        ) : warning ? (
+          <p className="ds-warning-text flex items-center gap-1">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+            <span className="ds-break-anywhere">{warning}</span>
+          </p>
         ) : hint ? (
           <p className="ds-helper-text">{hint}</p>
         ) : null}
@@ -66,13 +73,16 @@ FormField.displayName = "FormField"
 
 /**
  * A titled, collapsible form section. Long forms become scannable groups;
- * sections collapse to a summary so a screenful fits the viewport.
+ * sections collapse to a summary so a screenful fits the viewport. Pass
+ * `memoryKey` to persist each section's expanded/collapsed state across
+ * sessions (keyed `nushine.ws.form.section.<memoryKey>`).
  */
 function FormSection({
   title,
   description,
   icon: Icon,
   defaultOpen = true,
+  memoryKey,
   className,
   children,
 }: {
@@ -80,11 +90,37 @@ function FormSection({
   description?: string
   icon?: React.ComponentType<{ className?: string }>
   defaultOpen?: boolean
+  memoryKey?: string
   className?: string
   children: React.ReactNode
 }) {
+  const [open, setOpen] = React.useState<boolean | undefined>(() => {
+    if (!memoryKey) return undefined
+    try {
+      const raw = localStorage.getItem(`nushine.ws.form.section.${memoryKey}`)
+      const parsed = raw ? (JSON.parse(raw) as { v?: number; s?: { open?: boolean } }) : null
+      return typeof parsed?.s?.open === "boolean" ? parsed.s.open : undefined
+    } catch {
+      return undefined
+    }
+  })
+
+  function handleOpenChange(next: boolean) {
+    if (memoryKey) {
+      try {
+        localStorage.setItem(
+          `nushine.ws.form.section.${memoryKey}`,
+          JSON.stringify({ v: 1, s: { open: next } }),
+        )
+      } catch {
+        // storage unavailable — degrade gracefully
+      }
+    }
+    setOpen(next)
+  }
+
   return (
-    <Collapsible defaultOpen={defaultOpen} className={cn("ds-field", className)}>
+    <Collapsible open={open} onOpenChange={handleOpenChange} defaultOpen={defaultOpen} className={cn("ds-field", className)}>
       <CollapsibleTrigger className="group flex w-full items-center justify-between gap-3 rounded-[var(--ds-radius-lg)] py-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-primary)]/20">
         <span className="flex items-center gap-2.5">
           {Icon && (

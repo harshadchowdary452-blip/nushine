@@ -13,12 +13,14 @@ Tests the complete treatment execution lifecycle:
   → Verify Case Report synchronization
   → Verify Patient Timeline
 """
+import os
 import requests
 import sys
 import json
 from datetime import date, timedelta
 
 BASE = "http://localhost:8000/api/v1"
+PASSWORD = os.getenv("SUPER_ADMIN_PASSWORD", "")
 PASS_COUNT = 0
 FAIL_COUNT = 0
 
@@ -42,7 +44,10 @@ def main():
 
     # ── Step 0: Login ──
     print("\n[0] Login as superadmin...")
-    r = requests.post(f"{BASE}/auth/login", json={"email": "superadmin@dental.com", "password": "SuperAdmin@123"})
+    if not PASSWORD:
+        print("  FAIL  Missing SUPER_ADMIN_PASSWORD env var (must match the API's seeded admin)")
+        return 1
+    r = requests.post(f"{BASE}/auth/login", json={"email": "superadmin@dental.com", "password": PASSWORD})
     check("Login returns 200", r.status_code == 200, r.status_code)
     token = r.json()["access_token"]
     h = {"Authorization": f"Bearer {token}"}

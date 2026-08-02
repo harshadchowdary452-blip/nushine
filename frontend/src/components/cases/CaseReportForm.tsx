@@ -518,10 +518,13 @@ export default function CaseReportForm({
           </Button>
         </div>
       ) : (
-        <Button type="submit" className="w-full h-9 text-sm" disabled={!selectedPatient || !form.chief_complaint || saving}>
-          {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-          <Save className="h-4 w-4 mr-2" /> Create Case Report
-        </Button>
+        <div className="sticky bottom-0 -mx-6 -mb-5 mt-4 flex gap-3 border-t border-[var(--ds-border)] bg-[var(--ds-surface)] px-6 py-4">
+          <Button variant="outline" className="flex-1" type="button" onClick={onCancel} disabled={saving}>Cancel</Button>
+          <Button className="flex-1" type="submit" disabled={!selectedPatient || !form.chief_complaint || saving}>
+            {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+            <Save className="h-4 w-4 mr-2" /> Create Case Report
+          </Button>
+        </div>
       )}
     </form>
   )

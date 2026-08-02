@@ -5,6 +5,7 @@ import { Button } from "../ui/button"
 import { ScrollArea } from "../ui/scroll-area"
 import { Loader2, MessageSquare, Plus, Clock, User as UserIcon } from "lucide-react"
 import { useToast } from "@/components/ui/toast"
+import { extractDetail } from "@/types"
 import { crmApi } from "../../services/endpoints"
 
 interface Note {
@@ -35,9 +36,9 @@ export function NotesTimeline({ feedbackId, feedbackType: _feedbackType }: Props
     setLoading(true)
     crmApi.feedbackNotes.list(feedbackId)
       .then(setNotes)
-      .catch(() => {})
+      .catch((err: unknown) => addToast({ title: "Could not load notes", description: extractDetail(err), variant: "destructive" }))
       .finally(() => setLoading(false))
-  }, [feedbackId])
+  }, [feedbackId, addToast])
 
   async function handleAdd() {
     if (!feedbackId || !newNote.trim()) return

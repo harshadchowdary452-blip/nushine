@@ -52,7 +52,7 @@ class LeadCallOutcome(str, enum.Enum):
 class Lead(Base):
     __tablename__ = "leads"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    hospital_id: Mapped[str] = mapped_column(String(36), ForeignKey("hospitals.id"), nullable=False)
+    hospital_id: Mapped[str] = mapped_column(String(36), ForeignKey("hospitals.id"), nullable=False, index=True)
     assigned_staff_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
     assigned_doctor_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
     converted_patient_id: Mapped[str] = mapped_column(String(36), ForeignKey("patients.id"), nullable=True)
@@ -69,7 +69,7 @@ class Lead(Base):
     budget: Mapped[float] = mapped_column(Float, nullable=True)
     preferred_visit_date: Mapped[date] = mapped_column(Date, nullable=True)
     notes: Mapped[str] = mapped_column(Text, nullable=True)
-    status: Mapped[str] = mapped_column(String(30), nullable=False, default=LeadStatus.NEW.value)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default=LeadStatus.NEW.value, index=True)
     lead_score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_contacted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     next_follow_up_date: Mapped[date] = mapped_column(Date, nullable=True)

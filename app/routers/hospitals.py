@@ -27,7 +27,7 @@ async def create_hospital(data: HospitalCreate, db: AsyncSession = Depends(get_d
 
 
 @router.get("/")
-async def get_hospitals(skip: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=200), admin_group_id: Optional[str] = Query(None), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+async def get_hospitals(skip: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=200), admin_group_id: Optional[str] = Query(None), search: Optional[str] = Query(None), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.VIEW_OWN_HOSPITALS, Permission.VIEW_ALL_HOSPITALS)
     service = HospitalService(db)
     filters = {}
@@ -39,7 +39,11 @@ async def get_hospitals(skip: int = Query(0, ge=0), limit: int = Query(100, ge=1
             filters["id"] = current_user.get("hospital_id")
     elif role == Role.SUPER_ADMIN.value and admin_group_id:
         filters["admin_group_id"] = admin_group_id
-    return await service.get_all(skip=skip, limit=limit, filters=filters or None)
+    hospitals = await service.get_all(skip=skip, limit=limit, filters=filters or None)
+    if search and search.strip():
+        term = search.strip().lower()
+        hospitals = [h for h in hospitals if h.name and term in h.name.lower()]
+    return hospitals
 
 
 @router.get("/{hospital_id}", response_model=HospitalResponse)

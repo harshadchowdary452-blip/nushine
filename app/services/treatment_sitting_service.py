@@ -74,14 +74,9 @@ class TreatmentSittingService:
         )
         self.db.add(appt)
         await self.db.flush()
-        try:
-            max_num = await self.db.execute(select(func.max(Appointment.appointment_number)))
-            max_val = max_num.scalar()
-            next_num = (int(max_val.split("-")[1]) + 1) if max_val else 1
-            appt.appointment_number = f"APPT-{next_num:04d}"
-            await self.db.flush()
-        except Exception:
-            pass
+        # O(1) UUID-derived display number — no full-table MAX() scan.
+        appt.appointment_number = f"APPT-{appt.id[:8].upper()}"
+        await self.db.flush()
         logger.info("Auto-created appointment %s for patient %s on %s", appt.id, case.patient_id, sitting.next_appointment_date)
         try:
             patient_obj = await self.db.get(Patient, case.patient_id)

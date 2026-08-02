@@ -13,8 +13,21 @@ class PatientRepository(BaseRepository[Patient]):
     def __init__(self, db: AsyncSession):
         super().__init__(Patient, db)
 
+    async def get(self, id: Any) -> Optional[Patient]:
+        query = select(self.model).where(self.model.id == id).options(
+            selectinload(Patient.hospital),
+            selectinload(Patient.doctor),
+            selectinload(Patient.created_by),
+            selectinload(Patient.updated_by),
+        )
+        result = await self.db.execute(query)
+        return result.scalar_one_or_none()
+
     async def get_all(self, skip: int = 0, limit: int = 100, filters: Optional[Dict[str, Any]] = None, order_by: Optional[str] = None, descending: bool = False) -> List[Patient]:
-        query = select(self.model)
+        query = select(self.model).options(
+            selectinload(Patient.hospital),
+            selectinload(Patient.doctor),
+        )
         if filters:
             for key, value in filters.items():
                 if value is None or value == "":
@@ -76,7 +89,7 @@ class PatientRepository(BaseRepository[Patient]):
                     query = query.where(Patient.id.in_(subq))
                 elif key == "patient_source" and value:
                     query = query.where(Patient.patient_source.ilike(f"%{value}%"))
-                elif key.endswith("__in") and isinstance(value, (list, tuple)):
+                elif key.endswith("__in") and isinstance(value, (list, tuple, set)):
                     attr_name = key[:-4]
                     if hasattr(self.model, attr_name):
                         query = query.where(getattr(self.model, attr_name).in_(value))
@@ -164,7 +177,7 @@ class PatientRepository(BaseRepository[Patient]):
                     query = query.where(Patient.id.in_(subq))
                 elif key == "patient_source" and value:
                     query = query.where(Patient.patient_source.ilike(f"%{value}%"))
-                elif key.endswith("__in") and isinstance(value, (list, tuple)):
+                elif key.endswith("__in") and isinstance(value, (list, tuple, set)):
                     attr_name = key[:-4]
                     if hasattr(self.model, attr_name):
                         query = query.where(getattr(self.model, attr_name).in_(value))

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/components/ui/toast"
+import { useTrackRecent } from "@/hooks/useTrackRecent"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { Case, TreatmentPlanItem, TreatmentPlan, CaseTimeline } from "@/types"
 import ProfessionalOdontogram from "@/components/toothchart/ProfessionalOdontogram"
@@ -42,6 +43,14 @@ export default function CaseReportDetail() {
     refetchOnReconnect: false,
   })
   const c: Case | undefined = caseData
+
+  useTrackRecent(
+    "case",
+    caseData?.id,
+    caseData,
+    (c) => c?.patient_name || "Case",
+    (c) => (c?.case_number ? `#${c.case_number}` : c?.chief_complaint || undefined)
+  )
 
   const { data: planItems } = useQuery({
     queryKey: ["treatment-plan-items", id],

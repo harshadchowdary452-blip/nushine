@@ -20,12 +20,13 @@ Flow:
 16. Multiple clinical episodes per patient
 17. Findings History with severity
 """
+import os
 import requests
 import json
 import sys
 
 BASE = "http://localhost:8000/api/v1"
-PASSWORD = "SuperAdmin@123"
+PASSWORD = os.getenv("SUPER_ADMIN_PASSWORD", "")
 
 passed = 0
 failed = 0

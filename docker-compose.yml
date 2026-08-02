@@ -1,5 +1,10 @@
 version: "3.8"
 
+# Production-compose baseline. The API container refuses to start without
+# SECRET_KEY / SUPER_ADMIN_PASSWORD (see app/config.py production validation).
+# The React SPA is intentionally not built here — deploy the frontend separately
+# (e.g. nginx/CDN) and point CORS_ORIGINS at its public origin.
+
 services:
   db:
     image: postgres:16-alpine
@@ -38,9 +43,15 @@ services:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/dental_hospital
       DATABASE_URL_SYNC: postgresql://postgres:postgres@db:5432/dental_hospital
       REDIS_URL: redis://redis:6379/0
-      SECRET_KEY: ${SECRET_KEY:-super-secret-key-change-in-production}
+      # Required at `docker compose up` time — no weak fallbacks (the app refuses
+      # to boot with placeholder secrets in production).
+      #   SECRET_KEY:  python -c "import secrets;print(secrets.token_urlsafe(48))"
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set in the environment}
+      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:?SUPER_ADMIN_PASSWORD must be set in the environment}
+      SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL:-superadmin@dental.com}
       ENVIRONMENT: production
       DEBUG: "false"
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
     depends_on:
       db:
         condition: service_healthy

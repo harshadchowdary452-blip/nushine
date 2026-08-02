@@ -36,7 +36,7 @@ class ConsentFormRepository(BaseRepository[ConsentForm]):
             if date_to:
                 query = query.where(ConsentForm.created_at <= date_to)
             for key, value in filters.items():
-                if key.endswith("__in") and isinstance(value, (list, tuple)):
+                if key.endswith("__in") and isinstance(value, (list, tuple, set)):
                     attr_name = key[:-4]
                     if hasattr(self.model, attr_name):
                         query = query.where(getattr(self.model, attr_name).in_(value))

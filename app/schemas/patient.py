@@ -8,6 +8,10 @@ class PatientCreate(BaseModel):
     doctor_id: Optional[str] = None
     full_name: str = Field(..., min_length=2, max_length=255)
     gender: Optional[str] = None
+    patient_type: Optional[str] = None
+    guardian_name: Optional[str] = None
+    guardian_relationship: Optional[str] = None
+    guardian_phone: Optional[str] = None
     date_of_birth: Optional[date] = None
     age: Optional[int] = None
     phone: Optional[str] = None
@@ -26,12 +30,17 @@ class PatientCreate(BaseModel):
     medical_history: Optional[str] = None
     abha_id: Optional[str] = None
     op_no: Optional[str] = None
+    emergency_contact: Optional[str] = None
     status: Optional[str] = None
 
 
 class PatientUpdate(BaseModel):
     full_name: Optional[str] = None
     gender: Optional[str] = None
+    patient_type: Optional[str] = None
+    guardian_name: Optional[str] = None
+    guardian_relationship: Optional[str] = None
+    guardian_phone: Optional[str] = None
     date_of_birth: Optional[date] = None
     age: Optional[int] = None
     phone: Optional[str] = None
@@ -59,6 +68,10 @@ class PatientResponse(BaseModel):
     doctor_id: Optional[str]
     full_name: str
     gender: Optional[str]
+    patient_type: str
+    guardian_name: Optional[str]
+    guardian_relationship: Optional[str]
+    guardian_phone: Optional[str]
     date_of_birth: Optional[date]
     age: Optional[int]
     phone: Optional[str]

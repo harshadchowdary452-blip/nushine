@@ -1,10 +1,19 @@
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import field_validator
+from pydantic import model_validator
 from typing import List
 
 
 BASE_DIR = Path(__file__).resolve().parents[1]
+
+_WEAK_SECRETS = {
+    "CHANGE-ME-IN-PRODUCTION",
+    "change-this-in-production",
+    "super-secret-key-change-in-production",
+    "supersecret",
+    "secret",
+    "changeme",
+}
 
 
 class Settings(BaseSettings):
@@ -62,21 +71,18 @@ class Settings(BaseSettings):
     SUPER_ADMIN_EMAIL: str = "superadmin@dental.com"
     SUPER_ADMIN_PASSWORD: str = "CHANGE-ME-IN-PRODUCTION"
 
-    @field_validator("SECRET_KEY")
-    @classmethod
-    def validate_secret_key(cls, v: str) -> str:
-        import os
-        if os.environ.get("ENVIRONMENT") == "production" and v in ("CHANGE-ME-IN-PRODUCTION", "change-this-in-production"):
-            raise ValueError("SECRET_KEY must be set to a secure value in production")
-        return v
-
-    @field_validator("SUPER_ADMIN_PASSWORD")
-    @classmethod
-    def validate_admin_password(cls, v: str) -> str:
-        import os
-        if os.environ.get("ENVIRONMENT") == "production" and v == "CHANGE-ME-IN-PRODUCTION":
-            raise ValueError("SUPER_ADMIN_PASSWORD must be set in production")
-        return v
+    @model_validator(mode="after")
+    def validate_production_secrets(self):
+        # Fail-fast in EVERY environment, not just when ENVIRONMENT is set as an
+        # OS variable — `.env` overrides otherwise skipped this guard entirely.
+        if self.ENVIRONMENT == "production":
+            if self.SECRET_KEY in _WEAK_SECRETS or len(self.SECRET_KEY) < 32:
+                raise ValueError("SECRET_KEY must be a strong random value (>= 32 chars) in production")
+            if self.SUPER_ADMIN_PASSWORD in ("", "CHANGE-ME-IN-PRODUCTION") or len(self.SUPER_ADMIN_PASSWORD) < 12:
+                raise ValueError("SUPER_ADMIN_PASSWORD must be a strong value in production")
+            if "sqlite" in self.DATABASE_URL:
+                raise ValueError("SQLite is not allowed in production")
+        return self
 
 
 settings = Settings()

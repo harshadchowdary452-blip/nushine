@@ -7,7 +7,7 @@ from sqlalchemy import select, func, extract, and_
 from fastapi import HTTPException, status
 from app.repositories.appointment_repository import AppointmentRepository
 from app.repositories.audit_log_repository import AuditLogRepository
-from app.models.appointment import Appointment, AppointmentStatus, AppointmentType, TREATMENT_DURATIONS, PROCEDURE_DURATIONS, resolve_duration, Appointment as ApptModel
+from app.models.appointment import Appointment, AppointmentStatus, AppointmentType, TREATMENT_DURATIONS, PROCEDURE_DURATIONS, resolve_duration
 from app.models.patient import Patient
 from app.models.user import User
 from app.models.notification import Notification
@@ -355,15 +355,9 @@ class AppointmentService:
                 "notes": data.get("notes"),
             }
             appointment = await self.repo.create(**create_data)
-
-            try:
-                max_num = await self.db.execute(select(func.max(ApptModel.appointment_number)))
-                max_val = max_num.scalar()
-                next_num = (int(max_val.split("-")[1]) + 1) if max_val else 1
-                appointment.appointment_number = f"APPT-{next_num:04d}"
-                await self.db.flush()
-            except Exception:
-                pass
+            # O(1) UUID-derived display number — no full-table MAX() scan.
+            appointment.appointment_number = f"APPT-{appointment.id[:8].upper()}"
+            await self.db.flush()
 
             try:
                 notification = Notification(

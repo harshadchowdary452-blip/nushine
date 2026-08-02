@@ -100,6 +100,25 @@ export { ButtonGroup, SplitButton, DropdownButton, Fab } from "./components/butt
 // Forms
 export { FormField, FormSection, StickySaveBar } from "./components/form"
 
+// Enterprise Form System (Part 3D)
+export { EnterpriseActionBar } from "./components/form-action-bar"
+export type { EnterpriseActionBarProps } from "./components/form-action-bar"
+export { EnterpriseWizard } from "./components/enterprise-wizard"
+export type { EnterpriseWizardProps, EnterpriseWizardStep } from "./components/enterprise-wizard"
+export { FileUpload } from "./components/file-upload"
+export type { FileUploadProps } from "./components/file-upload"
+export { EnterpriseFormDialog, EnterpriseFieldGrid } from "./components/enterprise-form"
+export type { EnterpriseFormDialogProps, EnterpriseFieldGridProps } from "./components/enterprise-form"
+
+// Enterprise Business Workflow Engine (Part 3D final)
+export { WorkflowProvider, useWorkflowContext } from "./components/workflow-context"
+export type { WorkflowContextValue, WorkflowParentRecord } from "./components/workflow-context"
+export { WorkflowSummaryPanel, WorkflowNextActions, DuplicateWarning } from "./components/workflow-completion"
+export type {
+  WorkflowSummaryPanelProps, WorkflowSummaryItem, WorkflowNextActionsProps,
+  WorkflowNextAction, DuplicateWarningProps, DuplicateCandidateRow,
+} from "./components/workflow-completion"
+
 // Date & time
 export { default as DatePicker, MonthPicker, TimePicker, DateTimePicker, DateRangePicker } from "./components/date-time"
 export type { DateRange } from "./components/date-time"

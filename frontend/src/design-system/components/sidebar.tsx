@@ -9,7 +9,7 @@ import {
   Settings, ChevronLeft, Building2, Shield, MessageSquare,
   Activity, IndianRupee, FileText,
   Clock, UserPlus, Search, Download, LayoutList, Kanban,
-  Sun, Moon, Star, ChevronDown, Hospital, Menu,
+  Sun, Moon, Star, ChevronDown, Hospital, Menu, ListChecks,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useSidebarStore } from "@/store/sidebarStore"
@@ -41,7 +41,10 @@ const navConfig: Record<RoleKey, NavGroup[]> = {
   SUPER_ADMIN: [
     {
       label: "Overview",
-      items: [{ label: "Dashboard", icon: LayoutDashboard, path: "/" }],
+      items: [
+        { label: "Dashboard", icon: LayoutDashboard, path: "/" },
+        { label: "Tasks", icon: ListChecks, path: "/tasks" },
+      ],
     },
     {
       label: "Administration",
@@ -59,7 +62,10 @@ const navConfig: Record<RoleKey, NavGroup[]> = {
   GROUP_ADMIN: [
     {
       label: "Overview",
-      items: [{ label: "Dashboard", icon: LayoutDashboard, path: "/" }],
+      items: [
+        { label: "Dashboard", icon: LayoutDashboard, path: "/" },
+        { label: "Tasks", icon: ListChecks, path: "/tasks" },
+      ],
     },
     {
       label: "Administration",
@@ -84,7 +90,10 @@ const navConfig: Record<RoleKey, NavGroup[]> = {
   HOSPITAL_ADMIN: [
     {
       label: "Overview",
-      items: [{ label: "Dashboard", icon: LayoutDashboard, path: "/" }],
+      items: [
+        { label: "Dashboard", icon: LayoutDashboard, path: "/" },
+        { label: "Tasks", icon: ListChecks, path: "/tasks" },
+      ],
     },
     {
       label: "Patient Management",
@@ -135,6 +144,7 @@ const navConfig: Record<RoleKey, NavGroup[]> = {
       label: "Overview",
       items: [
         { label: "Dashboard", icon: LayoutDashboard, path: "/" },
+        { label: "Tasks", icon: ListChecks, path: "/tasks" },
         { label: "Availability", icon: Clock, path: "/doctors/availability" },
       ],
     },

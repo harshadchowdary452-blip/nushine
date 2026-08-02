@@ -98,6 +98,7 @@ export default function DoctorDashboard() {
     staleTime: 10000,
     gcTime: 60000,
     refetchInterval: 30000,
+    refetchIntervalInBackground: false,
   })
 
   if (!user) return null

@@ -19,8 +19,8 @@ class ConsultantService:
     async def get(self, consultant_id: str) -> Optional[Consultant]:
         return await self.repo.get(consultant_id)
 
-    async def get_all(self, skip: int = 0, limit: int = 100, filters: dict = None) -> List[Consultant]:
-        return await self.repo.get_all(skip=skip, limit=limit, filters=filters)
+    async def get_all(self, skip: int = 0, limit: int = 100, filters: dict = None, order_by: str = None, descending: bool = False) -> List[Consultant]:
+        return await self.repo.get_all(skip=skip, limit=limit, filters=filters, order_by=order_by, descending=descending)
 
     async def update(self, consultant_id: str, data: dict, user_id: str = None) -> Optional[Consultant]:
         consultant = await self.repo.update(consultant_id, **data)

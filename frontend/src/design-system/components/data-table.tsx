@@ -832,9 +832,9 @@ export default function DataTable<TData, TValue = unknown>({
 
       {error ? (
         <ErrorState
-          kind={typeof error === "string" ? "unknown" : "unknown"}
+          kind="server"
           title="Couldn't load this data"
-          description={typeof error === "string" ? error : error.message}
+          description="Something went wrong while loading this data. Please try again."
           onRetry={onRetry}
           size="section"
         />

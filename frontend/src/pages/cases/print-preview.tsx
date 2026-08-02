@@ -4,11 +4,13 @@ import { Loader2, Printer, Download, ArrowLeft } from "lucide-react"
 import { casesApi } from "@/services/endpoints"
 import api from "@/services/api"
 import { Button } from "@/components/ui/button"
+import { useToast } from "@/components/ui/toast"
 import CaseReportPrint from "./CaseReportPrint"
 
 export default function CasePrintPreview() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { addToast } = useToast()
   const { data: c, isFetching } = useQuery({
     queryKey: ["case", id],
     queryFn: () => casesApi.get(id!),
@@ -42,8 +44,12 @@ export default function CasePrintPreview() {
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown error"
-      alert("PDF download failed: " + msg)
+      void err
+      addToast({
+        variant: "destructive",
+        title: "PDF download failed",
+        description: "We couldn't generate this PDF right now. Please try again in a moment.",
+      })
     }
   }
 

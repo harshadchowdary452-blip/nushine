@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from app.repositories.base import BaseRepository
 from app.models.billing import Billing
 from app.models.case import Case
@@ -21,12 +21,16 @@ class BillingRepository(BaseRepository[Billing]):
             if hospital_ids_in:
                 query = query.join(Case, Billing.case_id == Case.id).join(Patient, Case.patient_id == Patient.id).where(Patient.hospital_id.in_(hospital_ids_in))
             for key, value in filters.items():
-                if key.endswith("__in") and isinstance(value, (list, tuple)):
+                if key.endswith("__in") and isinstance(value, (list, tuple, set)):
                     attr_name = key[:-4]
                     if hasattr(self.model, attr_name):
                         query = query.where(getattr(self.model, attr_name).in_(value))
-                elif key == "search" and value and hasattr(self.model, "full_name"):
-                    query = query.where(self.model.full_name.ilike(f"%{value}%"))
+                elif key == "search" and value:
+                    term = f"%{value}%"
+                    conditions = [Billing.patient_name.ilike(term), Billing.invoice_number.ilike(term)]
+                    if hasattr(self.model, "full_name"):
+                        conditions.append(self.model.full_name.ilike(term))
+                    query = query.where(or_(*conditions))
                 elif hasattr(self.model, key) and value is not None:
                     query = query.where(getattr(self.model, key) == value)
         if order_by and hasattr(self.model, order_by):

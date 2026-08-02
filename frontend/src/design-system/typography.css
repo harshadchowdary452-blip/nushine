@@ -220,6 +220,15 @@
     color: var(--ds-success);
   }
 
+  .ds-warning-text {
+    font-family: var(--ds-error-text-family);
+    font-size: var(--ds-error-text-size);
+    font-weight: var(--ds-error-text-weight);
+    line-height: var(--ds-error-text-leading);
+    letter-spacing: var(--ds-error-text-tracking);
+    color: var(--ds-warning);
+  }
+
   /* ─────────────────────────────────────────────────────────────────────────
      CONTENT
      ───────────────────────────────────────────────────────────────────────── */

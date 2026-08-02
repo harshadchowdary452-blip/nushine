@@ -2,7 +2,9 @@ import * as React from "react"
 import { useState } from "react"
 import { CalendarRange, ChevronDown, Download, Maximize2, Minimize2, RefreshCw } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { PageContainer } from "@/design-system"
+// Deep import (not the barrel) to avoid a barrel → dashboard → shell → barrel cycle
+// that forces Rollup to retain the recharts chart modules in the entry graph.
+import { PageContainer } from "@/design-system/components/page-container"
 import { Button } from "@/design-system/components/button"
 import { Input } from "@/design-system/components/input"
 import { Label } from "@/design-system/components/label"

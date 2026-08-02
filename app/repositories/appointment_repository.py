@@ -68,7 +68,7 @@ def _apply_common_filters(query, filters: Dict[str, Any]):
                 .join(Billing, Billing.case_id == CaseModel.id, isouter=True)
                 .where(Billing.payment_status == value)
             )
-        elif key.endswith("__in") and isinstance(value, (list, tuple)):
+        elif key.endswith("__in") and isinstance(value, (list, tuple, set)):
             attr_name = key[:-4]
             if hasattr(Appointment, attr_name):
                 query = query.where(getattr(Appointment, attr_name).in_(value))

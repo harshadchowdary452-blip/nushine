@@ -21,6 +21,18 @@ export function useToast() {
   return React.useContext(ToastProvider)
 }
 
+// Module-level sink so non-component code (e.g. the react-query cache) can push
+// toasts without access to the provider context.
+let toastSink: ((toast: Omit<Toast, "id">) => void) | null = null
+
+export function registerToastSink(fn: ((toast: Omit<Toast, "id">) => void) | null) {
+  toastSink = fn
+}
+
+export function toast(opts: Omit<Toast, "id">) {
+  toastSink?.(opts)
+}
+
 export interface Toast {
   id: string
   title?: string
@@ -109,6 +121,11 @@ export function Toaster() {
   const removeToast = React.useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id))
   }, [])
+
+  React.useEffect(() => {
+    registerToastSink(addToast)
+    return () => registerToastSink(null)
+  }, [addToast])
 
   return (
     <ToastProvider.Provider value={{ toasts, addToast, removeToast }}>

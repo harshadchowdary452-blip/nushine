@@ -59,6 +59,7 @@ from app.models.automation_execution_queue import AutomationExecutionQueue
 from app.models.follow_up_template import FollowUpTemplate
 from app.models.generated_enquiry import GeneratedEnquiry
 from app.models.event_log import EventLog
+from app.models.task import Task, TaskStatus, TaskPriority
 
 __all__ = [
     "AdminGroup", "Hospital", "User", "Patient", "Consultant",
@@ -97,4 +98,5 @@ __all__ = [
     "FollowUpTemplate",
     "GeneratedEnquiry",
     "EventLog",
+    "Task", "TaskStatus", "TaskPriority",
 ]

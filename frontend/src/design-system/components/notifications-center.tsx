@@ -2,13 +2,18 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
+import { useNavigate } from "react-router-dom"
 import { motion } from "framer-motion"
 import {
   Bell, Calendar, AlertCircle, MessageSquare, Clock, Trash2, X, CheckCheck,
+  CheckCircle2, FlaskConical, Hourglass, UserPlus, Workflow,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useFixedPosition, useOverlayDismiss, resolveOverlayLayer } from "@/lib/overlay"
 import { notificationsApi } from "@/services/endpoints"
+import { entityPath } from "@/lib/entity-links"
+import { extractDetail } from "@/types"
+import { useToast } from "@/design-system/components/toast"
 import { format } from "date-fns"
 
 export interface NotificationItem {
@@ -17,6 +22,8 @@ export interface NotificationItem {
   description: string
   type: string
   is_read: boolean
+  entity_type?: string | null
+  entity_id?: string | null
   created_at: string
 }
 
@@ -28,15 +35,31 @@ const iconMap: Record<string, { icon: React.ElementType; color: string; label: s
   billing: { icon: AlertCircle, color: "text-[var(--ds-warning)]", label: "Billing" },
   crm: { icon: MessageSquare, color: "text-[var(--ds-primary)]", label: "CRM" },
   system: { icon: AlertCircle, color: "text-[var(--ds-text-tertiary)]", label: "System" },
+  follow_up_assigned: { icon: MessageSquare, color: "text-[var(--ds-primary)]", label: "Follow-up assigned" },
+  workflow: { icon: Workflow, color: "text-[var(--ds-primary)]", label: "Workflow" },
+  treatment_overdue: { icon: AlertCircle, color: "text-[var(--ds-danger)]", label: "Treatment overdue" },
+  treatment_completed: { icon: CheckCircle2, color: "text-[var(--ds-success)]", label: "Treatment completed" },
+  lab_delay: { icon: FlaskConical, color: "text-[var(--ds-warning)]", label: "Lab delay" },
+  patient_waiting: { icon: Hourglass, color: "text-[var(--ds-warning)]", label: "Patient waiting" },
+  pending_assignment: { icon: UserPlus, color: "text-[var(--ds-info)]", label: "Assignment pending" },
+  daily_queue: { icon: Calendar, color: "text-[var(--ds-info)]", label: "Today's queue" },
 }
 
 const filters = [
-  { key: "all", label: "All" },
-  { key: "unread", label: "Unread" },
-  { key: "appointment", label: "Appointments" },
-  { key: "billing", label: "Billing" },
-  { key: "crm", label: "CRM" },
-  { key: "system", label: "System" },
+  { key: "all", label: "All", match: () => true },
+  { key: "unread", label: "Unread", match: (n: NotificationItem) => !n.is_read },
+  {
+    key: "appointment", label: "Appointments",
+    match: (n: NotificationItem) => n.type === "appointment" || n.type === "daily_queue",
+  },
+  {
+    key: "treatment", label: "Treatments",
+    match: (n: NotificationItem) =>
+      ["treatment_overdue", "treatment_completed", "lab_delay", "patient_waiting", "pending_assignment"].includes(n.type),
+  },
+  { key: "billing", label: "Billing", match: (n: NotificationItem) => n.type === "billing" },
+  { key: "crm", label: "CRM", match: (n: NotificationItem) => n.type === "follow_up_assigned" || n.type === "message" },
+  { key: "system", label: "System", match: (n: NotificationItem) => n.type === "workflow" || n.type === "system" },
 ] as const
 type FilterKey = (typeof filters)[number]["key"]
 
@@ -68,6 +91,8 @@ export default function NotificationsCenter({
   const popupRef = useRef<HTMLDivElement>(null)
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
   const [activeFilter, setActiveFilter] = useState<FilterKey>("all")
+  const navigate = useNavigate()
+  const { addToast } = useToast()
   const { position } = useFixedPosition(open, triggerRef, { gap: 6, align: "end", popupRef })
   useOverlayDismiss(open, () => onOpenChange(false), triggerRef, popupRef)
   const layer = resolveOverlayLayer(triggerRef.current)
@@ -77,17 +102,20 @@ export default function NotificationsCenter({
       const data = await notificationsApi.list()
       onUnreadCountChange(data?.unread ?? 0)
       setNotifications(data?.items ?? [])
-    } catch {
+    } catch (err: unknown) {
       setNotifications([])
+      addToast({ title: "Could not load notifications", description: extractDetail(err), variant: "destructive" })
     }
-  }, [onUnreadCountChange])
+  }, [onUnreadCountChange, addToast])
 
   const markAllRead = async () => {
     try {
       await notificationsApi.markAllRead()
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })))
       onUnreadCountChange(0)
-    } catch { /* ignore */ }
+    } catch (err: unknown) {
+      addToast({ title: "Could not mark notifications as read", description: extractDetail(err), variant: "destructive" })
+    }
   }
 
   useEffect(() => {
@@ -95,15 +123,39 @@ export default function NotificationsCenter({
     fetchNotifications()
   }, [open, fetchNotifications])
 
+  const markRead = async (id: string) => {
+    try {
+      await notificationsApi.markRead(id)
+    } catch (err: unknown) {
+      addToast({ title: "Could not update notification", description: extractDetail(err), variant: "destructive" })
+    }
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)))
+    const stillUnread = notifications.filter((n) => n.id !== id && !n.is_read).length
+    onUnreadCountChange(stillUnread)
+  }
+
+  const openNotification = async (n: NotificationItem) => {
+    if (!n.is_read) {
+      await markRead(n.id)
+    }
+    onOpenChange(false)
+    const path = entityPath(n.entity_type, n.entity_id)
+    if (path) navigate(path)
+  }
+
   const handleDelete = async (id: string) => {
     try {
       await notificationsApi.delete(id)
       setNotifications((prev) => prev.filter((n) => n.id !== id))
-    } catch { /* ignore */ }
+    } catch (err: unknown) {
+      addToast({ title: "Could not delete notification", description: extractDetail(err), variant: "destructive" })
+    }
     try {
       const data = await notificationsApi.unreadCount()
       onUnreadCountChange(data?.unread ?? 0)
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore count refresh failure */
+    }
   }
 
   const handleDeleteAll = async () => {
@@ -111,13 +163,14 @@ export default function NotificationsCenter({
       await notificationsApi.deleteAll()
       setNotifications([])
       onUnreadCountChange(0)
-    } catch { /* ignore */ }
+    } catch (err: unknown) {
+      addToast({ title: "Could not clear notifications", description: extractDetail(err), variant: "destructive" })
+    }
   }
 
   const filtered = notifications.filter((n) => {
-    if (activeFilter === "all") return true
-    if (activeFilter === "unread") return !n.is_read
-    return n.type === activeFilter
+    const active = filters.find((f) => f.key === activeFilter) ?? filters[0]
+    return active.match(n)
   })
 
   const unreadTotal = notifications.filter((n) => !n.is_read).length
@@ -216,13 +269,26 @@ export default function NotificationsCenter({
                   {filtered.map((n) => {
                     const mapped = iconMap[n.type] || { icon: Bell, color: "text-[var(--ds-text-tertiary)]", label: "System" }
                     const Icon = mapped.icon
+                    const hasTarget = !!entityPath(n.entity_type, n.entity_id)
                     return (
                       <div
                         key={n.id}
-                        role="listitem"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => openNotification(n)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault()
+                            openNotification(n)
+                          }
+                        }}
+                        aria-label={`${n.title}${hasTarget ? ", open record" : ""}${!n.is_read ? ", unread" : ""}`}
                         className={cn(
-                          "group flex gap-3 px-4 py-3 transition-colors",
-                          !n.is_read ? "bg-[var(--ds-primary-subtle)]" : "hover:bg-[var(--ds-surface-hover)]"
+                          "group flex gap-3 px-4 py-3 text-left transition-colors",
+                          !n.is_read
+                            ? "bg-[var(--ds-primary-subtle)] cursor-pointer hover:bg-[var(--ds-primary-light)]"
+                            : "hover:bg-[var(--ds-surface-hover)] cursor-pointer",
+                          !hasTarget && "cursor-default"
                         )}
                       >
                         <div className={cn("mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--ds-radius-lg)] bg-[var(--ds-surface-secondary)]", mapped.color)}>
@@ -238,10 +304,14 @@ export default function NotificationsCenter({
                             {timeAgo(n.created_at)}
                             <span className="mx-1 text-[var(--ds-border)]">•</span>
                             <span className="capitalize">{mapped.label}</span>
+                            {hasTarget && <span className="ml-1 text-[var(--ds-primary)]">· Open</span>}
                           </p>
                         </div>
                         <button
-                          onClick={() => handleDelete(n.id)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDelete(n.id)
+                          }}
                           aria-label={`Delete: ${n.title}`}
                           className="flex h-7 w-7 shrink-0 items-center justify-center self-start rounded-[var(--ds-radius-lg)] text-[var(--ds-text-tertiary)] opacity-0 transition-all group-hover:opacity-100 hover:bg-[var(--ds-danger-subtle)] hover:text-[var(--ds-danger)] focus-visible:opacity-100"
                         >

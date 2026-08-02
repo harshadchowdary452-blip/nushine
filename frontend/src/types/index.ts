@@ -92,6 +92,8 @@ export interface Hospital {
 
 export type PatientGender = "MALE" | "FEMALE" | "OTHER"
 
+export type PatientType = "ADULT" | "CHILD"
+
 export interface Patient {
   id: string
   hospital_id: string
@@ -99,6 +101,10 @@ export interface Patient {
   doctor_id: string | null
   full_name: string
   gender: PatientGender | null
+  patient_type?: PatientType
+  guardian_name?: string | null
+  guardian_relationship?: string | null
+  guardian_phone?: string | null
   date_of_birth: string | null
   age: number | null
   phone: string | null

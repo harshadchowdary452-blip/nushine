@@ -34,25 +34,13 @@ class ConsentFormService:
                 cf.uploader_name = u.full_name
         return cf
 
-    async def _get_upload_dir(self, hospital_id: str) -> str:
-        upload_dir = os.path.join(settings.UPLOAD_DIR, "consent_forms", hospital_id)
-        os.makedirs(upload_dir, exist_ok=True)
-        return upload_dir
-
-    async def create(self, data: dict, file_bytes: bytes, file_ext: str, user_id: str) -> ConsentForm:
+    async def create(self, data: dict, pdf_path: str, user_id: str) -> ConsentForm:
         try:
             hospital_id = data.get("hospital_id")
             if not hospital_id:
                 raise HTTPException(status_code=400, detail="hospital_id is required")
 
-            upload_dir = await self._get_upload_dir(hospital_id)
-            import uuid
-            file_name = f"{hospital_id}_{data.get('patient_id', 'unknown')}_{int(datetime.now().timestamp())}{file_ext}"
-            file_path = os.path.join(upload_dir, file_name)
-            with open(file_path, "wb") as f:
-                f.write(file_bytes)
-
-            data["pdf_path"] = file_path
+            data["pdf_path"] = pdf_path
             data["uploaded_by"] = user_id
 
             cf = await self.repo.create(**data)
@@ -67,7 +55,7 @@ class ConsentFormService:
             raise
         except Exception as e:
             logger.exception("CREATE_CONSENT_FORM - Error: %s", str(e))
-            raise HTTPException(status_code=500, detail=f"Failed to create consent form: {str(e)}")
+            raise HTTPException(status_code=500, detail="Failed to create consent form")
 
     async def get_all(self, skip: int = 0, limit: int = 100, filters: dict = None) -> List[ConsentForm]:
         items = await self.repo.get_all(skip=skip, limit=limit, filters=filters)
@@ -117,20 +105,13 @@ class ConsentFormService:
             logger.exception("UPDATE_CONSENT_FORM - Error: %s", str(e))
             raise HTTPException(status_code=500, detail=f"Failed to update consent form: {str(e)}")
 
-    async def replace_pdf(self, cf_id: str, file_bytes: bytes, file_ext: str, user_id: str) -> Optional[ConsentForm]:
+    async def replace_pdf(self, cf_id: str, pdf_path: str, user_id: str) -> Optional[ConsentForm]:
         try:
             cf = await self.repo.get(cf_id)
             if not cf:
                 return None
             old_path = cf.pdf_path
-            upload_dir = os.path.join(settings.UPLOAD_DIR, "consent_forms", cf.hospital_id)
-            os.makedirs(upload_dir, exist_ok=True)
-            import uuid
-            file_name = f"{cf.hospital_id}_{cf.patient_id or 'unknown'}_{int(datetime.now().timestamp())}{file_ext}"
-            file_path = os.path.join(upload_dir, file_name)
-            with open(file_path, "wb") as f:
-                f.write(file_bytes)
-            cf = await self.repo.update(cf_id, pdf_path=file_path)
+            cf = await self.repo.update(cf_id, pdf_path=pdf_path)
             if old_path and os.path.exists(old_path):
                 try:
                     os.remove(old_path)

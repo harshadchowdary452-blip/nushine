@@ -40,8 +40,8 @@ async def check_appointment_reminders():
                         hospital_name, doctor_name = await _reminder_context(
                             db, patient.id, getattr(apt, "hospital_id", None), getattr(apt, "doctor_id", None) or patient.doctor_id)
                         await send_appointment_reminder(patient.phone, patient.full_name, apt.appointment_date.isoformat(), apt.appointment_time.strftime("%H:%M"), hospital_name, doctor_name)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.exception("check_appointment_reminders failed: %s", e)
         await asyncio.sleep(3600)
 
 
@@ -59,8 +59,8 @@ async def check_same_day_appointments():
                         hospital_name, doctor_name = await _reminder_context(
                             db, patient.id, getattr(apt, "hospital_id", None), getattr(apt, "doctor_id", None) or patient.doctor_id)
                         await send_appointment_reminder(patient.phone, patient.full_name, apt.appointment_date.isoformat(), apt.appointment_time.strftime("%H:%M"), hospital_name, doctor_name)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.exception("check_same_day_appointments failed: %s", e)
         await asyncio.sleep(1800)
 
 
@@ -69,8 +69,8 @@ async def check_overdue_treatments():
         try:
             from app.services.overdue_detection import check_overdue_treatments as _check
             await _check()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.exception("check_overdue_treatments failed: %s", e)
         await asyncio.sleep(3600)
 
 
@@ -120,11 +120,11 @@ async def check_missed_appointments():
                                 payload={"appointment_id": str(apt.id), "patient_id": str(apt.patient_id), "visit_date": yesterday.isoformat()},
                                 db=db,
                             )
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.warning("check_missed_appointments publish_event failed: %s", e)
                 await db.commit()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.exception("check_missed_appointments failed: %s", e)
         await asyncio.sleep(43200)
 
 
@@ -194,8 +194,8 @@ async def check_recurring_recalls():
                         fresh_interval = res.scalar_one_or_none()
                         if fresh_interval:
                             interval_days = fresh_interval
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.warning("check_recurring_recalls interval lookup failed: %s", e)
 
                     # Anchor next due to the cycle (previous due + interval)
                     new_due = recall.due_date + timedelta(days=interval_days)
@@ -235,6 +235,6 @@ async def check_recurring_recalls():
                 if advanced:
                     await db.commit()
                     logger.info("RECURRING_RECALLS_ADVANCED: %d chains advanced", advanced)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.exception("check_recurring_recalls failed: %s", e)
         await asyncio.sleep(3600)

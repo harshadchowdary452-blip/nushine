@@ -118,10 +118,10 @@ async def seed_data(db_session):
 
     # Create appointments
     today = date.today()
-    a1 = Appointment(id=str(uuid.uuid4()), patient_id=p1.id, doctor_id=doc1.id, appointment_date=today, appointment_time=time(10, 0), is_active=True)
-    a2 = Appointment(id=str(uuid.uuid4()), patient_id=p2.id, doctor_id=doc1.id, appointment_date=today, appointment_time=time(11, 0), is_active=True)
-    a3 = Appointment(id=str(uuid.uuid4()), patient_id=p3.id, doctor_id=doc2.id, appointment_date=today, appointment_time=time(12, 0), is_active=True)
-    a4 = Appointment(id=str(uuid.uuid4()), patient_id=p4.id, doctor_id=doc3.id, appointment_date=today, appointment_time=time(13, 0), is_active=True)
+    a1 = Appointment(id=str(uuid.uuid4()), patient_id=p1.id, doctor_id=doc1.id, appointment_date=today, appointment_time=time(10, 0), duration_minutes=30, end_time=time(10, 30), is_active=True)
+    a2 = Appointment(id=str(uuid.uuid4()), patient_id=p2.id, doctor_id=doc1.id, appointment_date=today, appointment_time=time(11, 0), duration_minutes=30, end_time=time(11, 30), is_active=True)
+    a3 = Appointment(id=str(uuid.uuid4()), patient_id=p3.id, doctor_id=doc2.id, appointment_date=today, appointment_time=time(12, 0), duration_minutes=30, end_time=time(12, 30), is_active=True)
+    a4 = Appointment(id=str(uuid.uuid4()), patient_id=p4.id, doctor_id=doc3.id, appointment_date=today, appointment_time=time(13, 0), duration_minutes=30, end_time=time(13, 30), is_active=True)
     db_session.add_all([a1, a2, a3, a4])
     await db_session.flush()
 

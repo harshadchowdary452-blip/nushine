@@ -6,6 +6,11 @@ from app.database import Base, get_db
 from app.main import app, limiter
 from app.routers.auth import limiter as auth_limiter
 
+# Live-server scripts (no pytest fixtures, hit http://localhost:8000 directly).
+# They are executed manually; importing them during collection would run the
+# full flow (and previously the hardcoded superadmin credential).
+collect_ignore = ["test_treatment_e2e.py"]
+
 TEST_DATABASE_URL = "sqlite+aiosqlite://"
 engine = create_async_engine(TEST_DATABASE_URL, echo=False, connect_args={"check_same_thread": False})
 test_async_session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)

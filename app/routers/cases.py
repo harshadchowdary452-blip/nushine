@@ -3,10 +3,11 @@ import os
 import json
 import io
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.encoders import jsonable_encoder
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, func
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
 from datetime import date, datetime, timezone
@@ -168,20 +169,21 @@ async def get_cases(
         else:
             q = q.order_by(Case.created_at.desc() if sort_desc else Case.created_at)
 
+        # Total matching rows for correct client-side pagination (X-Total-Count).
+        total = (await db.execute(select(func.count()).select_from(q.order_by(None).subquery()))).scalar() or 0
+
         q = q.offset(skip).limit(limit)
         result = await db.execute(q)
         cases = list(result.scalars().all())
         svc = CaseService(db)
         for c in cases:
             await svc.attach_names(c)
-        return cases
+        return JSONResponse(content=jsonable_encoder(cases), headers={"X-Total-Count": str(total)})
     except HTTPException:
         raise
     except Exception as e:
-        import traceback
-        print("=== CASE HISTORY LIST ERROR ===", flush=True)
-        traceback.print_exc()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Internal Server Error: {str(e)}")
+        logger.exception("Case history list failed: %s", e)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 
 @router.get("/{case_id}/pdf")
@@ -425,7 +427,8 @@ async def get_case_odontogram(case_id: str, db: AsyncSession = Depends(get_db), 
         img_bytes = render_odontogram(fd_list, dpi=200)
         return Response(content=img_bytes, media_type="image/png")
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Odontogram render failed: {str(e)}")
+        logger.exception("Odontogram render failed: %s", e)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Odontogram render failed")
 
 
 @router.post("/{case_id}/approve-treatment-plan", response_model=CaseResponse)

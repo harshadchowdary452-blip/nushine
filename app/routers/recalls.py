@@ -248,14 +248,13 @@ async def generate_recalls(db: AsyncSession = Depends(get_db), current_user: dic
     from app.models.treatment_plan import TreatmentPlan
     from app.models.case import Case
     from app.models.patient import Patient
-    from sqlalchemy import not_, join
+    from sqlalchemy import not_, exists
     existing_types = [FollowUpType.SIX_MONTH_RECALL.value, FollowUpType.TWELVE_MONTH_RECALL.value, FollowUpType.CUSTOM_RECALL.value]
-    existing_q = select(FollowUp.treatment_id).where(
+    existing_sub = select(FollowUp.treatment_id).where(
         FollowUp.hospital_id == hospital_id,
         FollowUp.follow_up_type.in_(existing_types),
         FollowUp.status != FollowUpStatus.LOST.value,
     )
-    existing_ids = set((await db.execute(existing_q)).scalars().all())
     sittings_q = select(
         TreatmentSitting, TreatmentPlan.treatment_name, TreatmentPlan.treatment_template_id,
         Case.patient_id, Case.doctor_id, Patient.hospital_id,
@@ -266,7 +265,7 @@ async def generate_recalls(db: AsyncSession = Depends(get_db), current_user: dic
     ).join(Patient, Case.patient_id == Patient.id
     ).where(
         TreatmentSitting.status == "COMPLETED",
-        not_(TreatmentSitting.id.in_(existing_ids)),
+        not_(exists(existing_sub.where(FollowUp.treatment_id == TreatmentSitting.id))),
     )
     if hospital_id:
         sittings_q = sittings_q.where(Patient.hospital_id == hospital_id)

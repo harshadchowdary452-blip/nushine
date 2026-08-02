@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/dialog";
 import { ArrowLeft, Download, Plus, CreditCard, History, Percent, FileText } from "lucide-react";
 import { format } from "date-fns";
+import { useTrackRecent } from "@/hooks/useTrackRecent";
 
 function StatusBadge({ status }: { status: string }) {
   const cls = `status-badge status-badge-${status?.toLowerCase()}`;
@@ -55,6 +56,14 @@ export default function BillingDetail() {
     queryFn: () => billingApi.get(id!),
     enabled: !!id,
   });
+
+  useTrackRecent(
+    "billing",
+    billing?.id,
+    billing,
+    (b) => (b?.invoice_number ? `Invoice #${b.invoice_number}` : "Invoice"),
+    (b) => b?.patient_name || undefined
+  );
 
   const { data: historyEntries } = useQuery({
     queryKey: ["billing", id, "history"],

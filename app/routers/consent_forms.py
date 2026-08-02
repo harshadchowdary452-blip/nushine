@@ -13,22 +13,24 @@ from app.schemas.common import MessageResponse
 from app.models.hospital import Hospital
 from app.models.consent_form import ConsentForm
 from app.services.timeline_helper import record_timeline_event, build_changes
+from app.utils.uploads import save_upload, PDF_EXTENSIONS
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/consent-forms", tags=["Consent Forms"])
 
-ALLOWED_EXTENSIONS = {".pdf"}
+ALLOWED_EXTENSIONS = PDF_EXTENSIONS
 
 
-def _verify_hospital_access(current_user: dict, cf: ConsentForm):
-    role = current_user.get("role")
-    if role == Role.SUPER_ADMIN.value:
+async def _verify_hospital_access(current_user: dict, cf: ConsentForm, db: AsyncSession = None):
+    """Scope a consent form to the caller's tenant.
+
+    SUPER_ADMIN -> unrestricted.
+    GROUP_ADMIN -> the form's hospital must belong to the caller's admin group.
+    HOSPITAL_ADMIN / DOCTOR -> the form must belong to the caller's hospital.
+    """
+    if current_user.get("role") == Role.SUPER_ADMIN.value:
         return
-    if role == Role.GROUP_ADMIN.value:
-        return  # verify_tenant_access will handle
-    user_hospital_id = current_user.get("hospital_id")
-    if cf.hospital_id != user_hospital_id:
-        raise HTTPException(status_code=403, detail="Access denied: consent form belongs to another hospital")
+    await verify_tenant_access(current_user, cf, "consent_form", db)
 
 
 @router.post("/", response_model=ConsentFormResponse, status_code=status.HTTP_201_CREATED)
@@ -60,10 +62,11 @@ async def create_consent_form(
         if not hr.scalar_one_or_none():
             raise HTTPException(status_code=403, detail="Access denied")
 
-    file_ext = os.path.splitext(file.filename or ".pdf")[1].lower()
-    if file_ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
-    file_bytes = await file.read()
+    # Validate extension + size while streaming to disk under a random UUID
+    # (unpredictable filename) instead of buffering the whole PDF in memory.
+    sub = f"consent_forms/{hospital_id}"
+    url = await save_upload(file, sub, allowed=PDF_EXTENSIONS)
+    pdf_path = os.path.join(settings.UPLOAD_DIR, sub, os.path.basename(url))
 
     service = ConsentFormService(db)
     data = {
@@ -78,7 +81,7 @@ async def create_consent_form(
         "case_id": case_id,
         "treatment_plan_id": treatment_plan_id,
     }
-    cf = await service.create(data, file_bytes, file_ext, user_id=current_user.get("sub"))
+    cf = await service.create(data, pdf_path, user_id=current_user.get("sub"))
     await record_timeline_event(
         db, current_user=current_user, patient_id=cf.patient_id or patient_id,
         action="Consent Form Created",
@@ -152,7 +155,7 @@ async def get_consent_form(
     cf = await service.get(cf_id)
     if not cf:
         raise HTTPException(status_code=404, detail="Consent form not found")
-    _verify_hospital_access(current_user, cf)
+    await _verify_hospital_access(current_user, cf, db)
     return cf
 
 
@@ -168,7 +171,7 @@ async def update_consent_form(
     cf = await service.get(cf_id)
     if not cf:
         raise HTTPException(status_code=404, detail="Consent form not found")
-    _verify_hospital_access(current_user, cf)
+    await _verify_hospital_access(current_user, cf, db)
     old_data = {"remarks": cf.remarks, "consent_type": cf.consent_type}
     updated = await service.update(cf_id, data.model_dump(exclude_none=True), user_id=current_user.get("sub"))
     new_data = {"remarks": updated.remarks, "consent_type": updated.consent_type}
@@ -191,16 +194,15 @@ async def replace_consent_form_pdf(
     current_user: dict = Depends(get_current_user),
 ):
     verify_permission(current_user, Permission.MANAGE_BILLING)
-    file_ext = os.path.splitext(file.filename or ".pdf")[1].lower()
-    if file_ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
-    file_bytes = await file.read()
     service = ConsentFormService(db)
     cf = await service.get(cf_id)
     if not cf:
         raise HTTPException(status_code=404, detail="Consent form not found")
-    _verify_hospital_access(current_user, cf)
-    updated = await service.replace_pdf(cf_id, file_bytes, file_ext, user_id=current_user.get("sub"))
+    await _verify_hospital_access(current_user, cf, db)
+    sub = f"consent_forms/{cf.hospital_id}"
+    url = await save_upload(file, sub, allowed=PDF_EXTENSIONS)
+    pdf_path = os.path.join(settings.UPLOAD_DIR, sub, os.path.basename(url))
+    updated = await service.replace_pdf(cf_id, pdf_path, user_id=current_user.get("sub"))
     await record_timeline_event(
         db, current_user=current_user, patient_id=cf.patient_id,
         action="Consent Form PDF Replaced",
@@ -221,7 +223,7 @@ async def get_consent_form_pdf(
     cf = await service.get(cf_id)
     if not cf:
         raise HTTPException(status_code=404, detail="Consent form not found")
-    _verify_hospital_access(current_user, cf)
+    await _verify_hospital_access(current_user, cf, db)
     if not cf.pdf_path or not os.path.exists(cf.pdf_path):
         raise HTTPException(status_code=404, detail="PDF file not found")
     await service.log_view(cf_id, user_id=current_user.get("sub"))
@@ -240,7 +242,7 @@ async def download_consent_form_pdf(
     cf = await service.get(cf_id)
     if not cf:
         raise HTTPException(status_code=404, detail="Consent form not found")
-    _verify_hospital_access(current_user, cf)
+    await _verify_hospital_access(current_user, cf, db)
     if not cf.pdf_path or not os.path.exists(cf.pdf_path):
         raise HTTPException(status_code=404, detail="PDF file not found")
     await service.log_download(cf_id, user_id=current_user.get("sub"))
@@ -259,7 +261,7 @@ async def delete_consent_form(
     cf = await service.get(cf_id)
     if not cf:
         raise HTTPException(status_code=404, detail="Consent form not found")
-    _verify_hospital_access(current_user, cf)
+    await _verify_hospital_access(current_user, cf, db)
     await service.soft_delete(cf_id, user_id=current_user.get("sub"))
     await record_timeline_event(
         db, current_user=current_user, patient_id=cf.patient_id,
@@ -281,7 +283,7 @@ async def restore_consent_form(
     cf = await service.restore(cf_id, user_id=current_user.get("sub"))
     if not cf:
         raise HTTPException(status_code=404, detail="Consent form not found")
-    _verify_hospital_access(current_user, cf)
+    await _verify_hospital_access(current_user, cf, db)
     await record_timeline_event(
         db, current_user=current_user, patient_id=cf.patient_id,
         action="Consent Form Restored",

@@ -29,4 +29,3 @@ reports
 *.ps1
 *.sqlite
 *.db
-Dockerfile

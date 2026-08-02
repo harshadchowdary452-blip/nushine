@@ -17,10 +17,13 @@ SUPER_ADMIN → GROUP_ADMIN → HOSPITAL_ADMIN → DOCTOR → PATIENT
 
 ## Quick Start
 ```bash
-docker-compose up -d
+# Provide production secrets (required by docker-compose; see app/config.py)
+#   SECRET_KEY=$(python -c "import secrets;print(secrets.token_urlsafe(48))")
+#   SUPER_ADMIN_PASSWORD=<strong-password>
+SECRET_KEY=<...> SUPER_ADMIN_PASSWORD=<...> docker-compose up -d
 # API: http://localhost:8000
 # Swagger: http://localhost:8000/docs
-# Default Super Admin: superadmin@dental.com / SuperAdmin@123
+# Super Admin: {SUPER_ADMIN_EMAIL:-superadmin@dental.com} / $SUPER_ADMIN_PASSWORD
 ```
 
 ## API Endpoints (prefix: /api/v1)

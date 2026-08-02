@@ -172,7 +172,7 @@ async def get_treatment_plans(
         raise
     except Exception as e:
         logger.exception("GET_TREATMENT_PLANS error: %s", str(e))
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to load treatment plans: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to load treatment plans")
 
 
 @router.get("/by-case/{case_id}", response_model=List[TreatmentPlanResponse])

@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, List
-import os, uuid, shutil
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.core.permissions import verify_permission, verify_tenant_access, Permission, Role
@@ -9,8 +8,8 @@ from sqlalchemy import select
 from app.models.case import Case
 from app.repositories.pre_op_repository import PreOpRepository
 from app.repositories.audit_log_repository import AuditLogRepository
-from app.config import settings
 from app.services.timeline_helper import record_timeline_event
+from app.utils.uploads import save_upload
 
 router = APIRouter(prefix="/pre-ops", tags=["Pre-Op"])
 
@@ -62,23 +61,11 @@ async def add_pre_op(case_id: str, notes: Optional[str] = Form(None), photos: Li
     if photos:
         for photo in photos if isinstance(photos, list) else [photos]:
             if photo.filename:
-                ext = os.path.splitext(photo.filename)[1] or ".jpg"
-                filename = f"{uuid.uuid4()}{ext}"
-                upload_path = os.path.join(settings.UPLOAD_DIR, "pre_op")
-                os.makedirs(upload_path, exist_ok=True)
-                with open(os.path.join(upload_path, filename), "wb") as f:
-                    shutil.copyfileobj(photo.file, f)
-                photo_urls.append(f"/uploads/pre_op/{filename}")
+                photo_urls.append(await save_upload(photo, "pre_op"))
     if xrays:
         for xray in xrays if isinstance(xrays, list) else [xrays]:
             if xray.filename:
-                ext = os.path.splitext(xray.filename)[1] or ".jpg"
-                filename = f"{uuid.uuid4()}{ext}"
-                upload_path = os.path.join(settings.UPLOAD_DIR, "xrays")
-                os.makedirs(upload_path, exist_ok=True)
-                with open(os.path.join(upload_path, filename), "wb") as f:
-                    shutil.copyfileobj(xray.file, f)
-                xray_urls.append(f"/uploads/xrays/{filename}")
+                xray_urls.append(await save_upload(xray, "xrays"))
     existing = await repo.get_all(filters={"case_id": case_id})
     if existing:
         target = existing[-1]

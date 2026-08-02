@@ -16,7 +16,7 @@ class TreatmentSittingStatus(str, Enum):
 class TreatmentSitting(Base):
     __tablename__ = "treatment_sittings"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    treatment_plan_id: Mapped[str] = mapped_column(String(36), ForeignKey("treatment_plans.id"), nullable=False)
+    treatment_plan_id: Mapped[str] = mapped_column(String(36), ForeignKey("treatment_plans.id"), nullable=False, index=True)
     sitting_number: Mapped[int] = mapped_column(Integer, nullable=False)
     sitting_date: Mapped[date] = mapped_column(Date, nullable=True)
     doctor_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)

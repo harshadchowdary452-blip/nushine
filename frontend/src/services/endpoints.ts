@@ -97,12 +97,26 @@ export const patientsApi = {
   delete: (id: string) => api.delete(`/patients/${id}`).then((r) => r.data),
   search: (params?: PaginationParams) =>
     api.get("/patients/search", { params: withPagination(params) }).then((r) => r.data),
+  checkDuplicates: (params?: { full_name?: string; phone?: string; email?: string; hospital_id?: string; limit?: number }) =>
+    api.get("/patients/duplicates", { params }).then((r) => r.data),
   getPatientTimeline: (patientId: string, params?: Record<string, unknown>) =>
     api.get(`/patients/${patientId}/timeline`, { params }).then((r) => r.data),
 }
 
 export const casesApi = {
-  list: (params?: Record<string, unknown>) => api.get("/cases", { params }).then((r) => r.data),
+  list: async (params?: Record<string, unknown>) => {
+    const r = await api.get("/cases", { params })
+    const items = r.data
+    const total = Number(r.headers?.["x-total-count"]) || items?.length || 0
+    const limit = Number(params?.limit) || Number(params?.page_size) || items?.length || 0
+    const skip = Number(params?.skip) || 0
+    return {
+      items,
+      total,
+      page: limit > 0 ? Math.floor(skip / limit) + 1 : 1,
+      page_size: limit,
+    }
+  },
   get: (id: string) => api.get(`/cases/${id}`).then((r) => r.data),
   create: (data: Record<string, unknown>) => api.post("/cases", data).then((r) => r.data),
   update: (id: string, data: Record<string, unknown>) =>
@@ -422,12 +436,68 @@ export const reportsApi = {
 }
 
 export const notificationsApi = {
-  list: () => api.get("/notifications").then((r) => r.data),
+  list: (params?: { type?: string; unread?: boolean; entity_type?: string }) =>
+    api.get("/notifications", { params }).then((r) => r.data),
   markRead: (id: string) => api.post(`/notifications/${id}/read`).then((r) => r.data),
   markAllRead: () => api.post("/notifications/read-all").then((r) => r.data),
   unreadCount: () => api.get("/notifications/unread-count").then((r) => r.data),
   delete: (id: string) => api.delete(`/notifications/${id}`).then((r) => r.data),
   deleteAll: () => api.delete("/notifications").then((r) => r.data),
+}
+
+export interface TaskItem {
+  id: string
+  title: string
+  description?: string | null
+  due_date?: string | null
+  priority: string
+  status: string
+  assignee_id?: string | null
+  assignee_name?: string | null
+  created_by: string
+  created_by_name?: string | null
+  entity_type?: string | null
+  entity_id?: string | null
+  completed_at?: string | null
+  created_at: string
+  updated_at: string
+  is_overdue: boolean
+}
+
+export interface TaskStats {
+  total: number
+  open: number
+  in_progress: number
+  completed: number
+  overdue: number
+  due_today: number
+  upcoming: number
+  by_priority: Record<string, number>
+}
+
+export const tasksApi = {
+  list: (params?: {
+    status?: string
+    priority?: string
+    assignee_id?: string
+    view?: "today" | "overdue" | "upcoming" | "all"
+    entity_type?: string
+    entity_id?: string
+    search?: string
+    limit?: number
+    offset?: number
+  }) => api.get("/tasks", { params }).then((r) => r.data as TaskItem[]),
+  stats: () => api.get("/tasks/stats").then((r) => r.data as TaskStats),
+  get: (id: string) => api.get(`/tasks/${id}`).then((r) => r.data as TaskItem),
+  create: (data: Partial<TaskItem> & { title: string }) =>
+    api.post("/tasks", data).then((r) => r.data as TaskItem),
+  update: (id: string, data: Partial<TaskItem>) =>
+    api.put(`/tasks/${id}`, data).then((r) => r.data as TaskItem),
+  setStatus: (id: string, status: string) =>
+    api.patch(`/tasks/${id}/status`, { status }).then((r) => r.data as TaskItem),
+  setAssignee: (id: string, assignee_id: string | null) =>
+    api.patch(`/tasks/${id}/assignee`, { assignee_id }).then((r) => r.data as TaskItem),
+  delete: (id: string) => api.delete(`/tasks/${id}`).then((r) => r.data),
 }
 
 export const whatsappApi = {

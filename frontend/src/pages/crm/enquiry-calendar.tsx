@@ -932,7 +932,7 @@ export default function EnquiryCalendar() {
       crmApi.followUps
         .update(item.id, { status: "CONTACTED", contact_channel: "CALL" })
         .then(() => invalidateCalendar())
-        .catch(() => {})
+        .catch((err: unknown) => addToast({ title: "Could not mark as contacted", description: extractDetail(err), variant: "destructive" }))
     }
   }
 

@@ -41,7 +41,7 @@ class CaseRepository(BaseRepository[Case]):
             if hospital_id:
                 query = query.join(Patient, Case.patient_id == Patient.id).where(Patient.hospital_id == hospital_id)
             for key, value in filters.items():
-                if key.endswith("__in") and isinstance(value, (list, tuple)):
+                if key.endswith("__in") and isinstance(value, (list, tuple, set)):
                     attr_name = key[:-4]
                     if hasattr(self.model, attr_name):
                         query = query.where(getattr(self.model, attr_name).in_(value))

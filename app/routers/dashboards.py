@@ -529,7 +529,7 @@ async def super_admin_dashboard(
             })
     hospital_performance.sort(key=lambda x: x["revenue"], reverse=True)
 
-    # Doctor performance by revenue (system-wide)
+    # Doctor performance by revenue (period-filtered, system-wide)
     doctor_performance = []
     doctor_rev_r = await db.execute(
         select(
@@ -538,7 +538,11 @@ async def super_admin_dashboard(
         )
         .select_from(Billing)
         .join(Case, Billing.case_id == Case.id)
-        .where(Case.doctor_id.isnot(None))
+        .where(
+            Case.doctor_id.isnot(None),
+            Billing.updated_at >= date_start,
+            Billing.updated_at < date_end,
+        )
         .group_by(Case.doctor_id)
         .order_by(text("revenue DESC"))
     )
@@ -807,7 +811,7 @@ async def group_admin_dashboard(
         })
     hospital_performance.sort(key=lambda x: x["revenue"], reverse=True)
 
-    # Doctor performance — revenue scoped to hospital(s)
+    # Doctor performance — revenue scoped to hospital(s), period-filtered
     doctor_performance = []
     if case_ids:
         doctor_rev_r = await db.execute(
@@ -817,7 +821,12 @@ async def group_admin_dashboard(
             )
             .select_from(Billing)
             .join(Case, Billing.case_id == Case.id)
-            .where(Billing.case_id.in_(case_ids), Case.doctor_id.isnot(None))
+            .where(
+                Billing.case_id.in_(case_ids),
+                Case.doctor_id.isnot(None),
+                Billing.updated_at >= date_start,
+                Billing.updated_at < date_end,
+            )
             .group_by(Case.doctor_id)
             .order_by(text("revenue DESC"))
         )
@@ -1757,7 +1766,7 @@ async def quick_view_admin_group(
     net_profit = await calculate_profit(period_revenue, total_expenses)
     profit_margin = await calculate_profit_margin(period_revenue, net_profit)
 
-    # Top doctors
+    # Top doctors (period-filtered)
     top_doctors = []
     if case_ids:
         doctor_rev_r = await db.execute(
@@ -1767,7 +1776,12 @@ async def quick_view_admin_group(
             )
             .select_from(Billing)
             .join(Case, Billing.case_id == Case.id)
-            .where(Billing.case_id.in_(case_ids), Case.doctor_id.isnot(None))
+            .where(
+                Billing.case_id.in_(case_ids),
+                Case.doctor_id.isnot(None),
+                Billing.updated_at >= date_start,
+                Billing.updated_at < date_end,
+            )
             .group_by(Case.doctor_id)
             .order_by(text("revenue DESC"))
         )

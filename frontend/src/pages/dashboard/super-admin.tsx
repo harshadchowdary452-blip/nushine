@@ -177,6 +177,7 @@ export default function SuperAdminDashboard() {
     staleTime: 30000,
     gcTime: 60000,
     refetchInterval: 30000,
+    refetchIntervalInBackground: false,
   })
 
   const { items: activityFeed, loading: activityLoading } = useDashboardActivity()

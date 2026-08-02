@@ -144,74 +144,94 @@ def verify_permission(current_user: dict, *permissions: Permission):
     logger.debug("VERIFY_PERMISSION OK: sub=%s role=%s", user_sub, user_role)
 
 
+async def _hospital_admin_group(db, hospital_id):
+    """Resolve the admin_group_id that owns a hospital (None when unknown)."""
+    if not db or not hospital_id:
+        return None
+    from app.models.hospital import Hospital
+    result = await db.execute(select(Hospital.admin_group_id).where(Hospital.id == hospital_id))
+    row = result.one_or_none()
+    return str(row[0]) if row else None
+
+
 async def verify_tenant_access(current_user: dict, entity: object, entity_type: str, db=None):
-    """Verify GROUP_ADMIN has tenant-level access to an entity.
-    For SUPER_ADMIN/HOSPITAL_ADMIN/DOCTOR, permissions are checked by verify_permission instead.
+    """Verify the caller may access an entity within their tenant scope.
+
+    GROUP_ADMIN      -> entity must belong to one of the caller's hospitals (admin group).
+    HOSPITAL_ADMIN / DOCTOR -> entity must belong to the caller's hospital.
+    SUPER_ADMIN      -> unrestricted.
+
+    entity_type values: hospital, doctor, patient, case, billing, treatment_plan,
+                        appointment, sitting, consultant, consent_form, expense.
     """
     role = current_user.get("role")
-    if role != Role.GROUP_ADMIN.value:
+    if role == Role.SUPER_ADMIN.value:
         return True
-    agid = current_user.get("admin_group_id")
-    if not agid:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: no admin group")
+    if role not in (Role.GROUP_ADMIN.value, Role.HOSPITAL_ADMIN.value, Role.DOCTOR.value):
+        return True
 
-    entity_agid = None
+    hid = None          # hospital the entity belongs to
+    entity_agid = None  # admin group the entity belongs to
+
     if entity_type == "hospital":
-        entity_agid = str(getattr(entity, "admin_group_id", ""))
+        hid = getattr(entity, "id", None)
+        entity_agid = str(getattr(entity, "admin_group_id", "") or "")
     elif entity_type == "doctor":
-        entity_agid = str(getattr(entity, "admin_group_id", ""))
+        hid = getattr(entity, "hospital_id", None)
+        entity_agid = str(getattr(entity, "admin_group_id", "") or "")
     elif entity_type == "patient":
-        from app.models.hospital import Hospital
-        from sqlalchemy import select
         hid = getattr(entity, "hospital_id", None)
-        if hid and db:
-            result = await db.execute(select(Hospital.admin_group_id).where(Hospital.id == hid))
-            row = result.one_or_none()
-            entity_agid = str(row[0]) if row else None
     elif entity_type in ("case", "billing", "treatment_plan", "appointment", "sitting"):
-        if db:
-            from app.models.case import Case as CaseModel
-            from app.models.patient import Patient as PatientModel
-            from app.models.hospital import Hospital as HospitalModel
-            from app.models.billing import Billing
-            from app.models.treatment_plan import TreatmentPlan
-            from app.models.appointment import Appointment
-            from sqlalchemy import select
-            if entity_type == "case":
-                case_id = getattr(entity, "id", None)
-            elif entity_type == "billing":
-                case_id = getattr(entity, "case_id", None)
-            elif entity_type == "treatment_plan":
-                case_id = getattr(entity, "case_id", None)
-            elif entity_type == "appointment":
-                patient_id = getattr(entity, "patient_id", None)
-            elif entity_type == "sitting":
-                plan_id = getattr(entity, "treatment_plan_id", None)
-                if plan_id:
-                    plan_result = await db.execute(select(TreatmentPlan.case_id).where(TreatmentPlan.id == plan_id))
-                    plan_row = plan_result.one_or_none()
-                    case_id = plan_row[0] if plan_row else None
+        if not db:
+            return True
+        from app.models.case import Case as CaseModel
+        from app.models.patient import Patient as PatientModel
+        from app.models.billing import Billing
+        from app.models.treatment_plan import TreatmentPlan
+        from app.models.appointment import Appointment
+        patient_id = None
+        if entity_type == "case":
+            patient_id = getattr(entity, "patient_id", None)
+        elif entity_type == "billing":
+            case_id = getattr(entity, "case_id", None)
             if case_id:
-                case_result = await db.execute(select(CaseModel.patient_id).where(CaseModel.id == case_id))
-                case_row = case_result.one_or_none()
-                patient_id = case_row[0] if case_row else None
-            if patient_id:
-                pat_result = await db.execute(select(PatientModel.hospital_id).where(PatientModel.id == patient_id))
-                pat_row = pat_result.one_or_none()
-                hid = pat_row[0] if pat_row else None
-                if hid:
-                    hosp_result = await db.execute(select(HospitalModel.admin_group_id).where(HospitalModel.id == hid))
-                    hosp_row = hosp_result.one_or_none()
-                    entity_agid = str(hosp_row[0]) if hosp_row else None
-    elif entity_type == "consultant":
+                row = (await db.execute(select(CaseModel.patient_id).where(CaseModel.id == case_id))).one_or_none()
+                patient_id = row[0] if row else None
+        elif entity_type == "treatment_plan":
+            case_id = getattr(entity, "case_id", None)
+            if case_id:
+                row = (await db.execute(select(CaseModel.patient_id).where(CaseModel.id == case_id))).one_or_none()
+                patient_id = row[0] if row else None
+        elif entity_type == "appointment":
+            patient_id = getattr(entity, "patient_id", None)
+        elif entity_type == "sitting":
+            plan_id = getattr(entity, "treatment_plan_id", None)
+            if plan_id:
+                prow = (await db.execute(select(TreatmentPlan.case_id).where(TreatmentPlan.id == plan_id))).one_or_none()
+                case_id = prow[0] if prow else None
+                if case_id:
+                    crow = (await db.execute(select(CaseModel.patient_id).where(CaseModel.id == case_id))).one_or_none()
+                    patient_id = crow[0] if crow else None
+        if patient_id:
+            prow = (await db.execute(select(PatientModel.hospital_id).where(PatientModel.id == patient_id))).one_or_none()
+            hid = prow[0] if prow else None
+    elif entity_type in ("consultant", "consent_form", "expense"):
         hid = getattr(entity, "hospital_id", None)
-        if hid and db:
-            from app.models.hospital import Hospital
-            from sqlalchemy import select
-            result = await db.execute(select(Hospital.admin_group_id).where(Hospital.id == hid))
-            row = result.one_or_none()
-            entity_agid = str(row[0]) if row else None
 
-    if entity_agid and entity_agid != str(agid):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: not in your admin group")
+    if role == Role.GROUP_ADMIN.value:
+        if not entity_agid:
+            entity_agid = await _hospital_admin_group(db, hid)
+        agid = current_user.get("admin_group_id")
+        if not agid:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: no admin group")
+        if entity_agid and entity_agid != str(agid):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: not in your admin group")
+        return True
+
+    # HOSPITAL_ADMIN / DOCTOR: the entity must belong to the caller's hospital.
+    # When the caller has no hospital context (or the entity's hospital is
+    # unresolvable) we fall back to permission-only checks rather than fail open.
+    user_hospital_id = current_user.get("hospital_id")
+    if hid and user_hospital_id and str(hid) != str(user_hospital_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: entity belongs to another hospital")
     return True

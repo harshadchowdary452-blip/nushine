@@ -9,11 +9,13 @@ Tests the complete synchronization chain:
   4. Patient Timeline: events for start/visit/complete
   5. Complete Treatment: status transitions correctly
 """
+import os
 import requests
 import sys
 from datetime import date, timedelta
 
 BASE = "http://localhost:8000/api/v1"
+PASSWORD = os.getenv("SUPER_ADMIN_PASSWORD", "")
 PASS_COUNT = 0
 FAIL_COUNT = 0
 
@@ -48,7 +50,10 @@ def main():
 
     # ── Setup ──
     print("\n[0] Login and setup...")
-    r = requests.post(f"{BASE}/auth/login", json={"email": "superadmin@dental.com", "password": "SuperAdmin@123"})
+    if not PASSWORD:
+        print("  FAIL  Missing SUPER_ADMIN_PASSWORD env var (must match the API's seeded admin)")
+        return 1
+    r = requests.post(f"{BASE}/auth/login", json={"email": "superadmin@dental.com", "password": PASSWORD})
     check("Login returns 200", r.status_code == 200)
     token = r.json()["access_token"]
     h = {"Authorization": f"Bearer {token}"}

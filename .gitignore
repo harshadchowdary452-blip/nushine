@@ -24,7 +24,13 @@ app/uploads/patient_photos/*
 app/uploads/xrays/*
 app/uploads/pre_op/*
 app/uploads/post_op/*
+app/uploads/invoices/*
 !app/uploads/**/.gitkeep
+
+# Runtime-generated exports
+app/exports/
+app/exports/*
+!app/exports/.gitkeep
 
 # Testing
 .coverage

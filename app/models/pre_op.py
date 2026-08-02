@@ -8,7 +8,7 @@ from app.database import Base
 class PreOp(Base):
     __tablename__ = "pre_ops"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    case_id: Mapped[str] = mapped_column(String(36), ForeignKey("cases.id"), nullable=False)
+    case_id: Mapped[str] = mapped_column(String(36), ForeignKey("cases.id"), nullable=False, index=True)
     notes: Mapped[str] = mapped_column(Text, nullable=True)
     photo_urls: Mapped[str] = mapped_column(Text, nullable=True)
     xray_urls: Mapped[str] = mapped_column(Text, nullable=True)

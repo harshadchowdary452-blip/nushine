@@ -1,8 +1,8 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, useCallback, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import type { ColumnDef, SortingState } from "@tanstack/react-table"
-import { Plus, Eye, Trash2, Users, UserPlus, Phone, MessageSquare } from "lucide-react"
+import { Plus, Eye, Trash2, Users, UserPlus, Phone, MessageSquare, User as UserIcon, MapPin, HeartPulse, CalendarPlus, UserRound } from "lucide-react"
 import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,14 +12,28 @@ import { Badge } from "@/components/ui/badge"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select"
 import SearchableSelect from "@/components/ui/searchable-select"
 import { patientsApi, doctorsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
 import QuickExport from "@/components/ui/quick-export"
 import { useServerFilters } from "@/hooks/useServerFilters"
+import { useWorkspaceMemory } from "@/hooks/useWorkspaceMemory"
+import { useFormState } from "@/hooks/useFormState"
+import { useFormDraft, useUnsavedChangesGuard } from "@/hooks/useFormDraft"
+import { useDuplicateCheck } from "@/hooks/useDuplicateCheck"
+import type { DuplicateCandidate } from "@/hooks/useDuplicateCheck"
+import { required, email, phone, max, maxLength } from "@/lib/validation"
+import type { FieldRules } from "@/lib/validation"
 import PatientFilterBar from "./filter-bar"
-import { EnterpriseWorkspace, DataTable, DrawerSection } from "@/design-system"
+import {
+  EnterpriseWorkspace, DataTable, DrawerSection,
+  EnterpriseFormDialog, EnterpriseWizard, EnterpriseFieldGrid, FormField,
+  WorkflowNextActions, DuplicateWarning,
+} from "@/design-system"
+import type { EnterpriseWizardStep } from "@/design-system"
 import type { Patient, PaginatedResponse, User } from "@/types"
 import { extractDetail } from "@/types"
 import { useAuthStore } from "@/store/authStore"
@@ -38,19 +52,54 @@ const SOURCE_OPTIONS = [
   "Campaign", "Event", "Lead", "Other",
 ]
 
-interface PatientForm {
+const PATIENT_RULES: FieldRules = {
+  full_name: [required("Full name is required"), maxLength(120)],
+  email: [email()],
+  phone: [phone()],
+  patient_source: [required("Please select how the patient heard about us")],
+  age: [max(150, "Age must be 150 or under")],
+  op_no: [maxLength(40)],
+  abha_id: [maxLength(20)],
+}
+
+const WIZARD_STEPS: EnterpriseWizardStep[] = [
+  { title: "Basic Information", description: "Name, type, contact & source", icon: UserIcon, fields: ["full_name", "email", "phone", "gender", "age", "patient_type", "patient_source"] },
+  { title: "Contact & Registration", description: "Address, guardian, OP & ABHA", icon: MapPin, fields: ["address", "op_no", "abha_id"] },
+  { title: "Medical Information", description: "History & vitals", icon: HeartPulse, fields: ["medical_history", "height", "weight", "bp", "sugar", "spo2"] },
+]
+
+const GENDER_OPTIONS = [
+  { value: "MALE", label: "Male" },
+  { value: "FEMALE", label: "Female" },
+  { value: "OTHER", label: "Other" },
+]
+
+const PATIENT_TYPE_OPTIONS = [
+  { value: "ADULT", label: "Adult" },
+  { value: "CHILD", label: "Child" },
+]
+
+const GUARDIAN_RELATIONSHIP_OPTIONS = [
+  "Parent", "Father", "Mother", "Grandparent", "Guardian", "Other",
+]
+
+type PatientForm = {
   full_name: string; email: string; phone: string; gender: string; age: string;
+  patient_type: string; guardian_name: string; guardian_relationship: string; guardian_phone: string;
   patient_source: string; source_campaign_name: string; source_campaign_id: string;
   source_campaign_date: string; address: string; medical_history: string; abha_id: string;
-  height: string; weight: string; bp: string; sugar: string; spo2: string; op_no: string
+  height: string; weight: string; bp: string; sugar: string; spo2: string; op_no: string;
+  emergency_contact: string
 }
 
 function getEmptyForm(): PatientForm {
   return {
     full_name: "", email: "", phone: "", gender: "", age: "",
+    patient_type: "ADULT", guardian_name: "", guardian_relationship: "", guardian_phone: "",
     patient_source: "", source_campaign_name: "", source_campaign_id: "",
     source_campaign_date: "", address: "", medical_history: "", abha_id: "",
     height: "", weight: "", bp: "", sugar: "", spo2: "", op_no: "",
+    emergency_contact: "",
   }
 }
 
@@ -59,7 +108,9 @@ function stripEmptyFormFields(data: PatientForm): Record<string, unknown> {
   for (const [key, value] of Object.entries(data)) {
     if (value !== "" && value !== undefined) {
       if (key === "height" || key === "weight") cleaned[key] = Number(value)
-      else cleaned[key] = value
+      else if (key === "patient_type" && data.patient_type === "CHILD") {
+        cleaned[key] = "CHILD"
+      } else cleaned[key] = value
     }
   }
   return cleaned
@@ -81,16 +132,86 @@ export default function PatientList() {
   } = useServerFilters({ defaultSort: "created_at", defaultSortDir: "desc" })
 
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [form, setForm] = useState<PatientForm>(getEmptyForm)
+  const [step, setStep] = useState(0)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deletingPatient, setDeletingPatient] = useState<Patient | null>(null)
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [bulkTargets, setBulkTargets] = useState<Patient[]>([])
-  const [quickViewPatient, setQuickViewPatient] = useState<Patient | null>(null)
+  const [completedPatient, setCompletedPatient] = useState<Patient | null>(null)
+  const [dupAcknowledged, setDupAcknowledged] = useState(false)
+
+  const {
+    values: formValues, setField: setFormField, onBlur: onFormBlur,
+    validate: validateForm, validateFields: validateStepFields,
+    fieldError, dirty: formDirty, reset: resetFormState,
+  } = useFormState<PatientForm>({ initialValues: getEmptyForm(), rules: PATIENT_RULES, validateOn: "blur" })
+  const draft = useFormDraft<PatientForm>("patients.create", { version: 1 })
+  const { clear: clearUnsavedGuard } = useUnsavedChangesGuard(dialogOpen && formDirty)
+
+  // Autosave the in-progress patient to a draft so nothing is lost on close.
+  useEffect(() => {
+    if (!dialogOpen || !formDirty) return
+    const t = window.setTimeout(() => draft.saveDraft(formValues), 400)
+    return () => window.clearTimeout(t)
+  }, [dialogOpen, formDirty, formValues, draft])
+
+  function resetForm() {
+    resetFormState(getEmptyForm())
+    setStep(0)
+    setDialogOpen(false)
+  }
+
+  function openDialog() {
+    resetFormState(draft.readDraft() ?? getEmptyForm())
+    setStep(0)
+    setDupAcknowledged(false)
+    clearDuplicates()
+    setDialogOpen(true)
+  }
+
+  function handleDialogOpenChange(open: boolean) {
+    if (!open) {
+      if (formDirty && !window.confirm("Discard unsaved changes and close?")) return
+      resetForm()
+    } else {
+      openDialog()
+    }
+    setDialogOpen(open)
+  }
+
+  const validateStep = useCallback(
+    (index: number): boolean => validateStepFields((WIZARD_STEPS[index]?.fields ?? []) as (keyof PatientForm)[]),
+    [validateStepFields],
+  )
+
+  // Workspace memory: restore the selected record when returning to the list
+  const { state: workspace, update: updateWorkspace } = useWorkspaceMemory<{ quickViewId?: string }>(
+    "patients.list",
+    { quickViewId: undefined },
+    { version: 1 }
+  )
+  const openQuickView = useCallback((patient: Patient | null) => {
+    updateWorkspace({ quickViewId: patient?.id })
+  }, [updateWorkspace])
 
   useCreateParam(() => openDialog())
 
   const currentUser = useAuthStore((s) => s.user)
+
+  const {
+    candidates: dupCandidates, total: dupTotal, checked: dupChecked,
+    check: checkDuplicates, clear: clearDuplicates,
+  } = useDuplicateCheck({ hospitalId: currentUser?.hospital_id ?? undefined })
+
+  // Smart duplicate detection: probe the registry while step 0 is filled in.
+  useEffect(() => {
+    if (!dialogOpen || dupAcknowledged) return
+    checkDuplicates({
+      full_name: formValues.full_name,
+      phone: formValues.phone,
+      email: formValues.email,
+    })
+  }, [dialogOpen, dupAcknowledged, formValues.full_name, formValues.phone, formValues.email, checkDuplicates])
 
   const { data, isLoading } = useQuery<PaginatedResponse<Patient>>({
     queryKey: ["patients", "search", queryKey, page],
@@ -122,6 +243,10 @@ export default function PatientList() {
     if (Array.isArray(data)) return data
     return data?.items || []
   }, [data])
+
+  const quickViewPatient: Patient | null = workspace.quickViewId
+    ? patients.find((p) => p.id === workspace.quickViewId) ?? null
+    : null
 
   const totalCount = useMemo(() => {
     if (Array.isArray(data)) return data.length
@@ -174,21 +299,33 @@ export default function PatientList() {
 
   const createMutation = useMutation({
     mutationFn: (data: Record<string, unknown>) => patientsApi.create(data),
-    onSuccess: () => {
+    onSuccess: (created: Patient) => {
       queryClient.invalidateQueries({ queryKey: ["patients"], refetchType: "all" })
       queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" })
       queryClient.invalidateQueries({ queryKey: ["crm"] })
       addToast({ title: "Success", description: "Patient created successfully", variant: "success" })
+      draft.clearDraft()
+      clearUnsavedGuard()
       resetForm()
+      // Smart workflow completion: offer the related-record shortcuts.
+      setCompletedPatient(created)
     },
     onError: (err: unknown) => {
       addToast({ title: "Error", description: extractDetail(err), variant: "destructive" })
     },
   })
 
-  function resetForm() { setForm(getEmptyForm()); setDialogOpen(false) }
-  function openDialog() { setForm(getEmptyForm()); setDialogOpen(true) }
-  function handleDialogOpenChange(open: boolean) { if (!open) resetForm(); setDialogOpen(open) }
+  const handleSubmit = () => {
+    if (!validateForm()) return
+    createMutation.mutate(stripEmptyFormFields(formValues))
+  }
+
+  function handleOpenDuplicate(candidate: DuplicateCandidate) {
+    clearDuplicates()
+    setDupAcknowledged(true)
+    resetForm()
+    navigate(`/patients/${candidate.id}`)
+  }
 
   const columns = useMemo<ColumnDef<Patient>[]>(
     () => [
@@ -250,7 +387,7 @@ export default function PatientList() {
         enableHiding: false,
         cell: ({ row }) => (
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" aria-label={`Quick view ${row.original.full_name}`} onClick={(e) => { e.stopPropagation(); setQuickViewPatient(row.original) }}>
+            <Button variant="ghost" size="icon" aria-label={`Quick view ${row.original.full_name}`} onClick={(e) => { e.stopPropagation(); openQuickView(row.original) }}>
               <Eye className="h-4 w-4" />
             </Button>
             <Button variant="ghost" size="icon" aria-label={`Delete ${row.original.full_name}`} onClick={(e) => { e.stopPropagation(); confirmDelete(row.original) }}>
@@ -260,7 +397,7 @@ export default function PatientList() {
         ),
       },
     ],
-    []
+    [openQuickView]
   )
 
   function handleSortingChange(sorting: SortingState) {
@@ -268,18 +405,9 @@ export default function PatientList() {
     setSort(f?.id ?? "", f?.desc ? "desc" : "asc")
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!form.patient_source) {
-      addToast({ title: "Validation Error", description: "Please select how the patient heard about us", variant: "destructive" })
-      return
-    }
-    createMutation.mutate(stripEmptyFormFields(form))
-  }
-
   const quickView = quickViewPatient ? {
     open: true,
-    onClose: () => setQuickViewPatient(null),
+    onClose: () => openQuickView(null),
     title: quickViewPatient.full_name,
     subtitle: [
       quickViewPatient.op_no && `OP No. ${quickViewPatient.op_no}`,
@@ -290,11 +418,11 @@ export default function PatientList() {
     statusPill: <StatusBadge status={quickViewPatient.status} />,
     onOpenFull: () => {
       navigate(`/patients/${quickViewPatient.id}`)
-      setQuickViewPatient(null)
+      openQuickView(null)
     },
     actions: quickViewPatient.phone ? (
       <>
-        <a href={`tel:${quickViewPatient.phone}`} onClick={() => setQuickViewPatient(null)}>
+        <a href={`tel:${quickViewPatient.phone}`} onClick={() => openQuickView(null)}>
           <Button variant="outline" size="sm" aria-label="Call patient">
             <Phone className="h-4 w-4" />
             <span className="hidden sm:inline">Call</span>
@@ -304,7 +432,7 @@ export default function PatientList() {
           href={`https://wa.me/${quickViewPatient.phone.replace(/[^0-9]/g, "")}`}
           target="_blank"
           rel="noopener noreferrer"
-          onClick={() => setQuickViewPatient(null)}
+          onClick={() => openQuickView(null)}
         >
           <Button variant="outline" size="sm" aria-label="WhatsApp patient">
             <MessageSquare className="h-4 w-4" />
@@ -442,124 +570,240 @@ export default function PatientList() {
               <StatusBadge status={row.status} />
             </div>
           )}
-          onRowClick={(row) => setQuickViewPatient(row)}
+          onRowClick={(row) => openQuickView(row)}
         />
       </EnterpriseWorkspace>
 
-      {/* Create Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
-        <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
-          <DialogHeader className="px-6 pt-6 pb-0 shrink-0">
-            <DialogTitle>Add Patient</DialogTitle>
-            <DialogDescription>Fill in the details to register a new patient.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
-            <div className="overflow-y-auto px-6 py-4 space-y-4 flex-1">
-              <div className="grid gap-2">
-                <Label htmlFor="name">Full Name</Label>
-                <Input id="name" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} required />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="phone">Phone</Label>
-                  <Input id="phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="gender">Gender</Label>
-                  <select id="gender" value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                    <option value="">Select gender</option>
-                    <option value="MALE">Male</option>
-                    <option value="FEMALE">Female</option>
-                    <option value="OTHER">Other</option>
-                  </select>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="age">Age</Label>
-                  <NumericInput id="age" mode="integer" min={0} max={150} value={form.age} onChange={(v) => setForm({ ...form, age: v })} />
-                </div>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="source">How Did You Hear About Us?</Label>
-                <SearchableSelect value={form.patient_source} onValueChange={(v) => setForm({ ...form, patient_source: v })}
-                  options={SOURCE_OPTIONS} placeholder="Search or select source..." />
-              </div>
-              {form.patient_source === "Campaign" && (
-                <div className="grid grid-cols-3 gap-3 rounded-lg border border-blue-100 bg-blue-50 p-3">
-                  <div className="grid gap-1">
-                    <Label htmlFor="campaign_name" className="text-xs">Campaign Name</Label>
-                    <Input id="campaign_name" className="h-8 text-xs" placeholder="Campaign name"
-                      value={form.source_campaign_name} onChange={(e) => setForm({ ...form, source_campaign_name: e.target.value })} />
-                  </div>
-                  <div className="grid gap-1">
-                    <Label htmlFor="campaign_id" className="text-xs">Campaign ID</Label>
-                    <Input id="campaign_id" className="h-8 text-xs" placeholder="Campaign ID"
-                      value={form.source_campaign_id} onChange={(e) => setForm({ ...form, source_campaign_id: e.target.value })} />
-                  </div>
-                  <div className="grid gap-1">
-                    <Label htmlFor="campaign_date" className="text-xs">Campaign Date</Label>
-                    <Input id="campaign_date" type="date" className="h-8 text-xs"
-                      value={form.source_campaign_date} onChange={(e) => setForm({ ...form, source_campaign_date: e.target.value })} />
-                  </div>
+      {/* Create Dialog — multi-step wizard */}
+      <EnterpriseFormDialog
+        open={dialogOpen}
+        onOpenChange={handleDialogOpenChange}
+        title="Add Patient"
+        description="Fill in the details to register a new patient."
+        scrollable={false}
+      >
+        <EnterpriseWizard
+          steps={WIZARD_STEPS}
+          currentStep={step}
+          onStepChange={setStep}
+          validateStep={validateStep}
+          onSubmit={handleSubmit}
+          submitting={createMutation.isPending}
+          onCancel={() => handleDialogOpenChange(false)}
+        >
+          {step === 0 && (
+            <div className="space-y-4">
+              {dupChecked && dupTotal > 0 && !dupAcknowledged && (
+                <DuplicateWarning
+                  candidates={dupCandidates}
+                  onOpenExisting={handleOpenDuplicate}
+                  onContinueAnyway={() => { setDupAcknowledged(true); clearDuplicates() }}
+                />
+              )}
+              <FormField label="Full Name" htmlFor="name" required error={fieldError("full_name")} hint="Patient's legal name as registered.">
+                <Input
+                  id="name"
+                  value={formValues.full_name}
+                  onChange={(e) => setFormField("full_name", e.target.value)}
+                  onBlur={() => onFormBlur("full_name")}
+                  aria-invalid={Boolean(fieldError("full_name"))}
+                />
+              </FormField>
+              <EnterpriseFieldGrid>
+                <FormField label="Patient Type" htmlFor="patient_type" hint="Children require guardian details.">
+                  <Select value={formValues.patient_type} onValueChange={(v) => setFormField("patient_type", v)}>
+                    <SelectTrigger id="patient_type">
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PATIENT_TYPE_OPTIONS.map((t) => (
+                        <SelectItem key={t.value} value={t.value}>
+                          {t.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormField>
+                <FormField label="Email" htmlFor="email" error={fieldError("email")}>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={formValues.email}
+                    onChange={(e) => setFormField("email", e.target.value)}
+                    onBlur={() => onFormBlur("email")}
+                    placeholder="name@clinic.com"
+                  />
+                </FormField>
+              </EnterpriseFieldGrid>
+              <EnterpriseFieldGrid>
+                <FormField label="Phone" htmlFor="phone" error={fieldError("phone")}>
+                  <Input
+                    id="phone"
+                    value={formValues.phone}
+                    onChange={(e) => setFormField("phone", e.target.value)}
+                    onBlur={() => onFormBlur("phone")}
+                    placeholder="e.g. +91 98765 43210"
+                  />
+                </FormField>
+                <FormField label="Age" htmlFor="age" error={fieldError("age")}>
+                  <NumericInput id="age" mode="integer" min={0} max={150} value={formValues.age} onChange={(v) => setFormField("age", v)} />
+                </FormField>
+              </EnterpriseFieldGrid>
+              <EnterpriseFieldGrid>
+                <FormField label="Gender" htmlFor="gender">
+                  <Select value={formValues.gender} onValueChange={(v) => setFormField("gender", v)}>
+                    <SelectTrigger id="gender">
+                      <SelectValue placeholder="Select gender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {GENDER_OPTIONS.map((g) => (
+                        <SelectItem key={g.value} value={g.value}>
+                          {g.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormField>
+                <FormField label="Emergency Contact" htmlFor="emergency_contact" hint="Parent / next of kin if the patient is a child.">
+                  <Input id="emergency_contact" value={formValues.emergency_contact} onChange={(e) => setFormField("emergency_contact", e.target.value)} placeholder="e.g. +91 91234 56780" />
+                </FormField>
+              </EnterpriseFieldGrid>
+              {formValues.patient_type === "CHILD" && (
+                <div className="rounded-lg border border-[var(--ds-border-light)] bg-[var(--ds-surface-secondary)] p-3">
+                  <p className="ds-form-title mb-3 text-[var(--ds-text)]">Guardian Information</p>
+                  <EnterpriseFieldGrid>
+                    <FormField label="Guardian Name" htmlFor="guardian_name">
+                      <Input id="guardian_name" value={formValues.guardian_name} onChange={(e) => setFormField("guardian_name", e.target.value)} placeholder="Guardian's full name" />
+                    </FormField>
+                    <FormField label="Relationship" htmlFor="guardian_relationship">
+                      <SearchableSelect
+                        value={formValues.guardian_relationship}
+                        onValueChange={(v) => setFormField("guardian_relationship", v)}
+                        options={GUARDIAN_RELATIONSHIP_OPTIONS}
+                        placeholder="Select relationship..."
+                      />
+                    </FormField>
+                  </EnterpriseFieldGrid>
+                  <FormField label="Guardian Phone" htmlFor="guardian_phone">
+                    <Input id="guardian_phone" value={formValues.guardian_phone} onChange={(e) => setFormField("guardian_phone", e.target.value)} placeholder="e.g. +91 98765 43210" />
+                  </FormField>
                 </div>
               )}
-              <div className="grid gap-2">
-                <Label htmlFor="address">Address</Label>
-                <Input id="address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="op_no">OP No.</Label>
-                  <Input id="op_no" value={form.op_no} onChange={(e) => setForm({ ...form, op_no: e.target.value })} placeholder="e.g. OP-2024-001" />
+              <FormField label="How Did You Hear About Us?" htmlFor="source" required error={fieldError("patient_source")}>
+                <SearchableSelect
+                  value={formValues.patient_source}
+                  onValueChange={(v) => setFormField("patient_source", v)}
+                  options={SOURCE_OPTIONS}
+                  placeholder="Search or select source..."
+                />
+              </FormField>
+              {formValues.patient_source === "Campaign" && (
+                <div className="grid grid-cols-3 gap-3 rounded-lg border border-blue-100 bg-blue-50 p-3">
+                  <FormField label="Campaign Name" htmlFor="campaign_name">
+                    <Input id="campaign_name" className="h-8 text-xs" placeholder="Campaign name"
+                      value={formValues.source_campaign_name} onChange={(e) => setFormField("source_campaign_name", e.target.value)} />
+                  </FormField>
+                  <FormField label="Campaign ID" htmlFor="campaign_id">
+                    <Input id="campaign_id" className="h-8 text-xs" placeholder="Campaign ID"
+                      value={formValues.source_campaign_id} onChange={(e) => setFormField("source_campaign_id", e.target.value)} />
+                  </FormField>
+                  <FormField label="Campaign Date" htmlFor="campaign_date">
+                    <Input id="campaign_date" type="date" className="h-8 text-xs"
+                      value={formValues.source_campaign_date} onChange={(e) => setFormField("source_campaign_date", e.target.value)} />
+                  </FormField>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="abha_id">ABHA ID</Label>
-                  <Input id="abha_id" value={form.abha_id} onChange={(e) => setForm({ ...form, abha_id: e.target.value })} placeholder="14-digit ABHA number" maxLength={20} />
-                </div>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="medical_history">Medical History</Label>
-                <Textarea id="medical_history" value={form.medical_history} onChange={(e) => setForm({ ...form, medical_history: e.target.value })} placeholder="Past medical history, allergies, medications..." />
-              </div>
-              <div className="border-t pt-4 mt-2">
-                <p className="text-xs font-semibold text-muted-foreground mb-3">Vitals</p>
-                <div className="grid grid-cols-5 gap-3">
-                  <div className="grid gap-1">
-                    <Label htmlFor="height" className="text-xs">Height (cm)</Label>
-                    <NumericInput id="height" mode="decimal" decimalPlaces={1} suffix="cm" className="h-8 text-xs" value={form.height} onChange={(v) => setForm({ ...form, height: v })} />
-                  </div>
-                  <div className="grid gap-1">
-                    <Label htmlFor="weight" className="text-xs">Weight (kg)</Label>
-                    <NumericInput id="weight" mode="decimal" decimalPlaces={1} suffix="kg" className="h-8 text-xs" value={form.weight} onChange={(v) => setForm({ ...form, weight: v })} />
-                  </div>
-                  <div className="grid gap-1">
-                    <Label htmlFor="bp" className="text-xs">BP</Label>
-                    <Input id="bp" className="h-8 text-xs" placeholder="120/80" value={form.bp} onChange={(e) => setForm({ ...form, bp: e.target.value })} />
-                  </div>
-                  <div className="grid gap-1">
-                    <Label htmlFor="sugar" className="text-xs">Sugar</Label>
-                    <Input id="sugar" className="h-8 text-xs" placeholder="mg/dL" value={form.sugar} onChange={(e) => setForm({ ...form, sugar: e.target.value })} />
-                  </div>
-                  <div className="grid gap-1">
-                    <Label htmlFor="spo2" className="text-xs">SpO2 (%)</Label>
-                    <NumericInput id="spo2" mode="decimal" decimalPlaces={1} suffix="%" className="h-8 text-xs" placeholder="98" value={form.spo2} onChange={(v) => setForm({ ...form, spo2: v })} />
-                  </div>
-                </div>
+              )}
+            </div>
+          )}
+          {step === 1 && (
+            <div className="space-y-4">
+              <FormField label="Address" htmlFor="address">
+                <Input id="address" value={formValues.address} onChange={(e) => setFormField("address", e.target.value)} placeholder="Street, city, PIN" />
+              </FormField>
+              <EnterpriseFieldGrid>
+                <FormField label="OP No." htmlFor="op_no" error={fieldError("op_no")}>
+                  <Input id="op_no" value={formValues.op_no} onChange={(e) => setFormField("op_no", e.target.value)} placeholder="e.g. OP-2024-001" />
+                </FormField>
+                <FormField label="ABHA ID" htmlFor="abha_id" error={fieldError("abha_id")} hint="14-digit ABHA number">
+                  <Input id="abha_id" value={formValues.abha_id} onChange={(e) => setFormField("abha_id", e.target.value)} placeholder="14-digit ABHA number" maxLength={20} />
+                </FormField>
+              </EnterpriseFieldGrid>
+            </div>
+          )}
+          {step === 2 && (
+            <div className="space-y-4">
+              <FormField label="Medical History" htmlFor="medical_history">
+                <Textarea id="medical_history" value={formValues.medical_history} onChange={(e) => setFormField("medical_history", e.target.value)} placeholder="Past medical history, allergies, medications..." />
+              </FormField>
+              <div>
+                <p className="ds-form-title mb-3 text-[var(--ds-text)]">Vitals</p>
+                <EnterpriseFieldGrid columns={3}>
+                  <FormField label="Height (cm)" htmlFor="height">
+                    <NumericInput id="height" mode="decimal" decimalPlaces={1} suffix="cm" value={formValues.height} onChange={(v) => setFormField("height", v)} />
+                  </FormField>
+                  <FormField label="Weight (kg)" htmlFor="weight">
+                    <NumericInput id="weight" mode="decimal" decimalPlaces={1} suffix="kg" value={formValues.weight} onChange={(v) => setFormField("weight", v)} />
+                  </FormField>
+                  <FormField label="BP" htmlFor="bp">
+                    <Input id="bp" placeholder="120/80" value={formValues.bp} onChange={(e) => setFormField("bp", e.target.value)} />
+                  </FormField>
+                  <FormField label="Sugar" htmlFor="sugar">
+                    <Input id="sugar" placeholder="mg/dL" value={formValues.sugar} onChange={(e) => setFormField("sugar", e.target.value)} />
+                  </FormField>
+                  <FormField label="SpO2 (%)" htmlFor="spo2">
+                    <NumericInput id="spo2" mode="decimal" decimalPlaces={1} suffix="%" placeholder="98" value={formValues.spo2} onChange={(v) => setFormField("spo2", v)} />
+                  </FormField>
+                </EnterpriseFieldGrid>
               </div>
             </div>
-            <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-[var(--ds-border-light)]">
-              <Button type="button" variant="outline" onClick={resetForm}>Cancel</Button>
-              <Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? "Saving..." : "Save"}</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+          )}
+        </EnterpriseWizard>
+      </EnterpriseFormDialog>
+
+      {/* Workflow completion — related-record shortcuts after a successful save */}
+      <WorkflowNextActions
+        open={Boolean(completedPatient)}
+        onOpenChange={(open) => { if (!open) setCompletedPatient(null) }}
+        title="Patient registered"
+        description={`${completedPatient?.full_name ?? "The patient"} is now part of the practice. What's next?`}
+        summaryTitle="Registered patient"
+        summary={completedPatient ? [
+          { label: "Name", value: completedPatient.full_name },
+          { label: "Patient type", value: completedPatient.patient_type === "CHILD" ? "Child" : "Adult" },
+          { label: "Phone", value: completedPatient.phone || "—" },
+          { label: "Status", value: completedPatient.status?.replace(/_/g, " ") ?? "NEW" },
+          { label: "OP No.", value: completedPatient.op_no || "—" },
+          { label: "Source", value: completedPatient.patient_source || "—" },
+        ] : []}
+        primaryAction={{
+          label: "Schedule Appointment",
+          icon: <CalendarPlus className="h-4 w-4" aria-hidden="true" />,
+          onClick: () => {
+            const id = completedPatient?.id
+            setCompletedPatient(null)
+            if (id) navigate(`/appointments?patient_id=${id}`)
+          },
+        }}
+        secondaryActions={[
+          {
+            label: "Open Profile",
+            icon: <UserRound className="h-4 w-4" aria-hidden="true" />,
+            onClick: () => {
+              const id = completedPatient?.id
+              setCompletedPatient(null)
+              if (id) navigate(`/patients/${id}`)
+            },
+          },
+          {
+            label: "Register Another",
+            icon: <UserPlus className="h-4 w-4" aria-hidden="true" />,
+            onClick: () => {
+              setCompletedPatient(null)
+              openDialog()
+            },
+          },
+        ]}
+      />
 
       {/* Delete Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

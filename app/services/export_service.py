@@ -396,7 +396,7 @@ async def _csv_consent_forms(db, hospital_ids, date_start, date_end):
 # ═══════════════════════════════════════════════════════════════════
 #  EXCEL GENERATOR  –  professional formatting
 # ═══════════════════════════════════════════════════════════════════
-async def _generate_excel(data, headers, filename):
+def _generate_excel(data, headers, filename):
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side, numbers
     from openpyxl.utils import get_column_letter
@@ -1127,7 +1127,10 @@ async def export_data(
     elif format == "excel":
         safe = label.lower().replace(" ", "_")
         filename = f"{safe}_{date_str}.xlsx"
-        filepath = await _generate_excel(data, headers, filename)
+        # openpyxl rendering is pure CPU and can be large — keep it off the
+        # event loop so concurrent requests are not starved.
+        import asyncio
+        filepath = await asyncio.to_thread(_generate_excel, data, headers, filename)
         return filepath, count
 
     elif format == "pdf":

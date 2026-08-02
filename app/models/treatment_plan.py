@@ -23,7 +23,7 @@ class TreatmentPlan(Base):
     __tablename__ = "treatment_plans"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     treatment_number: Mapped[str] = mapped_column(String(20), nullable=True, unique=True)
-    case_id: Mapped[str] = mapped_column(String(36), ForeignKey("cases.id"), nullable=False)
+    case_id: Mapped[str] = mapped_column(String(36), ForeignKey("cases.id"), nullable=False, index=True)
     treatment_name: Mapped[str] = mapped_column(String(255), nullable=False)
     treatment_type_id: Mapped[str] = mapped_column(String(36), ForeignKey("treatment_types.id"), nullable=True)
     treatment_template_id: Mapped[str] = mapped_column(String(36), ForeignKey("treatment_templates.id"), nullable=True)
@@ -37,7 +37,7 @@ class TreatmentPlan(Base):
     start_date: Mapped[date] = mapped_column(Date, nullable=True)
     expected_completion_date: Mapped[date] = mapped_column(Date, nullable=True)
     next_appointment_date: Mapped[date] = mapped_column(Date, nullable=True)
-    status: Mapped[TreatmentPlanStatus] = mapped_column(SAEnum(TreatmentPlanStatus, create_constraint=False), default=TreatmentPlanStatus.ASSIGNED, nullable=False)
+    status: Mapped[TreatmentPlanStatus] = mapped_column(SAEnum(TreatmentPlanStatus, create_constraint=False), default=TreatmentPlanStatus.ASSIGNED, nullable=False, index=True)
     notes: Mapped[str] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     assigned_doctor_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)

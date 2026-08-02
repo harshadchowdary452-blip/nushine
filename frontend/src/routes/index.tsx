@@ -1,12 +1,13 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createBrowserRouter, Navigate, Outlet, useLocation } from "react-router-dom"
-import { AnimatePresence } from "framer-motion"
 import { lazy, Suspense } from "react"
 import type { ReactElement } from "react"
 import { useAuthStore } from "@/store/authStore"
 import type { Role } from "@/types"
 import { getHospitalOverride, setHospitalOverride } from "@/lib/hospital-override"
-import { EnterpriseAppLayout } from "@/design-system"
+// Deep import: the @/design-system barrel also re-exports the dashboard chart
+// modules (recharts), which would statically bundle ~450KB into the entry chunk.
+import EnterpriseAppLayout from "@/design-system/components/app-layout"
 
 const Login = lazy(() => import("@/pages/auth/login"))
 const SuperAdminDashboard = lazy(() => import("@/pages/dashboard/super-admin"))
@@ -31,6 +32,7 @@ const TreatmentPlanApproval = lazy(() => import("@/pages/treatments/approval"))
 const ScheduleFirstAppointment = lazy(() => import("@/pages/treatments/schedule-first"))
 const TreatmentWorkflowBoard = lazy(() => import("@/pages/treatments/workflow-board"))
 const DoctorQueue = lazy(() => import("@/pages/treatments/doctor-queue"))
+const TaskCenter = lazy(() => import("@/pages/tasks/task-center"))
 const BillingList = lazy(() => import("@/pages/billing/list"))
 const BillingDetail = lazy(() => import("@/pages/billing/detail"))
 const WhatsAppMessaging = lazy(() => import("@/pages/whatsapp/messaging"))
@@ -95,9 +97,7 @@ function ProtectedLayout() {
   return (
     <EnterpriseAppLayout>
       <Suspense fallback={<PageLoader />}>
-        <AnimatePresence mode="wait">
-          <Outlet key={location.pathname} />
-        </AnimatePresence>
+        <Outlet />
       </Suspense>
     </EnterpriseAppLayout>
   )
@@ -213,6 +213,7 @@ export const router = createBrowserRouter([
       },
       { path: "/treatments/workflow", element: withRoles(<TreatmentWorkflowBoard />, ADMIN_ROLES) },
       { path: "/treatments/queue", element: withRoles(<DoctorQueue />, CARE_ROLES) },
+      { path: "/tasks", element: withRoles(<TaskCenter />, [...ADMIN_ROLES, "DOCTOR"]) },
       { path: "/consent-forms", element: withRoles(<ConsentFormList />, CARE_ROLES) },
       { path: "/consent-forms/view/:id", element: withRoles(<ConsentFormView />, CARE_ROLES) },
       { path: "/settings/clinical", element: withRoles(<ClinicalSettings />, ["HOSPITAL_ADMIN"]) },

@@ -421,6 +421,7 @@ export default function CrmDashboardPage() {
     queryFn: () => crmApi.commandCenter(apiParams),
     staleTime: 20000,
     refetchInterval: 30000,
+    refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
   })
 

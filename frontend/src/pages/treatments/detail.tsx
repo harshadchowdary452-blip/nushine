@@ -44,6 +44,7 @@ import {
 import { treatmentApi, treatmentSittingsApi, casesApi } from "@/services/endpoints"
 import { formatIndianRupees } from "@/lib/currency"
 import { cn } from "@/lib/utils"
+import { useTrackRecent } from "@/hooks/useTrackRecent"
 import AppointmentScheduler from "@/components/appointments/AppointmentScheduler"
 import type {
   TreatmentPlan,
@@ -121,6 +122,14 @@ export default function TreatmentDetail() {
     queryFn: () => treatmentApi.get(id!),
     enabled: !!id,
   })
+
+  useTrackRecent(
+    "treatment",
+    plan?.id,
+    plan,
+    (p) => p?.treatment_name || "Treatment",
+    (p) => (p?.patient_name ? p.patient_name : p?.treatment_number || undefined)
+  )
 
   const { data: sittingData } = useQuery({
     queryKey: ["treatment-sittings", id],

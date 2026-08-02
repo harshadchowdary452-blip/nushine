@@ -129,6 +129,7 @@ export default function GroupAdminDashboard() {
     staleTime: 15000,
     gcTime: 60000,
     refetchInterval: 30000,
+    refetchIntervalInBackground: false,
   })
 
   const { items: activityFeed, loading: activityLoading } = useDashboardActivity()

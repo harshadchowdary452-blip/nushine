@@ -2,7 +2,7 @@ import logging
 from typing import Optional, List
 from datetime import date, time
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 from fastapi import HTTPException, status
 from app.repositories.treatment_plan_repository import TreatmentPlanRepository
@@ -90,12 +90,11 @@ class TreatmentPlanService:
             data["completed_sittings"] = 0
             data["remaining_sittings"] = total
             plan = await self.repo.create(**data)
-            try:
-                cnt = await self.db.execute(select(func.count(TreatmentPlan.id)))
-                plan.treatment_number = f"TRT-{cnt.scalar():04d}"
-                await self.db.flush()
-            except Exception:
-                pass
+            # Display number derived from the plan's UUID — O(1) and unique, instead
+            # of a full-table COUNT() on every create (which also reused numbers
+            # after deletions and silently violated the UNIQUE constraint).
+            plan.treatment_number = f"TRT-{plan.id[:8].upper()}"
+            await self.db.flush()
             await self.audit_log_repo.create(user_id=user_id, action="CREATE_TREATMENT_PLAN", entity_type="TREATMENT_PLAN", entity_id=str(plan.id), details=f"Treatment plan '{plan.treatment_name}' created")
             return plan
         except HTTPException:
@@ -150,14 +149,10 @@ class TreatmentPlanService:
         )
         self.db.add(appt)
         await self.db.flush()
-        try:
-            max_num = await self.db.execute(select(func.max(Appointment.appointment_number)))
-            max_val = max_num.scalar()
-            next_num = (int(max_val.split("-")[1]) + 1) if max_val else 1
-            appt.appointment_number = f"APPT-{next_num:04d}"
-            await self.db.flush()
-        except Exception:
-            pass
+        # Same O(1) UUID-derived scheme as treatment_number; avoids a MAX() scan
+        # and is safe against duplicate/reused numbers.
+        appt.appointment_number = f"APPT-{appt.id[:8].upper()}"
+        await self.db.flush()
         logger.info("Auto-created appointment %s for patient %s on %s", appt.id, case.patient_id, plan.next_appointment_date)
         try:
             patient_obj = await self.db.get(Patient, case.patient_id)

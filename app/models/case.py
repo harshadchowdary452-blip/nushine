@@ -27,13 +27,13 @@ class CaseTreatmentPlanStatus(str, Enum):
 class ClinicalFinding(Base):
     __tablename__ = "clinical_findings"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    case_id: Mapped[str] = mapped_column(String(36), ForeignKey("cases.id"), nullable=False)
+    case_id: Mapped[str] = mapped_column(String(36), ForeignKey("cases.id"), nullable=False, index=True)
     finding_type: Mapped[str] = mapped_column(String(50), nullable=False)
     tooth_number: Mapped[str] = mapped_column(String(10), nullable=True)
     dentition_type: Mapped[str] = mapped_column(String(5), nullable=True)
     surface: Mapped[str] = mapped_column(String(50), nullable=True)
     severity: Mapped[str] = mapped_column(String(50), nullable=True)
-    doctor_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
+    doctor_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True, index=True)
     notes: Mapped[str] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -45,8 +45,8 @@ class Case(Base):
     __tablename__ = "cases"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     case_number: Mapped[str] = mapped_column(String(20), nullable=True, unique=True)
-    patient_id: Mapped[str] = mapped_column(String(36), ForeignKey("patients.id"), nullable=False)
-    doctor_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
+    patient_id: Mapped[str] = mapped_column(String(36), ForeignKey("patients.id"), nullable=False, index=True)
+    doctor_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True, index=True)
     consultant_id: Mapped[str] = mapped_column(String(36), ForeignKey("consultants.id"), nullable=True)
     appointment_id: Mapped[str] = mapped_column(String(36), ForeignKey("appointments.id"), nullable=True)
     # Chief Complaint
@@ -102,7 +102,7 @@ class Case(Base):
     treatment_plan_approved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     treatment_plan_rejection_reason: Mapped[str] = mapped_column(Text, nullable=True)
     # Status
-    status: Mapped[CaseStatus] = mapped_column(SAEnum(CaseStatus, create_constraint=False), default=CaseStatus.OPEN, nullable=False)
+    status: Mapped[CaseStatus] = mapped_column(SAEnum(CaseStatus, create_constraint=False), default=CaseStatus.OPEN, nullable=False, index=True)
     notes: Mapped[str] = mapped_column(Text, nullable=True)
     completion_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
