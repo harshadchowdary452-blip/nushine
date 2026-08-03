@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import String, DateTime, Text, Boolean, Integer, ForeignKey, Enum as SAEnum
+from sqlalchemy import String, DateTime, Text, Boolean, Integer, Float, ForeignKey, Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 from enum import Enum
@@ -103,6 +103,12 @@ class Case(Base):
     treatment_plan_rejection_reason: Mapped[str] = mapped_column(Text, nullable=True)
     # Status
     status: Mapped[CaseStatus] = mapped_column(SAEnum(CaseStatus, create_constraint=False), default=CaseStatus.OPEN, nullable=False, index=True)
+    # Financial summary (kept in sync by BillingSyncService; billing is the source of truth)
+    estimated_cost: Mapped[float] = mapped_column(Float, nullable=True)
+    total_billed: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    total_paid: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    outstanding_balance: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    payment_status: Mapped[str] = mapped_column(String(20), nullable=True)
     notes: Mapped[str] = mapped_column(Text, nullable=True)
     completion_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

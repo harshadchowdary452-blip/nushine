@@ -241,7 +241,7 @@ async def create_enquiry(data: EnquiryCreate, db: AsyncSession = Depends(get_db)
             db=db,
         )
     except Exception:
-        pass
+        logger.warning("Failed to publish ENQUIRY_CREATED event", exc_info=True)
     await db.commit()
     return {"id": str(enquiry.id), "status": enquiry.status}
 
@@ -1177,7 +1177,7 @@ async def update_enquiry_status(
                         db=db,
                     )
             except Exception:
-                pass
+                logger.warning("Failed to publish enquiry completion event", exc_info=True)
         elif data.status == "CANCELLED":
             ge.cancelled_by_event = "MANUAL"
             ge.cancelled_at = datetime.now(timezone.utc)
@@ -1364,7 +1364,7 @@ async def create_enquiry_follow_up(enquiry_id: str, data: EnquiryFollowUpAction,
                 db=db,
             )
     except Exception:
-        pass
+        logger.warning("Failed to publish ENQUIRY_CONVERTED event", exc_info=True)
     await db.commit()
     return {"success": True, "enquiry_status": e.status}
 

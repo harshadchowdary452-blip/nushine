@@ -559,9 +559,11 @@ async def _revenue_trend_chart(db, hospital_ids, date_start, date_end, filename)
     pids = await _get_patient_ids(db, hospital_ids)
     cids = await _get_case_ids(db, pids)
     range_days = (date_end - date_start).days
-    fmt_sql = "YYYY-MM-DD" if range_days <= 31 else "YYYY-MM"
+    pg_fmt = "YYYY-MM-DD" if range_days <= 31 else "YYYY-MM"
+    sq_fmt = "%Y-%m-%d" if range_days <= 31 else "%Y-%m"
+    period_expr = func.to_char(Billing.updated_at, pg_fmt) if settings.DB_IS_POSTGRESQL else func.strftime(sq_fmt, Billing.updated_at)
     q = select(
-        func.to_char(Billing.updated_at, fmt_sql).label("period"),
+        period_expr.label("period"),
         func.sum(Billing.paid_amount).label("revenue"),
     ).where(Billing.updated_at >= date_start, Billing.updated_at < date_end)
     if cids is not None:
@@ -583,9 +585,11 @@ async def _revenue_trend_chart(db, hospital_ids, date_start, date_end, filename)
 async def _appointment_trend_chart(db, hospital_ids, date_start, date_end, filename):
     pids = await _get_patient_ids(db, hospital_ids)
     range_days = (date_end - date_start).days
-    fmt_sql = "YYYY-MM-DD" if range_days <= 31 else "YYYY-MM"
+    pg_fmt = "YYYY-MM-DD" if range_days <= 31 else "YYYY-MM"
+    sq_fmt = "%Y-%m-%d" if range_days <= 31 else "%Y-%m"
+    period_expr = func.to_char(Appointment.appointment_date, pg_fmt) if settings.DB_IS_POSTGRESQL else func.strftime(sq_fmt, Appointment.appointment_date)
     q = select(
-        func.to_char(Appointment.appointment_date, fmt_sql).label("period"),
+        period_expr.label("period"),
         func.count(Appointment.id).label("count"),
     ).where(Appointment.appointment_date >= date_start.date() if hasattr(date_start, 'date') else date_start,
              Appointment.appointment_date < date_end.date() if hasattr(date_end, 'date') else date_end)
@@ -605,9 +609,11 @@ async def _appointment_trend_chart(db, hospital_ids, date_start, date_end, filen
 
 async def _patient_growth_chart(db, hospital_ids, date_start, date_end, filename):
     range_days = (date_end - date_start).days
-    fmt_sql = "YYYY-MM-DD" if range_days <= 31 else "YYYY-MM"
+    pg_fmt = "YYYY-MM-DD" if range_days <= 31 else "YYYY-MM"
+    sq_fmt = "%Y-%m-%d" if range_days <= 31 else "%Y-%m"
+    period_expr = func.to_char(Patient.created_at, pg_fmt) if settings.DB_IS_POSTGRESQL else func.strftime(sq_fmt, Patient.created_at)
     q = select(
-        func.to_char(Patient.created_at, fmt_sql).label("period"),
+        period_expr.label("period"),
         func.count(Patient.id).label("count"),
     ).where(Patient.created_at >= date_start, Patient.created_at < date_end)
     if hospital_ids is not None:

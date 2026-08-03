@@ -9,9 +9,18 @@ from app.routers.auth import limiter as auth_limiter
 # Live-server scripts (no pytest fixtures, hit http://localhost:8000 directly).
 # They are executed manually; importing them during collection would run the
 # full flow (and previously the hardcoded superadmin credential).
-collect_ignore = ["test_treatment_e2e.py"]
+collect_ignore = [
+    "test_treatment_e2e.py",
+    "test_phase33_e2e.py",
+    "test_sync_chain_e2e.py",
+    "test_treatment_execution_e2e.py",
+]
 
 TEST_DATABASE_URL = "sqlite+aiosqlite://"
+# Align app config with the in-memory test database so DB-specific SQL
+# (to_char vs strftime) resolves to SQLite during tests.
+from app.config import settings as _settings
+_settings.DATABASE_URL = TEST_DATABASE_URL
 engine = create_async_engine(TEST_DATABASE_URL, echo=False, connect_args={"check_same_thread": False})
 test_async_session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 

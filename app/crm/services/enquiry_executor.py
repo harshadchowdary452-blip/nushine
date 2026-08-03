@@ -18,6 +18,8 @@ from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func
 
+from app.crm.services.automation_log import write_automation_log
+
 logger = logging.getLogger("crm.enquiry_executor")
 
 
@@ -129,6 +131,14 @@ class EnquiryExecutor:
                 decision.treatment_type_id, decision.appointment_id, decision.due_date,
             )
             result.duplicate_prevented += 1
+            await write_automation_log(
+                db, hospital_id=hospital_id, patient_id=decision.patient_id,
+                case_id=decision.case_id, event=decision.trigger_event,
+                rule="enquiry_executor", enquiry_type=decision.enquiry_type,
+                decision="SKIP", reason="Duplicate prevented by idempotency key",
+                occurrence_number=getattr(decision, 'occurrence_number', None),
+                chain_id=getattr(decision, 'chain_id', None), due_date=decision.due_date,
+            )
             return result
 
         # Validate enquiry type
@@ -142,6 +152,12 @@ class EnquiryExecutor:
                 decision.enquiry_type, VALID_TYPES,
             )
             result.errors.append(f"Invalid enquiry_type: {decision.enquiry_type}")
+            await write_automation_log(
+                db, hospital_id=hospital_id, patient_id=decision.patient_id,
+                case_id=decision.case_id, event=decision.trigger_event,
+                rule="enquiry_executor", enquiry_type=decision.enquiry_type,
+                decision="SKIP", reason=f"Invalid enquiry_type: {decision.enquiry_type}",
+            )
             return result
 
         # Create the enquiry
@@ -152,6 +168,14 @@ class EnquiryExecutor:
             logger.info(
                 "ENQUIRY_CREATED: type=%s id=%s patient=%s due=%s",
                 decision.enquiry_type, ge.id, decision.patient_id, decision.due_date,
+            )
+            await write_automation_log(
+                db, hospital_id=hospital_id, patient_id=decision.patient_id,
+                case_id=decision.case_id, event=decision.trigger_event,
+                rule="enquiry_executor", enquiry_type=decision.enquiry_type,
+                decision="CREATE", reason=decision.description or decision.trigger_event,
+                occurrence_number=ge.occurrence_number,
+                chain_id=ge.chain_id, due_date=ge.due_date,
             )
         except Exception as exc:
             logger.error("ENQUIRY_CREATE_FAILED: type=%s error=%s", decision.enquiry_type, str(exc))
@@ -200,6 +224,12 @@ class EnquiryExecutor:
             logger.info(
                 "ENQUIRIES_CANCELLED: patient=%s types=%s count=%d reason=%s",
                 patient_id, cancel_types, cancelled, decision.cancel_reason,
+            )
+            await write_automation_log(
+                db, hospital_id=hospital_id, patient_id=patient_id,
+                event=decision.trigger_event, rule="enquiry_executor",
+                enquiry_type=",".join(cancel_types), decision="CANCEL",
+                reason=decision.cancel_reason or decision.trigger_event,
             )
 
         return cancelled
@@ -328,16 +358,17 @@ class EnquiryExecutor:
             recurrence_interval_days=getattr(decision, 'recurrence_interval_days', None),
             chain_id=None,
         )
-        if getattr(decision, 'is_recurring', False):
-            if getattr(decision, 'chain_id', None):
-                ge.chain_id = decision.chain_id
-            else:
-                ge.chain_id = ge.id
 
         ge.enquiry_number = await self._generate_enquiry_number(db)
 
         db.add(ge)
         await db.flush()
+        # chain_id must reference a REAL id. Assign only AFTER flush so a
+        # recurring chain's first occurrence gets chain_id = its own id
+        # (subsequent occurrences are chained to it by the scheduler/event path).
+        if getattr(decision, 'is_recurring', False):
+            ge.chain_id = getattr(decision, 'chain_id', None) or ge.id
+            await db.flush()
         return ge
 
     # ============================================================

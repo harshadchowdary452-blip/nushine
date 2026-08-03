@@ -3,9 +3,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List, Optional
 from datetime import date
+import logging
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.core.permissions import verify_permission, verify_tenant_access, Permission, Role
+from app.core.tenant import get_user_admin_group_id, get_group_hospital_ids
 from app.models.appointment import Appointment
 from app.models.case import Case
 from app.models.patient import Patient
@@ -16,6 +18,8 @@ from app.schemas.patient import PatientCreate, PatientUpdate, PatientResponse
 from app.schemas.common import MessageResponse
 from app.config import settings
 from app.utils.uploads import save_upload
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/patients", tags=["Patients"])
 
@@ -56,7 +60,7 @@ async def create_patient(data: PatientCreate, db: AsyncSession = Depends(get_db)
             db=db,
         )
     except Exception:
-        pass
+        logger.warning("Failed to publish CRM event", exc_info=True)
     return patient
 
 
@@ -130,7 +134,16 @@ async def get_patients(
         filters["sort_order"] = sort_order
     role = current_user.get("role")
     if role == Role.DOCTOR.value:
-        if current_user.get("sub"):
+        # Doctors see patients of all hospitals in their admin group (the group
+        # admin's hospitals) so they can pick a patient when writing case reports.
+        agid = await get_user_admin_group_id(db, current_user)
+        if agid:
+            hids = await get_group_hospital_ids(db, agid)
+            if hids:
+                filters["hospital_id__in"] = hids
+            else:
+                return []
+        elif current_user.get("sub"):
             did = current_user.get("sub")
             direct_ids = select(Patient.id).where(Patient.doctor_id == did)
             appt_ids = select(Appointment.patient_id).where(Appointment.doctor_id == did, Appointment.is_active == True)
@@ -171,6 +184,11 @@ async def search_patients(q: str = Query(..., min_length=1), hospital_id: Option
     effective_hospital_id = hospital_id
     effective_doctor_id = doctor_id
     if role == Role.DOCTOR.value:
+        agid = await get_user_admin_group_id(db, current_user)
+        if agid:
+            hids = await get_group_hospital_ids(db, agid)
+            if hids:
+                return await service.search(q, hospital_ids_in=hids, doctor_id=None, status_filter=status_filter)
         effective_doctor_id = current_user.get("sub")
         if not effective_hospital_id and current_user.get("hospital_id"):
             effective_hospital_id = current_user.get("hospital_id")
@@ -260,7 +278,14 @@ async def search_patients_advanced(
 
     role = current_user.get("role")
     if role == Role.DOCTOR.value:
-        if current_user.get("sub"):
+        agid = await get_user_admin_group_id(db, current_user)
+        if agid:
+            hids = await get_group_hospital_ids(db, agid)
+            if hids:
+                filters["hospital_id__in"] = hids
+            else:
+                return {"items": [], "total": 0, "page": 1, "size": page_size, "pages": 0}
+        elif current_user.get("sub"):
             did = current_user.get("sub")
             direct_ids = select(Patient.id).where(Patient.doctor_id == did)
             appt_ids = select(Appointment.patient_id).where(Appointment.doctor_id == did, Appointment.is_active == True)
@@ -330,7 +355,10 @@ async def check_patient_duplicates(
     effective_hospital_id = hospital_id
     hospital_ids_in = None
     if role == Role.DOCTOR.value:
-        if not effective_hospital_id and current_user.get("hospital_id"):
+        agid = await get_user_admin_group_id(db, current_user)
+        if agid:
+            hospital_ids_in = await get_group_hospital_ids(db, agid)
+        elif not effective_hospital_id and current_user.get("hospital_id"):
             effective_hospital_id = current_user.get("hospital_id")
     elif role == Role.HOSPITAL_ADMIN.value:
         if not effective_hospital_id and current_user.get("hospital_id"):
@@ -433,7 +461,7 @@ async def update_patient(patient_id: str, data: PatientUpdate, db: AsyncSession 
                 db=db,
             )
     except Exception:
-        pass
+        logger.warning("Failed to publish CRM event", exc_info=True)
     return patient
 
 
@@ -462,7 +490,7 @@ async def delete_patient(patient_id: str, db: AsyncSession = Depends(get_db), cu
             db=db,
         )
     except Exception:
-        pass
+        logger.warning("Failed to publish CRM event", exc_info=True)
     return MessageResponse(message="Patient deleted successfully")
 
 

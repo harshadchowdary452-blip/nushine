@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from typing import List, Optional
 import os
 from app.database import get_db
@@ -60,7 +61,7 @@ async def create_billing(data: BillingCreate, db: AsyncSession = Depends(get_db)
             db=db,
         )
     except Exception:
-        pass
+        logger.warning("Failed to publish CRM event", exc_info=True)
     return billing
 
 
@@ -159,6 +160,189 @@ async def get_billings_by_case(case_id: str, db: AsyncSession = Depends(get_db),
     await verify_tenant_access(current_user, case, "case", db)
     service = BillingService(db)
     return await service.get_by_case(case_id)
+
+
+async def _build_patient_filters(current_user: dict, db: AsyncSession, hospital_id: Optional[str] = None) -> dict:
+    """Role-scoped patient filter for billing patient search (mirrors /patients)."""
+    from app.models.hospital import Hospital
+    from app.core.tenant import get_user_admin_group_id, get_group_hospital_ids
+
+    filters = {}
+    role = current_user.get("role")
+    if role == Role.SUPER_ADMIN.value:
+        if hospital_id:
+            filters["hospital_id"] = hospital_id
+    elif role == Role.DOCTOR.value:
+        agid = await get_user_admin_group_id(db, current_user)
+        if agid:
+            hids = await get_group_hospital_ids(db, agid)
+            if hids:
+                filters["hospital_id__in"] = hids
+        elif current_user.get("hospital_id"):
+            filters["hospital_id"] = current_user.get("hospital_id")
+    elif role == Role.HOSPITAL_ADMIN.value:
+        if current_user.get("hospital_id"):
+            filters["hospital_id"] = current_user.get("hospital_id")
+    elif role == Role.GROUP_ADMIN.value:
+        agid = current_user.get("admin_group_id")
+        if agid:
+            hr = await db.execute(select(Hospital.id).where(Hospital.admin_group_id == agid))
+            hids = [row[0] for row in hr.all()]
+            if hids:
+                filters["hospital_id__in"] = hids
+    return filters
+
+
+@router.get("/search")
+async def billing_patient_search(
+    q: str = Query(..., min_length=1),
+    limit: int = Query(10, ge=1, le=25),
+    hospital_id: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Patient-first invoice search: match by OP number, name or mobile and return
+    each patient together with their active cases and financial summary."""
+    verify_permission(current_user, Permission.MANAGE_BILLING)
+    from app.repositories.patient_repository import PatientRepository
+    from app.services.billing_sync_service import BillingSyncService
+    from app.models.user import User
+
+    filters = {"search": q}
+    filters.update(await _build_patient_filters(current_user, db, hospital_id))
+    repo = PatientRepository(db)
+    total = await repo.count(filters=filters or None)
+    patients = await repo.get_all(skip=0, limit=limit, filters=filters or None)
+    if not patients:
+        return {"items": [], "total": 0}
+
+    pids = [p.id for p in patients]
+    case_result = await db.execute(
+        select(Case)
+        .where(Case.patient_id.in_(pids), Case.is_active == True)
+        .options(selectinload(Case.doctor))
+        .order_by(Case.created_at.desc())
+    )
+    all_cases = list(case_result.scalars().all())
+    cases_by_patient: dict = {}
+    for c in all_cases:
+        cases_by_patient.setdefault(str(c.patient_id), []).append(c)
+
+    sync_svc = BillingSyncService(db)
+    items = []
+    for p in patients:
+        cases = cases_by_patient.get(str(p.id), [])
+        active_cases = [
+            {
+                "id": c.id,
+                "case_number": c.case_number,
+                "chief_complaint": c.chief_complaint,
+                "doctor_name": c.doctor.full_name if c.doctor else None,
+                "status": str(c.status.value) if hasattr(c.status, "value") else str(c.status),
+                "created_at": c.created_at.isoformat() if c.created_at else None,
+                "estimated_cost": c.estimated_cost,
+                "total_billed": c.total_billed,
+                "total_paid": c.total_paid,
+                "outstanding_balance": c.outstanding_balance,
+                "payment_status": c.payment_status,
+            }
+            for c in cases
+        ]
+        financial = await sync_svc.get_patient_summary(str(p.id))
+        items.append({
+            "id": p.id,
+            "full_name": p.full_name,
+            "op_no": p.op_no,
+            "phone": p.phone,
+            "gender": p.gender,
+            "age": p.age,
+            "status": getattr(p, "status", None),
+            "financial_summary": financial,
+            "active_cases": active_cases,
+        })
+    return {"items": items, "total": total}
+
+
+@router.get("/cases/{case_id}/billable")
+async def get_billable_treatments(case_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    """Billable treatments for a case: treatment plans + their visits with
+    charges, already-paid amounts and balances."""
+    verify_permission(current_user, Permission.MANAGE_BILLING)
+    from sqlalchemy.orm import selectinload
+    from app.models.treatment_sitting import TreatmentSitting
+    from app.models.treatment_plan import TreatmentPlan as TPModel
+
+    case_result = await db.execute(
+        select(Case)
+        .where(Case.id == case_id)
+        .options(selectinload(Case.doctor), selectinload(Case.patient))
+    )
+    case = case_result.scalar_one_or_none()
+    if not case:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
+    await verify_tenant_access(current_user, case, "case", db)
+
+    plans_result = await db.execute(
+        select(TPModel)
+        .where(TPModel.case_id == case_id, TPModel.is_active == True, TPModel.status != "CANCELLED")
+        .order_by(TPModel.sequence_order, TPModel.created_at)
+    )
+    plans = list(plans_result.scalars().all())
+    sittings_result = await db.execute(
+        select(TreatmentSitting)
+        .where(TreatmentSitting.treatment_plan_id.in_([p.id for p in plans]) if plans else TreatmentSitting.treatment_plan_id == "")
+        .order_by(TreatmentSitting.sitting_number)
+    )
+    sittings_by_plan: dict = {}
+    for s in list(sittings_result.scalars().all()):
+        sittings_by_plan.setdefault(str(s.treatment_plan_id), []).append(s)
+
+    treatment_plans = []
+    for p in plans:
+        sittings = sittings_by_plan.get(str(p.id), [])
+        treatment_plans.append({
+            "id": p.id,
+            "treatment_name": p.treatment_name,
+            "description": p.description,
+            "cost": p.cost,
+            "paid_amount": p.paid_amount,
+            "pending_amount": max(0.0, (p.cost or 0) - (p.paid_amount or 0)),
+            "status": str(p.status.value) if hasattr(p.status, "value") else str(p.status),
+            "total_sittings": p.total_sittings,
+            "completed_sittings": p.completed_sittings,
+            "remaining_sittings": p.remaining_sittings,
+            "sittings": [
+                {
+                    "id": s.id,
+                    "sitting_number": s.sitting_number,
+                    "sitting_date": s.sitting_date.isoformat() if s.sitting_date else None,
+                    "status": str(s.status.value) if hasattr(s.status, "value") else str(s.status),
+                    "charge": s.charge,
+                    "paid_amount": s.paid_amount,
+                    "invoice_status": s.invoice_status,
+                }
+                for s in sittings
+            ],
+        })
+
+    return {
+        "case": {
+            "id": case.id,
+            "case_number": case.case_number,
+            "patient_id": case.patient_id,
+            "patient_name": case.patient.full_name if case.patient else None,
+            "chief_complaint": case.chief_complaint,
+            "doctor_name": case.doctor.full_name if case.doctor else None,
+            "status": str(case.status.value) if hasattr(case.status, "value") else str(case.status),
+            "created_at": case.created_at.isoformat() if case.created_at else None,
+            "estimated_cost": case.estimated_cost,
+            "total_billed": case.total_billed,
+            "total_paid": case.total_paid,
+            "outstanding_balance": case.outstanding_balance,
+            "payment_status": case.payment_status,
+        },
+        "treatment_plans": treatment_plans,
+    }
 
 
 async def _check_billing_hospital(billing_id: str, current_user: dict, db: AsyncSession):
@@ -268,7 +452,7 @@ async def update_payment(billing_id: str, data: BillingUpdate, db: AsyncSession 
             db=db,
         )
     except Exception:
-        pass
+        logger.warning("Failed to publish CRM event", exc_info=True)
     return updated
 
 

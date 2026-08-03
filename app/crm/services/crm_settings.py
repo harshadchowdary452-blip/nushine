@@ -22,6 +22,8 @@ DEFAULT_BUSINESS_START = time(9, 0)
 DEFAULT_BUSINESS_END = time(18, 0)
 DEFAULT_TIMEZONE = "Asia/Kolkata"
 
+from app.crm.defaults import APPOINTMENT_REMINDER_OFFSET_DAYS
+
 
 @dataclass
 class FollowUpSnapshot:
@@ -50,7 +52,9 @@ class CrmSettings:
     default_reminder_offset_days: int = 1
     weekend_policy: str = "SKIP"  # SKIP | INCLUDE
     holidays: list[str] = field(default_factory=list)  # ISO date strings
-    # Follow-up configs (loaded from crm_follow_up_configs)
+    # Follow-up configs (loaded from crm_follow_up_configs).
+    # LEAD/OPD/CASE_RECOVERY/CASE_RECALL are ALWAYS populated (canonical defaults
+    # fill in when a hospital has no row) — never None.
     lead_follow_up: Optional[FollowUpSnapshot] = None
     opd_follow_up: Optional[FollowUpSnapshot] = None
     treatment_follow_ups: dict[str, FollowUpSnapshot] = field(default_factory=dict)
@@ -98,7 +102,7 @@ class CRMSettingsService:
             business_hours_start=self._parse_time(configs.get("crm_business_start"), DEFAULT_BUSINESS_START),
             business_hours_end=self._parse_time(configs.get("crm_business_end"), DEFAULT_BUSINESS_END),
             timezone=configs.get("crm_timezone", DEFAULT_TIMEZONE),
-            default_reminder_offset_days=self._parse_int(configs.get("crm_reminder_offset"), 1),
+            default_reminder_offset_days=self._parse_int(configs.get("crm_reminder_offset"), APPOINTMENT_REMINDER_OFFSET_DAYS),
             weekend_policy=configs.get("crm_weekend_policy", "SKIP"),
             holidays=self._parse_holidays(configs.get("crm_holidays")),
             lead_follow_up=follow_ups.get("LEAD"),
@@ -113,6 +117,7 @@ class CRMSettingsService:
 
     async def _load_follow_up_configs(self, db: AsyncSession, hospital_id: str) -> dict[str, FollowUpSnapshot]:
         from app.models.crm_follow_up_config import CrmFollowUpConfig
+        from app.crm.defaults import FOLLOW_UP_DEFAULTS
         result = await db.execute(
             select(CrmFollowUpConfig).where(CrmFollowUpConfig.hospital_id == hospital_id)
         )
@@ -133,6 +138,25 @@ class CRMSettingsService:
                 out[f"TREATMENT:{row.treatment_type_id}"] = snap
             else:
                 out[row.context_type] = snap
+
+        # SINGLE source of truth: fill every non-treatment context with the canonical
+        # default when the hospital has no row, so snapshots are NEVER None and the
+        # rule engine/scheduler can never fall back to ad-hoc literals.
+        for context_type, defaults in FOLLOW_UP_DEFAULTS.items():
+            if context_type == "TREATMENT":
+                continue
+            if context_type not in out:
+                out[context_type] = FollowUpSnapshot(
+                    enabled=defaults.enabled,
+                    start_delay_days=defaults.start_delay_days,
+                    auto_close_on_completion=defaults.auto_close_on_completion,
+                    skip_wellness_if_appointment=defaults.skip_wellness_if_appointment,
+                    max_attempts=defaults.max_attempts,
+                    days_between_attempts=defaults.days_between_attempts,
+                    auto_close_after_final=defaults.auto_close_after_final,
+                    auto_close_action=defaults.auto_close_action,
+                    stop_automation_on=defaults.stop_automation_on,
+                )
         return out
 
     async def is_enabled(self, db: AsyncSession, hospital_id: str) -> bool:

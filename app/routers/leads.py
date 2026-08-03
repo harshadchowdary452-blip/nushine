@@ -23,6 +23,18 @@ async def _verify_lead_access(service, lead_id: str, current_user: dict):
     role = current_user.get("role")
     if role in ("HOSPITAL_ADMIN", "DOCTOR") and lead.hospital_id != current_user.get("hospital_id"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: lead belongs to another hospital")
+    if role == "GROUP_ADMIN":
+        from app.models.hospital import Hospital
+        from sqlalchemy import select
+        agid = current_user.get("admin_group_id")
+        if not agid:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: no admin group scope")
+        hospital_result = await service.db.execute(
+            select(Hospital.admin_group_id).where(Hospital.id == lead.hospital_id)
+        )
+        row = hospital_result.scalar_one_or_none()
+        if not row or row != agid:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: lead belongs to another hospital group")
     return lead
 
 
@@ -121,19 +133,30 @@ async def get_leads(
         from app.models.hospital import Hospital
         from sqlalchemy import select
         agid = current_user.get("admin_group_id")
+        hids = []
         if agid:
             hospital_result = await db.execute(select(Hospital.id).where(Hospital.admin_group_id == agid))
             hids = [row[0] for row in hospital_result.all()]
-            if hids:
-                filters["hospital_id__in"] = hids
-            else:
-                return []
-        else:
-            return []
+        if not hids:
+            return {
+                "items": [],
+                "total": 0,
+                "page": (skip // limit) + 1 if limit else 1,
+                "page_size": limit,
+            }
+        filters["hospital_id__in"] = hids
     else:
         if hospital_id:
             filters["hospital_id"] = hospital_id
-    return await service.get_all(skip=skip, limit=limit, filters=filters or None)
+    filters_arg = filters or None
+    items = await service.get_all(skip=skip, limit=limit, filters=filters_arg)
+    total = await service.repo.count(filters=filters_arg)
+    return {
+        "items": items,
+        "total": total,
+        "page": (skip // limit) + 1 if limit else 1,
+        "page_size": limit,
+    }
 
 
 @router.get("/{lead_id}", response_model=LeadResponse)
@@ -203,7 +226,7 @@ async def update_lead_status(lead_id: str, data: LeadStatusUpdate, db: AsyncSess
                     db=db,
                 )
     except Exception:
-        pass
+        logger.warning("Failed to publish CRM lead event", exc_info=True)
     return result
 
 
@@ -308,7 +331,7 @@ async def convert_lead(lead_id: str, data: LeadConvertCreate, db: AsyncSession =
             db=db,
         )
     except Exception:
-        pass
+        logger.warning("Failed to publish LEAD_CONVERTED event", exc_info=True)
     try:
         from app.models.generated_enquiry import GeneratedEnquiry
         from sqlalchemy import update
@@ -322,7 +345,7 @@ async def convert_lead(lead_id: str, data: LeadConvertCreate, db: AsyncSession =
             .values(status="CONVERTED")
         )
     except Exception:
-        pass
+        logger.warning("Failed to mark generated enquiries CONVERTED", exc_info=True)
     # Send welcome message on conversion
     if lead:
         try:
@@ -352,7 +375,7 @@ async def convert_lead(lead_id: str, data: LeadConvertCreate, db: AsyncSession =
                 user_name=current_user.get("full_name") or current_user.get("username"),
             )
         except Exception:
-            pass
+            logger.warning("Failed to send lead conversion welcome message", exc_info=True)
     return result
 
 

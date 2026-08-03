@@ -134,7 +134,7 @@ async def create_rule(
         hospital_id=hospital_id,
         status="DRAFT",
         version=1,
-        created_by=current_user.get("id"),
+        created_by=current_user.get("sub"),
     )
     db.add(rule)
     await db.flush()
@@ -194,7 +194,7 @@ async def update_rule(
         setattr(rule, key, value)
 
     rule.version = (rule.version or 1) + 1
-    rule.modified_by = current_user.get("id")
+    rule.modified_by = current_user.get("sub")
 
     # Save version snapshot
     version_log = AutomationRuleVersion(
@@ -202,7 +202,7 @@ async def update_rule(
         version=rule.version,
         rule_snapshot=json.dumps(_rule_to_dict(rule)),
         change_summary=f"Updated by {current_user.get('full_name', 'system')}",
-        created_by=current_user.get("id"),
+        created_by=current_user.get("sub"),
     )
     db.add(version_log)
 
@@ -293,7 +293,7 @@ async def clone_rule(rule_id: str, db: AsyncSession = Depends(get_db), current_u
         hospital_id=rule.hospital_id,
         status="DRAFT",
         version=1,
-        created_by=current_user.get("id"),
+        created_by=current_user.get("sub"),
     )
     db.add(new_rule)
     await db.flush()

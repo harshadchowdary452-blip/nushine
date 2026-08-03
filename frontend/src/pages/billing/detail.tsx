@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast";
 import { formatIndianRupees } from "@/lib/currency";
+import type { BillingItem } from "@/types";
 import {
   Select,
   SelectContent,
@@ -252,6 +253,53 @@ export default function BillingDetail() {
               )}
             </div>
           </Card>
+
+          {billing.items && billing.items.length > 0 && (
+            <Card className="p-6 border-border shadow-card">
+              <h2 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
+                <FileText className="h-5 w-5 text-primary" />
+                Line Items
+              </h2>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-text-muted">
+                      <th className="pb-2 pr-3 font-medium">Description</th>
+                      <th className="pb-2 pr-3 font-medium text-right">Qty</th>
+                      <th className="pb-2 pr-3 font-medium text-right">Unit Price</th>
+                      <th className="pb-2 pr-3 font-medium text-right">Discount</th>
+                      <th className="pb-2 pr-3 font-medium text-right">Amount</th>
+                      <th className="pb-2 pr-3 font-medium text-right">Paid</th>
+                      <th className="pb-2 font-medium text-right">Balance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {billing.items.map((item: BillingItem) => (
+                      <tr key={item.id} className="border-b border-border last:border-0">
+                        <td className="py-2.5 pr-3">
+                          <span className="font-medium text-text-primary">{item.description || "Item"}</span>
+                          {(item.treatment_plan_name || item.treatment_sitting_number) && (
+                            <span className="block text-xs text-text-muted">
+                              {item.treatment_plan_name}
+                              {item.treatment_sitting_number ? ` · Visit #${item.treatment_sitting_number}` : ""}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2.5 pr-3 text-right">{item.quantity}</td>
+                        <td className="py-2.5 pr-3 text-right">{formatIndianRupees(item.unit_price)}</td>
+                        <td className="py-2.5 pr-3 text-right text-green-600">
+                          {item.discount_amount > 0 ? `- ${formatIndianRupees(item.discount_amount)}` : "—"}
+                        </td>
+                        <td className="py-2.5 pr-3 text-right font-medium">{formatIndianRupees(item.net_amount)}</td>
+                        <td className="py-2.5 pr-3 text-right text-green-600">{formatIndianRupees(item.paid_amount)}</td>
+                        <td className="py-2.5 text-right text-amber-600">{formatIndianRupees(item.pending_amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
 
           <Card className="p-6 border-border shadow-card">
             <h2 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List
+import logging
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.core.permissions import verify_permission, verify_tenant_access, Permission, Role
@@ -14,6 +15,8 @@ from app.schemas.common import MessageResponse
 from app.models.patient import Patient
 from app.models.hospital import Hospital
 from app.services.timeline_helper import record_timeline_event, build_changes
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/treatment-sittings", tags=["Treatment Sittings"])
 
@@ -130,7 +133,7 @@ async def update_sitting(sitting_id: str, data: TreatmentSittingUpdate, db: Asyn
             )
 
     except Exception:
-        pass
+        logger.warning("Failed to publish CRM event", exc_info=True)
     await db.commit()
     return sitting
 

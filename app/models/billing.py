@@ -8,6 +8,7 @@ from enum import Enum
 
 class DiscountType(str, Enum):
     PERCENTAGE = "PERCENTAGE"
+    FIXED = "FIXED"
     FIXED_AMOUNT = "FIXED_AMOUNT"
 
 
@@ -43,3 +44,4 @@ class Billing(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), index=True)
     case = relationship("Case", back_populates="billings")
+    items = relationship("BillingItem", back_populates="billing", cascade="all, delete-orphan", lazy="selectin")

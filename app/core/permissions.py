@@ -229,9 +229,27 @@ async def verify_tenant_access(current_user: dict, entity: object, entity_type: 
         return True
 
     # HOSPITAL_ADMIN / DOCTOR: the entity must belong to the caller's hospital.
+    # A DOCTOR whose hospital belongs to an admin group may instead access
+    # entities of any hospital within that group (the group admin's hospitals),
+    # so doctors can write case reports for patients across the group.
     # When the caller has no hospital context (or the entity's hospital is
     # unresolvable) we fall back to permission-only checks rather than fail open.
     user_hospital_id = current_user.get("hospital_id")
+
+    if role == Role.DOCTOR.value:
+        agid = current_user.get("admin_group_id")
+        if not agid and db and user_hospital_id:
+            agid = await _hospital_admin_group(db, user_hospital_id)
+        if agid:
+            if hid:
+                entity_agid = entity_agid or (await _hospital_admin_group(db, hid) if db else None)
+                if entity_agid and entity_agid != str(agid):
+                    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: not in your admin group")
+            return True
+        if hid and user_hospital_id and str(hid) != str(user_hospital_id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: entity belongs to another hospital")
+        return True
+
     if hid and user_hospital_id and str(hid) != str(user_hospital_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: entity belongs to another hospital")
     return True

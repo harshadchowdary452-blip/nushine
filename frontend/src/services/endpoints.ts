@@ -352,6 +352,10 @@ export const billingApi = {
       discount_reason?: string
     },
   ) => api.put(`/billings/${id}/discount`, data).then((r) => r.data),
+  searchPatients: (params: { q: string; limit?: number }) =>
+    api.get("/billings/search", { params }).then((r) => r.data),
+  getCaseBillable: (caseId: string) =>
+    api.get(`/billings/cases/${caseId}/billable`).then((r) => r.data),
 }
 
 export const dashboardApi = {

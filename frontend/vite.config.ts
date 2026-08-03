@@ -29,6 +29,9 @@ export default defineConfig({
     },
   },
   server: {
+    // 0.0.0.0 so the dev server (and its /api proxy) is reachable from other
+    // devices on the network, not just localhost.
+    host: true,
     proxy: {
       "/api": {
         target: "http://localhost:8000",

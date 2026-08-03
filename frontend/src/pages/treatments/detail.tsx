@@ -156,6 +156,8 @@ export default function TreatmentDetail() {
     mutationFn: () => treatmentApi.start(id!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["treatment-plan", id] })
+      queryClient.invalidateQueries({ queryKey: ["treatment-plans"] })
+      queryClient.invalidateQueries({ queryKey: ["treatment-plans-board"] })
     },
   })
 
@@ -185,6 +187,8 @@ export default function TreatmentDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["treatment-sittings", id] })
       queryClient.invalidateQueries({ queryKey: ["treatment-plan", id] })
+      queryClient.invalidateQueries({ queryKey: ["treatment-plans"] })
+      queryClient.invalidateQueries({ queryKey: ["treatment-plans-board"] })
       setVisitDialogOpen(false)
       setVisitForm({
         clinical_notes: "",
@@ -205,6 +209,8 @@ export default function TreatmentDetail() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["treatment-plan", id] })
+      queryClient.invalidateQueries({ queryKey: ["treatment-plans"] })
+      queryClient.invalidateQueries({ queryKey: ["treatment-plans-board"] })
       setCompleteDialogOpen(false)
     },
   })
@@ -225,6 +231,8 @@ export default function TreatmentDetail() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["treatment-plan", id] })
+      queryClient.invalidateQueries({ queryKey: ["treatment-plans"] })
+      queryClient.invalidateQueries({ queryKey: ["treatment-plans-board"] })
       setWaitingDialogOpen(false)
       setWaitingReason("")
       setWaitingFollowup("")

@@ -8,13 +8,16 @@ from app.repositories.billing_repository import BillingRepository
 from app.repositories.audit_log_repository import AuditLogRepository
 from app.repositories.billing_history_repository import BillingHistoryRepository
 from app.models.billing import Billing, PaymentStatus, DiscountType
+from app.models.billing_item import BillingItem
 from app.models.billing_history import BillingHistory
 from app.models.case import Case
 from app.models.patient import Patient
 from app.models.hospital import Hospital
 from app.models.user import User
 from app.models.treatment_plan import TreatmentPlan
+from app.models.treatment_sitting import TreatmentSitting
 from app.models.appointment import Appointment, AppointmentStatus, AppointmentType
+from app.services.billing_sync_service import BillingSyncService
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -385,6 +388,97 @@ class BillingService:
         pdf.output(pdf_path)
         return pdf_path
 
+    async def _validate_item(self, item: dict, case: Case, billed_sittings: set, billed_plans: dict):
+        """Validate an invoice line item against its case and prevent cross-case
+        or duplicate treatment billing."""
+        plan_id = item.get("treatment_plan_id")
+        sitting_id = item.get("treatment_sitting_id")
+        if not plan_id and not sitting_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Each billing item must reference a treatment plan or a treatment sitting")
+        if plan_id:
+            plan = await self.db.get(TreatmentPlan, plan_id)
+            if not plan:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Treatment plan {plan_id} not found")
+            if str(plan.case_id) != str(case.id):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot bill a treatment from another case")
+            if not item.get("allow_duplicate"):
+                pending = billed_plans.get(plan_id)
+                if pending is not None and pending <= 0:
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Treatment '{plan.treatment_name}' is already fully billed on this case")
+        if sitting_id:
+            sitting = await self.db.get(TreatmentSitting, sitting_id)
+            if not sitting:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Treatment visit {sitting_id} not found")
+            plan = await self.db.get(TreatmentPlan, sitting.treatment_plan_id)
+            if not plan or str(plan.case_id) != str(case.id):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot bill a treatment visit from another case")
+            if sitting_id in billed_sittings and not item.get("allow_duplicate"):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Visit #{sitting.sitting_number} has already been invoiced on this case")
+
+    async def _build_items(self, items_data: list, case: Case, discount_type: str, discount_percent: float, discount_amount: float) -> tuple:
+        if not items_data:
+            return [], 0.0
+
+        existing = (await self.db.execute(
+            select(Billing).where(Billing.case_id == case.id, Billing.payment_status != PaymentStatus.CANCELLED)
+        )).scalars().all()
+        billed_sittings = set()
+        billed_plans = {}
+        for b in existing:
+            items = list(b.items or [])
+            if not items and b.treatment_plan_id:
+                billed_plans[b.treatment_plan_id] = billed_plans.get(b.treatment_plan_id, 0) + float(b.pending_amount or 0)
+            for it in items:
+                if it.treatment_sitting_id:
+                    billed_sittings.add(it.treatment_sitting_id)
+                if it.treatment_plan_id:
+                    billed_plans[it.treatment_plan_id] = billed_plans.get(it.treatment_plan_id, 0) + float(it.pending_amount or 0)
+
+        for it in items_data:
+            await self._validate_item(it, case, billed_sittings, billed_plans)
+
+        plan_names = {}
+        sitting_labels = {}
+        plan_ids = [it["treatment_plan_id"] for it in items_data if it.get("treatment_plan_id")]
+        sitting_ids = [it["treatment_sitting_id"] for it in items_data if it.get("treatment_sitting_id")]
+        if plan_ids:
+            for p in (await self.db.execute(select(TreatmentPlan).where(TreatmentPlan.id.in_(plan_ids)))).scalars().all():
+                plan_names[p.id] = p.treatment_name
+        if sitting_ids:
+            for s in (await self.db.execute(select(TreatmentSitting).where(TreatmentSitting.id.in_(sitting_ids)))).scalars().all():
+                sitting_labels[s.id] = f"Visit #{s.sitting_number}"
+
+        pct = discount_percent if discount_type == DiscountType.PERCENTAGE.value else (round(discount_amount / max(sum(float(it.get("quantity", 1)) * float(it.get("unit_price", 0)) for it in items_data), 1e-9) * 100, 2) if discount_amount else 0)
+
+        gross = round(sum(float(it.get("quantity", 1)) * float(it.get("unit_price", 0)) for it in items_data), 2)
+        built = []
+        for it in items_data:
+            qty = int(it.get("quantity", 1) or 1)
+            unit = round(float(it.get("unit_price", 0)), 2)
+            amount = round(qty * unit, 2)
+            if discount_type == DiscountType.PERCENTAGE.value:
+                item_discount = round(amount * pct / 100, 2)
+            else:
+                item_discount = round(amount * float(discount_amount or 0) / gross, 2) if gross > 0 else 0.0
+            net = round(amount - item_discount, 2)
+            label = it.get("description")
+            if not label:
+                if it.get("treatment_plan_id") and plan_names.get(it["treatment_plan_id"]):
+                    label = plan_names[it["treatment_plan_id"]]
+                elif it.get("treatment_sitting_id") and sitting_labels.get(it["treatment_sitting_id"]):
+                    label = sitting_labels[it["treatment_sitting_id"]]
+            built.append({
+                "treatment_plan_id": it.get("treatment_plan_id"),
+                "treatment_sitting_id": it.get("treatment_sitting_id"),
+                "description": label,
+                "quantity": qty,
+                "unit_price": unit,
+                "amount": amount,
+                "discount_amount": item_discount,
+                "net_amount": net,
+            })
+        return built, gross
+
     async def create(self, data: dict, user_id: str = None) -> Billing:
         try:
             case_id = data.get("case_id")
@@ -396,32 +490,48 @@ class BillingService:
             if not case:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Case with id {case_id} not found")
 
-            gross_amount = data.get("total_amount", 0)
+            patient_id = data.get("patient_id")
+            if patient_id and str(case.patient_id) != str(patient_id):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Billing must belong to the selected patient")
+            items_data = data.get("items") or []
+            data.pop("patient_id", None)
+            data.pop("items", None)
+
+            discount_type = data.get("discount_type", DiscountType.PERCENTAGE.value)
+            discount_percent = data.get("discount_percent", 0) or 0
+            discount_amount = data.get("discount_amount", 0) or 0
+
+            if items_data:
+                gross_amount = round(sum(float(it.get("quantity", 1)) * float(it.get("unit_price", 0)) for it in items_data), 2)
+            else:
+                gross_amount = data.get("total_amount", 0)
             if gross_amount <= 0:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="total_amount must be greater than 0")
 
             data["original_amount"] = gross_amount
 
-            discount_type = data.get("discount_type", DiscountType.PERCENTAGE.value)
-            if discount_type == DiscountType.FIXED_AMOUNT.value:
-                discount_amount = data.get("discount_amount", 0)
+            if discount_type in (DiscountType.FIXED.value, DiscountType.FIXED_AMOUNT.value):
+                discount_amount = min(float(discount_amount or 0), gross_amount)
                 discount_percent = round(discount_amount / gross_amount * 100, 2) if gross_amount > 0 else 0
-                data["discount_percent"] = discount_percent
-                data["discount_amount"] = discount_amount
             else:
-                discount_percent = data.get("discount_percent", 0) or 0
+                discount_percent = min(float(discount_percent or 0), 100)
                 discount_amount = round(gross_amount * discount_percent / 100, 2) if discount_percent > 0 else 0
-                data["discount_percent"] = discount_percent
-                data["discount_amount"] = discount_amount
+            data["discount_percent"] = discount_percent
+            data["discount_amount"] = discount_amount
 
-            if discount_amount > 0 and discount_amount < gross_amount:
-                data["total_amount"] = round(gross_amount - discount_amount, 2)
+            if items_data:
+                items, gross = await self._build_items(items_data, case, discount_type, discount_percent, discount_amount)
+                total_after_discount = round(sum(float(it["net_amount"]) for it in items), 2)
+                data["original_amount"] = gross
+                data["discount_amount"] = round(gross - total_after_discount, 2)
             else:
-                data["total_amount"] = gross_amount
+                items = []
+                total_after_discount = round(gross_amount - discount_amount, 2) if discount_amount > 0 and discount_amount < gross_amount else gross_amount
+
+            data["total_amount"] = total_after_discount
 
             paid_amount = data.get("paid_amount", 0)
-            total_after_discount = data["total_amount"]
-            pending_amount = total_after_discount - paid_amount
+            pending_amount = round(total_after_discount - paid_amount, 2)
             if pending_amount <= 0:
                 data["payment_status"] = PaymentStatus.PAID.value
                 data["paid_at"] = datetime.now(timezone.utc)
@@ -432,11 +542,25 @@ class BillingService:
 
             data["pending_amount"] = pending_amount
 
+            if items_data:
+                plan_ids = {it["treatment_plan_id"] for it in items if it.get("treatment_plan_id")}
+                if len(plan_ids) == 1:
+                    data["treatment_plan_id"] = plan_ids.pop()
+                elif len(plan_ids) > 1:
+                    data["treatment_plan_id"] = None
+
             billing = await self.repo.create(**data)
+            if items:
+                for it in items:
+                    item = BillingItem(billing_id=billing.id, **it)
+                    self.db.add(item)
+                await self.db.flush()
+                await self.db.refresh(billing, attribute_names=["items"])
+
             await self.audit_log_repo.create(user_id=user_id, action="CREATE_BILLING", entity_type="BILLING", entity_id=str(billing.id), details="Billing created")
             new_vals = {k: getattr(billing, k) for k in ("total_amount", "paid_amount", "pending_amount", "discount_amount", "discount_percent", "payment_status") if hasattr(billing, k)}
             await self._record_history(billing.id, "CREATE_BILLING", new_data=new_vals, changes_summary=f"Billing created for Rs. {total_after_discount:.2f}", user_id=user_id)
-            await self._sync_treatment_plan_paid_amounts(billing.case_id)
+            await BillingSyncService(self.db).sync_billing(billing)
 
             # Auto-generate PDF
             try:
@@ -531,7 +655,7 @@ class BillingService:
                 billing = await self.repo.update(billing.id, pdf_path=pdf_path)
             except Exception as e:
                 logger.warning("INVOICE_PDF regeneration failed: %s", str(e))
-            await self._sync_treatment_plan_paid_amounts(billing.case_id)
+            await BillingSyncService(self.db).sync_billing(billing)
             return billing
         except Exception as e:
             logger.exception("UPDATE_BILLING_PAYMENT - Error: %s", str(e))
@@ -543,7 +667,7 @@ class BillingService:
             return None
         original_amount = billing.original_amount or billing.total_amount
         prev_data = {"discount_type": billing.discount_type, "discount_percent": billing.discount_percent, "discount_amount": billing.discount_amount, "total_amount": billing.total_amount}
-        if discount_type == DiscountType.FIXED_AMOUNT.value:
+        if discount_type in (DiscountType.FIXED.value, DiscountType.FIXED_AMOUNT.value):
             if discount_amount >= original_amount:
                 raise HTTPException(status_code=400, detail="Discount amount cannot exceed original amount")
             calc_discount_amount = discount_amount
@@ -559,6 +683,10 @@ class BillingService:
         billing.discount_reason = discount_reason
         billing.original_amount = original_amount
         billing.total_amount = round(original_amount - calc_discount_amount, 2)
+        if billing.items:
+            for item in billing.items:
+                item.discount_amount = round(float(item.amount) * calc_discount_amount / original_amount, 2) if original_amount > 0 else 0.0
+                item.net_amount = round(float(item.amount) - float(item.discount_amount), 2)
         billing.pending_amount = round(billing.total_amount - billing.paid_amount, 2)
         if billing.pending_amount <= 0 and billing.paid_amount > 0:
             billing.payment_status = PaymentStatus.PAID
@@ -567,31 +695,8 @@ class BillingService:
         await self._attach_names(billing)
         new_vals = {"discount_type": billing.discount_type, "discount_percent": billing.discount_percent, "discount_amount": billing.discount_amount, "total_amount": billing.total_amount}
         await self._record_history(billing.id, "DISCOUNT_APPLIED", previous_data=prev_data, new_data=new_vals, changes_summary=f"Discount applied: {calc_discount_percent}% / Rs.{calc_discount_amount:.2f}", user_id=user_id)
-        await self._sync_treatment_plan_paid_amounts(billing.case_id)
+        await BillingSyncService(self.db).sync_billing(billing)
         return billing
-
-    async def _sync_treatment_plan_paid_amounts(self, case_id: str):
-        try:
-            tps = await self.db.execute(
-                select(TreatmentPlan).where(TreatmentPlan.case_id == case_id)
-            )
-            treatment_plans = tps.scalars().all()
-            if not treatment_plans:
-                return
-            billings = await self.repo.get_all(filters={"case_id": case_id})
-            total_cost = sum(tp.cost or 0 for tp in treatment_plans)
-            for tp in treatment_plans:
-                tp_paid = 0
-                direct_billings = [b for b in billings if b.treatment_plan_id == tp.id]
-                for b in direct_billings:
-                    tp_paid += b.paid_amount or 0
-                if not direct_billings and total_cost > 0:
-                    indirect_paid = sum(b.paid_amount or 0 for b in billings if not b.treatment_plan_id)
-                    tp_paid += round(indirect_paid * (tp.cost or 0) / total_cost, 2)
-                tp.paid_amount = tp_paid
-            await self.db.flush()
-        except Exception as e:
-            logger.warning("Failed to sync treatment plan paid amounts: %s", e)
 
     async def get_revenue(self, hospital_id: str = None) -> Dict[str, Any]:
         filters = {}
@@ -638,9 +743,13 @@ class BillingService:
 
     async def delete(self, billing_id: str, user_id: str = None) -> bool:
         try:
+            billing = await self.repo.get(billing_id)
+            case_id = billing.case_id if billing else None
             await self.audit_log_repo.create(user_id=user_id, action="DELETE_BILLING", entity_type="BILLING", entity_id=billing_id, details="Billing deleted")
             await self._record_history(billing_id, "DELETE_BILLING", changes_summary="Billing deleted", user_id=user_id)
             result = await self.repo.delete(billing_id)
+            if case_id:
+                await BillingSyncService(self.db).sync_case(case_id)
             return result
         except Exception as e:
             logger.exception("DELETE_BILLING - Error: %s", str(e))

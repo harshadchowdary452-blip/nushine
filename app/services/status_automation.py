@@ -129,6 +129,8 @@ class StatusAutomationService:
         )
         self.db.add(billing)
         await self.db.flush()
+        from app.services.billing_sync_service import BillingSyncService
+        await BillingSyncService(self.db).sync_billing(billing)
         await self._create_notification(
             doctor_id=case.doctor_id,
             title="Invoice Generated",
@@ -152,6 +154,8 @@ class StatusAutomationService:
             billing.total_amount = completed_total
             billing.pending_amount = completed_total - billing.paid_amount
             await self.db.flush()
+            from app.services.billing_sync_service import BillingSyncService
+            await BillingSyncService(self.db).sync_billing(billing)
 
     async def _auto_create_appointment_from_follow_up(self, follow_up_id: str):
         fu = await self.db.get(FollowUp, follow_up_id)
@@ -297,18 +301,25 @@ class StatusAutomationService:
         all_done = all(p.status == TreatmentPlanStatus.COMPLETED for p in plans)
         if all_done and plans and case.status != CaseStatus.COMPLETED:
             case.status = CaseStatus.COMPLETED
+            case.completion_date = datetime.now(timezone.utc)
             await self.db.flush()
             await self.update_patient_status(case.patient_id)
             try:
                 from app.crm.services.event_dispatcher import publish_event
                 from app.crm.enums import EventType, EventSource
                 from datetime import date as _date
+                from app.models.patient import Patient
+                resolved_hospital_id = None
+                if case.patient_id:
+                    patient = await self.db.get(Patient, case.patient_id)
+                    if patient:
+                        resolved_hospital_id = str(patient.hospital_id) if patient.hospital_id else None
                 await publish_event(
                     event_type=EventType.CASE_COMPLETED,
                     source_module=EventSource.CASE,
                     entity_type="CASE",
                     entity_id=case_id,
-                    hospital_id=None,
+                    hospital_id=resolved_hospital_id,
                     patient_id=str(case.patient_id) if case.patient_id else None,
                     doctor_id=str(case.doctor_id) if case.doctor_id else None,
                     payload={

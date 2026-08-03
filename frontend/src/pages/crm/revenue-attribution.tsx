@@ -40,7 +40,7 @@ export default function RevenueAttribution() {
   })
 
   const revenueData = useMemo(() => {
-    const items: Lead[] = Array.isArray(leads) ? leads : []
+    const items: Lead[] = Array.isArray(leads) ? leads : (leads as { items?: Lead[] } | undefined)?.items || []
     const converted = items.filter((l) => l.status === "CONVERTED")
     const sourceRevenue: Record<string, { count: number; potentialRevenue: number }> = {}
 

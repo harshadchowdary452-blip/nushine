@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react"
+import { useState, useMemo, useCallback, useEffect, useRef } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
@@ -12,7 +12,7 @@ import {
   type SortingState,
   type ColumnFiltersState,
 } from "@tanstack/react-table"
-import { Plus, Search, Eye, Trash2, Receipt, DollarSign, CreditCard, AlertCircle, Download } from "lucide-react"
+import { Plus, Search, Eye, Trash2, Receipt, DollarSign, CreditCard, AlertCircle, Download, User, ChevronLeft, ChevronRight, Phone, Hash, Calendar, CheckCircle2 } from "lucide-react"
 import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -34,19 +34,30 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { billingApi, casesApi } from "@/services/endpoints"
+import { billingApi, patientsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
 import QuickExport from "@/components/ui/quick-export"
 import { formatIndianRupees } from "@/lib/currency"
 import { PageHeader, EmptyState, LoadingSkeleton, MetricCard, StatusBadge, Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/design-system"
-import type { Billing, Case, PaginatedResponse } from "@/types"
+import type { Billing, BillingPatientSearchResult, BillingSearchCase, CaseBillable, Patient, PaginatedResponse } from "@/types"
 import { extractDetail } from "@/types"
 import { useAuthStore } from "@/store/authStore"
 import { useCreateParam } from "@/lib/use-create-param"
 
+interface InvoiceItem {
+  key: string
+  treatment_plan_id?: string
+  treatment_sitting_id?: string
+  description: string
+  quantity: number
+  unit_price: number
+}
+
 interface InvoiceForm {
   [key: string]: unknown
   case_id: string
+  patient_id: string
+  items: InvoiceItem[]
   total_amount: number | null
   paid_amount: number | null
   payment_method: string
@@ -58,7 +69,20 @@ interface InvoiceForm {
 }
 
 function getEmptyInvoiceForm(): InvoiceForm {
-  return { case_id: "", total_amount: null, paid_amount: null, payment_method: "", notes: "", discount_type: "PERCENTAGE", discount_percent: 0, discount_amount: 0, discount_reason: "" }
+  return { case_id: "", patient_id: "", items: [], total_amount: null, paid_amount: null, payment_method: "", notes: "", discount_type: "PERCENTAGE", discount_percent: 0, discount_amount: 0, discount_reason: "" }
+}
+
+function Highlight({ text, query }: { text: string; query: string }) {
+  if (!query) return <>{text}</>
+  const idx = text.toLowerCase().indexOf(query.toLowerCase())
+  if (idx === -1) return <>{text}</>
+  return (
+    <>
+      {text.slice(0, idx)}
+      <mark className="bg-amber-200 rounded px-0.5">{text.slice(idx, idx + query.length)}</mark>
+      {text.slice(idx + query.length)}
+    </>
+  )
 }
 
 export default function BillingList() {
@@ -75,6 +99,18 @@ export default function BillingList() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deletingBilling, setDeletingBilling] = useState<Billing | null>(null)
   const [form, setForm] = useState<InvoiceForm>(getEmptyInvoiceForm)
+  const [wizardStep, setWizardStep] = useState<"patient" | "case" | "treatments">("patient")
+  const [patientQuery, setPatientQuery] = useState("")
+  const [patientResults, setPatientResults] = useState<BillingPatientSearchResult[]>([])
+  const [recentPatients, setRecentPatients] = useState<Patient[]>([])
+  const [selectedPatient, setSelectedPatient] = useState<BillingPatientSearchResult | null>(null)
+  const [selectedCase, setSelectedCase] = useState<BillingSearchCase | null>(null)
+  const [caseBillable, setCaseBillable] = useState<CaseBillable | null>(null)
+  const [searching, setSearching] = useState(false)
+  const [caseLoading, setCaseLoading] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(-1)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useCreateParam(() => openDialog())
 
@@ -85,10 +121,6 @@ export default function BillingList() {
 
   const navigate = useNavigate()
   const currentUser = useAuthStore((s) => s.user)
-  const { data: casesData } = useQuery<PaginatedResponse<Case>>({
-    queryKey: ["cases", "dropdown"],
-    queryFn: () => casesApi.list({ page_size: 200, hospital_id: currentUser?.hospital_id || undefined }),
-  })
 
   const billings: Billing[] = useMemo(
     () => {
@@ -96,14 +128,6 @@ export default function BillingList() {
       return data?.items || []
     },
     [data]
-  )
-
-  const cases: Case[] = useMemo(
-    () => {
-      if (Array.isArray(casesData)) return casesData
-      return casesData?.items || []
-    },
-    [casesData]
   )
 
   const kpis = useMemo(() => {
@@ -118,6 +142,7 @@ export default function BillingList() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["billings"], refetchType: "all" })
       queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" })
+      queryClient.invalidateQueries({ queryKey: ["cases"], refetchType: "all" })
       addToast({ title: "Success", description: "Invoice deleted successfully", variant: "success" })
       setDeleteDialogOpen(false)
       setDeletingBilling(null)
@@ -143,6 +168,7 @@ export default function BillingList() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["billings"], refetchType: "all" })
       queryClient.invalidateQueries({ queryKey: ["dash"], refetchType: "all" })
+      queryClient.invalidateQueries({ queryKey: ["cases"], refetchType: "all" })
       addToast({ title: "Success", description: "Invoice created successfully", variant: "success" })
       resetForm()
     },
@@ -151,15 +177,198 @@ export default function BillingList() {
     },
   })
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    const total = form.total_amount ?? 0
-    if (total <= 0) {
-      addToast({ title: "Validation Error", description: "Total amount must be greater than 0", variant: "destructive" })
+  const grossTotal = useMemo(
+    () => form.items.reduce((s, it) => s + (it.quantity || 1) * (it.unit_price || 0), 0),
+    [form.items],
+  )
+  const netTotal = useMemo(() => {
+    if (form.items.length > 0) {
+      const discountAmt = form.discount_type === "FIXED"
+        ? Math.min(form.discount_amount || 0, grossTotal)
+        : grossTotal * ((form.discount_percent || 0) / 100)
+      return Math.max(0, grossTotal - discountAmt)
+    }
+    return Math.max(0, (form.total_amount ?? 0) - (form.discount_amount ?? 0))
+  }, [form.items, form.discount_type, form.discount_percent, form.discount_amount, grossTotal, form.total_amount])
+
+  const loadRecentPatients = useCallback(async () => {
+    try {
+      const data = await patientsApi.list({ page_size: 5, hospital_id: currentUser?.hospital_id || undefined })
+      const items = Array.isArray(data) ? data : (data as PaginatedResponse<Patient>).items || []
+      setRecentPatients(items)
+    } catch {
+      setRecentPatients([])
+    }
+  }, [currentUser?.hospital_id])
+
+  const runSearch = useCallback(async (q: string) => {
+    if (!q.trim()) {
+      setPatientResults([])
+      setActiveIndex(-1)
+      loadRecentPatients()
       return
     }
-    const cleaned = { ...form, total_amount: total, paid_amount: form.paid_amount ?? 0 }
-    createMutation.mutate(cleaned)
+    setSearching(true)
+    try {
+      const res = await billingApi.searchPatients({ q: q.trim(), limit: 8 })
+      setPatientResults(res?.items || [])
+      setActiveIndex(-1)
+    } catch {
+      setPatientResults([])
+    } finally {
+      setSearching(false)
+    }
+  }, [loadRecentPatients])
+
+  useEffect(() => {
+    if (dialogOpen) {
+      setWizardStep("patient")
+      setPatientQuery("")
+      setSelectedPatient(null)
+      setSelectedCase(null)
+      setCaseBillable(null)
+      setForm(getEmptyInvoiceForm())
+      loadRecentPatients()
+      setTimeout(() => searchInputRef.current?.focus(), 60)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dialogOpen])
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      runSearch(patientQuery)
+    }, 250)
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [patientQuery, runSearch])
+
+  useEffect(() => {
+    if (!selectedCase) return
+    setCaseLoading(true)
+    setCaseBillable(null)
+    billingApi
+      .getCaseBillable(selectedCase.id)
+      .then((res) => setCaseBillable(res as CaseBillable))
+      .catch(() => setCaseBillable(null))
+      .finally(() => setCaseLoading(false))
+  }, [selectedCase])
+
+  function selectPatient(patient: BillingPatientSearchResult) {
+    setSelectedPatient(patient)
+    setSelectedCase(null)
+    setCaseBillable(null)
+    setForm((f) => ({ ...f, patient_id: patient.id, case_id: "" }))
+    const active = patient.active_cases || []
+    if (active.length === 1) {
+      setSelectedCase(active[0])
+      setForm((f) => ({ ...f, case_id: active[0].id }))
+      setWizardStep("treatments")
+    } else if (active.length > 1) {
+      setWizardStep("case")
+    } else {
+      setWizardStep("case")
+    }
+  }
+
+  function selectCase(c: BillingSearchCase) {
+    setSelectedCase(c)
+    setForm((f) => ({ ...f, case_id: c.id }))
+    setWizardStep("treatments")
+  }
+
+  function addItem(it: InvoiceItem) {
+    setForm((f) => {
+      const exists = f.items.some((x) => x.key === it.key)
+      if (exists) return f
+      return { ...f, items: [...f.items, it] }
+    })
+  }
+
+  function removeItem(key: string) {
+    setForm((f) => ({ ...f, items: f.items.filter((x) => x.key !== key) }))
+  }
+
+  function updateItemQty(key: string, quantity: number) {
+    setForm((f) => ({
+      ...f,
+      items: f.items.map((x) => (x.key === key ? { ...x, quantity: Math.max(1, quantity) } : x)),
+    }))
+  }
+
+  function handlePatientKeyDown(e: React.KeyboardEvent) {
+    const list = patientResults.length > 0 ? patientResults : recentPatients
+    if (list.length === 0) return
+    if (e.key === "ArrowDown") {
+      e.preventDefault()
+      setActiveIndex((i) => Math.min(i + 1, list.length - 1))
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault()
+      setActiveIndex((i) => Math.max(i - 1, -1))
+    } else if (e.key === "Enter") {
+      e.preventDefault()
+      const idx = activeIndex === -1 ? 0 : activeIndex
+      const chosen = list[idx]
+      if (chosen) {
+        if (patientResults.length > 0) {
+          selectPatient(chosen as BillingPatientSearchResult)
+        } else {
+          // Recent patient from the generic list: resolve billing options on the fly
+          resolveRecent(chosen as Patient)
+        }
+      }
+    }
+  }
+
+  async function resolveRecent(p: Patient) {
+    try {
+      const res = await billingApi.searchPatients({ q: p.op_no || p.phone || p.full_name, limit: 5 })
+      const match = (res?.items || []).find((x: BillingPatientSearchResult) => x.id === p.id) || (res?.items || [])[0]
+      if (match) {
+        selectPatient(match)
+      } else {
+        addToast({ title: "Info", description: "No active case found for this patient", variant: "default" })
+      }
+    } catch {
+      addToast({ title: "Error", description: "Could not load patient", variant: "destructive" })
+    }
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!selectedCase) {
+      addToast({ title: "Validation Error", description: "Please select a case", variant: "destructive" })
+      return
+    }
+    const payload: Record<string, unknown> = {
+      case_id: selectedCase.id,
+      patient_id: selectedPatient?.id,
+      discount_type: form.discount_type,
+      discount_percent: form.discount_percent,
+      discount_amount: form.discount_amount,
+      discount_reason: form.discount_reason || undefined,
+      paid_amount: form.paid_amount ?? 0,
+      payment_method: form.payment_method || undefined,
+      notes: form.notes || undefined,
+    }
+    if (form.items.length > 0) {
+      payload.items = form.items.map((it) => ({
+        treatment_plan_id: it.treatment_plan_id || undefined,
+        treatment_sitting_id: it.treatment_sitting_id || undefined,
+        description: it.description,
+        quantity: it.quantity,
+        unit_price: it.unit_price,
+      }))
+    } else {
+      const total = form.total_amount ?? 0
+      if (total <= 0) {
+        addToast({ title: "Validation Error", description: "Select a treatment or enter a total amount", variant: "destructive" })
+        return
+      }
+      payload.total_amount = total
+    }
+    createMutation.mutate(payload as InvoiceForm)
   }
 
   const downloadPdf = useCallback(async (id: string) => {
@@ -180,6 +389,10 @@ export default function BillingList() {
 
   function resetForm() {
     setForm(getEmptyInvoiceForm())
+    setSelectedPatient(null)
+    setSelectedCase(null)
+    setCaseBillable(null)
+    setWizardStep("patient")
     setDialogOpen(false)
   }
 
@@ -399,167 +612,508 @@ export default function BillingList() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
-        <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
+        <DialogContent className="sm:max-w-[720px] max-h-[92vh] flex flex-col">
           <DialogHeader className="px-6 pt-6 pb-0 shrink-0">
             <DialogTitle>New Invoice</DialogTitle>
             <DialogDescription>
-              Create a new invoice for a patient.
+              {wizardStep === "patient" && "Search the patient by OP number, name or mobile"}
+              {wizardStep === "case" && "Select the case to invoice"}
+              {wizardStep === "treatments" && "Pick treatments and record payment"}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
-            <div className="overflow-y-auto px-6 py-4 space-y-4 flex-1">
-              <div className="grid gap-2">
-                <Label htmlFor="case">Case</Label>
-                <Select
-                  value={form.case_id}
-                  onValueChange={(v) => setForm({ ...form, case_id: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select case" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {cases.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.chief_complaint} — {c.patient_name || c.patient?.full_name || "-"}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="total">Total Amount</Label>
-                  <NumericInput
-                    id="total"
-                    mode="currency"
-                    prefix="₹"
-                    placeholder="0"
-                    required
-                    value={form.total_amount ?? ""}
-                    onChange={(v) => setForm({ ...form, total_amount: v ? Number(v) : null })}
-                  />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="paid">Paid Amount</Label>
-                  <NumericInput
-                    id="paid"
-                    mode="currency"
-                    prefix="₹"
-                    placeholder="0"
-                    value={form.paid_amount ?? ""}
-                    onChange={(v) => setForm({ ...form, paid_amount: v ? Number(v) : null })}
-                  />
-              </div>
-              <div className="border-t pt-4">
-                <Label className="mb-2 block text-sm font-medium">Discount</Label>
-                <div className="flex gap-2 mb-3">
-                  <Button
+
+          <div className="px-6 pt-4 shrink-0">
+            <div className="flex items-center gap-1 text-xs">
+              {(["patient", "case", "treatments"] as const).map((s, i) => {
+                const order = ["patient", "case", "treatments"]
+                const active = wizardStep === s
+                const done = order.indexOf(wizardStep) > i
+                return (
+                  <button
+                    key={s}
                     type="button"
-                    variant={form.discount_type === "PERCENTAGE" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setForm({ ...form, discount_type: "PERCENTAGE", discount_percent: 0, discount_amount: 0 })}
+                    onClick={() => (done || wizardStep === "patient" ? setWizardStep(s) : undefined)}
+                    className="flex items-center gap-1.5 group"
+                    disabled={!done && wizardStep !== "patient" && wizardStep !== s}
                   >
-                    Percentage (%)
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={form.discount_type === "FIXED" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setForm({ ...form, discount_type: "FIXED", discount_percent: 0, discount_amount: 0 })}
-                  >
-                    Fixed (Rs.)
-                  </Button>
-                </div>
-                {form.discount_type === "PERCENTAGE" ? (
-                  <div className="grid gap-2">
-                    <Label>Discount %</Label>
-                    <NumericInput
-                      mode="percentage"
-                      suffix="%"
-                      min={0}
-                      max={100}
-                      step="0.1"
-                      placeholder="0"
-                      value={form.discount_percent || ""}
-                      onChange={(v) => {
-                        const pct = Math.min(100, Math.max(0, Number(v) || 0))
-                        const gross = form.total_amount ?? 0
-                        const amt = Math.round(gross * pct / 100 * 100) / 100
-                        setForm({ ...form, discount_percent: pct, discount_amount: amt })
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <div className="grid gap-2">
-                    <Label>Discount Amount (Rs.)</Label>
-                    <NumericInput
-                      mode="currency"
-                      prefix="₹"
-                      min={0}
-                      step="1"
-                      placeholder="0"
-                      value={form.discount_amount || ""}
-                      onChange={(v) => {
-                        const gross = form.total_amount ?? 0
-                        const amt = Math.min(gross, Math.max(0, Number(v) || 0))
-                        const pct = gross > 0 ? Math.round(amt / gross * 100 * 100) / 100 : 0
-                        setForm({ ...form, discount_amount: amt, discount_percent: pct })
-                      }}
-                    />
-                  </div>
-                )}
-                <div className="grid gap-2 mt-3">
-                  <Label>Discount Reason (optional)</Label>
-                  <Input
-                    value={form.discount_reason}
-                    onChange={(e) => setForm({ ...form, discount_reason: e.target.value })}
-                    placeholder="e.g. New patient offer"
-                  />
-                </div>
-                {form.discount_amount > 0 && (form.total_amount ?? 0) > 0 && (
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Net after discount: <span className="font-semibold text-green-600">{formatIndianRupees(Math.max(0, (form.total_amount ?? 0) - form.discount_amount))}</span>
-                  </p>
-                )}
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="method">Payment Method</Label>
-                <Select
-                  value={form.payment_method}
-                  onValueChange={(v) => setForm({ ...form, payment_method: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select method" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="CASH">Cash</SelectItem>
-                    <SelectItem value="CARD">Card</SelectItem>
-                    <SelectItem value="INSURANCE">Insurance</SelectItem>
-                    <SelectItem value="BANK_TRANSFER">Bank Transfer</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="notes">Notes</Label>
-                <Input
-                  id="notes"
-                  value={form.notes}
-                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                />
-              </div>
+                    <span className={`flex items-center justify-center h-5 w-5 rounded-full text-[10px] font-semibold ${active ? "bg-primary text-primary-foreground" : done ? "bg-green-500 text-white" : "bg-muted text-muted-foreground"}`}>
+                      {done ? "✓" : i + 1}
+                    </span>
+                    <span className={`capitalize ${active ? "font-semibold text-foreground" : "text-muted-foreground"}`}>
+                      {s === "treatments" ? "Treatments" : s}
+                    </span>
+                    {i < 2 && <span className="mx-1 h-px w-5 bg-border" />}
+                  </button>
+                )
+              })}
             </div>
-            <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-[var(--ds-border-light)]">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={resetForm}
-              >
+          </div>
+
+          <div className="overflow-y-auto px-6 py-4 flex-1 min-h-0">
+            {wizardStep === "patient" && (
+              <div className="space-y-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    ref={searchInputRef}
+                    value={patientQuery}
+                    onChange={(e) => setPatientQuery(e.target.value)}
+                    onKeyDown={handlePatientKeyDown}
+                    placeholder="Search by OP number, name or mobile..."
+                    className="pl-10"
+                  />
+                </div>
+                {searching ? (
+                  <LoadingSkeleton rows={3} />
+                ) : patientQuery.trim() ? (
+                  patientResults.length === 0 ? (
+                    <EmptyState icon={User} title="No patients found" description="Try a different OP number, name or mobile number." />
+                  ) : (
+                    <ul className="divide-y divide-border rounded-lg border border-border">
+                      {patientResults.map((p, i) => (
+                        <li key={p.id}>
+                          <button
+                            type="button"
+                            onClick={() => selectPatient(p)}
+                            onMouseEnter={() => setActiveIndex(i)}
+                            className={`w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-muted/50 transition-colors ${activeIndex === i ? "bg-muted/60" : ""}`}
+                          >
+                            <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                              <User className="h-4 w-4" />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block font-medium text-sm">
+                                <Highlight text={p.full_name} query={patientQuery} />
+                              </span>
+                              <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                                {p.op_no && (
+                                  <span className="inline-flex items-center gap-1">
+                                    <Hash className="h-3 w-3" /> <Highlight text={p.op_no} query={patientQuery} />
+                                  </span>
+                                )}
+                                {p.phone && (
+                                  <span className="inline-flex items-center gap-1">
+                                    <Phone className="h-3 w-3" /> <Highlight text={p.phone} query={patientQuery} />
+                                  </span>
+                                )}
+                              </span>
+                            </span>
+                            <span className="shrink-0 text-right">
+                              <span className="block text-sm">
+                                <span className={`font-semibold ${(p.financial_summary?.outstanding_balance || 0) > 0 ? "text-amber-600" : "text-green-600"}`}>
+                                  {formatIndianRupees(p.financial_summary?.outstanding_balance || 0)}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground"> outstanding</span>
+                              </span>
+                              <span className="mt-1 block text-[10px] text-muted-foreground">
+                                {(p.active_cases || []).length} active case{(p.active_cases || []).length === 1 ? "" : "s"}
+                              </span>
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">Recent patients</p>
+                    {recentPatients.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No recent patients found.</p>
+                    ) : (
+                      <ul className="divide-y divide-border rounded-lg border border-border">
+                        {recentPatients.map((p, i) => (
+                          <li key={p.id}>
+                            <button
+                              type="button"
+                              onClick={() => resolveRecent(p)}
+                              onMouseEnter={() => setActiveIndex(i)}
+                              className={`w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-muted/50 transition-colors ${activeIndex === i ? "bg-muted/60" : ""}`}
+                            >
+                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                                <User className="h-4 w-4" />
+                              </span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block font-medium text-sm truncate">{p.full_name}</span>
+                                <span className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
+                                  {p.op_no && (
+                                    <span className="inline-flex items-center gap-1">
+                                      <Hash className="h-3 w-3" /> {p.op_no}
+                                    </span>
+                                  )}
+                                  {p.phone && (
+                                    <span className="inline-flex items-center gap-1">
+                                      <Phone className="h-3 w-3" /> {p.phone}
+                                    </span>
+                                  )}
+                                </span>
+                              </span>
+                              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+                <p className="text-[11px] text-muted-foreground">Use ↑/↓ to navigate and Enter to select.</p>
+              </div>
+            )}
+
+            {wizardStep === "case" && selectedPatient && (
+              <div className="space-y-4">
+                <div className="rounded-lg border border-border p-4 bg-muted/30">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-sm">{selectedPatient.full_name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {selectedPatient.op_no && <span className="inline-flex items-center gap-1 mr-3"><Hash className="h-3 w-3" /> {selectedPatient.op_no}</span>}
+                        {selectedPatient.phone && <span className="inline-flex items-center gap-1"><Phone className="h-3 w-3" /> {selectedPatient.phone}</span>}
+                      </p>
+                    </div>
+                    <span className={`text-sm font-semibold ${(selectedPatient.financial_summary?.outstanding_balance || 0) > 0 ? "text-amber-600" : "text-green-600"}`}>
+                      Outstanding: {formatIndianRupees(selectedPatient.financial_summary?.outstanding_balance || 0)}
+                    </span>
+                  </div>
+                </div>
+
+                {(selectedPatient.active_cases || []).length === 0 ? (
+                  <EmptyState icon={AlertCircle} title="No active cases" description="Every invoice must belong to a case. Create an active case for this patient first." />
+                ) : (
+                  <ul className="divide-y divide-border rounded-lg border border-border">
+                    {(selectedPatient.active_cases || []).map((c) => (
+                      <li key={c.id}>
+                        <button
+                          type="button"
+                          onClick={() => selectCase(c)}
+                          className="w-full text-left px-4 py-3 flex items-start justify-between gap-3 hover:bg-muted/50 transition-colors"
+                        >
+                          <span className="min-w-0">
+                            <span className="block font-medium text-sm truncate">{c.chief_complaint}</span>
+                            <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                              {c.case_number && <span>Case: {c.case_number}</span>}
+                              {c.doctor_name && <span>Dr. {c.doctor_name}</span>}
+                              {c.created_at && (
+                                <span className="inline-flex items-center gap-1">
+                                  <Calendar className="h-3 w-3" /> {format(new Date(c.created_at), "MMM dd, yyyy")}
+                                </span>
+                              )}
+                            </span>
+                          </span>
+                          <span className="shrink-0 flex items-center gap-2">
+                            <StatusBadge status={c.status} />
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            {wizardStep === "treatments" && (
+              <div className="space-y-5">
+                {caseLoading && <LoadingSkeleton rows={4} />}
+                {!caseLoading && !caseBillable && (
+                  <EmptyState icon={AlertCircle} title="Could not load treatments" description="Refresh and try again." />
+                )}
+                {!caseLoading && caseBillable && (
+                  <>
+                    <div className="rounded-lg border border-border p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-medium text-sm">{selectedPatient?.full_name}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">{caseBillable.case.chief_complaint}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {caseBillable.case.case_number && <span className="mr-3">Case: {caseBillable.case.case_number}</span>}
+                            {caseBillable.case.doctor_name && <span>Dr. {caseBillable.case.doctor_name}</span>}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <StatusBadge status={caseBillable.case.payment_status || "NO_BILLING"} />
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Outstanding: <span className={`font-semibold ${(caseBillable.case.outstanding_balance || 0) > 0 ? "text-amber-600" : "text-green-600"}`}>{formatIndianRupees(caseBillable.case.outstanding_balance || 0)}</span>
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {caseBillable.treatment_plans.length === 0 && (
+                      <p className="text-sm text-muted-foreground">No active treatments found for this case. Enter a manual total below.</p>
+                    )}
+
+                    <div className="space-y-3">
+                      {caseBillable.treatment_plans.map((plan) => {
+                        const planSelected = form.items.some((it) => it.key === plan.id)
+                        return (
+                          <div key={plan.id} className="rounded-lg border border-border overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                planSelected
+                                  ? removeItem(plan.id)
+                                  : addItem({ key: plan.id, treatment_plan_id: plan.id, description: plan.treatment_name, quantity: 1, unit_price: plan.cost })
+                              }
+                              className={`w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/50 transition-colors ${planSelected ? "bg-primary/5" : ""}`}
+                            >
+                              <span className="flex items-center gap-3 min-w-0">
+                                <CheckCircle2 className={`h-4 w-4 shrink-0 ${planSelected ? "text-primary" : "text-muted-foreground"}`} />
+                                <span className="min-w-0">
+                                  <span className="block font-medium text-sm truncate">{plan.treatment_name}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    Paid {formatIndianRupees(plan.paid_amount)} · Balance {formatIndianRupees(plan.pending_amount)}
+                                  </span>
+                                </span>
+                              </span>
+                              <span className="flex items-center gap-2 shrink-0">
+                                <StatusBadge status={plan.status} />
+                                <span className="text-sm font-semibold">{formatIndianRupees(plan.cost)}</span>
+                              </span>
+                            </button>
+                            {(plan.sittings || []).length > 0 && (
+                              <ul className="border-t border-border divide-y divide-border">
+                                {plan.sittings.map((s) => {
+                                  const key = `sit-${s.id}`
+                                  const selected = form.items.some((it) => it.key === key)
+                                  const invoiced = s.invoice_status === "INVOICED"
+                                  const defaultCharge = s.charge ?? (plan.cost > 0 && plan.total_sittings > 0 ? Math.round((plan.cost / plan.total_sittings) * 100) / 100 : plan.cost)
+                                  return (
+                                    <li key={s.id}>
+                                      <button
+                                        type="button"
+                                        disabled={invoiced}
+                                        onClick={() =>
+                                          selected
+                                            ? removeItem(key)
+                                            : addItem({
+                                                key,
+                                                treatment_plan_id: plan.id,
+                                                treatment_sitting_id: s.id,
+                                                description: `${plan.treatment_name} — Visit #${s.sitting_number}`,
+                                                quantity: 1,
+                                                unit_price: defaultCharge,
+                                              })
+                                        }
+                                        className={`w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors ${selected ? "bg-primary/5" : ""} ${invoiced ? "opacity-50 cursor-not-allowed" : "hover:bg-muted/50"}`}
+                                      >
+                                        <span className="flex items-center gap-3 min-w-0">
+                                          <span className={`flex h-4 w-4 items-center justify-center rounded-full border ${selected ? "border-primary bg-primary" : invoiced ? "border-muted bg-muted" : "border-border"}`}>
+                                            {selected && <CheckCircle2 className="h-3 w-3 text-white" />}
+                                          </span>
+                                          <span className="min-w-0">
+                                            <span className="block text-sm truncate">Visit #{s.sitting_number}{s.sitting_date ? ` · ${format(new Date(s.sitting_date), "MMM dd, yyyy")}` : ""}</span>
+                                            <span className="text-[11px] text-muted-foreground">
+                                              {invoiced ? `Invoiced · Paid ${formatIndianRupees(s.paid_amount)}` : "Not invoiced"}
+                                            </span>
+                                          </span>
+                                        </span>
+                                        <span className="text-sm font-medium shrink-0">{formatIndianRupees(defaultCharge)}</span>
+                                      </button>
+                                    </li>
+                                  )
+                                })}
+                              </ul>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    {form.items.length > 0 && (
+                      <div className="rounded-lg border border-border divide-y divide-border">
+                        <p className="px-4 py-2 text-xs font-medium text-muted-foreground">Selected items</p>
+                        {form.items.map((it) => (
+                          <div key={it.key} className="px-4 py-2.5 flex items-center justify-between gap-3">
+                            <span className="min-w-0">
+                              <span className="block text-sm font-medium truncate">{it.description}</span>
+                              <span className="text-[11px] text-muted-foreground">{formatIndianRupees(it.unit_price)} each</span>
+                            </span>
+                            <span className="flex items-center gap-2 shrink-0">
+                              <NumericInput
+                                mode="integer"
+                                min={1}
+                                value={it.quantity}
+                                onChange={(v) => updateItemQty(it.key, Number(v) || 1)}
+                                className="w-16 h-8 text-sm"
+                              />
+                              <span className="text-sm font-semibold w-20 text-right">{formatIndianRupees(it.quantity * it.unit_price)}</span>
+                              <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(it.key)} title="Remove">
+                                <Trash2 className="h-4 w-4 text-danger" />
+                              </Button>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {form.items.length === 0 && (
+                      <div className="grid gap-2">
+                        <Label htmlFor="total">Total Amount (manual)</Label>
+                        <NumericInput
+                          id="total"
+                          mode="currency"
+                          prefix="₹"
+                          placeholder="0"
+                          value={form.total_amount ?? ""}
+                          onChange={(v) => setForm({ ...form, total_amount: v ? Number(v) : null })}
+                        />
+                      </div>
+                    )}
+
+                    <div className="border-t pt-4">
+                      <Label className="mb-2 block text-sm font-medium">Discount</Label>
+                      <div className="flex gap-2 mb-3">
+                        <Button
+                          type="button"
+                          variant={form.discount_type === "PERCENTAGE" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setForm({ ...form, discount_type: "PERCENTAGE", discount_percent: 0, discount_amount: 0 })}
+                        >
+                          Percentage (%)
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={form.discount_type === "FIXED" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setForm({ ...form, discount_type: "FIXED", discount_percent: 0, discount_amount: 0 })}
+                        >
+                          Fixed (Rs.)
+                        </Button>
+                      </div>
+                      {form.discount_type === "PERCENTAGE" ? (
+                        <div className="grid gap-2">
+                          <Label>Discount %</Label>
+                          <NumericInput
+                            mode="percentage"
+                            suffix="%"
+                            min={0}
+                            max={100}
+                            step="0.1"
+                            placeholder="0"
+                            value={form.discount_percent || ""}
+                            onChange={(v) => {
+                              const pct = Math.min(100, Math.max(0, Number(v) || 0))
+                              const gross = grossTotal > 0 ? grossTotal : form.total_amount ?? 0
+                              const amt = Math.round(gross * pct / 100 * 100) / 100
+                              setForm({ ...form, discount_percent: pct, discount_amount: amt })
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="grid gap-2">
+                          <Label>Discount Amount (Rs.)</Label>
+                          <NumericInput
+                            mode="currency"
+                            prefix="₹"
+                            min={0}
+                            step="1"
+                            placeholder="0"
+                            value={form.discount_amount || ""}
+                            onChange={(v) => {
+                              const gross = grossTotal > 0 ? grossTotal : form.total_amount ?? 0
+                              const amt = Math.min(gross, Math.max(0, Number(v) || 0))
+                              const pct = gross > 0 ? Math.round(amt / gross * 100 * 100) / 100 : 0
+                              setForm({ ...form, discount_amount: amt, discount_percent: pct })
+                            }}
+                          />
+                        </div>
+                      )}
+                      <div className="grid gap-2 mt-3">
+                        <Label>Discount Reason (optional)</Label>
+                        <Input
+                          value={form.discount_reason}
+                          onChange={(e) => setForm({ ...form, discount_reason: e.target.value })}
+                          placeholder="e.g. New patient offer"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="paid">Paid Amount</Label>
+                      <NumericInput
+                        id="paid"
+                        mode="currency"
+                        prefix="₹"
+                        placeholder="0"
+                        value={form.paid_amount ?? ""}
+                        onChange={(v) => setForm({ ...form, paid_amount: v ? Number(v) : null })}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="method">Payment Method</Label>
+                      <Select
+                        value={form.payment_method}
+                        onValueChange={(v) => setForm({ ...form, payment_method: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select method" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="CASH">Cash</SelectItem>
+                          <SelectItem value="CARD">Card</SelectItem>
+                          <SelectItem value="INSURANCE">Insurance</SelectItem>
+                          <SelectItem value="BANK_TRANSFER">Bank Transfer</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="notes">Notes</Label>
+                      <Input
+                        id="notes"
+                        value={form.notes}
+                        onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="rounded-lg bg-muted/40 border border-border p-4 space-y-1.5">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Gross total</span>
+                        <span>{formatIndianRupees(grossTotal > 0 ? grossTotal : (form.total_amount ?? 0))}</span>
+                      </div>
+                      {form.discount_amount > 0 && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Discount</span>
+                          <span className="text-green-600">- {formatIndianRupees(form.discount_amount)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-base font-semibold border-t border-border pt-1.5">
+                        <span>Net total</span>
+                        <span>{formatIndianRupees(netTotal)}</span>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-[var(--ds-border-light)] flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="outline" onClick={resetForm}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending ? "Saving..." : "Save"}
+              {wizardStep === "case" && (
+                <Button type="button" variant="ghost" onClick={() => setWizardStep("patient")}>
+                  <ChevronLeft className="h-4 w-4 mr-1" /> Back
+                </Button>
+              )}
+              {wizardStep === "treatments" && (
+                <Button type="button" variant="ghost" onClick={() => setWizardStep("case")}>
+                  <ChevronLeft className="h-4 w-4 mr-1" /> Back
+                </Button>
+              )}
+            </div>
+            {wizardStep === "patient" && selectedPatient && (selectedPatient.active_cases || []).length === 1 && (
+              <Button type="button" variant="ghost" onClick={() => setWizardStep("treatments")}>
+                Skip to treatments <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
-            </DialogFooter>
-          </form>
+            )}
+            {wizardStep === "treatments" && !caseLoading && caseBillable && (
+              <Button type="button" onClick={handleSubmit} disabled={createMutation.isPending}>
+                {createMutation.isPending ? "Saving..." : "Create Invoice"}
+              </Button>
+            )}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

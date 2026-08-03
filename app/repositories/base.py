@@ -94,7 +94,29 @@ class BaseRepository(Generic[ModelType]):
         query = select(func.count(self.model.id))
         if filters:
             for key, value in filters.items():
-                if hasattr(self.model, key) and value is not None:
+                if value is None:
+                    continue
+                if key.endswith("__in") and isinstance(value, (list, tuple, set)):
+                    attr_name = key[:-4]
+                    if hasattr(self.model, attr_name):
+                        query = query.where(getattr(self.model, attr_name).in_(value))
+                elif key.endswith("__ge"):
+                    attr_name = key[:-4]
+                    if hasattr(self.model, attr_name):
+                        query = query.where(getattr(self.model, attr_name) >= value)
+                elif key.endswith("__gt"):
+                    attr_name = key[:-4]
+                    if hasattr(self.model, attr_name):
+                        query = query.where(getattr(self.model, attr_name) > value)
+                elif key.endswith("__le"):
+                    attr_name = key[:-4]
+                    if hasattr(self.model, attr_name):
+                        query = query.where(getattr(self.model, attr_name) <= value)
+                elif key.endswith("__lt"):
+                    attr_name = key[:-4]
+                    if hasattr(self.model, attr_name):
+                        query = query.where(getattr(self.model, attr_name) < value)
+                elif hasattr(self.model, key):
                     query = query.where(getattr(self.model, key) == value)
         result = await self.db.execute(query)
-        return result.scalar()
+        return result.scalar() or 0

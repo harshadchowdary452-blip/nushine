@@ -47,10 +47,16 @@ async def override_get_db():
 @pytest.fixture
 async def client():
     app.dependency_overrides[get_db] = override_get_db
+    from app.main import limiter as main_limiter
+    from app.routers.auth import limiter as auth_limiter
+    main_limiter.enabled = False
+    auth_limiter.enabled = False
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
     app.dependency_overrides.clear()
+    main_limiter.enabled = True
+    auth_limiter.enabled = True
 
 
 @pytest.fixture
@@ -483,7 +489,11 @@ async def test_doctor_sees_only_own_patients(client):
     resp = await client.get("/api/v1/patients/", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
     data = resp.json()
-    assert len(data) == 2  # p1, p2 only
+    # Doctors see patients across their admin group's hospitals (for case reports),
+    # but never patients from other groups.
+    assert len(data) == 3  # p1, p2, p3 (Group Alpha)
+    names = [p["full_name"] for p in data]
+    assert "Patient Four (Other Group)" not in names
 
 
 # ==========================

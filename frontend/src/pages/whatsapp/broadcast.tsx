@@ -79,7 +79,10 @@ export default function WhatsAppBroadcast() {
     () => (Array.isArray(patients) ? patients : []),
     [patients],
   )
-  const allLeads: Lead[] = useMemo(() => (Array.isArray(leads) ? leads : []), [leads])
+  const allLeads: Lead[] = useMemo(
+    () => (Array.isArray(leads) ? leads : (leads as { items?: Lead[] } | undefined)?.items || []),
+    [leads],
+  )
   const allTemplates: Array<{ id: string; name: string; message: string }> = useMemo(
     () => (Array.isArray(templates) ? templates : []),
     [templates],

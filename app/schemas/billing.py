@@ -3,8 +3,39 @@ from typing import Optional, List
 from datetime import datetime
 
 
+class BillingItemCreate(BaseModel):
+    treatment_plan_id: Optional[str] = None
+    treatment_sitting_id: Optional[str] = None
+    description: Optional[str] = None
+    quantity: int = Field(default=1, ge=1)
+    unit_price: float = Field(default=0.0, ge=0)
+    allow_duplicate: bool = False
+
+
+class BillingItemResponse(BaseModel):
+    id: str
+    billing_id: str
+    treatment_plan_id: Optional[str] = None
+    treatment_sitting_id: Optional[str] = None
+    description: Optional[str] = None
+    quantity: int
+    unit_price: float
+    amount: float
+    discount_amount: float
+    net_amount: float
+    paid_amount: float
+    pending_amount: float
+    treatment_plan_name: Optional[str] = None
+    treatment_sitting_number: Optional[int] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class BillingCreate(BaseModel):
     case_id: str
+    patient_id: Optional[str] = None
     treatment_plan_id: Optional[str] = None
     total_amount: float = Field(default=0.0, ge=0)
     paid_amount: float = Field(default=0.0, ge=0)
@@ -14,6 +45,7 @@ class BillingCreate(BaseModel):
     discount_percent: float = Field(default=0.0, ge=0, le=100)
     discount_amount: float = Field(default=0.0, ge=0)
     discount_reason: Optional[str] = None
+    items: Optional[List[BillingItemCreate]] = None
 
 
 class BillingUpdate(BaseModel):
@@ -47,6 +79,7 @@ class BillingResponse(BaseModel):
     payment_method: Optional[str]
     paid_at: Optional[datetime]
     notes: Optional[str]
+    items: Optional[List[BillingItemResponse]] = None
     created_at: datetime
     updated_at: datetime
 

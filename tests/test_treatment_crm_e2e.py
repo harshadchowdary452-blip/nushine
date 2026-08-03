@@ -145,17 +145,16 @@ async def test_treatment_crm_workflow_e2e(client: AsyncClient, seed):
     assert "7_DAY_FOLLOW_UP" not in fu_types, "7-Day FU should NOT be created"
     assert len(fups) == 2, f"Expected exactly 2 follow-ups, got {len(fups)}"
 
-    # ── VERIFY: Enquiry Calendar shows the created recalls ──
+    # ── VERIFY: Recalls Calendar shows the created recalls ──
     today = date.today()
-    r = await client.get("/api/v1/crm/enquiries/calendar", headers=headers, params={
+    r = await client.get("/api/v1/crm/recalls/calendar", headers=headers, params={
         "start_date": today.isoformat(),
         "end_date": (today.replace(year=today.year + 1)).isoformat(),
     })
     assert r.status_code == 200
     calendar_entries = r.json()
-    # At least 2 entries should exist (the two recalls)
-    calendar_sources = {e["source"] for e in calendar_entries}
-    assert "follow_up" in calendar_sources or len(calendar_entries) >= 2, \
+    # At least 1 entry should exist (recalls are deduped per patient in the calendar)
+    assert isinstance(calendar_entries, list) and len(calendar_entries) >= 1, \
         f"Calendar should show recalls, got {len(calendar_entries)} entries"
 
     # ── VERIFY: Patient Timeline shows correct progression ──

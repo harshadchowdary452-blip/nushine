@@ -104,6 +104,8 @@ class Appointment(Base):
     appointment_type: Mapped[AppointmentType] = mapped_column(SAEnum(AppointmentType, create_constraint=False), default=AppointmentType.CONSULTATION, nullable=False)
     notes: Mapped[str] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    reminder_sent: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
+    reminded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     created_by_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)

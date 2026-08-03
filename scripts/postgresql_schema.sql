@@ -203,6 +203,8 @@ CREATE TABLE appointments (
 	appointment_type appointmenttype NOT NULL, 
 	notes TEXT, 
 	is_active BOOLEAN NOT NULL, 
+	reminder_sent BOOLEAN NOT NULL DEFAULT FALSE, 
+	reminded_at TIMESTAMP WITH TIME ZONE, 
 	created_at TIMESTAMP WITH TIME ZONE NOT NULL, 
 	updated_at TIMESTAMP WITH TIME ZONE NOT NULL, 
 	PRIMARY KEY (id), 

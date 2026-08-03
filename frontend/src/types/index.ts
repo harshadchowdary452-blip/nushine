@@ -512,7 +512,102 @@ export interface DoctorBlockedSlot {
   updated_at: string
 }
 
-export type PaymentStatus = "PENDING" | "PARTIAL" | "PAID" | "OVERDUE"
+export type PaymentStatus = "PENDING" | "PARTIAL" | "PAID" | "OVERDUE" | "DRAFT" | "CANCELLED" | "UNPAID" | "NO_BILLING"
+
+export interface BillingItem {
+  id: string
+  billing_id: string
+  treatment_plan_id?: string | null
+  treatment_sitting_id?: string | null
+  description?: string | null
+  quantity: number
+  unit_price: number
+  amount: number
+  discount_amount: number
+  net_amount: number
+  paid_amount: number
+  pending_amount: number
+  treatment_plan_name?: string | null
+  treatment_sitting_number?: number | null
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancialSummary {
+  total_billed: number
+  total_paid: number
+  outstanding_balance: number
+  payment_status: string
+}
+
+export interface BillingSearchCase {
+  id: string
+  case_number?: string | null
+  chief_complaint: string
+  doctor_name?: string | null
+  status: string
+  created_at?: string | null
+  estimated_cost?: number | null
+  total_billed?: number
+  total_paid?: number
+  outstanding_balance?: number
+  payment_status?: string | null
+}
+
+export interface BillingPatientSearchResult {
+  id: string
+  full_name: string
+  op_no?: string | null
+  phone?: string | null
+  gender?: string | null
+  age?: number | null
+  status?: string | null
+  financial_summary: FinancialSummary
+  active_cases: BillingSearchCase[]
+}
+
+export interface BillableSitting {
+  id: string
+  sitting_number: number
+  sitting_date?: string | null
+  status: string
+  charge?: number | null
+  paid_amount: number
+  invoice_status: string
+}
+
+export interface BillableTreatmentPlan {
+  id: string
+  treatment_name: string
+  description?: string | null
+  cost: number
+  paid_amount: number
+  pending_amount: number
+  status: string
+  total_sittings: number
+  completed_sittings: number
+  remaining_sittings: number
+  sittings: BillableSitting[]
+}
+
+export interface CaseBillable {
+  case: {
+    id: string
+    case_number?: string | null
+    patient_id: string
+    patient_name?: string | null
+    chief_complaint: string
+    doctor_name?: string | null
+    status: string
+    created_at?: string | null
+    estimated_cost?: number | null
+    total_billed?: number
+    total_paid?: number
+    outstanding_balance?: number
+    payment_status?: string | null
+  }
+  treatment_plans: BillableTreatmentPlan[]
+}
 
 export interface Billing {
   id: string
@@ -532,6 +627,7 @@ export interface Billing {
   paid_at?: string | null
   notes: string | null
   invoice_number?: string
+  items?: BillingItem[] | null
   created_at: string
   updated_at: string
   case?: Case

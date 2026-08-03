@@ -18,6 +18,8 @@ from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 
+from app.crm.defaults import MISSED_APPOINTMENT_DELAY_DAYS
+
 logger = logging.getLogger("crm.rule_engine")
 
 
@@ -255,10 +257,10 @@ class RuleEngine:
             logger.debug("LEAD_DUPLICATE: lead=%s already has LEAD_FOLLOW_UP", lead_id)
             return None
 
-        # Load lead follow-up config
+        # Load lead follow-up config (single source of truth — always populated)
         follow_up_config = settings.lead_follow_up
-        delay_days = follow_up_config.start_delay_days if follow_up_config else 1
-        enabled = follow_up_config.enabled if follow_up_config is not None else True
+        delay_days = follow_up_config.start_delay_days
+        enabled = follow_up_config.enabled
 
         if not enabled:
             return None
@@ -274,9 +276,9 @@ class RuleEngine:
 
         due_date = today + timedelta(days=delay_days)
 
-        # Multi-attempt config
-        max_attempts = follow_up_config.max_attempts if follow_up_config else 3
-        days_between = follow_up_config.days_between_attempts if follow_up_config else 3
+        # Multi-attempt config (single source of truth — always populated)
+        max_attempts = follow_up_config.max_attempts
+        days_between = follow_up_config.days_between_attempts
 
         # Update lead automation fields
         from app.models.lead import Lead
@@ -315,10 +317,10 @@ class RuleEngine:
         if not patient_id:
             return None
 
-        # Load OPD follow-up config (default: enabled with 3-day delay)
+        # Load OPD follow-up config (single source of truth — always populated)
         follow_up_config = settings.opd_follow_up
-        delay_days = follow_up_config.start_delay_days if follow_up_config else 3
-        enabled = follow_up_config.enabled if follow_up_config is not None else True
+        delay_days = follow_up_config.start_delay_days
+        enabled = follow_up_config.enabled
 
         if not enabled:
             logger.debug("OPD_SKIP: disabled for hospital=%s", hospital_id)
@@ -460,7 +462,7 @@ class RuleEngine:
             return None
 
         # Calculate due date: appointment_date - reminder_days
-        reminder_days = settings.default_reminder_offset_days if settings else 1
+        reminder_days = settings.default_reminder_offset_days
         due_date = appt_date - timedelta(days=reminder_days)
         if due_date < date.today():
             due_date = date.today()
@@ -539,9 +541,9 @@ class RuleEngine:
             from datetime import datetime as _dt
             if isinstance(visit_date, str):
                 visit_date = _dt.fromisoformat(visit_date).date() if "T" in visit_date else date.fromisoformat(visit_date)
-            due_date = visit_date + timedelta(days=1)
+            due_date = visit_date + timedelta(days=MISSED_APPOINTMENT_DELAY_DAYS)
         else:
-            due_date = date.today() + timedelta(days=1)
+            due_date = date.today() + timedelta(days=MISSED_APPOINTMENT_DELAY_DAYS)
 
         return Decision(
             action="CREATE",
@@ -588,7 +590,7 @@ class RuleEngine:
             appointment_id = next_appt.id
             appt_date = next_appt.appointment_date
 
-            reminder_days = settings.default_reminder_offset_days if settings else 1
+            reminder_days = settings.default_reminder_offset_days
             due_date = appt_date - timedelta(days=reminder_days) if appt_date else date.today()
             if due_date < date.today():
                 due_date = date.today()
@@ -626,7 +628,7 @@ class RuleEngine:
 
             appointment_id = next_appt.id
             appt_date = next_appt.appointment_date
-            reminder_days = settings.default_reminder_offset_days if settings else 1
+            reminder_days = settings.default_reminder_offset_days
             due_date = appt_date - timedelta(days=reminder_days) if appt_date else date.today()
             if due_date < date.today():
                 due_date = date.today()
@@ -649,7 +651,7 @@ class RuleEngine:
         if not follow_up_config:
             follow_up_config = settings.opd_follow_up
 
-        enabled = follow_up_config.enabled if follow_up_config is not None else True
+        enabled = follow_up_config.enabled
         if not enabled:
             logger.debug("TREATMENT_WELLNESS_DISABLED: hospital=%s treatment_type=%s", hospital_id, treatment_type_id)
             return None
@@ -673,7 +675,7 @@ class RuleEngine:
         # Auto-close completed enquiries
         await self._auto_close_enquiries(db, hospital_id, patient_id, ["OPD_FOLLOW_UP", "TREATMENT_WELLNESS", "APPOINTMENT_REMINDER"])
 
-        delay_days = follow_up_config.start_delay_days if follow_up_config else 3
+        delay_days = follow_up_config.start_delay_days
 
         visit_date = payload.get("visit_date")
         if visit_date:
@@ -726,16 +728,34 @@ class RuleEngine:
             logger.debug("CASE_WELLNESS_SKIP: case=%s status=%s (not COMPLETED)", case_id, case.status)
             return []
 
+        if not hospital_id:
+            # Case has no hospital column; resolve via the patient if needed
+            from app.models.patient import Patient
+            patient = await db.get(Patient, patient_id)
+            if patient and patient.hospital_id:
+                hospital_id = patient.hospital_id
+        if not hospital_id:
+            return []
+
         decisions = []
 
-        visit_date = payload.get("visit_date")
-        if visit_date:
-            from datetime import datetime as _dt
-            if isinstance(visit_date, str):
-                visit_date = _dt.fromisoformat(visit_date).date() if "T" in visit_date else date.fromisoformat(visit_date)
-            base_date = visit_date
+        # Actual completion timestamp is authoritative (NOT creation date / event time).
+        # Prefer case.completion_date, then case.updated_at, then the event's visit_date.
+        if case:
+            if case.completion_date:
+                base_date = case.completion_date.date() if isinstance(case.completion_date, datetime) else case.completion_date
+            elif case.updated_at:
+                base_date = case.updated_at.date()
+            else:
+                base_date = date.today()
         else:
-            base_date = date.today()
+            visit_date = payload.get("visit_date")
+            if visit_date:
+                from datetime import datetime as _dt
+                visit_date = _dt.fromisoformat(visit_date).date() if "T" in visit_date else date.fromisoformat(visit_date)
+                base_date = visit_date
+            else:
+                base_date = date.today()
 
         # Duplicate check FIRST — before auto-close destroys existing PENDING records
         # Case Wellness
@@ -752,9 +772,9 @@ class RuleEngine:
         )
         if not existing_wellness.scalar_one_or_none():
             follow_up_config = settings.case_recovery
-            wellness_enabled = follow_up_config.enabled if follow_up_config is not None else True
+            wellness_enabled = follow_up_config.enabled
             if wellness_enabled:
-                delay_days = follow_up_config.start_delay_days if follow_up_config else 15
+                delay_days = follow_up_config.start_delay_days
                 due_date = base_date + timedelta(days=delay_days)
                 decisions.append(Decision(
                     action="CREATE",
@@ -786,11 +806,9 @@ class RuleEngine:
             # Cancel any existing pending recalls for this patient from OTHER cases
             await self._cancel_patient_pending_recalls(db, hospital_id, patient_id, exclude_case_id=case_id, reason="CASE_COMPLETED_NEW_CHAIN")
 
-            recall_enabled = settings.case_recall.enabled if settings.case_recall is not None else True
+            recall_enabled = settings.case_recall.enabled
             if recall_enabled:
-                recall_delay = 180
-                if settings.case_recall:
-                    recall_delay = settings.case_recall.start_delay_days if settings.case_recall.start_delay_days else 180
+                recall_delay = settings.case_recall.start_delay_days
                 recall_due = base_date + timedelta(days=recall_delay)
                 decisions.append(Decision(
                     action="CREATE",
@@ -866,10 +884,10 @@ class RuleEngine:
         if lead.status not in ("NEW", "CONTACTED", "INTERESTED", "FOLLOW_UP_REQUIRED"):
             return None
 
-        # Load config for max_attempts and days_between
+        # Load config for max_attempts and days_between (single source of truth)
         follow_up_config = settings.lead_follow_up
-        max_attempts = follow_up_config.max_attempts if follow_up_config else 3
-        days_between = follow_up_config.days_between_attempts if follow_up_config else 3
+        max_attempts = follow_up_config.max_attempts
+        days_between = follow_up_config.days_between_attempts
 
         current_occ = completed_ge.occurrence_number or 1
 
@@ -902,6 +920,7 @@ class RuleEngine:
             occurrence_number=next_occ,
             total_attempts=max_attempts,
             recurrence_interval_days=days_between,
+            chain_id=completed_ge.chain_id or completed_ge.id,
         )
 
     async def _rule_lead_not_interested(
@@ -974,74 +993,33 @@ class RuleEngine:
     async def _rule_recall_completed(
         self, db: AsyncSession, hospital_id: str, payload: dict, settings
     ) -> Optional["Decision"]:
-        """Rule: When a recurring recall is completed, schedule the next one."""
-        from app.crm.services.event_dispatcher import Decision
-        from app.models.generated_enquiry import GeneratedEnquiry
+        """Rule: When a recurring recall is completed, schedule the next one.
 
+        Uses the shared idempotent primitive (recurring_recalls) so this fast-forward
+        path is byte-for-byte identical to the scheduler's auto-advance path.
+        """
         enquiry_id = payload.get("entity_id") or payload.get("enquiry_id")
         if not enquiry_id:
             return None
 
+        from app.models.generated_enquiry import GeneratedEnquiry
         completed_recall = await db.get(GeneratedEnquiry, enquiry_id)
         if not completed_recall or completed_recall.enquiry_type != "RECALL":
             return None
         if not completed_recall.is_recurring:
             return None
-
-        patient_id = completed_recall.patient_id
-
-        # Check: does patient already have a PENDING recall? (exclude the one we just completed)
-        existing = await db.execute(
-            select(GeneratedEnquiry).where(
-                and_(
-                    GeneratedEnquiry.hospital_id == hospital_id,
-                    GeneratedEnquiry.patient_id == patient_id,
-                    GeneratedEnquiry.enquiry_type == "RECALL",
-                    GeneratedEnquiry.status == "PENDING",
-                    GeneratedEnquiry.id != enquiry_id,
-                )
-            ).limit(1)
-        )
-        if existing.scalar_one_or_none():
+        if not completed_recall.patient_id:
             return None
 
-        # Read CURRENT interval from CRM Settings — always fresh from DB, not cached
-        interval_days = 180
-        try:
-            from app.models.crm_follow_up_config import CrmFollowUpConfig
-            result = await db.execute(
-                select(CrmFollowUpConfig.start_delay_days).where(
-                    and_(
-                        CrmFollowUpConfig.hospital_id == hospital_id,
-                        CrmFollowUpConfig.context_type == "CASE_RECALL",
-                    )
-                ).limit(1)
-            )
-            fresh_interval = result.scalar_one_or_none()
-            if fresh_interval:
-                interval_days = fresh_interval
-        except Exception:
-            pass
-
-        completion_date = date.today()
-        new_due = completion_date + timedelta(days=interval_days)
-        new_occurrence = completed_recall.occurrence_number + 1
-
-        return Decision(
-            action="CREATE",
-            enquiry_type="RECALL",
-            due_date=new_due,
-            priority="LOW",
-            patient_id=patient_id,
-            case_id=completed_recall.case_id,
-            doctor_id=completed_recall.doctor_id,
+        from app.crm.services.recurring_recalls import schedule_next_recurring_recall
+        await schedule_next_recurring_recall(
+            db,
+            hospital_id or completed_recall.hospital_id,
+            completed_recall,
             trigger_event="RECALL_COMPLETED",
-            description=f"Recurring recall #{new_occurrence}",
-            is_recurring=True,
-            occurrence_number=new_occurrence,
-            recurrence_interval_days=interval_days,
-            chain_id=completed_recall.chain_id or completed_recall.id,
+            reason="Recurring recall scheduled after completion (event path)",
         )
+        return None
 
     async def _cancel_patient_pending_recalls(
         self, db: AsyncSession, hospital_id: str, patient_id: str,

@@ -19,9 +19,10 @@ from app.core.logging import setup_logging, correlation_id, generate_correlation
 from app.core.middleware import RequestIDMiddleware
 from app.dependencies import verify_hospital_context
 from app.utils.scheduler import check_appointment_reminders, check_same_day_appointments, check_missed_appointments, check_overdue_treatments, check_recurring_recalls
-from app.routers import auth, admin_groups, hospitals, doctors, consultants, patients, cases, consultant_notes, treatment_plans, treatment_sittings, treatment_plan_items, appointments, billings, pre_ops, post_ops, dashboards, whatsapp_messaging, whatsapp_config, notifications, hospital_monthly_expenses, reports, crm, crm_v2, calendar, status_audit, leads, doctor_working_hours, doctor_availability, doctor_leaves, doctor_blocked_slots, consent_forms, enquiries, treatment_follow_ups, recalls, exports, treatment_types, doctor_queue, clinical_progress_notes, master_data, crm_rules, crm_config_settings, crm_feedback, users, tasks
+from app.routers import auth, admin_groups, hospitals, doctors, consultants, patients, cases, consultant_notes, treatment_plans, treatment_sittings, treatment_plan_items, appointments, billings, pre_ops, post_ops, dashboards, whatsapp_messaging, whatsapp_config, notifications, hospital_monthly_expenses, reports, crm, crm_v2, calendar, status_audit, leads, doctor_working_hours, doctor_availability, doctor_leaves, doctor_blocked_slots, consent_forms, enquiries, treatment_follow_ups, recalls, exports, treatment_types, doctor_queue, clinical_progress_notes, master_data, crm_rules, crm_config_settings, crm_feedback, crm_settings, users, tasks
 from app.crm.routers import events as crm_events
 from app.crm.routers import event_test as crm_event_test
+from app.crm.routers import automation as crm_automation
 
 setup_logging(settings.ENVIRONMENT)
 logger = logging.getLogger("app")
@@ -108,6 +109,27 @@ ALTER TABLE leads ADD COLUMN IF NOT EXISTS latest_feedback_date TIMESTAMPTZ;
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS latest_feedback_notes TEXT;
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS latest_call_outcome VARCHAR(30);
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS latest_follow_up_requirement VARCHAR(20);
+
+-- CRM Automation audit trail (idempotent)
+CREATE TABLE IF NOT EXISTS crm_automation_logs (
+    id VARCHAR(36) PRIMARY KEY,
+    hospital_id VARCHAR(36),
+    patient_id VARCHAR(36),
+    case_id VARCHAR(36),
+    event VARCHAR(50),
+    rule VARCHAR(100),
+    enquiry_type VARCHAR(50),
+    decision VARCHAR(20) NOT NULL,
+    reason TEXT,
+    occurrence_number INTEGER,
+    chain_id VARCHAR(36),
+    due_date DATE,
+    config_snapshot TEXT,
+    created_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_crm_automation_logs_hospital ON crm_automation_logs(hospital_id);
+CREATE INDEX IF NOT EXISTS idx_crm_automation_logs_patient ON crm_automation_logs(patient_id);
+CREATE INDEX IF NOT EXISTS idx_crm_automation_logs_created ON crm_automation_logs(created_at);
 """
 
 
@@ -144,8 +166,8 @@ async def lifespan(app: FastAPI):
     # Legacy CRM handler wiring removed — all events route through CentralEventDispatcher
 
     try:
-        from app.utils.case_pdf import _ensure_browser
-        await _ensure_browser()
+        from app.utils.case_pdf import warm_up
+        await warm_up()
         logger.info("Playwright browser ready")
     except Exception as e:
         logger.warning(f"Playwright pre-launch skipped: {e}")
@@ -195,7 +217,10 @@ async def integrity_error_handler(request: Request, exc: IntegrityError):
     if "unique" in msg or "duplicate" in msg:
         detail = "A record with this name already exists. Please use a different name."
     elif "foreign key" in msg or "referenced" in msg:
-        detail = "This record has related data and cannot be deleted. Try deactivating it instead."
+        if request.method in ("POST", "PUT", "PATCH"):
+            detail = "Operation references a record that does not exist or is inactive."
+        else:
+            detail = "This record has related data and cannot be deleted. Try deactivating it instead."
     else:
         detail = "Operation failed due to a data constraint violation."
     return JSONResponse(
@@ -269,7 +294,9 @@ app.include_router(doctor_queue.router, prefix="/api/v1", dependencies=[Depends(
 app.include_router(clinical_progress_notes.router, prefix="/api/v1", dependencies=[Depends(verify_hospital_context)])
 app.include_router(master_data.router, prefix="/api/v1", dependencies=[Depends(verify_hospital_context)])
 app.include_router(crm_rules.router, prefix="/api/v1", dependencies=[Depends(verify_hospital_context)])
+app.include_router(crm_settings.router, prefix="/api/v1", dependencies=[Depends(verify_hospital_context)])
 app.include_router(crm_config_settings.router, prefix="/api/v1", dependencies=[Depends(verify_hospital_context)])
+app.include_router(crm_automation.router, prefix="/api/v1/crm", dependencies=[Depends(verify_hospital_context)])
 app.include_router(crm_feedback.router, prefix="/api/v1", dependencies=[Depends(verify_hospital_context)])
 app.include_router(users.router, prefix="/api/v1", dependencies=[Depends(verify_hospital_context)])
 app.include_router(tasks.router, prefix="/api/v1", dependencies=[Depends(verify_hospital_context)])

@@ -50,6 +50,23 @@ async def _get_case_ids_for_patients(db: AsyncSession, patient_ids: list[str]) -
     return [row[0] for row in r.all()]
 
 
+def _trend_group_expr(column, range_days: int):
+    """Return a group-by expression producing 'YYYY-MM-DD HH24:00' / 'YYYY-MM-DD' / 'YYYY-MM' keys.
+
+    Uses to_char on PostgreSQL and the equivalent strftime on SQLite so tests and
+    the app behave identically regardless of the backing database.
+    """
+    if range_days <= 1:
+        pg_fmt, sq_fmt = 'YYYY-MM-DD HH24:00', '%Y-%m-%d %H:00'
+    elif range_days <= 90:
+        pg_fmt, sq_fmt = 'YYYY-MM-DD', '%Y-%m-%d'
+    else:
+        pg_fmt, sq_fmt = 'YYYY-MM', '%Y-%m'
+    if settings.DB_IS_POSTGRESQL:
+        return func.to_char(column, pg_fmt)
+    return func.strftime(sq_fmt, column)
+
+
 async def _monthly_revenue_trend(db: AsyncSession, case_ids: list[str] | None = None,
                                  date_start: datetime | None = None, date_end: datetime | None = None) -> list:
     if not date_start:
@@ -59,15 +76,9 @@ async def _monthly_revenue_trend(db: AsyncSession, case_ids: list[str] | None = 
         date_end = datetime.now(timezone.utc)
 
     range_days = (date_end - date_start).days
-    if range_days <= 1:
-        fmt = 'YYYY-MM-DD HH24:00'
-    elif range_days <= 90:
-        fmt = 'YYYY-MM-DD'
-    else:
-        fmt = 'YYYY-MM'
 
     query = select(
-        func.to_char(Billing.updated_at, fmt).label('month'),
+        _trend_group_expr(Billing.updated_at, range_days).label('month'),
         func.sum(Billing.paid_amount).label('revenue'),
     ).where(Billing.updated_at >= date_start, Billing.updated_at < date_end)
     if case_ids is not None:
@@ -87,15 +98,9 @@ async def _monthly_patient_trend(db: AsyncSession, hospital_ids: list[str] | Non
         date_end = datetime.now(timezone.utc)
 
     range_days = (date_end - date_start).days
-    if range_days <= 1:
-        fmt = 'YYYY-MM-DD HH24:00'
-    elif range_days <= 90:
-        fmt = 'YYYY-MM-DD'
-    else:
-        fmt = 'YYYY-MM'
 
     query = select(
-        func.to_char(Patient.created_at, fmt).label('month'),
+        _trend_group_expr(Patient.created_at, range_days).label('month'),
         func.count(Patient.id).label('count'),
     ).where(Patient.created_at >= date_start, Patient.created_at < date_end)
     if hospital_ids is not None:
@@ -115,15 +120,9 @@ async def _monthly_case_trend(db: AsyncSession, case_ids: list[str] | None = Non
         date_end = datetime.now(timezone.utc)
 
     range_days = (date_end - date_start).days
-    if range_days <= 1:
-        fmt = 'YYYY-MM-DD HH24:00'
-    elif range_days <= 90:
-        fmt = 'YYYY-MM-DD'
-    else:
-        fmt = 'YYYY-MM'
 
     query = select(
-        func.to_char(Case.created_at, fmt).label('month'),
+        _trend_group_expr(Case.created_at, range_days).label('month'),
         func.count(Case.id).label('count'),
     ).where(Case.created_at >= date_start, Case.created_at < date_end)
     if case_ids is not None:
@@ -144,15 +143,9 @@ async def _monthly_appointment_trend(db: AsyncSession, hospital_ids: list[str] |
         date_end = datetime.now(timezone.utc)
 
     range_days = (date_end - date_start).days
-    if range_days <= 1:
-        fmt = 'YYYY-MM-DD HH24:00'
-    elif range_days <= 90:
-        fmt = 'YYYY-MM-DD'
-    else:
-        fmt = 'YYYY-MM'
 
     query = select(
-        func.to_char(Appointment.created_at, fmt).label('month'),
+        _trend_group_expr(Appointment.created_at, range_days).label('month'),
         func.count(Appointment.id).label('count'),
     ).where(Appointment.created_at >= date_start, Appointment.created_at < date_end)
     if doctor_id:
@@ -549,10 +542,9 @@ async def super_admin_dashboard(
     for row in doctor_rev_r.all():
         did = row[0]
         rev = float(row[1] or 0)
-        if rev > 0:
-            dname_r = await db.execute(select(User.full_name).where(User.id == did))
-            dname = dname_r.scalar() or did
-            doctor_performance.append({"id": did, "name": dname, "value": rev})
+        dname_r = await db.execute(select(User.full_name).where(User.id == did))
+        dname = dname_r.scalar() or did
+        doctor_performance.append({"id": did, "name": dname, "value": rev})
 
     # Monthly growth trend with expenses (respect period)
     combined_trend = await revenue_trend_with_expenses(db, hospital_ids=None, period=period, start_date=start_date, end_date=end_date)
@@ -833,10 +825,9 @@ async def group_admin_dashboard(
         for row in doctor_rev_r.all():
             did = row[0]
             rev = float(row[1] or 0)
-            if rev > 0:
-                dname_r = await db.execute(select(User.full_name).where(User.id == did))
-                dname = dname_r.scalar() or did
-                doctor_performance.append({"id": did, "name": dname, "value": rev})
+            dname_r = await db.execute(select(User.full_name).where(User.id == did))
+            dname = dname_r.scalar() or did
+            doctor_performance.append({"id": did, "name": dname, "value": rev})
 
     # Monthly growth trend with expenses (respect period)
     combined_trend = await revenue_trend_with_expenses(db, case_ids if case_ids else [], hospital_ids, period=period, start_date=start_date, end_date=end_date)
@@ -1123,9 +1114,8 @@ async def hospital_admin_dashboard(
         )
         for row in (await db.execute(dr_q)).all():
             did, rev = row[0], float(row[1] or 0)
-            if rev > 0:
-                dname = (await db.execute(select(User.full_name).where(User.id == did))).scalar() or did
-                doctor_performance.append({"id": did, "name": dname, "value": rev})
+            dname = (await db.execute(select(User.full_name).where(User.id == did))).scalar() or did
+            doctor_performance.append({"id": did, "name": dname, "value": rev})
 
     # --- Treatment performance (PERIOD-FILTERED) ---
     treatment_performance = []
@@ -1479,6 +1469,7 @@ async def doctor_dashboard(
     now = datetime.now(timezone.utc)
     current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     current_year_start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    period_start, period_end = get_date_range(period, start_date, end_date)
 
     my_patients = (await db.execute(
         select(func.count(func.distinct(Patient.id))).where(
@@ -1788,10 +1779,9 @@ async def quick_view_admin_group(
         for row in doctor_rev_r.all():
             did = row[0]
             rev = float(row[1] or 0)
-            if rev > 0:
-                dname_r = await db.execute(select(User.full_name).where(User.id == did))
-                dname = dname_r.scalar() or did
-                top_doctors.append({"id": did, "name": dname, "value": rev})
+            dname_r = await db.execute(select(User.full_name).where(User.id == did))
+            dname = dname_r.scalar() or did
+            top_doctors.append({"id": did, "name": dname, "value": rev})
 
     return {
         "id": group_id,

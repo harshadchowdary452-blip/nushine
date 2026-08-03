@@ -104,9 +104,9 @@ class TreatmentGenerator:
                         db=self.db,
                     )
                 except Exception:
-                    pass
+                    logger.warning("Failed to publish TREATMENT_CREATED event", exc_info=True)
         except Exception:
-            pass
+            logger.warning("Failed to publish treatment creation events", exc_info=True)
 
         logger.info("Generated %d treatments from %d items for case %s", len(generated), len(items), case_id)
         return generated

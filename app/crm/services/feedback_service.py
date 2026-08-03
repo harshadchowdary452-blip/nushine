@@ -56,7 +56,7 @@ class FeedbackService:
             notes=data.get("notes"),
             feedback_by=data.get(
                 "feedback_by",
-                self.current_user.get("id") if self.current_user else None,
+                self.current_user.get("sub") if self.current_user else None,
             ),
         )
         self.db.add(fb)
@@ -116,7 +116,7 @@ class FeedbackService:
             additional_comments=data.get("additional_comments"),
             feedback_by=data.get(
                 "feedback_by",
-                self.current_user.get("id") if self.current_user else None,
+                self.current_user.get("sub") if self.current_user else None,
             ),
         )
         self.db.add(fb)
@@ -162,7 +162,7 @@ class FeedbackService:
             feedback_id=feedback_id,
             feedback_type=feedback_type,
             content=content,
-            created_by=self.current_user.get("id") if self.current_user else None,
+            created_by=self.current_user.get("sub") if self.current_user else None,
         )
         self.db.add(note)
         await self.db.flush()

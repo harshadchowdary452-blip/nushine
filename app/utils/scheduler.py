@@ -29,17 +29,47 @@ async def _reminder_context(db, patient_id, hospital_id=None, doctor_id=None):
 async def check_appointment_reminders():
     while True:
         try:
+            from app.crm.services.crm_settings import get_settings_service
             async with async_session_factory() as db:
-                tomorrow = date.today() + timedelta(days=1)
-                query = select(Appointment).where(Appointment.appointment_date == tomorrow, Appointment.status == AppointmentStatus.SCHEDULED, Appointment.is_active == True)
+                today = date.today()
+                svc = get_settings_service()
+                horizon = today + timedelta(days=30)
+                query = select(Appointment).where(
+                    Appointment.appointment_date >= today,
+                    Appointment.appointment_date <= horizon,
+                    Appointment.status == AppointmentStatus.SCHEDULED,
+                    Appointment.is_active == True,
+                    Appointment.reminded_at.is_(None),
+                )
                 result = await db.execute(query)
                 appointments = result.scalars().all()
+                sent = 0
                 for apt in appointments:
+                    hid = getattr(apt, "hospital_id", None)
+                    offset = 1
+                    if hid:
+                        try:
+                            offset = (await svc.get_settings(db, hid)).default_reminder_offset_days
+                        except Exception:
+                            offset = 1
+                    if offset <= 0:
+                        # Same-day reminders are handled by check_same_day_appointments
+                        continue
+                    target = apt.appointment_date - timedelta(days=offset)
+                    if target != today:
+                        continue
                     patient = await db.get(Patient, apt.patient_id)
                     if patient and patient.phone:
                         hospital_name, doctor_name = await _reminder_context(
-                            db, patient.id, getattr(apt, "hospital_id", None), getattr(apt, "doctor_id", None) or patient.doctor_id)
-                        await send_appointment_reminder(patient.phone, patient.full_name, apt.appointment_date.isoformat(), apt.appointment_time.strftime("%H:%M"), hospital_name, doctor_name)
+                            db, patient.id, hid, getattr(apt, "doctor_id", None) or patient.doctor_id)
+                        sent_ok = await send_appointment_reminder(patient.phone, patient.full_name, apt.appointment_date.isoformat(), apt.appointment_time.strftime("%H:%M"), hospital_name, doctor_name)
+                        if sent_ok:
+                            apt.reminder_sent = True
+                            apt.reminded_at = datetime.now(timezone.utc)
+                            sent += 1
+                            logger.info("APPT_REMINDER_SENT: appointment %s for patient %s", apt.id, apt.patient_id)
+                if sent:
+                    await db.commit()
         except Exception as e:
             logger.exception("check_appointment_reminders failed: %s", e)
         await asyncio.sleep(3600)
@@ -50,7 +80,7 @@ async def check_same_day_appointments():
         try:
             async with async_session_factory() as db:
                 today = date.today()
-                query = select(Appointment).where(Appointment.appointment_date == today, Appointment.status == AppointmentStatus.SCHEDULED, Appointment.is_active == True)
+                query = select(Appointment).where(Appointment.appointment_date == today, Appointment.status == AppointmentStatus.SCHEDULED, Appointment.is_active == True, Appointment.reminded_at.is_(None))
                 result = await db.execute(query)
                 appointments = result.scalars().all()
                 for apt in appointments:
@@ -58,7 +88,12 @@ async def check_same_day_appointments():
                     if patient and patient.phone:
                         hospital_name, doctor_name = await _reminder_context(
                             db, patient.id, getattr(apt, "hospital_id", None), getattr(apt, "doctor_id", None) or patient.doctor_id)
-                        await send_appointment_reminder(patient.phone, patient.full_name, apt.appointment_date.isoformat(), apt.appointment_time.strftime("%H:%M"), hospital_name, doctor_name)
+                        sent = await send_appointment_reminder(patient.phone, patient.full_name, apt.appointment_date.isoformat(), apt.appointment_time.strftime("%H:%M"), hospital_name, doctor_name)
+                        if sent:
+                            apt.reminder_sent = True
+                            apt.reminded_at = datetime.now(timezone.utc)
+                            logger.info("APPT_SAME_DAY_REMINDER_SENT: appointment %s for patient %s", apt.id, apt.patient_id)
+                await db.commit()
         except Exception as e:
             logger.exception("check_same_day_appointments failed: %s", e)
         await asyncio.sleep(1800)
@@ -128,113 +163,128 @@ async def check_missed_appointments():
         await asyncio.sleep(43200)
 
 
-async def check_recurring_recalls():
-    """Auto-advance recurring recall chains.
+async def _run_recurring_recall_pass(factory):
+    """Single deterministic pass over recurring recall chains.
 
-    A recurring recall (e.g. 180-day dental recall) keeps regenerating each cycle
-    until a new case is created for the patient. Once the current occurrence's due
-    date passes, the next occurrence is scheduled using the same chain, and the
-    overdue occurrence is closed so only ONE enquiry stays active per chain.
+    Task A (advance):  an overdue PENDING occurrence is closed and its successor is
+                       scheduled (next due = previous due + current interval).
+    Task B (heal):     a chain whose latest occurrence was completed WITHOUT a
+                       successor (e.g. the completion event path never ran) is
+                       re-scheduled. Both tasks use the same idempotent primitive so
+                       they can never double-create or resurrect an old chain.
+
+    Only ONE enquiry stays active per chain; a new case cancels old chains.
     """
+    from app.models.generated_enquiry import GeneratedEnquiry
+    from app.crm.services.crm_settings import get_settings_service
+    from app.crm.services.recurring_recalls import schedule_next_recurring_recall
+
+    # Automation always reads FRESH settings — never a stale in-process cache
+    get_settings_service().invalidate_cache()
+
+    advanced = 0
+    healed = 0
+
+    async with factory() as db:
+        today = date.today()
+
+        # ── Task A: advance overdue PENDING occurrences ──────────────────────
+        result = await db.execute(
+            select(GeneratedEnquiry).where(
+                and_(
+                    GeneratedEnquiry.enquiry_type == "RECALL",
+                    GeneratedEnquiry.status == "PENDING",
+                    GeneratedEnquiry.is_recurring == True,
+                    GeneratedEnquiry.due_date < today,
+                    GeneratedEnquiry.patient_id.is_not(None),
+                )
+            ).order_by(GeneratedEnquiry.due_date.asc())
+        )
+        overdue_recalls = result.scalars().all()
+        processed_chains = set()
+
+        for recall in overdue_recalls:
+            chain = recall.chain_id or recall.id
+            if chain in processed_chains:
+                continue
+
+            # Skip if this chain already has a newer PENDING occurrence
+            newer = await db.execute(
+                select(GeneratedEnquiry.id).where(
+                    and_(
+                        GeneratedEnquiry.chain_id == chain,
+                        GeneratedEnquiry.enquiry_type == "RECALL",
+                        GeneratedEnquiry.status == "PENDING",
+                        GeneratedEnquiry.due_date > recall.due_date,
+                    )
+                ).limit(1)
+            )
+            if newer.scalar_one_or_none():
+                continue
+
+            processed_chains.add(chain)
+
+            # Close the overdue occurrence so only one stays active
+            now = datetime.now(timezone.utc)
+            recall.status = "COMPLETED"
+            recall.cancelled_by_event = "RECURRING_RECALL_AUTO_ADVANCED"
+            recall.cancelled_at = now
+            await db.flush()
+
+            new_ge = await schedule_next_recurring_recall(
+                db, recall.hospital_id, recall,
+                trigger_event="RECURRING_RECALL_AUTO_ADVANCED",
+                reason="Recurring recall auto-advance (scheduler)",
+            )
+            if new_ge:
+                advanced += 1
+
+        # ── Task B: heal completed chains with no successor ───────────────────
+        chain_ids = (await db.execute(
+            select(GeneratedEnquiry.chain_id).where(
+                and_(
+                    GeneratedEnquiry.enquiry_type == "RECALL",
+                    GeneratedEnquiry.is_recurring == True,
+                    GeneratedEnquiry.chain_id.is_not(None),
+                    GeneratedEnquiry.patient_id.is_not(None),
+                )
+            ).distinct()
+        )).scalars().all()
+
+        for chain in chain_ids:
+            members = (await db.execute(
+                select(GeneratedEnquiry).where(
+                    and_(
+                        GeneratedEnquiry.chain_id == chain,
+                        GeneratedEnquiry.enquiry_type == "RECALL",
+                    )
+                ).order_by(GeneratedEnquiry.occurrence_number.desc())
+            )).scalars().all()
+            if not members:
+                continue
+            latest = members[0]
+            if latest.status != "COMPLETED":
+                continue
+            new_ge = await schedule_next_recurring_recall(
+                db, latest.hospital_id, latest,
+                trigger_event="RECURRING_RECALL_AUTO_ADVANCED",
+                reason="Recovered recurring recall chain (scheduler heal)",
+            )
+            if new_ge:
+                healed += 1
+
+        if advanced or healed:
+            await db.commit()
+            logger.info("RECURRING_RECALLS_ADVANCED: %d advanced, %d healed", advanced, healed)
+
+    return {"advanced": advanced, "healed": healed}
+
+
+async def check_recurring_recalls():
+    """Auto-advance + self-heal recurring recall chains (runs every hour)."""
     while True:
         try:
-            from app.models.generated_enquiry import GeneratedEnquiry
-
-            async with async_session_factory() as db:
-                today = date.today()
-
-                result = await db.execute(
-                    select(GeneratedEnquiry).where(
-                        and_(
-                            GeneratedEnquiry.enquiry_type == "RECALL",
-                            GeneratedEnquiry.status == "PENDING",
-                            GeneratedEnquiry.is_recurring == True,
-                            GeneratedEnquiry.due_date < today,
-                        )
-                    ).order_by(GeneratedEnquiry.due_date.asc())
-                )
-                overdue_recalls = result.scalars().all()
-
-                advanced = 0
-                processed_chains = set()
-
-                for recall in overdue_recalls:
-                    chain = recall.chain_id or recall.id
-                    if chain in processed_chains:
-                        continue
-
-                    # Skip if this chain already has a newer PENDING occurrence
-                    newer = await db.execute(
-                        select(GeneratedEnquiry.id).where(
-                            and_(
-                                GeneratedEnquiry.chain_id == chain,
-                                GeneratedEnquiry.enquiry_type == "RECALL",
-                                GeneratedEnquiry.status == "PENDING",
-                                GeneratedEnquiry.due_date > recall.due_date,
-                            )
-                        ).limit(1)
-                    )
-                    if newer.scalar_one_or_none():
-                        continue
-
-                    processed_chains.add(chain)
-
-                    # Read CURRENT interval from CRM settings (always fresh)
-                    interval_days = recall.recurrence_interval_days or 180
-                    try:
-                        from app.models.crm_follow_up_config import CrmFollowUpConfig
-                        res = await db.execute(
-                            select(CrmFollowUpConfig.start_delay_days).where(
-                                and_(
-                                    CrmFollowUpConfig.hospital_id == recall.hospital_id,
-                                    CrmFollowUpConfig.context_type == "CASE_RECALL",
-                                )
-                            ).limit(1)
-                        )
-                        fresh_interval = res.scalar_one_or_none()
-                        if fresh_interval:
-                            interval_days = fresh_interval
-                    except Exception as e:
-                        logger.warning("check_recurring_recalls interval lookup failed: %s", e)
-
-                    # Anchor next due to the cycle (previous due + interval)
-                    new_due = recall.due_date + timedelta(days=interval_days)
-
-                    # Close the overdue occurrence so only one stays active
-                    now = datetime.now(timezone.utc)
-                    recall.status = "COMPLETED"
-                    recall.cancelled_by_event = "RECURRING_RECALL_AUTO_ADVANCED"
-                    recall.cancelled_at = now
-                    await db.flush()
-
-                    from app.crm.services.enquiry_executor import get_enquiry_executor
-
-                    new_ge = GeneratedEnquiry(
-                        hospital_id=recall.hospital_id,
-                        patient_id=recall.patient_id,
-                        case_id=recall.case_id,
-                        doctor_id=recall.doctor_id,
-                        treatment_type_id=recall.treatment_type_id,
-                        enquiry_type="RECALL",
-                        due_date=new_due,
-                        priority="LOW",
-                        status="PENDING",
-                        notes=f"Recurring recall #{recall.occurrence_number + 1}",
-                        is_recurring=True,
-                        occurrence_number=recall.occurrence_number + 1,
-                        recurrence_interval_days=interval_days,
-                        chain_id=chain,
-                        trigger_event="RECURRING_RECALL_AUTO_ADVANCED",
-                        created_by_event="RECURRING_RECALL_AUTO_ADVANCED",
-                        generation_reason="Recurring recall auto-advance (scheduler)",
-                    )
-                    new_ge.enquiry_number = await get_enquiry_executor()._generate_enquiry_number(db)
-                    db.add(new_ge)
-                    advanced += 1
-
-                if advanced:
-                    await db.commit()
-                    logger.info("RECURRING_RECALLS_ADVANCED: %d chains advanced", advanced)
+            await _run_recurring_recall_pass(async_session_factory)
         except Exception as e:
             logger.exception("check_recurring_recalls failed: %s", e)
         await asyncio.sleep(3600)

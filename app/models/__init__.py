@@ -18,6 +18,7 @@ from app.models.doctor_blocked_slot import DoctorBlockedSlot
 from app.models.pre_op import PreOp
 from app.models.post_op import PostOp
 from app.models.billing import Billing, DiscountType, PaymentStatus
+from app.models.billing_item import BillingItem
 from app.models.refresh_token import RefreshToken
 from app.models.audit_log import AuditLog
 from app.models.payment_transaction import PaymentTransaction
@@ -59,13 +60,14 @@ from app.models.automation_execution_queue import AutomationExecutionQueue
 from app.models.follow_up_template import FollowUpTemplate
 from app.models.generated_enquiry import GeneratedEnquiry
 from app.models.event_log import EventLog
+from app.models.crm_automation_log import CrmAutomationLog
 from app.models.task import Task, TaskStatus, TaskPriority
 
 __all__ = [
     "AdminGroup", "Hospital", "User", "Patient", "Consultant",
     "ConsultantNote", "TreatmentPlan", "TreatmentPlanItem", "TreatmentSitting",
     "ClinicalProgressNote",
-    "Appointment", "PreOp", "PostOp", "Billing", "RefreshToken", "AuditLog", "PaymentTransaction",
+    "Appointment", "PreOp", "PostOp", "Billing", "BillingItem", "RefreshToken", "AuditLog", "PaymentTransaction",
     "HospitalMonthlyExpense",
     "CommunicationLog", "CommunicationChannel", "CommunicationStatus", "MessageType",
     "Notification", "PatientFeedback", "FollowUp", "FollowUpStatus", "FollowUpType",
@@ -98,5 +100,6 @@ __all__ = [
     "FollowUpTemplate",
     "GeneratedEnquiry",
     "EventLog",
+    "CrmAutomationLog",
     "Task", "TaskStatus", "TaskPriority",
 ]

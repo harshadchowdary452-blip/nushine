@@ -292,7 +292,7 @@ async def send_whatsapp(
             db=db,
         )
     except Exception:
-        pass
+        logger.warning("Failed to publish CRM event", exc_info=True)
     await db.commit()
     if not success:
         raise HTTPException(status_code=500, detail="Failed to send WhatsApp message")
@@ -451,7 +451,7 @@ async def send_email(
             db=db,
         )
     except Exception:
-        pass
+        logger.warning("Failed to publish CRM event", exc_info=True)
     await db.commit()
     return {"success": True, "log_id": log.id}
 
@@ -923,7 +923,7 @@ async def mark_follow_up_completed(
     _verify_hospital_access(fu, current_user)
     fu.status = FollowUpStatus.COMPLETED.value
     fu.completed_date = datetime.now(timezone.utc)
-    fu.completed_by = current_user.get("id")
+    fu.completed_by = current_user.get("sub")
     fu.last_contact_date = datetime.now(timezone.utc)
     patient_id = fu.patient_id
     await record_timeline_event(
@@ -945,7 +945,7 @@ async def mark_follow_up_completed(
             db=db,
         )
     except Exception:
-        pass
+        logger.warning("Failed to publish CRM event", exc_info=True)
     await db.commit()
     return {"success": True}
 

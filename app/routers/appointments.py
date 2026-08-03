@@ -178,7 +178,7 @@ async def create_appointment(data: AppointmentCreate, db: AsyncSession = Depends
             db=db,
         )
     except Exception:
-        pass
+        logger.warning("Failed to publish CRM event", exc_info=True)
 
     return appointment
 
@@ -665,7 +665,7 @@ async def cancel_appointment(appointment_id: str, req: CancelRequest, db: AsyncS
             db=db,
         )
     except Exception:
-        pass
+        logger.warning("Failed to publish CRM event", exc_info=True)
     await db.commit()
 
     return MessageResponse(message="Appointment cancelled successfully")
@@ -728,7 +728,7 @@ async def complete_appointment(appointment_id: str, req: CompleteRequest, db: As
             db=db,
         )
     except Exception:
-        pass
+        logger.warning("Failed to publish CRM event", exc_info=True)
     await db.commit()
 
     return appointment
@@ -774,7 +774,7 @@ async def reschedule_appointment(appointment_id: str, req: RescheduleRequest, db
         details=f"Rescheduled from {old_date} {old_time} to {req.appointment_date} {req.appointment_time}. Reason: {req.reason or 'Not specified'}",
     )
     db.add(audit)
-    await db.refresh(appointment)
+    await db.flush()
 
     rescheduled_by_name = await _resolve_user_name(db, current_user.get("sub"))
     await record_timeline_event(
@@ -804,7 +804,7 @@ async def reschedule_appointment(appointment_id: str, req: RescheduleRequest, db
             db=db,
         )
     except Exception:
-        pass
+        logger.warning("Failed to publish CRM event", exc_info=True)
     await db.commit()
 
     return appointment

@@ -22,6 +22,7 @@ from app.core.permissions import verify_permission, Permission
 from app.models.crm_config import CrmConfig
 from app.models.crm_follow_up_config import CrmFollowUpConfig
 from app.models.treatment_type import TreatmentType
+from app.crm.defaults import APPOINTMENT_REMINDER_OFFSET_DAYS
 
 router = APIRouter(prefix="/crm-config", tags=["CRM Config Settings"])
 
@@ -72,6 +73,23 @@ def _follow_up_to_dict(c: CrmFollowUpConfig) -> dict:
         "stop_automation_on": getattr(c, 'stop_automation_on', 'CONVERTED,NOT_INTERESTED,LOST'),
         "created_at": c.created_at.isoformat() if c.created_at else None,
         "updated_at": c.updated_at.isoformat() if c.updated_at else None,
+    }
+
+
+def _defaults_dict(context_type: str) -> dict:
+    """Canonical display defaults for a follow-up context (single source: defaults.py)."""
+    from app.crm.defaults import FOLLOW_UP_DEFAULTS
+    d = FOLLOW_UP_DEFAULTS[context_type]
+    return {
+        "enabled": d.enabled,
+        "start_delay_days": d.start_delay_days,
+        "auto_close_on_completion": d.auto_close_on_completion,
+        "skip_wellness_if_appointment": d.skip_wellness_if_appointment,
+        "max_attempts": d.max_attempts,
+        "days_between_attempts": d.days_between_attempts,
+        "auto_close_after_final": d.auto_close_after_final,
+        "auto_close_action": d.auto_close_action,
+        "stop_automation_on": d.stop_automation_on,
     }
 
 
@@ -154,7 +172,7 @@ async def get_general_settings(
         "crm_business_start": "09:00",
         "crm_business_end": "18:00",
         "crm_timezone": "Asia/Kolkata",
-        "crm_reminder_offset": "1",
+        "crm_reminder_offset": str(APPOINTMENT_REMINDER_OFFSET_DAYS),
         "crm_weekend_policy": "SKIP",
         "crm_holidays": "[]",
     }
@@ -204,8 +222,6 @@ async def get_lead_settings(
 ):
     verify_permission(current_user, Permission.VIEW_LEADS, Permission.MANAGE_LEADS)
     hid = current_user.get("hospital_id")
-    if not hid:
-        return {"config": None}
     q = select(CrmFollowUpConfig).where(
         and_(CrmFollowUpConfig.hospital_id == hid, CrmFollowUpConfig.context_type == "LEAD")
     )
@@ -213,13 +229,7 @@ async def get_lead_settings(
     configs = list(result.scalars().all())
     if configs:
         return {"config": _follow_up_to_dict(configs[0])}
-    return {"config": {
-        "enabled": True, "start_delay_days": 1,
-        "auto_close_on_completion": False, "skip_wellness_if_appointment": False,
-        "max_attempts": 3, "days_between_attempts": 3,
-        "auto_close_after_final": False, "auto_close_action": "KEEP_OPEN",
-        "stop_automation_on": "CONVERTED,NOT_INTERESTED,LOST",
-    }}
+    return {"config": _defaults_dict("LEAD")}
 
 
 @router.put("/lead")
@@ -275,8 +285,6 @@ async def get_opd_settings(
 ):
     verify_permission(current_user, Permission.VIEW_LEADS, Permission.MANAGE_LEADS)
     hid = current_user.get("hospital_id")
-    if not hid:
-        return {"config": None}
     q = select(CrmFollowUpConfig).where(
         and_(CrmFollowUpConfig.hospital_id == hid, CrmFollowUpConfig.context_type == "OPD")
     )
@@ -284,13 +292,7 @@ async def get_opd_settings(
     configs = list(result.scalars().all())
     if configs:
         return {"config": _follow_up_to_dict(configs[0])}
-    return {"config": {
-        "enabled": True, "start_delay_days": 0,
-        "auto_close_on_completion": False, "skip_wellness_if_appointment": False,
-        "max_attempts": 3, "days_between_attempts": 3,
-        "auto_close_after_final": False, "auto_close_action": "KEEP_OPEN",
-        "stop_automation_on": "CONVERTED,NOT_INTERESTED,LOST",
-    }}
+    return {"config": _defaults_dict("OPD")}
 
 
 @router.put("/opd")
@@ -383,10 +385,7 @@ async def get_treatment_settings(
         items.append({
             "treatment_type_id": tt.id,
             "treatment_name": tt.name,
-            "config": _follow_up_to_dict(cfg) if cfg else {
-                "enabled": False, "start_delay_days": 0,
-                "auto_close_on_completion": False, "skip_wellness_if_appointment": False,
-            },
+            "config": _follow_up_to_dict(cfg) if cfg else _defaults_dict("TREATMENT"),
         })
     return {"items": items}
 
@@ -546,8 +545,8 @@ async def get_case_settings(
     verify_permission(current_user, Permission.VIEW_LEADS, Permission.MANAGE_LEADS)
     hid = current_user.get("hospital_id")
     defaults = {
-        "recovery": {"enabled": True, "start_delay_days": 3, "auto_close_on_completion": False, "skip_wellness_if_appointment": False},
-        "recall": {"enabled": True, "start_delay_days": 180, "auto_close_on_completion": False, "skip_wellness_if_appointment": False},
+        "recovery": _defaults_dict("CASE_RECOVERY"),
+        "recall": _defaults_dict("CASE_RECALL"),
     }
     if not hid:
         return defaults

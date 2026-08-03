@@ -14,7 +14,7 @@ from app.services.treatment_notification import (
     notify_treatment_completed, notify_treatment_overdue,
     notify_treatment_assigned, notify_pending_assignment,
 )
-from app.schemas.treatment_plan import TreatmentPlanUpdate, TreatmentPlanResponse
+from app.schemas.treatment_plan import TreatmentPlanCreate, TreatmentPlanUpdate, TreatmentPlanResponse
 from app.schemas.common import MessageResponse
 from app.models.case import Case
 from app.models.patient import Patient
@@ -175,6 +175,13 @@ async def get_treatment_plans(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to load treatment plans")
 
 
+@router.post("/", response_model=TreatmentPlanResponse, status_code=status.HTTP_201_CREATED)
+async def create_treatment_plan(data: TreatmentPlanCreate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.CREATE_TREATMENT_PLAN)
+    service = TreatmentPlanService(db)
+    return await service.create(data.model_dump(), user_id=current_user.get("sub"))
+
+
 @router.get("/by-case/{case_id}", response_model=List[TreatmentPlanResponse])
 async def get_plans_by_case(case_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.CREATE_TREATMENT_PLAN, Permission.MANAGE_CASES)
@@ -295,7 +302,7 @@ async def start_treatment(plan_id: str, db: AsyncSession = Depends(get_db), curr
             db=db,
         )
     except Exception:
-        pass
+        logger.warning("Failed to publish TREATMENT_STARTED event", exc_info=True)
     await db.commit()
     return result
 
@@ -339,7 +346,7 @@ async def complete_treatment(plan_id: str, body: CompleteTreatmentBody = Body(de
             db=db,
         )
     except Exception:
-        pass
+        logger.warning("Failed to publish TREATMENT_COMPLETED event", exc_info=True)
     try:
         svc = StatusAutomationService(db)
         await svc.update_treatment_status(plan_id, TreatmentPlanStatus.COMPLETED)

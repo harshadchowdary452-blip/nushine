@@ -330,7 +330,7 @@ async def send_whatsapp(
     log = CommunicationLog(
         patient_id=patient.id,
         hospital_id=hospital_id,
-        doctor_id=current_user.get("id") or patient.doctor_id,
+        doctor_id=current_user.get("sub") or patient.doctor_id,
         channel="WHATSAPP",
         message_type=request.message_type,
         message=rendered,
@@ -340,7 +340,7 @@ async def send_whatsapp(
         template_name=request.template_name,
         rendered_variables=json.dumps(request.rendered_variables) if request.rendered_variables else json.dumps(ctx["resolved"]),
         sent_via=request.send_mode,
-        approved_by=current_user.get("id"),
+        approved_by=current_user.get("sub"),
         approved_at=datetime.now(timezone.utc),
         follow_up_id=request.follow_up_id,
     )
@@ -353,7 +353,7 @@ async def send_whatsapp(
         hospital_id=hospital_id,
         action="preview_generated" if request.send_mode == "redirect" else "message_sent",
         details=json.dumps({"send_mode": request.send_mode, "resolved_vars": ctx["resolved"]}),
-        created_by=current_user.get("id"),
+        created_by=current_user.get("sub"),
     )
     db.add(audit_entry)
 
@@ -373,7 +373,7 @@ async def send_whatsapp(
             hospital_id=hospital_id,
             action="wa_link_generated",
             details=json.dumps(links),
-            created_by=current_user.get("id"),
+            created_by=current_user.get("sub"),
         )
         db.add(audit_entry2)
 
@@ -469,13 +469,13 @@ async def bulk_send(
         log = CommunicationLog(
             patient_id=pid,
             hospital_id=hospital_id or patient.hospital_id,
-            doctor_id=current_user.get("id") or patient.doctor_id,
+            doctor_id=current_user.get("sub") or patient.doctor_id,
             channel="WHATSAPP",
             message_type=msg_type,
             message=message,
             status=CommunicationStatus.PENDING.value,
             sent_via=send_mode,
-            approved_by=current_user.get("id"),
+            approved_by=current_user.get("sub"),
             approved_at=datetime.now(timezone.utc),
             follow_up_id=follow_up_id,
         )
@@ -687,7 +687,7 @@ async def confirm_delivery(
         patient_id=log.patient_id,
         hospital_id=log.hospital_id,
         action="delivered",
-        created_by=current_user.get("id"),
+        created_by=current_user.get("sub"),
     )
     db.add(audit_entry)
     await db.commit()

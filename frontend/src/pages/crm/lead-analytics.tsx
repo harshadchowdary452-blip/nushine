@@ -35,7 +35,7 @@ export default function LeadAnalytics() {
   })
 
   const analytics = useMemo(() => {
-    const items: Lead[] = Array.isArray(leads) ? leads : []
+    const items: Lead[] = Array.isArray(leads) ? leads : (leads as { items?: Lead[] } | undefined)?.items || []
     const total = items.length
     const statusBreakdown: Record<string, number> = {}
     const sourceBreakdown: Record<string, number> = {}

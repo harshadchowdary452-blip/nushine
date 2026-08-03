@@ -170,6 +170,13 @@ class TreatmentSittingService:
                         db=self.db,
                     )
             logger.info("CREATE_TREATMENT_SITTING - Success: %s", sitting.id)
+            if sitting.status == TreatmentSittingStatus.COMPLETED.value:
+                try:
+                    from app.services.treatment_enquiry_service import TreatmentEnquiryService
+                    service = TreatmentEnquiryService(self.db)
+                    await service.on_sitting_completed(treatment_plan_id, sitting.sitting_number)
+                except Exception as e:
+                    logger.warning("Failed to record sitting completion timeline: %s", e)
             await self.audit_log_repo.create(user_id=user_id, action="CREATE_TREATMENT_SITTING", entity_type="TREATMENT_SITTING", entity_id=str(sitting.id), details=f"Sitting #{sitting.sitting_number} created")
             return sitting
         except HTTPException:
@@ -218,6 +225,12 @@ class TreatmentSittingService:
                 await automation._check_case_completion(plan.case_id)
             except Exception as e:
                 logger.warning("Failed to auto-update case status after treatment completion: %s", e)
+            try:
+                from app.services.treatment_enquiry_service import TreatmentEnquiryService
+                service = TreatmentEnquiryService(self.db)
+                await service.on_treatment_plan_completed(plan.id)
+            except Exception as e:
+                logger.warning("Failed to create CRM recalls after treatment completion: %s", e)
         return auto_completed
 
     async def get(self, sitting_id: str) -> Optional[TreatmentSitting]:

@@ -163,6 +163,12 @@ class CaseResponse(BaseModel):
     status: str
     notes: Optional[str]
     is_active: bool
+    # Financial summary (synced from billing)
+    estimated_cost: Optional[float] = None
+    total_billed: Optional[float] = None
+    total_paid: Optional[float] = None
+    outstanding_balance: Optional[float] = None
+    payment_status: Optional[str] = None
     treatment_plan_status: Optional[str] = None
     treatment_plan_version: Optional[int] = None
     treatment_plan_approved: Optional[bool] = None

@@ -92,6 +92,9 @@ class TreatmentSittingResponse(BaseModel):
     completed_at: Optional[datetime] = None
     doctor_name: Optional[str] = None
     completed_by_name: Optional[str] = None
+    charge: Optional[float] = None
+    paid_amount: float = 0.0
+    invoice_status: str = "NOT_INVOICED"
     created_at: datetime
     updated_at: datetime
 

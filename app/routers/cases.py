@@ -86,7 +86,7 @@ async def create_case(data: CaseCreate, db: AsyncSession = Depends(get_db), curr
             db=db,
         )
     except Exception:
-        pass
+        logger.warning("Failed to publish CRM event", exc_info=True)
     await db.commit()
     case = await _load_case_with_findings(db, case.id)
     return case
@@ -151,7 +151,8 @@ async def get_cases(
             if uid:
                 q = q.where(Case.doctor_id == uid)
         elif role == Role.HOSPITAL_ADMIN.value:
-            hid = hospital_id or current_user.get("hospital_id")
+            # Never honor a client-supplied hospital_id: force the caller's own hospital.
+            hid = current_user.get("hospital_id")
             if hid:
                 q = q.join(Patient, Case.patient_id == Patient.id).where(Patient.hospital_id == hid)
         elif role == Role.GROUP_ADMIN.value:
@@ -264,7 +265,7 @@ async def update_case(case_id: str, data: CaseUpdate, db: AsyncSession = Depends
             db=db,
         )
     except Exception:
-        pass
+        logger.warning("Failed to publish CRM event", exc_info=True)
     updated = await _load_case_with_findings(db, case_id)
     return updated
 
@@ -327,7 +328,7 @@ async def complete_case(case_id: str, db: AsyncSession = Depends(get_db), curren
             db=db,
         )
     except Exception:
-        pass
+        logger.warning("Failed to publish CRM event", exc_info=True)
     await db.commit()
     updated = await _load_case_with_findings(db, case.id)
     return updated
@@ -493,7 +494,7 @@ async def approve_treatment_plan(case_id: str, db: AsyncSession = Depends(get_db
             db=db,
         )
     except Exception:
-        pass
+        logger.warning("Failed to publish CRM event", exc_info=True)
     await db.commit()
     case = await _load_case_with_findings(db, case_id)
     return case

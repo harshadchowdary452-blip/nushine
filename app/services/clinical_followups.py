@@ -279,6 +279,17 @@ async def create_overdue_followup(db: AsyncSession, plan_id: str, reason: str = 
     patient = await db.get(Patient, case.patient_id)
     if not patient:
         return
+    # Dedup: never stack a second pending URGENT overdue follow-up on the same plan.
+    existing = await db.execute(
+        select(FollowUp).where(
+            FollowUp.treatment_id == plan_id,
+            FollowUp.follow_up_type == FollowUpType.ONE_DAY_FOLLOW_UP.value,
+            FollowUp.status == FollowUpStatus.PENDING.value,
+            FollowUp.notes.ilike("URGENT:%"),
+        ).limit(1)
+    )
+    if existing.scalar_one_or_none():
+        return
     reminder_time = await _get_default_followup_time(db, patient.hospital_id)
     fu = FollowUp(
         patient_id=patient.id, hospital_id=patient.hospital_id,
