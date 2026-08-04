@@ -1,30 +1,38 @@
 import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
-import type { ColumnDef } from "@tanstack/react-table"
-import {
-  Activity, BarChart3, CalendarCheck2, ClipboardCheck, IndianRupee, Star,
-  TrendingUp, UserCheck, UserPlus, Users,
-} from "lucide-react"
+import type { ColumnDef, SortingState } from "@tanstack/react-table"
+import { Activity, CalendarCheck2, Sparkles, Stethoscope, UserCog } from "lucide-react"
 import { useAuthStore } from "@/store/authStore"
 import { doctorPerformanceApi, groupsApi } from "@/services/endpoints"
 import type { DoctorPerformanceOverview, DoctorPerformanceRow } from "@/services/endpoints"
 import { formatIndianNumber, formatIndianRupees } from "@/lib/currency"
-import { DataTable, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, WidgetCard } from "@/design-system"
-import {
-  CommandCenter, DashboardHeader, DashboardShell, DepartmentPerformance, KpiGrid,
-  downloadCSV, useDashboardFilter,
-} from "@/design-system/dashboard"
-import type { KpiDatum, PerformerDatum } from "@/design-system/dashboard"
+import { useServerFilters } from "@/hooks/useServerFilters"
+import { Button, DataTable, EnterpriseWorkspace, QuickExport } from "@/design-system"
+import type { DetailDrawerTab } from "@/design-system"
+import PerformanceFilterBar from "./filter-bar"
+import DoctorDetailPanel from "./doctor-drawer"
+
+const PAGE_SIZE = 25
+
+const DOCTOR_DRAWER_TABS: DetailDrawerTab[] = [
+  { key: "overview", label: "Overview", icon: Activity },
+  { key: "treatments", label: "Treatments", icon: Stethoscope },
+  { key: "insights", label: "Insights", icon: Sparkles },
+  { key: "appointments", label: "Appointments", icon: CalendarCheck2 },
+]
 
 export default function DoctorPerformanceOverview() {
   const { user } = useAuthStore()
   const navigate = useNavigate()
-  const filter = useDashboardFilter("this_month")
-  const [groupId, setGroupId] = useState("")
 
   const isSuperAdmin = user?.role === "SUPER_ADMIN"
   const isDoctor = user?.role === "DOCTOR"
+
+  const {
+    filters, setFilter, resetFilters, queryKey, activeChips, activeFilters,
+    page, setPage, sortField, sortDir, setSort,
+  } = useServerFilters({ defaultSort: "revenue", defaultSortDir: "desc" })
 
   const { data: adminGroups } = useQuery({
     queryKey: ["admin-groups", "list"],
@@ -33,21 +41,29 @@ export default function DoctorPerformanceOverview() {
     staleTime: 120000,
   })
 
-  const apiParams = useMemo(
-    () => ({
-      ...filter.apiParams,
-      ...(isSuperAdmin && groupId ? { group_id: groupId } : {}),
-    }),
-    [filter.apiParams, isSuperAdmin, groupId],
+  const period = filters.period || "this_month"
+
+  const apiParams = useMemo<Record<string, string | number | undefined>>(
+    () => {
+      const params: Record<string, string | number | undefined> = {
+        period,
+        sort_by: sortField || "revenue",
+        sort_order: sortDir,
+        page,
+        page_size: PAGE_SIZE,
+      }
+      if (period === "custom" && filters.start_date) params.start_date = filters.start_date
+      if (period === "custom" && filters.end_date) params.end_date = filters.end_date
+      if (filters.department) params.department = filters.department
+      if (filters.group_id) params.group_id = filters.group_id
+      if (filters.search) params.search = filters.search
+      return params
+    },
+    [period, filters, sortField, sortDir, page],
   )
 
-  const {
-    data,
-    isLoading,
-    isFetching,
-    refetch,
-  } = useQuery<DoctorPerformanceOverview>({
-    queryKey: ["doctor-performance", "overview", user?.id, apiParams],
+  const { data, isLoading } = useQuery<DoctorPerformanceOverview>({
+    queryKey: ["doctor-performance", "overview", user?.id, queryKey, page, sortField, sortDir],
     queryFn: () => doctorPerformanceApi.overview(apiParams),
     staleTime: 15000,
     gcTime: 60000,
@@ -55,120 +71,18 @@ export default function DoctorPerformanceOverview() {
     refetchIntervalInBackground: false,
   })
 
-  const s = data?.summary
-  const deltas = data?.deltas
   const doctors: DoctorPerformanceRow[] = data?.doctors ?? []
 
-  const openProfile = (doctorId: string) => navigate(`/performance/${doctorId}`)
-
-  const kpiRows: KpiDatum[][] = [
-    [
-      {
-        id: "revenue",
-        title: "Revenue",
-        value: formatIndianRupees(s?.revenue ?? 0),
-        rawValue: s?.revenue ?? 0,
-        change: deltas?.revenue_pct ?? null,
-        previousLabel: filter.previousLabel,
-        icon: IndianRupee,
-        tone: "success",
-        loading: isLoading,
-      },
-      {
-        id: "patients-seen",
-        title: "Patients Seen",
-        value: formatIndianNumber(s?.patients_seen ?? 0),
-        rawValue: s?.patients_seen ?? 0,
-        change: deltas?.patients_pct ?? null,
-        previousLabel: filter.previousLabel,
-        icon: Users,
-        tone: "accent",
-        loading: isLoading,
-      },
-      {
-        id: "appointments-completed",
-        title: "Appointments Completed",
-        value: formatIndianNumber(s?.appointments_completed ?? 0),
-        rawValue: s?.appointments_completed ?? 0,
-        change: deltas?.appointments_pct ?? null,
-        previousLabel: filter.previousLabel,
-        icon: CalendarCheck2,
-        tone: "info",
-        loading: isLoading,
-      },
-      {
-        id: "avg-rating",
-        title: "Average Rating",
-        value: s?.avg_rating != null ? `${s.avg_rating.toFixed(1)} / 5` : "—",
-        rawValue: s?.avg_rating ?? undefined,
-        change: null,
-        previousLabel: "Patient feedback",
-        icon: Star,
-        tone: "warning",
-        loading: isLoading,
-      },
-    ],
-    [
-      {
-        id: "attendance-rate",
-        title: "Attendance Rate",
-        value: `${s?.attendance_rate ?? 0}%`,
-        rawValue: s?.attendance_rate ?? 0,
-        change: null,
-        previousLabel: "Completed vs booked",
-        icon: UserCheck,
-        tone: "primary",
-        loading: isLoading,
-      },
-      {
-        id: "retention-rate",
-        title: "Retention Rate",
-        value: `${s?.retention_rate ?? 0}%`,
-        rawValue: s?.retention_rate ?? 0,
-        change: null,
-        previousLabel: "Returning patients",
-        icon: UserPlus,
-        tone: "accent",
-        loading: isLoading,
-      },
-      {
-        id: "case-completion",
-        title: "Case Completion",
-        value: `${s?.case_completion_rate ?? 0}%`,
-        rawValue: s?.case_completion_rate ?? 0,
-        change: null,
-        previousLabel: "Completed vs created",
-        icon: ClipboardCheck,
-        tone: "success",
-        loading: isLoading,
-      },
-      {
-        id: "treatment-completion",
-        title: "Treatment Completion",
-        value: `${s?.treatment_completion_rate ?? 0}%`,
-        rawValue: s?.treatment_completion_rate ?? 0,
-        change: null,
-        previousLabel: "Completed vs planned",
-        icon: Activity,
-        tone: "info",
-        loading: isLoading,
-      },
-    ],
-  ]
-
-  const leaderboard: PerformerDatum[] = doctors.slice(0, 6).map((d) => ({
-    id: d.id,
-    name: d.name,
-    value: formatIndianRupees(d.revenue),
-    subtitle: `${formatIndianNumber(d.treatments_completed)} treatments · ${formatIndianNumber(d.cases_created)} cases written`,
-    onClick: () => openProfile(d.id),
-  }))
+  const [quickViewId, setQuickViewId] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState("overview")
+  const quickViewDoctor = doctors.find((d) => d.id === quickViewId) ?? null
 
   const columns = useMemo<ColumnDef<DoctorPerformanceRow>[]>(
     () => [
       {
         accessorKey: "name",
         header: "Doctor",
+        enableSorting: true,
         cell: ({ row }) => (
           <div className="ds-min-w-0">
             <p className="ds-body font-medium text-[var(--ds-text)]">{row.original.name}</p>
@@ -181,11 +95,13 @@ export default function DoctorPerformanceOverview() {
       {
         accessorKey: "hospital_name",
         header: "Hospital",
+        enableSorting: false,
         cell: ({ row }) => row.original.hospital_name || "—",
       },
       {
         accessorKey: "revenue",
         header: "Revenue",
+        enableSorting: true,
         cell: ({ row }) => (
           <span className="ds-numeric font-medium text-[var(--ds-text)]">
             {formatIndianRupees(row.original.revenue)}
@@ -195,6 +111,7 @@ export default function DoctorPerformanceOverview() {
       {
         accessorKey: "patients_seen",
         header: "Patients",
+        enableSorting: true,
         cell: ({ row }) => (
           <span className="ds-numeric">{formatIndianNumber(row.original.patients_seen)}</span>
         ),
@@ -202,44 +119,53 @@ export default function DoctorPerformanceOverview() {
       {
         accessorKey: "appointments_completed",
         header: "Appts",
+        enableSorting: true,
         cell: ({ row }) => (
           <span className="ds-numeric">{formatIndianNumber(row.original.appointments_completed)}</span>
         ),
       },
       {
         accessorKey: "cases_created",
-        header: "Cases Written",
+        header: "Cases",
+        enableSorting: true,
         cell: ({ row }) => (
           <span className="ds-numeric">{formatIndianNumber(row.original.cases_created)}</span>
         ),
       },
       {
         accessorKey: "treatments_completed",
-        header: "Treatments Done",
+        header: "Treatments",
+        enableSorting: true,
         cell: ({ row }) => (
           <span className="ds-numeric">{formatIndianNumber(row.original.treatments_completed)}</span>
         ),
       },
       {
-        accessorKey: "sittings_completed",
-        header: "Sittings",
-        cell: ({ row }) => (
-          <span className="ds-numeric">{formatIndianNumber(row.original.sittings_completed)}</span>
-        ),
-      },
-      {
         accessorKey: "attendance_rate",
         header: "Attendance",
+        enableSorting: true,
         cell: ({ row }) => `${row.original.attendance_rate}%`,
       },
       {
-        accessorKey: "retention_rate",
-        header: "Retention",
-        cell: ({ row }) => `${row.original.retention_rate}%`,
+        accessorKey: "no_shows",
+        header: "No Shows",
+        enableSorting: true,
+        cell: ({ row }) => (
+          <span className="ds-numeric">{formatIndianNumber(row.original.no_shows)}</span>
+        ),
+      },
+      {
+        accessorKey: "outstanding_amount",
+        header: "Outstanding",
+        enableSorting: true,
+        cell: ({ row }) => (
+          <span className="ds-numeric">{formatIndianRupees(row.original.outstanding_amount)}</span>
+        ),
       },
       {
         accessorKey: "avg_rating",
         header: "Rating",
+        enableSorting: true,
         cell: ({ row }) =>
           row.original.avg_rating != null ? `${row.original.avg_rating.toFixed(1)}★` : "—",
       },
@@ -247,139 +173,125 @@ export default function DoctorPerformanceOverview() {
     [],
   )
 
-  const handleExport = () => {
-    const rows = doctors.map((d) => ({
-      Doctor: d.name,
-      Designation: d.designation,
-      Department: d.department,
-      Hospital: d.hospital_name || "",
-      Revenue: d.revenue,
-      PatientsSeen: d.patients_seen,
-      CasesWritten: d.cases_created,
-      TreatmentsDone: d.treatments_completed,
-      SittingsCompleted: d.sittings_completed,
-      AppointmentsCompleted: d.appointments_completed,
-      AttendanceRate: d.attendance_rate,
-      RetentionRate: d.retention_rate,
-      AvgRating: d.avg_rating ?? "",
-    }))
-    downloadCSV(`doctor-performance-${filter.period}`, rows, Object.keys(rows[0] ?? {}))
+  function handleSortingChange(sorting: SortingState) {
+    const f = sorting[0]
+    setSort(f?.id ?? "", f?.desc ? "desc" : "asc")
   }
 
-  const groupFilter = isSuperAdmin ? (
-    <div className="space-y-1">
-      <Label htmlFor="perf-group" className="ds-form-label text-[var(--ds-text-tertiary)]">
-        Group
-      </Label>
-      <Select value={groupId || "all"} onValueChange={(v) => setGroupId(v === "all" ? "" : v)}>
-        <SelectTrigger id="perf-group" aria-label="Group filter" className="h-9 w-[180px] text-sm">
-          <SelectValue placeholder="All Groups" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Groups</SelectItem>
-          {(Array.isArray(adminGroups) ? adminGroups : []).map((g: { id: string; name: string }) => (
-            <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  ) : undefined
+  function applySavedFilters(saved: Record<string, string>) {
+    resetFilters()
+    for (const [k, v] of Object.entries(saved)) setFilter(k, v)
+  }
+
+  const quickView = quickViewDoctor
+    ? {
+        open: true,
+        onClose: () => setQuickViewId(null),
+        title: quickViewDoctor.name,
+        subtitle: `${quickViewDoctor.designation} · ${quickViewDoctor.department}`,
+        eyebrow: quickViewDoctor.hospital_name || "Doctor",
+        tabs: DOCTOR_DRAWER_TABS,
+        activeTab,
+        onTabChange: setActiveTab,
+        openLabel: "Open full profile",
+        onOpenFull: () => {
+          navigate(`/performance/${quickViewDoctor.id}`)
+          setQuickViewId(null)
+        },
+        children: (
+          <DoctorDetailPanel
+            doctor={quickViewDoctor}
+            activeTab={activeTab}
+            apiParams={apiParams}
+          />
+        ),
+      }
+    : undefined
 
   return (
-    <DashboardShell>
-      <DashboardHeader
-        eyebrow="Enterprise Analytics"
-        title={isDoctor ? "My Performance" : "Doctor Performance & Clinical Productivity"}
-        subtitle={
-          isDoctor
-            ? "Your clinical productivity, revenue and patient outcomes"
-            : `${filter.rangeSummary} · ${formatIndianNumber(s?.doctors ?? 0)} doctor(s) in scope`
+    <EnterpriseWorkspace
+      title={isDoctor ? "My Performance" : "Doctor Performance & Clinical Productivity"}
+      description={`${period} · ${formatIndianNumber(data?.total_doctors ?? 0)} doctor(s) in scope`}
+      eyebrow="Enterprise Analytics"
+      search={{
+        value: filters.search || "",
+        onChange: (v) => setFilter("search", v),
+        placeholder: "Search doctors…",
+        ariaLabel: "Search doctors",
+      }}
+      filters={{
+        fields: (
+          <PerformanceFilterBar
+            filters={filters}
+            setFilter={setFilter}
+            resetFilters={resetFilters}
+            activeCount={activeFilters}
+            departments={data?.departments ?? []}
+            adminGroups={Array.isArray(adminGroups) ? (adminGroups as { id: string; name: string }[]) : []}
+          />
+        ),
+        chips: activeChips,
+        activeCount: activeFilters,
+        onRemoveChip: (k) => setFilter(k, ""),
+        onClearAll: resetFilters,
+        savedStorageKey: "doctor-performance-list",
+        savedCurrent: filters,
+        onApplySaved: applySavedFilters,
+      }}
+      toolbarActions={
+        <QuickExport
+          module="doctor-performance"
+          label="doctor-performance"
+          period={period}
+          startDate={filters.start_date}
+          endDate={filters.end_date}
+        />
+      }
+      totalCount={data?.total_doctors}
+      totalLabel="doctor(s)"
+      quickView={quickView}
+    >
+      <DataTable
+        key={queryKey}
+        columns={columns}
+        data={doctors}
+        loading={isLoading}
+        manualSorting
+        initialSorting={sortField ? [{ id: sortField, desc: sortDir === "desc" }] : []}
+        onSortingChange={handleSortingChange}
+        manualPagination
+        pagination
+        pageSize={PAGE_SIZE}
+        pageCount={data ? Math.max(1, Math.ceil((data.total_doctors ?? 0) / PAGE_SIZE)) : 1}
+        onPageChange={(pageIndex) => setPage(pageIndex + 1)}
+        onRowClick={(row) => {
+          setActiveTab("overview")
+          setQuickViewId(row.id)
+        }}
+        emptyIcon={isDoctor ? Activity : UserCog}
+        emptyTitle={activeFilters > 0 ? "No doctors match your filters" : "No performance data yet"}
+        emptyDescription={
+          activeFilters > 0
+            ? "Try adjusting or clearing the active filters."
+            : "Performance metrics appear once appointments and cases are recorded."
         }
-        stats={[
-          { label: "Revenue", value: formatIndianRupees(s?.revenue ?? 0) },
-          { label: "Patients", value: formatIndianNumber(s?.patients_seen ?? 0) },
-          { label: "Avg Rating", value: s?.avg_rating != null ? `${s.avg_rating.toFixed(1)} / 5` : "—" },
-        ]}
-      />
-
-      <CommandCenter
-        period={filter.period}
-        onPeriodChange={filter.setPeriod}
-        startDate={filter.startDate}
-        endDate={filter.endDate}
-        onStartDateChange={filter.setStartDate}
-        onEndDateChange={filter.setEndDate}
-        rangeSummary={filter.rangeSummary}
-        extraFilters={groupFilter}
-        onRefresh={() => void refetch()}
-        refreshing={isFetching}
-        onExport={handleExport}
-      />
-
-      <KpiGrid items={kpiRows[0]} cols={4} />
-      <KpiGrid items={kpiRows[1]} cols={4} />
-
-      <div className="grid gap-3 lg:grid-cols-3">
-        <DepartmentPerformance
-          title={isDoctor ? "My Ranking" : "Top Doctors"}
-          description="Ranked by revenue for this period"
-          items={leaderboard}
-          loading={isLoading}
-          className="lg:col-span-1"
-        />
-        <WidgetCard
-          title="Scope Snapshot"
-          description={`Aggregated across ${formatIndianNumber(s?.doctors ?? 0)} doctor(s)`}
-          icon={BarChart3}
-          className="lg:col-span-2"
-        >
-          {isLoading ? (
-            <div className="flex flex-col gap-3">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-10 animate-pulse rounded-[var(--ds-radius-lg)] bg-[var(--ds-surface-secondary)]" />
-              ))}
+        emptyAction={
+          activeFilters > 0 ? (
+            <Button variant="outline" onClick={resetFilters}>Clear Filters</Button>
+          ) : undefined
+        }
+        mobileCard={(row) => (
+          <div className="flex w-full items-center justify-between gap-3">
+            <div className="ds-min-w-0">
+              <p className="ds-body font-medium text-[var(--ds-text)]">{row.name}</p>
+              <p className="ds-caption text-[var(--ds-text-tertiary)]">
+                {formatIndianRupees(row.revenue)} · {formatIndianNumber(row.treatments_completed)} treatments
+              </p>
             </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {[
-                { label: "Cases created", value: formatIndianNumber(s?.cases_created ?? 0) },
-                { label: "Cases completed", value: formatIndianNumber(s?.cases_completed ?? 0) },
-                { label: "Active cases", value: formatIndianNumber(s?.active_cases ?? 0) },
-                { label: "Treatments planned", value: formatIndianNumber(s?.treatment_plans_created ?? 0) },
-                { label: "Treatments completed", value: formatIndianNumber(s?.treatments_completed ?? 0) },
-                { label: "Sittings completed", value: formatIndianNumber(s?.sittings_completed ?? 0) },
-                { label: "New patients", value: formatIndianNumber(s?.new_patients ?? 0) },
-                { label: "Returning patients", value: formatIndianNumber(s?.returning_patients ?? 0) },
-                { label: "Avg revenue / patient", value: formatIndianRupees(s?.avg_revenue_per_patient ?? 0) },
-                { label: "Recall success", value: `${s?.recall_success_rate ?? 0}%` },
-                { label: "Acceptance rate", value: `${s?.treatment_acceptance_rate ?? 0}%` },
-                { label: "Avg revenue / appt", value: formatIndianRupees(s?.avg_revenue_per_appointment ?? 0) },
-              ].map((m) => (
-                <div key={m.label} className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-border)] bg-[var(--ds-surface-secondary)] px-3 py-3">
-                  <p className="ds-caption text-[var(--ds-text-tertiary)]">{m.label}</p>
-                  <p className="ds-body mt-0.5 font-semibold text-[var(--ds-text)]">{m.value}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </WidgetCard>
-      </div>
-
-      <WidgetCard
-        title="Doctor Leaderboard"
-        description={`${formatIndianNumber(doctors.length)} doctor(s) · click a row to open the profile`}
-        icon={TrendingUp}
-        flush
-      >
-        <DataTable
-          columns={columns}
-          data={doctors}
-          loading={isLoading}
-          emptyTitle="No performance data yet"
-          emptyDescription="Performance metrics appear once appointments and cases are recorded."
-          onRowClick={(row) => openProfile(row.id)}
-        />
-      </WidgetCard>
-    </DashboardShell>
+            <Stethoscope className="h-4 w-4 shrink-0 text-[var(--ds-text-tertiary)]" aria-hidden="true" />
+          </div>
+        )}
+      />
+    </EnterpriseWorkspace>
   )
 }

@@ -409,6 +409,12 @@ export interface DoctorPerformanceParams {
   start_date?: string
   end_date?: string
   group_id?: string
+  search?: string
+  department?: string
+  sort_by?: string
+  sort_order?: "asc" | "desc"
+  page?: number
+  page_size?: number
 }
 
 export interface DoctorPerformanceSummary {
@@ -437,6 +443,18 @@ export interface DoctorPerformanceSummary {
   retention_rate: number
   recall_success_rate: number
   avg_rating: number | null
+  no_shows: number
+  outstanding_amount: number
+  cases_with_reports: number
+}
+
+export interface DoctorPerformanceTreatmentAnalytics {
+  name: string
+  count: number
+  total_cost: number
+  total_paid: number
+  completed: number
+  completion_rate: number
 }
 
 export interface DoctorPerformanceRow {
@@ -475,6 +493,12 @@ export interface DoctorPerformanceRow {
   retention_rate: number
   recall_success_rate: number
   avg_rating: number | null
+  treatment_breakdown: { name: string; value: number }[]
+  no_shows: number
+  outstanding_amount: number
+  cases_with_reports: number
+  individual_treatments: number
+  treatment_analytics: DoctorPerformanceTreatmentAnalytics[]
 }
 
 export interface DoctorPerformanceOverview {
@@ -497,6 +521,23 @@ export interface DoctorPerformanceOverview {
     appointments_pct: number
   }
   doctors: DoctorPerformanceRow[]
+  total_doctors: number
+  page: number
+  page_size: number
+  departments: string[]
+  treatment_breakdown: { name: string; value: number }[]
+  treatment_analytics: DoctorPerformanceTreatmentAnalytics[]
+}
+
+export interface DoctorPerformanceInsight {
+  type: "positive" | "warning" | "info" | "neutral"
+  text: string
+}
+
+export interface DoctorPerformanceInsightsResponse {
+  doctor_id: string
+  period: string
+  insights: DoctorPerformanceInsight[]
 }
 
 export interface DoctorPerformanceDetail extends DoctorPerformanceRow {
@@ -525,6 +566,10 @@ export const doctorPerformanceApi = {
   detail: (doctorId: string, params?: DoctorPerformanceParams) =>
     api
       .get<DoctorPerformanceDetail>(`/doctor-performance/${doctorId}`, { params })
+      .then((r) => r.data),
+  insights: (doctorId: string, params?: DoctorPerformanceParams) =>
+    api
+      .get<DoctorPerformanceInsightsResponse>(`/doctor-performance/${doctorId}/insights`, { params })
       .then((r) => r.data),
 }
 

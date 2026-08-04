@@ -375,6 +375,68 @@ async def _csv_doctors(db, hospital_ids, date_start, date_end):
     return data, headers, len(rows)
 
 
+async def _csv_doctor_performance(db, current_user, date_start, date_end):
+    """Performance & clinical productivity summary for the caller's scope."""
+    from app.routers.doctor_performance import _collect, _doctors_in_scope, _hospital_scope_for_user
+
+    doctors = await _doctors_in_scope(db, current_user, None, None)
+    dids = [d.id for d in doctors]
+    hospital_scope = _hospital_scope_for_user(current_user)
+    metrics, _ = await _collect(db, dids, date_start, date_end, hospital_scope)
+
+    headers = [
+        "Doctor Name", "Designation", "Department", "Hospital ID",
+        "Patients Seen", "New Patients", "Returning Patients",
+        "Appointments Completed", "Appointments Cancelled",
+        "Cases Created", "Cases Completed", "Active Cases",
+        "Treatments Completed", "Sittings Completed",
+        "Revenue", "Avg Revenue / Patient",
+        "Attendance Rate", "Retention Rate", "Case Completion",
+        "Treatment Acceptance", "Recall Success", "Avg Rating",
+        "No Shows", "Outstanding Amount", "Cases With Reports",
+    ]
+    data = []
+    for doc in doctors:
+        m = metrics.get(doc.id, {})
+        new_patients = max(0, m.get("patients_seen", 0) - m.get("returning_patients", 0))
+        attendance_den = (m.get("appointments_completed", 0) +
+                          m.get("appointments_cancelled", 0) +
+                          m.get("appointments_rescheduled", 0))
+        retention_den = new_patients + m.get("returning_patients", 0)
+        recall_den = m.get("followups_completed", 0) + m.get("followups_lost", 0)
+        from app.routers.doctor_performance import _pct
+
+        data.append([
+            doc.full_name,
+            doc.qualification or "Doctor",
+            doc.specialization or "General Dentistry",
+            doc.hospital_id or "",
+            m.get("patients_seen", 0),
+            new_patients,
+            m.get("returning_patients", 0),
+            m.get("appointments_completed", 0),
+            m.get("appointments_cancelled", 0),
+            m.get("cases_created", 0),
+            m.get("cases_completed_period", 0),
+            m.get("active_cases", 0),
+            m.get("treatments_completed", 0),
+            m.get("sittings_completed", 0),
+            round(m.get("revenue", 0), 2),
+            round(m.get("revenue", 0) / m["patients_seen"], 2) if m.get("patients_seen") else 0.0,
+            _pct(m.get("appointments_completed", 0), attendance_den),
+            _pct(m.get("returning_patients", 0), retention_den),
+            _pct(m.get("cases_completed_period", 0), m.get("cases_created", 0)),
+            _pct(m.get("plans_created", 0), m.get("cases_created", 0)),
+            _pct(m.get("followups_completed", 0), recall_den),
+            round(m.get("rating_sum", 0) / m["rating_count"], 2) if m.get("rating_count") else "",
+            m.get("no_shows", 0),
+            round(m.get("outstanding_amount", 0), 2),
+            m.get("cases_with_reports", 0),
+        ])
+    data.sort(key=lambda r: (r[14] if isinstance(r[14], (int, float)) else 0), reverse=True)
+    return data, headers, len(data)
+
+
 async def _csv_consent_forms(db, hospital_ids, date_start, date_end):
     q = select(
         ConsentForm.patient_id, ConsentForm.consent_type,
@@ -1108,6 +1170,7 @@ MODULE_LABELS = {
     "treatments": "Treatments", "billings": "Billings", "expenses": "Expenses",
     "leads": "Leads", "enquiries": "Enquiries", "follow-ups": "Follow-Ups",
     "recalls": "Recalls", "doctors": "Doctors", "consent-forms": "Consent Forms",
+    "doctor-performance": "Doctor Performance",
 }
 
 
@@ -1117,10 +1180,13 @@ async def export_data(
 ):
     hospital_ids = await _get_hospital_ids(db, current_user)
     date_start, date_end = get_date_range(period, start_date, end_date)
-    generator = EXPORT_MODULES.get(module)
-    if not generator:
-        raise ValueError(f"Unknown module: {module}")
-    data, headers, count = await generator(db, hospital_ids, date_start, date_end)
+    if module == "doctor-performance":
+        data, headers, count = await _csv_doctor_performance(db, current_user, date_start, date_end)
+    else:
+        generator = EXPORT_MODULES.get(module)
+        if not generator:
+            raise ValueError(f"Unknown module: {module}")
+        data, headers, count = await generator(db, hospital_ids, date_start, date_end)
     label = MODULE_LABELS.get(module, module)
     date_str = datetime.now(timezone.utc).strftime("%Y_%m_%d")
     hid = current_user.get("hospital_id")

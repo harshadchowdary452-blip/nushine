@@ -52,6 +52,10 @@ async def seed(db_session):
         "HC": User(email="perf_hc@t.com", password_hash=hash_password("TestPass123"),
                    full_name="Perf HC", role=Role.HOSPITAL_ADMIN, hospital_id=hc.id,
                    admin_group_id=group.id, is_active=True, is_verified=True),
+        # A hospital admin of a doctorless hospital who is NOT part of the group.
+        "HD": User(email="perf_hd@t.com", password_hash=hash_password("TestPass123"),
+                   full_name="Perf HD", role=Role.HOSPITAL_ADMIN, hospital_id=hc.id,
+                   is_active=True, is_verified=True),
         "DR1": User(email="perf_dr1@t.com", password_hash=hash_password("TestPass123"),
                     full_name="Dr One", role=Role.DOCTOR, hospital_id=ha.id,
                     admin_group_id=group.id, qualification="BDS", specialization="Orthodontics",
@@ -63,7 +67,7 @@ async def seed(db_session):
     }
     db_session.add_all(list(users.values()))
     await db_session.commit()
-    return {"group_id": group.id, "HA_ID": ha.id, "HB_ID": hb.id, **{k: v.id for k, v in users.items()}}
+    return {"group_id": group.id, "HA_ID": ha.id, "HB_ID": hb.id, "HC_ID": hc.id, **{k: v.id for k, v in users.items()}}
 
 
 async def login(client, email):
@@ -231,18 +235,27 @@ async def test_group_admin_sees_both_hospitals(client: AsyncClient, seed, db_ses
 
 
 @pytest.mark.asyncio
-async def test_hospital_admin_sees_only_own_hospital(client: AsyncClient, seed, db_session):
+async def test_hospital_admin_sees_group_scope(client: AsyncClient, seed, db_session):
     await seed_clinical(db_session, seed)
     token = await login(client, "perf_ha@t.com")
     data = await fetch_overview(client, token)
-    assert data["summary"]["doctors"] == 1
-    assert data["doctors"][0]["id"] == seed["DR1"]
-    assert data["doctors"][0]["hospital_id"] == seed["HA_ID"]
+    # HOSPITAL_ADMINs who belong to an admin group see every doctor in the group
+    # (multi-hospital group management), but each doctor's metrics are scoped to
+    # the admin's OWN hospital only.
+    assert data["summary"]["doctors"] == 2
+    by_id = {d["id"]: d for d in data["doctors"]}
+    assert set(by_id.keys()) == {seed["DR1"], seed["DR2"]}
+    assert by_id[seed["DR1"]]["hospital_id"] == seed["HA_ID"]
+    # DR1 works only at hospital A (the admin's hospital) -> full metrics.
+    assert by_id[seed["DR1"]]["revenue"] == 1500.0
+    # DR2 works only at hospital B -> nothing is attributable to hospital A.
+    assert by_id[seed["DR2"]]["revenue"] == 0.0
+    assert data["summary"]["revenue"] == 1500.0
 
 
 @pytest.mark.asyncio
 async def test_hospital_admin_with_no_doctors_returns_empty_payload(client: AsyncClient, seed):
-    token = await login(client, "perf_hc@t.com")
+    token = await login(client, "perf_hd@t.com")
     r = await client.get(
         "/api/v1/doctor-performance",
         headers={"Authorization": f"Bearer {token}"},
@@ -281,14 +294,14 @@ async def test_hospital_context_denied_outside_scope(client: AsyncClient, seed, 
     assert r.status_code == 403
     assert r.json()["detail"] == "HOSPITAL_CONTEXT_DENIED"
 
-    # Own hospital context is accepted and still scoped to hospital A.
+    # Own hospital context is accepted and still scoped to the group.
     r = await client.get(
         "/api/v1/doctor-performance",
         headers={"Authorization": f"Bearer {token}", "X-Hospital-ID": seed["HA_ID"]},
     )
     assert r.status_code == 200
-    assert r.json()["summary"]["doctors"] == 1
-    assert r.json()["doctors"][0]["id"] == seed["DR1"]
+    assert r.json()["summary"]["doctors"] == 2
+    assert {d["id"] for d in r.json()["doctors"]} == {seed["DR1"], seed["DR2"]}
 
 
 @pytest.mark.asyncio
@@ -327,13 +340,14 @@ async def test_dr1_aggregated_kpis(client: AsyncClient, seed, db_session):
     assert dr1["hospital_name"] == "Perf Hosp A"
 
     s = data["summary"]
-    assert s["doctors"] == 1
+    assert s["doctors"] == 2
     assert s["revenue"] == 1500.0
     assert s["patients_seen"] == 3
     assert s["attendance_rate"] == 75.0
     assert s["avg_rating"] == 4.0
 
-    # Period-over-period deltas vs the previous window (2026-06-01..2026-07-01).
+    # Period-over-period deltas vs the previous window (2026-06-01..2026-07-01),
+    # still scoped to the admin's own hospital (A).
     assert data["previous"]["appointments_completed"] == 1
     assert data["previous"]["revenue"] == 0.0
     assert data["deltas"]["appointments_pct"] == 200.0
@@ -360,9 +374,10 @@ async def test_detail_endpoint_scoping_and_payload(client: AsyncClient, seed, db
     assert len(detail["recent_appointments"]) == 5
     assert detail["recent_appointments"][0]["patient_name"] == "Perf Patient 3"
 
-    # HOSPITAL_ADMIN cannot open a doctor from the other hospital.
+    # HOSPITAL_ADMIN may open any doctor in the group (multi-hospital scope).
     r = await client.get(f"/api/v1/doctor-performance/{seed['DR2']}", headers={"Authorization": f"Bearer {ha}"})
-    assert r.status_code == 403
+    assert r.status_code == 200
+    assert r.json()["name"] == "Dr Two"
 
     # DOCTOR may open themselves but not a colleague.
     dr1 = await login(client, "perf_dr1@t.com")

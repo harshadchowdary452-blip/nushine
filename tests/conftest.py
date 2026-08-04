@@ -1,7 +1,9 @@
 import pytest
 from typing import AsyncGenerator
 from httpx import AsyncClient, ASGITransport
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.pool import NullPool
 from app.database import Base, get_db
 from app.main import app, limiter
 from app.routers.auth import limiter as auth_limiter
@@ -26,17 +28,37 @@ TEST_DATABASE_URL = os.environ.get(
 # strftime) resolves to PostgreSQL during tests, matching production.
 from app.config import settings as _settings
 _settings.DATABASE_URL = TEST_DATABASE_URL
-engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+engine = create_async_engine(TEST_DATABASE_URL, echo=False, poolclass=NullPool)
 test_async_session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
 @pytest.fixture(autouse=True)
 async def setup_database():
     async with engine.begin() as conn:
+        # Clean slate: drop everything before creating to avoid stale data
+        result = await conn.execute(text(
+            "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
+        ))
+        for row in result:
+            await conn.execute(text(f'DROP TABLE IF EXISTS "{row[0]}" CASCADE'))
+        result = await conn.execute(text(
+            "SELECT typname FROM pg_type WHERE typcategory = 'E'"
+        ))
+        for row in result:
+            await conn.execute(text(f'DROP TYPE IF EXISTS "{row[0]}" CASCADE'))
         await conn.run_sync(Base.metadata.create_all)
     yield
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        result = await conn.execute(text(
+            "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
+        ))
+        for row in result:
+            await conn.execute(text(f'DROP TABLE IF EXISTS "{row[0]}" CASCADE'))
+        result = await conn.execute(text(
+            "SELECT typname FROM pg_type WHERE typcategory = 'E'"
+        ))
+        for row in result:
+            await conn.execute(text(f'DROP TYPE IF EXISTS "{row[0]}" CASCADE'))
 
 
 async def override_get_db():

@@ -74,7 +74,13 @@ async def verify_hospital_context(
 
     role = current_user.get("role")
     if role == Role.SUPER_ADMIN.value:
-        return x_hospital_id
+        result = await db.execute(select(Hospital.id).where(Hospital.id == x_hospital_id))
+        if result.scalar_one_or_none():
+            return x_hospital_id
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="HOSPITAL_CONTEXT_DENIED",
+        )
 
     if role == Role.HOSPITAL_ADMIN.value:
         own = current_user.get("hospital_id")

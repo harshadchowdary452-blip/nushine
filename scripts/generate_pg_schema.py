@@ -11,8 +11,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import os
-os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///./dental_hospital.db"
-os.environ["DATABASE_URL_SYNC"] = "sqlite:///./dental_hospital.db"
+os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://unused:unused@localhost:5432/unused")
+os.environ.setdefault("DATABASE_URL_SYNC", "postgresql://unused:unused@localhost:5432/unused")
 
 from app.database import Base
 from app.models import *
