@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
@@ -16,6 +16,8 @@ import {
   Save,
   Pause,
   Beaker,
+  PlusCircle,
+  MoveRight,
 } from "lucide-react"
 import { format } from "date-fns"
 import { PageHeader } from "@/design-system"
@@ -41,10 +43,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { treatmentApi, treatmentSittingsApi, casesApi } from "@/services/endpoints"
+import { treatmentApi, treatmentSittingsApi, casesApi, doctorsApi } from "@/services/endpoints"
 import { formatIndianRupees } from "@/lib/currency"
 import { cn } from "@/lib/utils"
 import { useTrackRecent } from "@/hooks/useTrackRecent"
+import { useAuthStore } from "@/store/authStore"
 import AppointmentScheduler from "@/components/appointments/AppointmentScheduler"
 import type {
   TreatmentPlan,
@@ -54,6 +57,8 @@ import type {
   VisitPayload,
   WaitingPayload,
   AppointmentSchedulerSelectData,
+  User as UserType,
+  PaginatedResponse,
 } from "@/types"
 
 const STATUS_COLORS: Record<string, string> = {
@@ -80,6 +85,7 @@ export default function TreatmentDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const currentUser = useAuthStore((s) => s.user)
 
   const [visitDialogOpen, setVisitDialogOpen] = useState(false)
   const [viewSitting, setViewSitting] = useState<TreatmentSitting | null>(null)
@@ -95,6 +101,14 @@ export default function TreatmentDetail() {
   const [nextVisitRequired, setNextVisitRequired] = useState(true)
   const [nextAppointmentSlot, setNextAppointmentSlot] =
     useState<AppointmentSchedulerSelectData | null>(null)
+  const [visitDoctorId, setVisitDoctorId] = useState("")
+  const [extraVisitDialogOpen, setExtraVisitDialogOpen] = useState(false)
+  const [extraVisitReason, setExtraVisitReason] = useState("")
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false)
+  const [transferTargetId, setTransferTargetId] = useState("")
+  const [transferSlot, setTransferSlot] =
+    useState<AppointmentSchedulerSelectData | null>(null)
+  const [transferNotes, setTransferNotes] = useState("")
 
   // Visit form state
   const [visitForm, setVisitForm] = useState({
@@ -152,6 +166,45 @@ export default function TreatmentDetail() {
   const c = caseData as Case | undefined
   const pat = p?.patient as Patient | undefined
 
+  const { data: doctorsData } = useQuery<PaginatedResponse<UserType>>({
+    queryKey: ["doctors", "treatment-detail"],
+    queryFn: () =>
+      doctorsApi.list({
+        page_size: 200,
+        admin_group_id: currentUser?.admin_group_id || undefined,
+        hospital_id: currentUser?.hospital_id || undefined,
+      }),
+  })
+  const doctors: UserType[] = useMemo(() => {
+    if (Array.isArray(doctorsData)) return doctorsData
+    return doctorsData?.items || []
+  }, [doctorsData])
+
+  const { data: siblingPlansData } = useQuery({
+    queryKey: ["treatment-plans", "by-case", p?.case_id],
+    queryFn: () => treatmentApi.listByCase(p!.case_id),
+    enabled: !!p?.case_id,
+  })
+  const siblingPlans: TreatmentPlan[] = useMemo(
+    () => (Array.isArray(siblingPlansData) ? siblingPlansData : []),
+    [siblingPlansData],
+  )
+  const transferTargets = useMemo(
+    () =>
+      siblingPlans.filter(
+        (s) => s.id !== id && s.status !== "COMPLETED" && s.status !== "CANCELLED",
+      ),
+    [siblingPlans, id],
+  )
+  const transferTarget = transferTargets.find((t) => t.id === transferTargetId) || null
+
+  useEffect(() => {
+    if (visitDialogOpen) {
+      setVisitDoctorId((cur) => cur || p?.assigned_doctor_id || "")
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visitDialogOpen])
+
   const startMutation = useMutation({
     mutationFn: () => treatmentApi.start(id!),
     onSuccess: () => {
@@ -167,6 +220,7 @@ export default function TreatmentDetail() {
         treatment_plan_id: id!,
         sitting_number: currentSittingNumber,
         status: "COMPLETED",
+        doctor_id: visitDoctorId || null,
         clinical_notes: visitForm.clinical_notes || null,
         procedure_performed: visitForm.procedure_performed || null,
         prescription: visitForm.prescription || null,
@@ -190,6 +244,7 @@ export default function TreatmentDetail() {
       queryClient.invalidateQueries({ queryKey: ["treatment-plans"] })
       queryClient.invalidateQueries({ queryKey: ["treatment-plans-board"] })
       setVisitDialogOpen(false)
+      setVisitDoctorId("")
       setVisitForm({
         clinical_notes: "",
         procedure_performed: "",
@@ -244,6 +299,41 @@ export default function TreatmentDetail() {
         lab_cost: "",
         lab_tracking_notes: "",
       })
+    },
+  })
+
+  const extraVisitMutation = useMutation({
+    mutationFn: () =>
+      treatmentApi.extraVisit(id!, { reason: extraVisitReason || undefined }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["treatment-sittings", id] })
+      queryClient.invalidateQueries({ queryKey: ["treatment-plan", id] })
+      queryClient.invalidateQueries({ queryKey: ["treatment-plans"] })
+      queryClient.invalidateQueries({ queryKey: ["treatment-plans-board"] })
+      setExtraVisitDialogOpen(false)
+      setExtraVisitReason("")
+    },
+  })
+
+  const transferMutation = useMutation({
+    mutationFn: () =>
+      treatmentApi.transfer(id!, {
+        target_plan_id: transferTargetId,
+        appointment_date: transferSlot?.appointment_date,
+        appointment_time: transferSlot?.appointment_time,
+        notes: transferNotes || undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["treatment-plan", id] })
+      queryClient.invalidateQueries({ queryKey: ["treatment-sittings", id] })
+      queryClient.invalidateQueries({ queryKey: ["treatment-plans"] })
+      queryClient.invalidateQueries({ queryKey: ["treatment-plans-board"] })
+      queryClient.invalidateQueries({ queryKey: ["case", p?.case_id] })
+      queryClient.invalidateQueries({ queryKey: ["cases"] })
+      setTransferDialogOpen(false)
+      setTransferTargetId("")
+      setTransferSlot(null)
+      setTransferNotes("")
     },
   })
 
@@ -588,11 +678,28 @@ export default function TreatmentDetail() {
                   )}
                 </div>
               )}
+              {(isCompleted || (isInProgress && (p.completed_sittings || 0) >= (p.total_sittings || 0))) && (
+                <Button
+                  variant="outline"
+                  className="w-full text-blue-600 border-blue-200 hover:bg-blue-50"
+                  onClick={() => setExtraVisitDialogOpen(true)}
+                >
+                  <PlusCircle className="h-4 w-4 mr-2" /> Add Extra Visit
+                </Button>
+              )}
               {isCompleted && (
-                <div className="text-center py-4">
-                  <CheckCircle2 className="h-8 w-8 text-green-500 mx-auto mb-2" />
-                  <p className="text-sm font-medium text-green-700">Treatment Completed</p>
-                </div>
+                <>
+                  <div className="text-center py-3">
+                    <CheckCircle2 className="h-8 w-8 text-green-500 mx-auto mb-2" />
+                    <p className="text-sm font-medium text-green-700">Treatment Completed</p>
+                  </div>
+                  <Button
+                    className="w-full bg-blue-600 hover:bg-blue-700"
+                    onClick={() => setTransferDialogOpen(true)}
+                  >
+                    <MoveRight className="h-4 w-4 mr-2" /> Transfer to Next Treatment
+                  </Button>
+                </>
               )}
             </CardContent>
           </Card>
@@ -633,15 +740,32 @@ export default function TreatmentDetail() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div>
-              <Label>Procedure Performed *</Label>
-              <Input
-                value={visitForm.procedure_performed}
-                onChange={(e) =>
-                  setVisitForm({ ...visitForm, procedure_performed: e.target.value })
-                }
-                placeholder="e.g., Root Canal - Access Opening"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Doctor *</Label>
+                <Select value={visitDoctorId} onValueChange={setVisitDoctorId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select doctor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {doctors.map((doc) => (
+                      <SelectItem key={doc.id} value={doc.id}>
+                        {doc.full_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Procedure Performed *</Label>
+                <Input
+                  value={visitForm.procedure_performed}
+                  onChange={(e) =>
+                    setVisitForm({ ...visitForm, procedure_performed: e.target.value })
+                  }
+                  placeholder="e.g., Root Canal - Access Opening"
+                />
+              </div>
             </div>
             <div>
               <Label>Clinical Notes</Label>
@@ -729,6 +853,7 @@ export default function TreatmentDetail() {
             <Button
               onClick={() => saveVisitMutation.mutate()}
               disabled={
+                !visitDoctorId ||
                 !visitForm.procedure_performed ||
                 saveVisitMutation.isPending ||
                 (nextVisitRequired && !nextAppointmentSlot)
@@ -745,108 +870,206 @@ export default function TreatmentDetail() {
         </DialogContent>
       </Dialog>
 
-      {/* View Sitting Dialog */}
+      {/* View Sitting Dialog - Enterprise detail */}
       <Dialog open={!!viewSitting} onOpenChange={() => setViewSitting(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Visit {viewSitting?.sitting_number}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" /> Visit {viewSitting?.sitting_number}
+              {viewSitting && (
+                <Badge
+                  className={cn("text-[10px]", SITTING_STATUS_COLORS[viewSitting.status])}
+                >
+                  {viewSitting.status?.replace(/_/g, " ")}
+                </Badge>
+              )}
+            </DialogTitle>
           </DialogHeader>
           {viewSitting && (
-            <div className="space-y-3 text-sm">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <span className="text-muted-foreground text-xs">Date</span>
-                  <p>
-                    {viewSitting.sitting_date
-                      ? format(new Date(viewSitting.sitting_date), "dd MMM yyyy")
-                      : "—"}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground text-xs">Doctor</span>
-                  <p>{viewSitting.doctor_name || "—"}</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground text-xs">Status</span>
-                  <Badge className={cn("text-[10px]", SITTING_STATUS_COLORS[viewSitting.status])}>
-                    {viewSitting.status}
-                  </Badge>
-                </div>
-                <div>
-                  <span className="text-muted-foreground text-xs">Duration</span>
-                  <p>
-                    {viewSitting.duration_minutes ? `${viewSitting.duration_minutes} min` : "—"}
-                  </p>
+            <div className="space-y-5 text-sm">
+              {/* Overview */}
+              <div className="rounded-lg border bg-[var(--ds-background-subtle)]/50 p-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                  <div>
+                    <span className="text-muted-foreground text-xs">Date</span>
+                    <p className="font-medium">
+                      {viewSitting.sitting_date
+                        ? format(new Date(viewSitting.sitting_date), "dd MMM yyyy")
+                        : "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground text-xs">Duration</span>
+                    <p className="font-medium">
+                      {viewSitting.duration_minutes ? `${viewSitting.duration_minutes} min` : "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground text-xs">Doctor</span>
+                    <p className="font-medium">{viewSitting.doctor_name || "—"}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground text-xs">Completed By</span>
+                    <p className="font-medium">{viewSitting.completed_by_name || "—"}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground text-xs">Completed At</span>
+                    <p className="font-medium">
+                      {viewSitting.completed_at
+                        ? format(new Date(viewSitting.completed_at), "dd MMM yyyy, hh:mm a")
+                        : "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground text-xs">Recorded At</span>
+                    <p className="font-medium">
+                      {viewSitting.created_at
+                        ? format(new Date(viewSitting.created_at), "dd MMM yyyy, hh:mm a")
+                        : "—"}
+                    </p>
+                  </div>
                 </div>
               </div>
-              {viewSitting.procedure_performed && (
-                <div>
-                  <span className="text-muted-foreground text-xs">Procedure Performed</span>
-                  <p>{viewSitting.procedure_performed}</p>
+
+              {/* Clinical section */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Clinical Details
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <span className="text-muted-foreground text-xs">Procedure Performed</span>
+                    <p className="font-medium">
+                      {viewSitting.procedure_performed || viewSitting.work_done || "—"}
+                    </p>
+                  </div>
+                  {viewSitting.procedure_performed && viewSitting.work_done && (
+                    <div>
+                      <span className="text-muted-foreground text-xs">Work Done</span>
+                      <p className="font-medium">{viewSitting.work_done}</p>
+                    </div>
+                  )}
+                  <div className="sm:col-span-2">
+                    <span className="text-muted-foreground text-xs">Clinical Notes</span>
+                    <p>{viewSitting.clinical_notes || "—"}</p>
+                  </div>
+                  {viewSitting.doctor_notes && (
+                    <div className="sm:col-span-2">
+                      <span className="text-muted-foreground text-xs">Doctor Notes</span>
+                      <p>{viewSitting.doctor_notes}</p>
+                    </div>
+                  )}
+                  {viewSitting.prescription && (
+                    <div className="sm:col-span-2">
+                      <span className="text-muted-foreground text-xs">Prescription</span>
+                      <p>{viewSitting.prescription}</p>
+                    </div>
+                  )}
+                  {viewSitting.materials_used && (
+                    <div className="sm:col-span-2">
+                      <span className="text-muted-foreground text-xs">Materials Used</span>
+                      <p>{viewSitting.materials_used}</p>
+                    </div>
+                  )}
                 </div>
-              )}
-              {viewSitting.clinical_notes && (
-                <div>
-                  <span className="text-muted-foreground text-xs">Clinical Notes</span>
-                  <p>{viewSitting.clinical_notes}</p>
-                </div>
-              )}
-              {viewSitting.prescription && (
-                <div>
-                  <span className="text-muted-foreground text-xs">Prescription</span>
-                  <p>{viewSitting.prescription}</p>
-                </div>
-              )}
-              {viewSitting.materials_used && (
-                <div>
-                  <span className="text-muted-foreground text-xs">Materials Used</span>
-                  <p>{viewSitting.materials_used}</p>
-                </div>
-              )}
-              {viewSitting.doctor_notes && (
-                <div>
-                  <span className="text-muted-foreground text-xs">Doctor Notes</span>
-                  <p>{viewSitting.doctor_notes}</p>
-                </div>
-              )}
+              </div>
+
+              {/* Next appointment */}
               {viewSitting.next_appointment_date && (
                 <div className="border-t pt-3">
-                  <span className="text-muted-foreground text-xs">Next Appointment</span>
-                  <p className="flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />{" "}
-                    {format(new Date(viewSitting.next_appointment_date), "dd MMM yyyy")}
-                  </p>
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                    Next Appointment
+                  </h4>
+                  <div className="flex items-center gap-2 rounded-lg border bg-blue-50/50 px-3 py-2">
+                    <Calendar className="h-4 w-4 text-blue-600 shrink-0" />
+                    <span className="font-medium">
+                      {format(new Date(viewSitting.next_appointment_date), "dd MMM yyyy")}
+                      {viewSitting.next_appointment_time
+                        ? ` at ${viewSitting.next_appointment_time.slice(0, 5)}`
+                        : ""}
+                    </span>
+                    <span className="text-muted-foreground text-xs">
+                      with {viewSitting.next_appointment_doctor_name || "—"}
+                    </span>
+                  </div>
                 </div>
               )}
+
+              {/* Lab tracking */}
               {viewSitting.lab_name && (
                 <div className="border-t pt-3">
-                  <span className="text-muted-foreground text-xs">Lab Tracking</span>
-                  <div className="grid grid-cols-2 gap-2 mt-1">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                    Lab Tracking
+                  </h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     <div>
-                      <span className="text-xs text-muted-foreground">Lab:</span>{" "}
-                      {viewSitting.lab_name}
+                      <span className="text-xs text-muted-foreground">Lab</span>
+                      <p className="font-medium">{viewSitting.lab_name}</p>
                     </div>
                     <div>
-                      <span className="text-xs text-muted-foreground">Order #:</span>{" "}
-                      {viewSitting.lab_order_number || "—"}
+                      <span className="text-xs text-muted-foreground">Order #</span>
+                      <p className="font-medium">{viewSitting.lab_order_number || "—"}</p>
                     </div>
                     <div>
-                      <span className="text-xs text-muted-foreground">Sent:</span>{" "}
-                      {viewSitting.lab_sent_date
-                        ? format(new Date(viewSitting.lab_sent_date), "dd MMM")
-                        : "—"}
+                      <span className="text-xs text-muted-foreground">Sent</span>
+                      <p className="font-medium">
+                        {viewSitting.lab_sent_date
+                          ? format(new Date(viewSitting.lab_sent_date), "dd MMM yyyy")
+                          : "—"}
+                      </p>
                     </div>
                     <div>
-                      <span className="text-xs text-muted-foreground">Return:</span>{" "}
-                      {viewSitting.lab_return_date
-                        ? format(new Date(viewSitting.lab_return_date), "dd MMM")
-                        : "—"}
+                      <span className="text-xs text-muted-foreground">Return</span>
+                      <p className="font-medium">
+                        {viewSitting.lab_return_date
+                          ? format(new Date(viewSitting.lab_return_date), "dd MMM yyyy")
+                          : "—"}
+                      </p>
                     </div>
+                  </div>
+                  {viewSitting.lab_tracking_status && (
+                    <p className="mt-2 text-xs">
+                      <span className="text-muted-foreground">Status: </span>
+                      {viewSitting.lab_tracking_status.replace(/_/g, " ")}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Attachments / signature */}
+              {(viewSitting.images_json ||
+                viewSitting.attachments_json ||
+                viewSitting.digital_signature_url) && (
+                <div className="border-t pt-3">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                    Attachments & Signature
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {viewSitting.images_json && (
+                      <Badge variant="outline" className="text-xs">
+                        Images
+                      </Badge>
+                    )}
+                    {viewSitting.attachments_json && (
+                      <Badge variant="outline" className="text-xs">
+                        Attachments
+                      </Badge>
+                    )}
+                    {viewSitting.digital_signature_url && (
+                      <Badge variant="outline" className="text-xs text-green-700">
+                        Signed
+                      </Badge>
+                    )}
                   </div>
                 </div>
               )}
             </div>
           )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewSitting(null)}>
+              Close
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -1014,6 +1237,155 @@ export default function TreatmentDetail() {
               Complete
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Add Extra Visit Dialog */}
+      <Dialog open={extraVisitDialogOpen} onOpenChange={setExtraVisitDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <PlusCircle className="h-5 w-5 text-blue-600" /> Add Extra Visit
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-lg border bg-amber-50/50 px-3 py-2 text-sm">
+              The estimated visit count ({p.total_sittings}) is complete, but the patient
+              still needs treatment. This will add an extra visit (Visit{" "}
+              {currentSittingNumber}) and reopen the treatment as{" "}
+              <span className="font-medium">In Progress</span>.
+            </div>
+            <div>
+              <Label>Reason (optional)</Label>
+              <Textarea
+                value={extraVisitReason}
+                onChange={(e) => setExtraVisitReason(e.target.value)}
+                placeholder="e.g., Additional polishing session required after scaling"
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExtraVisitDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-blue-600 hover:bg-blue-700"
+              onClick={() => extraVisitMutation.mutate()}
+              disabled={extraVisitMutation.isPending}
+            >
+              {extraVisitMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : (
+                <PlusCircle className="h-4 w-4 mr-1" />
+              )}
+              Add Extra Visit
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Transfer to Next Treatment Dialog */}
+      <Dialog open={transferDialogOpen} onOpenChange={setTransferDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MoveRight className="h-5 w-5 text-blue-600" /> Transfer to Next Treatment
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Route the patient to the next treatment in this case. The target treatment
+              will be activated and an appointment will be scheduled with its concern doctor.
+            </p>
+            {transferTargets.length === 0 ? (
+              <div className="rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
+                No eligible treatments found in this case. Add and assign a concern doctor to
+                another treatment in the case report to enable transfer.
+              </div>
+            ) : (
+              <>
+                <div>
+                  <Label>Target Treatment *</Label>
+                  <Select
+                    value={transferTargetId}
+                    onValueChange={(v) => {
+                      setTransferTargetId(v)
+                      setTransferSlot(null)
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select treatment" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {transferTargets.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.treatment_name} ({t.completed_sittings}/{t.total_sittings} visits)
+                          {t.assigned_doctor_name ? ` — Dr. ${t.assigned_doctor_name}` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {transferTarget && (
+                  <div className="rounded-lg border bg-blue-50/50 px-3 py-2 text-sm">
+                    <span className="text-muted-foreground">Concern Doctor: </span>
+                    <span className="font-medium">
+                      {transferTarget.assigned_doctor_name
+                        ? `Dr. ${transferTarget.assigned_doctor_name}`
+                        : "Not assigned"}
+                    </span>
+                    {!transferTarget.assigned_doctor_id && (
+                      <p className="text-xs text-amber-700 mt-1">
+                        No concern doctor is assigned to this treatment. Assign one in the case
+                        report before transferring.
+                      </p>
+                    )}
+                  </div>
+                )}
+                <div>
+                  <Label>Schedule Appointment (optional)</Label>
+                  <AppointmentScheduler
+                    doctorId={transferTarget?.assigned_doctor_id || ""}
+                    showDoctorSelector={false}
+                    showTypeSelector={false}
+                    appointmentType="TREATMENT"
+                    procedureName={transferTarget?.treatment_name}
+                    onSelect={(data) => setTransferSlot(data)}
+                  />
+                </div>
+                <div>
+                  <Label>Notes (optional)</Label>
+                  <Textarea
+                    value={transferNotes}
+                    onChange={(e) => setTransferNotes(e.target.value)}
+                    placeholder="Handover notes for the concern doctor..."
+                    rows={2}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+          {transferTargets.length > 0 && (
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setTransferDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={() => transferMutation.mutate()}
+                disabled={
+                  !transferTargetId || !transferTarget?.assigned_doctor_id || transferMutation.isPending
+                }
+              >
+                {transferMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                ) : (
+                  <MoveRight className="h-4 w-4 mr-1" />
+                )}
+                Transfer & Schedule
+              </Button>
+            </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
     </div>

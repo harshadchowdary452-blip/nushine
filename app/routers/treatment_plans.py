@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, func, String as SAString
 from sqlalchemy.orm import selectinload, joinedload
 from typing import List, Optional
+from datetime import datetime, timezone, date, time, timedelta
 from pydantic import BaseModel
 from app.database import get_db
 from app.dependencies import get_current_user
@@ -20,6 +21,7 @@ from app.models.case import Case
 from app.models.patient import Patient
 from app.models.hospital import Hospital
 from app.models.treatment_plan import TreatmentPlan, TreatmentPlanStatus
+from app.models.appointment import Appointment, AppointmentStatus, AppointmentType, resolve_duration
 from app.models.user import User
 from app.services.timeline_helper import record_timeline_event, build_changes
 
@@ -29,6 +31,17 @@ logger = logging.getLogger(__name__)
 
 class CompleteTreatmentBody(BaseModel):
     outcome: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class ExtraVisitBody(BaseModel):
+    reason: Optional[str] = None
+
+
+class TransferTreatmentBody(BaseModel):
+    target_plan_id: str
+    appointment_date: Optional[date] = None
+    appointment_time: Optional[time] = None
     notes: Optional[str] = None
 
 
@@ -361,6 +374,206 @@ async def complete_treatment(plan_id: str, body: CompleteTreatmentBody = Body(de
     except Exception as e:
         logger.warning("Notification failed: %s", e)
     return result
+
+
+@router.post("/{plan_id}/extra-visit")
+async def add_extra_visit(plan_id: str, body: ExtraVisitBody = Body(default=None), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.CREATE_TREATMENT_PLAN)
+    service = TreatmentPlanService(db)
+    plan = await service.get(plan_id)
+    if not plan:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Treatment plan not found")
+    await verify_tenant_access(current_user, plan, "treatment_plan", db)
+
+    old_status = plan.status.value if hasattr(plan.status, "value") else plan.status
+    if old_status == TreatmentPlanStatus.CANCELLED.value:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot add an extra visit to a cancelled treatment")
+
+    was_completed = old_status == TreatmentPlanStatus.COMPLETED.value
+    plan.total_sittings = (plan.total_sittings or 0) + 1
+    plan.remaining_sittings = max(0, plan.total_sittings - (plan.completed_sittings or 0))
+    if was_completed:
+        plan.status = TreatmentPlanStatus.IN_PROGRESS
+        plan.completed_at = None
+    if body and body.reason:
+        plan.notes = f"{plan.notes + ' ' if plan.notes else ''}Extra visit added: {body.reason}".strip()
+    await db.flush()
+
+    svc = StatusAutomationService(db)
+    await svc.update_treatment_status(plan_id, TreatmentPlanStatus.IN_PROGRESS)
+    await db.commit()
+
+    patient_id = await _get_patient_id_from_plan(db, plan_id)
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=patient_id,
+        action="Extra Visit Added",
+        description=f"Extra visit added — estimated visits now {plan.total_sittings}"
+        + (f" (reason: {body.reason})" if body and body.reason else ""),
+        module="Treatments",
+        changes=[
+            {"field": "status", "old_value": old_status, "new_value": TreatmentPlanStatus.IN_PROGRESS.value},
+            {"field": "total_sittings", "old_value": plan.total_sittings - 1, "new_value": plan.total_sittings},
+        ],
+    )
+    updated = await service.get(plan_id)
+    return updated
+
+
+@router.post("/{plan_id}/transfer")
+async def transfer_treatment(plan_id: str, body: TransferTreatmentBody, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.CREATE_TREATMENT_PLAN)
+    service = TreatmentPlanService(db)
+    source = await service.get(plan_id)
+    if not source:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Treatment plan not found")
+    await verify_tenant_access(current_user, source, "treatment_plan", db)
+
+    source_status = source.status.value if hasattr(source.status, "value") else source.status
+    if source_status != TreatmentPlanStatus.COMPLETED.value:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only completed treatments can be transferred")
+
+    target = await service.get(body.target_plan_id)
+    if not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target treatment plan not found")
+    await verify_tenant_access(current_user, target, "treatment_plan", db)
+
+    if target.id == source.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot transfer a treatment to itself")
+    if target.case_id != source.case_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Target treatment must belong to the same case")
+
+    target_status = target.status.value if hasattr(target.status, "value") else target.status
+    if target_status in (TreatmentPlanStatus.COMPLETED.value, TreatmentPlanStatus.CANCELLED.value):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Target treatment is already completed or cancelled")
+
+    dep_check = await service.check_dependency_met(target.id)
+    if not dep_check["can_start"]:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=dep_check["reason"])
+
+    item = target.treatment_plan_item
+    concern_doctor = item.assigned_doctor if item and item.assigned_doctor else target.assigned_doctor
+    if not concern_doctor:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No concern doctor assigned to the target treatment")
+    concern_doctor_id = str(concern_doctor.id)
+
+    target.status = TreatmentPlanStatus.IN_PROGRESS
+    if not target.started_at:
+        target.started_at = datetime.now(timezone.utc)
+    await db.flush()
+
+    svc = StatusAutomationService(db)
+    await svc.update_treatment_status(target.id, TreatmentPlanStatus.IN_PROGRESS)
+
+    try:
+        from app.crm.services.event_dispatcher import publish_event
+        from app.crm.enums import EventType, EventSource
+        await publish_event(
+            event_type=EventType.TREATMENT_STARTED,
+            source_module=EventSource.TREATMENT,
+            entity_type="TREATMENT",
+            entity_id=str(target.id),
+            patient_id=await _get_patient_id_from_plan(db, str(target.id)),
+            doctor_id=concern_doctor_id,
+            db=db,
+        )
+    except Exception:
+        logger.warning("Failed to publish TREATMENT_STARTED for transferred treatment", exc_info=True)
+
+    appointment = None
+    if body.appointment_date:
+        case = await db.get(Case, source.case_id)
+        if case and case.patient_id:
+            appt_date = body.appointment_date
+            appt_time = body.appointment_time or time(9, 0)
+            existing = await db.execute(
+                select(Appointment).where(
+                    Appointment.patient_id == case.patient_id,
+                    Appointment.appointment_date == appt_date,
+                    Appointment.appointment_time == appt_time,
+                    Appointment.status == AppointmentStatus.SCHEDULED,
+                    Appointment.is_active == True,
+                ).limit(1)
+            )
+            if not existing.scalar_one_or_none():
+                duration = resolve_duration(
+                    procedure_name=target.treatment_name,
+                    appointment_type="TREATMENT",
+                    override_minutes=target.duration_minutes,
+                )
+                end_time = (datetime.combine(date.min, appt_time) + timedelta(minutes=duration)).time()
+                appointment = Appointment(
+                    patient_id=case.patient_id,
+                    doctor_id=concern_doctor_id,
+                    appointment_date=appt_date,
+                    appointment_time=appt_time,
+                    duration_minutes=duration,
+                    end_time=end_time,
+                    status=AppointmentStatus.SCHEDULED,
+                    appointment_type=AppointmentType.TREATMENT,
+                    notes=f"Auto-created from treatment transfer: {source.treatment_name} → {target.treatment_name}"
+                    + (f" ({body.notes})" if body.notes else ""),
+                )
+                db.add(appointment)
+                await db.flush()
+                appointment.appointment_number = f"APPT-{appointment.id[:8].upper()}"
+                await db.flush()
+                try:
+                    from app.crm.services.event_dispatcher import publish_event
+                    from app.crm.enums import EventType, EventSource
+                    await publish_event(
+                        event_type=EventType.APPOINTMENT_CREATED,
+                        source_module=EventSource.APPOINTMENT,
+                        entity_type="APPOINTMENT",
+                        entity_id=str(appointment.id),
+                        patient_id=str(case.patient_id),
+                        doctor_id=concern_doctor_id,
+                        payload={
+                            "appointment_id": str(appointment.id),
+                            "patient_id": str(case.patient_id),
+                            "treatment_plan_id": str(target.id),
+                            "doctor_id": concern_doctor_id,
+                            "appointment_date": appt_date.isoformat(),
+                            "status": "SCHEDULED",
+                        },
+                        db=db,
+                    )
+                except Exception:
+                    logger.warning("Failed to fire APPOINTMENT_CREATED for transfer appointment", exc_info=True)
+
+    await db.commit()
+
+    patient_id = await _get_patient_id_from_plan(db, plan_id)
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=patient_id,
+        action="Treatment Transferred",
+        description=f"{source.treatment_name} completed → routed to {target.treatment_name} ({concern_doctor.full_name})",
+        module="Treatments",
+    )
+    if appointment:
+        await record_timeline_event(
+            db, current_user=current_user, patient_id=patient_id,
+            action="Appointment Scheduled",
+            description=f"Appointment for {target.treatment_name} with {concern_doctor.full_name} on {appointment.appointment_date}"
+            + (f" at {appointment.appointment_time.strftime('%H:%M')}" if appointment.appointment_time else ""),
+            module="Appointments",
+        )
+
+    try:
+        await notify_treatment_assigned(db, target)
+    except Exception as e:
+        logger.warning("Notification failed: %s", e)
+
+    updated_target = await service.get(str(target.id))
+    return {
+        "source_plan_id": plan_id,
+        "target_plan": TreatmentPlanResponse.model_validate(updated_target).model_dump(),
+        "concern_doctor_id": concern_doctor_id,
+        "concern_doctor_name": concern_doctor.full_name,
+        "appointment_id": str(appointment.id) if appointment else None,
+        "appointment_date": appointment.appointment_date.isoformat() if appointment else None,
+        "appointment_time": appointment.appointment_time.strftime("%H:%M") if appointment and appointment.appointment_time else None,
+        "message": f"Transferred to {target.treatment_name}",
+    }
 
 
 @router.post("/{plan_id}/report-overdue")

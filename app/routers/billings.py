@@ -263,6 +263,86 @@ async def billing_patient_search(
     return {"items": items, "total": total}
 
 
+@router.get("/unbilled")
+async def get_unbilled_outstanding(
+    skip: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=200),
+    hospital_id: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Cases with completed treatments that have NOT been invoiced yet (₹0 billed).
+    Each row is the 'Start Billing' entry point from the billing tab."""
+    verify_permission(current_user, Permission.MANAGE_BILLING)
+    from app.services.billing_sync_service import BillingSyncService
+    from app.models.treatment_plan import TreatmentPlan as TP, TreatmentPlanStatus
+    from app.models.user import User
+
+    role = current_user.get("role")
+    scoped: Optional[set] = None
+    if role == Role.HOSPITAL_ADMIN.value:
+        hid = current_user.get("hospital_id")
+        if not hid:
+            return {"items": [], "total": 0}
+        pids = [r[0] for r in (await db.execute(select(Patient.id).where(Patient.hospital_id == hid))).all()]
+        if not pids:
+            return {"items": [], "total": 0}
+        scoped = {r[0] for r in (await db.execute(select(Case.id).where(Case.patient_id.in_(pids)))).all()}
+    elif role == Role.DOCTOR.value:
+        scoped = {r[0] for r in (await db.execute(select(Case.id).where(Case.doctor_id == current_user.get("sub")))).all()}
+    elif role == Role.GROUP_ADMIN.value:
+        tenant_filter = await get_hospital_filter(current_user, db)
+        if tenant_filter is None or "id" in tenant_filter:
+            return {"items": [], "total": 0}
+        if "hospital_id__in" in tenant_filter:
+            hids = tenant_filter["hospital_id__in"]
+            pids = [r[0] for r in (await db.execute(select(Patient.id).where(Patient.hospital_id.in_(hids)))).all()]
+            if not pids:
+                return {"items": [], "total": 0}
+            scoped = {r[0] for r in (await db.execute(select(Case.id).where(Case.patient_id.in_(pids)))).all()}
+
+    candidate = select(Case.id).join(TP, TP.case_id == Case.id).where(
+        TP.is_active == True, TP.status == TreatmentPlanStatus.COMPLETED.value,
+    )
+    if role == Role.SUPER_ADMIN.value and hospital_id:
+        pids = [r[0] for r in (await db.execute(select(Patient.id).where(Patient.hospital_id == hospital_id))).all()]
+        if not pids:
+            return {"items": [], "total": 0}
+        scoped = {r[0] for r in (await db.execute(select(Case.id).where(Case.patient_id.in_(pids)))).all()}
+    if scoped is not None:
+        candidate = candidate.where(Case.id.in_(scoped))
+    case_ids = [r[0] for r in (await db.execute(candidate.distinct())).all()]
+
+    sync_svc = BillingSyncService(db)
+    items = []
+    for cid in case_ids:
+        await sync_svc.sync_case(cid)
+        case = await db.get(Case, cid)
+        if not case or not case.outstanding_balance or case.outstanding_balance <= 0:
+            continue
+        patient = await db.get(Patient, case.patient_id) if case.patient_id else None
+        doctor = await db.get(User, case.doctor_id) if case.doctor_id else None
+        hospital = await db.get(Hospital, patient.hospital_id) if patient and patient.hospital_id else None
+        plan_rows = await db.execute(select(TP).where(
+            TP.case_id == cid, TP.is_active == True, TP.status == TreatmentPlanStatus.COMPLETED.value,
+        ))
+        treatment_names = [tp.treatment_name for tp in plan_rows.scalars().all() if tp.treatment_name]
+        items.append({
+            "case_id": cid,
+            "case_number": case.case_number,
+            "patient_id": str(patient.id) if patient else None,
+            "patient_name": patient.full_name if patient else None,
+            "op_no": getattr(patient, "op_no", None) if patient else None,
+            "hospital_id": str(patient.hospital_id) if patient and patient.hospital_id else None,
+            "hospital_name": hospital.name if hospital else None,
+            "doctor_id": str(case.doctor_id) if case.doctor_id else None,
+            "doctor_name": doctor.full_name if doctor else None,
+            "treatment_names": treatment_names,
+            "outstanding_balance": case.outstanding_balance,
+            "payment_status": case.payment_status,
+        })
+    return {"items": items, "total": len(items)}
+
+
 @router.get("/cases/{case_id}/billable")
 async def get_billable_treatments(case_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     """Billable treatments for a case: treatment plans + their visits with

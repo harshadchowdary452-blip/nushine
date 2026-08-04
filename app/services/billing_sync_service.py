@@ -41,6 +41,34 @@ class BillingSyncService:
             item.paid_amount = item_paid
             item.pending_amount = round(float(item.net_amount or 0) - item_paid, 2)
 
+    async def _billed_by_plan(self, case_id: str, active_billings: list) -> dict:
+        """Total invoice (net) amount attributed to each treatment plan.
+
+        Uses the same attribution as _sync_plans (line items by plan, plan-level
+        billings, generic case billings split proportionally by cost).
+        """
+        billed: dict = {}
+        if not active_billings:
+            return billed
+        rows = await self.db.execute(
+            select(TreatmentPlan.id, TreatmentPlan.cost).where(TreatmentPlan.case_id == case_id)
+        )
+        plan_rows = rows.all()
+        total_cost = sum(float(c or 0) for _, c in plan_rows) or 0
+        for b in active_billings:
+            if b.items:
+                for item in b.items:
+                    if item.treatment_plan_id:
+                        billed[item.treatment_plan_id] = billed.get(item.treatment_plan_id, 0.0) + float(item.net_amount or 0)
+            elif b.treatment_plan_id:
+                billed[b.treatment_plan_id] = billed.get(b.treatment_plan_id, 0.0) + float(b.total_amount or 0)
+            else:
+                generic = float(b.total_amount or 0)
+                if generic and total_cost > 0:
+                    for pid, cost in plan_rows:
+                        billed[pid] = billed.get(pid, 0.0) + generic * float(cost or 0) / total_cost
+        return billed
+
     async def _sync_plans(self, case_id: str, billings: list):
         r = await self.db.execute(select(TreatmentPlan).where(TreatmentPlan.case_id == case_id))
         plans = list(r.scalars().all())
@@ -166,5 +194,5 @@ class BillingSyncService:
             "total_billed": round(total_billed, 2),
             "total_paid": round(total_paid, 2),
             "outstanding_balance": round(outstanding, 2),
-            "payment_status": "NO_BILLING" if total_billed == 0 else ("PAID" if outstanding <= 0 else "PARTIAL" if total_paid > 0 else "UNPAID"),
+            "payment_status": "NO_BILLING" if (total_billed == 0 and outstanding <= 0) else ("PAID" if outstanding <= 0 else "PARTIAL" if total_paid > 0 else "UNPAID"),
         }

@@ -270,8 +270,11 @@ class StatusAutomationService:
 
         if new_status == TreatmentPlanStatus.IN_PROGRESS:
             case = await self.db.get(Case, tp.case_id)
-            if case and case.status in (CaseStatus.OPEN, CaseStatus.ON_HOLD):
+            if case and case.status in (CaseStatus.OPEN, CaseStatus.ON_HOLD, CaseStatus.COMPLETED):
+                was_completed = case.status == CaseStatus.COMPLETED
                 case.status = CaseStatus.IN_PROGRESS
+                if was_completed:
+                    case.completion_date = None
                 await self.db.flush()
                 await self.update_patient_status(case.patient_id)
 

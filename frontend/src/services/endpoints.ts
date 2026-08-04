@@ -248,6 +248,17 @@ export const treatmentApi = {
   start: (id: string) => api.post(`/treatment-plans/${id}/start`).then((r) => r.data),
   complete: (id: string, data?: { outcome?: string; notes?: string }) =>
     api.post(`/treatment-plans/${id}/complete`, data || {}).then((r) => r.data),
+  extraVisit: (id: string, data?: { reason?: string }) =>
+    api.post(`/treatment-plans/${id}/extra-visit`, data || {}).then((r) => r.data),
+  transfer: (
+    id: string,
+    data: {
+      target_plan_id: string
+      appointment_date?: string
+      appointment_time?: string
+      notes?: string
+    },
+  ) => api.post(`/treatment-plans/${id}/transfer`, data).then((r) => r.data),
   setWaiting: (
     id: string,
     waitingType: string,
@@ -354,6 +365,8 @@ export const billingApi = {
   ) => api.put(`/billings/${id}/discount`, data).then((r) => r.data),
   searchPatients: (params: { q: string; limit?: number }) =>
     api.get("/billings/search", { params }).then((r) => r.data),
+  unbilled: (params?: { page_size?: number }) =>
+    api.get("/billings/unbilled", { params }).then((r) => r.data),
   getCaseBillable: (caseId: string) =>
     api.get(`/billings/cases/${caseId}/billable`).then((r) => r.data),
 }

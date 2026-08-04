@@ -512,3 +512,92 @@ async def test_delete_billing_resyncs_case(client):
     assert case_f["total_billed"] == 5000  # only b1 remains
     assert case_f["total_paid"] == 3000
     assert case_f["payment_status"] == "PARTIAL"
+
+
+# ==========================
+# TEST: COMPLETED TREATMENTS WITH ₹0 PAID STILL COUNT AS OUTSTANDING
+# ==========================
+
+@pytest.mark.asyncio
+async def test_completed_unbilled_plan_counts_as_outstanding(client):
+    async with test_session_factory() as db:
+        seeds = await seed_data(db)
+        # Case c2 has a COMPLETED plan (₹4000) with ₹0 paid and NO invoice.
+        from app.services.billing_sync_service import BillingSyncService
+        await BillingSyncService(db).sync_case(seeds["c2"].id)
+        await db.commit()
+
+    case_f = await get_case_financials(seeds["c2"].id)
+    assert case_f["total_billed"] == 0
+    assert case_f["total_paid"] == 0
+    assert case_f["outstanding_balance"] == 4000
+    assert case_f["payment_status"] == "UNPAID"
+
+    async with test_session_factory() as db:
+        from app.services.billing_sync_service import BillingSyncService
+        summary = await BillingSyncService(db).get_patient_summary(seeds["p2"].id)
+    assert summary["outstanding_balance"] == 4000
+    assert summary["payment_status"] == "UNPAID"
+
+
+@pytest.mark.asyncio
+async def test_completed_plan_outstanding_not_double_counted(client):
+    async with test_session_factory() as db:
+        seeds = await seed_data(db)
+        from app.services.billing_sync_service import BillingSyncService
+        # Bill the completed plan (c2/plan2 ₹4000) in full.
+        db.add(Billing(
+            id=str(uuid.uuid4()), case_id=seeds["c2"].id,
+            total_amount=4000, paid_amount=4000, pending_amount=0,
+            payment_status=PaymentStatus.PAID,
+        ))
+        await db.flush()
+        await BillingSyncService(db).sync_case(seeds["c2"].id)
+        await db.commit()
+
+    case_f = await get_case_financials(seeds["c2"].id)
+    assert case_f["total_billed"] == 4000
+    assert case_f["total_paid"] == 4000
+    assert case_f["outstanding_balance"] == 0
+    assert case_f["payment_status"] == "PAID"
+
+
+# ==========================
+# TEST: UNBILLED OUTSTANDING LIST (billing tab "Start Billing")
+# ==========================
+
+@pytest.mark.asyncio
+async def test_unbilled_endpoint_lists_completed_uninvoiced_cases(client):
+    async with test_session_factory() as db:
+        seeds = await seed_data(db)
+
+    token, _ = await login_as(client, "super@test.com", "Pass123!")
+    resp = await client.get("/api/v1/billings/unbilled", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["total"] >= 1
+
+    # Case c2 has a COMPLETED plan (₹4000) with ₹0 paid and NO invoice → must appear.
+    match = next((i for i in data["items"] if i["case_id"] == seeds["c2"].id), None)
+    assert match is not None
+    assert match["patient_name"] == "Patient Two"
+    assert "Cleaning" in match["treatment_names"]
+    assert match["outstanding_balance"] == 4000
+    assert match["payment_status"] == "UNPAID"
+
+    # Case c1 (IN_PROGRESS plans, has invoice b1) must NOT appear as unbilled.
+    assert not any(i["case_id"] == seeds["c1"].id for i in data["items"])
+
+
+@pytest.mark.asyncio
+async def test_unbilled_endpoint_scope_by_role(client):
+    async with test_session_factory() as db:
+        await seed_data(db)
+
+    # doc1 (Group Alpha / h1) must see c2 (patient p2 belongs to h1)
+    token, _ = await login_as(client, "doc1@test.com", "Pass123!")
+    resp = await client.get("/api/v1/billings/unbilled", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    # doc1 only owns c1 + c2 (both have doc1 as case doctor); p3/c3 belongs to doc2
+    assert not any("Patient Three" in (i.get("patient_name") or "") for i in data["items"])

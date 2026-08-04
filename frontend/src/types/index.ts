@@ -374,6 +374,8 @@ export interface TreatmentSitting {
   prescription?: string | null
   next_appointment_date: string | null
   next_appointment_time: string | null
+  next_appointment_doctor_id?: string | null
+  next_appointment_doctor_name?: string | null
   next_visit_required?: boolean
   materials_used?: string | null
   duration_minutes?: number | null

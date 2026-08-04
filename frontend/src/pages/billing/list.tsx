@@ -17,7 +17,7 @@ import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { NumericInput } from "@/components/ui/numeric-input"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -72,6 +72,19 @@ function getEmptyInvoiceForm(): InvoiceForm {
   return { case_id: "", patient_id: "", items: [], total_amount: null, paid_amount: null, payment_method: "", notes: "", discount_type: "PERCENTAGE", discount_percent: 0, discount_amount: 0, discount_reason: "" }
 }
 
+interface UnbilledOutstanding {
+  case_id: string
+  case_number?: string | null
+  patient_id: string | null
+  patient_name: string | null
+  op_no?: string | null
+  hospital_name?: string | null
+  doctor_name?: string | null
+  treatment_names: string[]
+  outstanding_balance: number
+  payment_status?: string | null
+}
+
 function Highlight({ text, query }: { text: string; query: string }) {
   if (!query) return <>{text}</>
   const idx = text.toLowerCase().indexOf(query.toLowerCase())
@@ -105,6 +118,7 @@ export default function BillingList() {
   const [recentPatients, setRecentPatients] = useState<Patient[]>([])
   const [selectedPatient, setSelectedPatient] = useState<BillingPatientSearchResult | null>(null)
   const [selectedCase, setSelectedCase] = useState<BillingSearchCase | null>(null)
+  const [pendingStartBilling, setPendingStartBilling] = useState<BillingPatientSearchResult | null>(null)
   const [caseBillable, setCaseBillable] = useState<CaseBillable | null>(null)
   const [searching, setSearching] = useState(false)
   const [caseLoading, setCaseLoading] = useState(false)
@@ -113,6 +127,12 @@ export default function BillingList() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useCreateParam(() => openDialog())
+
+  const { data: unbilledData } = useQuery<{ items: UnbilledOutstanding[] }>({
+    queryKey: ["billings-unbilled"],
+    queryFn: () => billingApi.unbilled({ page_size: 100 }),
+  })
+  const unbilled: UnbilledOutstanding[] = unbilledData?.items || []
 
   const { data, isLoading } = useQuery<PaginatedResponse<Billing>>({
     queryKey: ["billings"],
@@ -401,6 +421,41 @@ export default function BillingList() {
     setDialogOpen(true)
   }
 
+  function startBillingFor(u: UnbilledOutstanding) {
+    if (!u.patient_id || !u.patient_name) return
+    const billingCase: BillingSearchCase = {
+      id: u.case_id,
+      case_number: u.case_number,
+      chief_complaint: "",
+      doctor_name: u.doctor_name,
+      status: "COMPLETED",
+      outstanding_balance: u.outstanding_balance,
+      payment_status: u.payment_status,
+    }
+    const patient: BillingPatientSearchResult = {
+      id: u.patient_id,
+      full_name: u.patient_name,
+      op_no: u.op_no,
+      financial_summary: {
+        total_billed: 0,
+        total_paid: 0,
+        outstanding_balance: u.outstanding_balance,
+        payment_status: u.payment_status || "UNPAID",
+      },
+      active_cases: [billingCase],
+    }
+    setPendingStartBilling(patient)
+    setDialogOpen(true)
+  }
+
+  useEffect(() => {
+    if (dialogOpen && pendingStartBilling) {
+      selectPatient(pendingStartBilling)
+      setPendingStartBilling(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dialogOpen, pendingStartBilling])
+
   function handleDialogOpenChange(open: boolean) {
     if (!open) resetForm()
     setDialogOpen(open)
@@ -523,6 +578,43 @@ export default function BillingList() {
         <MetricCard title="Paid Amount" value={formatIndianRupees(kpis.paid)} icon={CreditCard} />
         <MetricCard title="Pending Amount" value={formatIndianRupees(kpis.pending)} icon={AlertCircle} />
       </div>
+
+      {unbilled.length > 0 && (
+        <Card>
+          <CardHeader className="flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Receipt className="h-4 w-4 text-amber-600" />
+              Completed Treatments Not Invoiced ({unbilled.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y">
+              {unbilled.map((u) => (
+                <div key={u.case_id} className="flex items-center gap-3 p-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{u.patient_name}</span>
+                      {u.case_number && (
+                        <span className="text-xs text-muted-foreground">{u.case_number}</span>
+                      )}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-0.5 truncate">
+                      {u.treatment_names.join(", ") || "Completed treatment"}
+                      {u.doctor_name ? ` • Dr. ${u.doctor_name}` : ""}
+                    </div>
+                  </div>
+                  <div className="text-sm font-semibold whitespace-nowrap">
+                    {formatIndianRupees(u.outstanding_balance)}
+                  </div>
+                  <Button size="sm" onClick={() => startBillingFor(u)}>
+                    <Receipt className="h-3.5 w-3.5 mr-1.5" /> Start Billing
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardContent className="p-6">
