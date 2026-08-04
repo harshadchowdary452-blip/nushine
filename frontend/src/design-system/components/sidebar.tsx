@@ -52,6 +52,7 @@ const navConfig: Record<RoleKey, NavGroup[]> = {
         { label: "Groups", icon: Shield, path: "/admin/groups" },
         { label: "Hospitals", icon: Building2, path: "/admin/hospitals" },
         { label: "Doctors", icon: Stethoscope, path: "/admin/doctors" },
+        { label: "Doctor Performance", icon: Activity, path: "/performance" },
       ],
     },
     {
@@ -72,6 +73,7 @@ const navConfig: Record<RoleKey, NavGroup[]> = {
       items: [
         { label: "Hospitals", icon: Building2, path: "/admin/hospitals" },
         { label: "Doctors", icon: Stethoscope, path: "/admin/doctors" },
+        { label: "Doctor Performance", icon: Activity, path: "/performance" },
       ],
     },
     {
@@ -101,6 +103,7 @@ const navConfig: Record<RoleKey, NavGroup[]> = {
         { label: "Patients", icon: Users, path: "/patients", badge: "Core" },
         { label: "Appointments", icon: CalendarDays, path: "/appointments" },
         { label: "Doctors", icon: Stethoscope, path: "/admin/doctors" },
+        { label: "Doctor Performance", icon: Activity, path: "/performance" },
       ],
     },
     {
@@ -146,6 +149,7 @@ const navConfig: Record<RoleKey, NavGroup[]> = {
         { label: "Dashboard", icon: LayoutDashboard, path: "/" },
         { label: "Tasks", icon: ListChecks, path: "/tasks" },
         { label: "Availability", icon: Clock, path: "/doctors/availability" },
+        { label: "My Performance", icon: Activity, path: "/performance" },
       ],
     },
     {

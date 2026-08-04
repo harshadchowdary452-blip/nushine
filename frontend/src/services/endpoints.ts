@@ -365,7 +365,7 @@ export const billingApi = {
   ) => api.put(`/billings/${id}/discount`, data).then((r) => r.data),
   searchPatients: (params: { q: string; limit?: number }) =>
     api.get("/billings/search", { params }).then((r) => r.data),
-  unbilled: (params?: { page_size?: number }) =>
+  unbilled: (params?: { page_size?: number; hospital_id?: string }) =>
     api.get("/billings/unbilled", { params }).then((r) => r.data),
   getCaseBillable: (caseId: string) =>
     api.get(`/billings/cases/${caseId}/billable`).then((r) => r.data),
@@ -402,6 +402,130 @@ export const dashboardApi = {
   ) => api.get(`/dashboards/quick-view/doctor/${id}`, { params }).then((r) => r.data),
   quickViewPatient: (id: string) =>
     api.get(`/dashboards/quick-view/patient/${id}`).then((r) => r.data),
+}
+
+export interface DoctorPerformanceParams {
+  period?: string
+  start_date?: string
+  end_date?: string
+  group_id?: string
+}
+
+export interface DoctorPerformanceSummary {
+  doctors: number
+  patients_seen: number
+  new_patients: number
+  returning_patients: number
+  appointments_total: number
+  appointments_completed: number
+  appointments_cancelled: number
+  appointments_rescheduled: number
+  cases_created: number
+  cases_completed: number
+  active_cases: number
+  treatment_plans_created: number
+  treatments_completed: number
+  treatments_active: number
+  sittings_completed: number
+  revenue: number
+  avg_revenue_per_patient: number
+  avg_revenue_per_appointment: number
+  case_completion_rate: number
+  treatment_completion_rate: number
+  treatment_acceptance_rate: number
+  attendance_rate: number
+  retention_rate: number
+  recall_success_rate: number
+  avg_rating: number | null
+}
+
+export interface DoctorPerformanceRow {
+  id: string
+  name: string
+  email: string
+  qualification: string | null
+  specialization: string | null
+  designation: string
+  department: string
+  hospital_id: string | null
+  hospital_name: string | null
+  admin_group_id: string | null
+  admin_group_name: string | null
+  patients_seen: number
+  new_patients: number
+  returning_patients: number
+  appointments_total: number
+  appointments_completed: number
+  appointments_cancelled: number
+  appointments_rescheduled: number
+  cases_created: number
+  cases_completed: number
+  active_cases: number
+  treatment_plans_created: number
+  treatments_completed: number
+  treatments_active: number
+  sittings_completed: number
+  revenue: number
+  avg_revenue_per_patient: number
+  avg_revenue_per_appointment: number
+  case_completion_rate: number
+  treatment_completion_rate: number
+  treatment_acceptance_rate: number
+  attendance_rate: number
+  retention_rate: number
+  recall_success_rate: number
+  avg_rating: number | null
+}
+
+export interface DoctorPerformanceOverview {
+  period: string
+  scope: {
+    role: string
+    hospital_id: string | null
+    admin_group_id: string | null
+    group_id: string | null
+  }
+  summary: DoctorPerformanceSummary
+  previous: {
+    revenue: number
+    patients_seen: number
+    appointments_completed: number
+  }
+  deltas: {
+    revenue_pct: number
+    patients_pct: number
+    appointments_pct: number
+  }
+  doctors: DoctorPerformanceRow[]
+}
+
+export interface DoctorPerformanceDetail extends DoctorPerformanceRow {
+  phone: string | null
+  license_number: string | null
+  period: string
+  metrics: DoctorPerformanceRow
+  summary: DoctorPerformanceSummary
+  revenue_trend: { month: string; revenue: number }[]
+  appointment_trend: { month: string; n: number }[]
+  treatment_breakdown: { name: string; value: number }[]
+  recent_appointments: {
+    id: string
+    appointment_number: string
+    patient_name: string
+    appointment_date: string
+    appointment_time: string
+    status: string
+    appointment_type: string
+  }[]
+}
+
+export const doctorPerformanceApi = {
+  overview: (params?: DoctorPerformanceParams) =>
+    api.get<DoctorPerformanceOverview>("/doctor-performance", { params }).then((r) => r.data),
+  detail: (doctorId: string, params?: DoctorPerformanceParams) =>
+    api
+      .get<DoctorPerformanceDetail>(`/doctor-performance/${doctorId}`, { params })
+      .then((r) => r.data),
 }
 
 export const expensesApi = {

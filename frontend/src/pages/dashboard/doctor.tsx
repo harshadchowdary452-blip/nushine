@@ -10,6 +10,7 @@ import { useAuthStore } from "@/store/authStore"
 import { dashboardApi } from "@/services/endpoints"
 import { formatIndianNumber, formatIndianRupees } from "@/lib/currency"
 import { useDashboardActivity } from "@/lib/dashboard-activity"
+import { useUnbilledBilling } from "@/lib/use-unbilled-billing"
 import {
   AlertCenter, BusinessInsights, CommandCenter, DashboardChart,
   DashboardHeader, DashboardSection, DashboardShell, DepartmentPerformance,
@@ -100,6 +101,8 @@ export default function DoctorDashboard() {
     refetchInterval: 30000,
     refetchIntervalInBackground: false,
   })
+
+  const unbilledQuery = useUnbilledBilling()
 
   if (!user) return null
 
@@ -270,6 +273,16 @@ export default function DoctorDashboard() {
   /* ── Critical alerts ─────────────────────────────────────────────────────── */
   const revenueChange = s?.revenue_change ?? 0
   const alerts: AlertItem[] = []
+  const unbilledItems = unbilledQuery.items ?? []
+  if (unbilledItems.length > 0) {
+    alerts.push({
+      id: "unbilled-treatments",
+      title: `${unbilledItems.length} completed treatment(s) not invoiced`,
+      description: `${formatIndianRupees(unbilledQuery.total)} pending — start billing to collect.`,
+      severity: "warning",
+      onClick: () => navigate("/billing"),
+    })
+  }
   if (revenueChange < 0) {
     alerts.push({
       id: "revenue-drop",

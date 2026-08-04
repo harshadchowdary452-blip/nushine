@@ -16,12 +16,17 @@ collect_ignore = [
     "test_treatment_execution_e2e.py",
 ]
 
-TEST_DATABASE_URL = "sqlite+aiosqlite://"
-# Align app config with the in-memory test database so DB-specific SQL
-# (to_char vs strftime) resolves to SQLite during tests.
+import os
+
+TEST_DATABASE_URL = os.environ.get(
+    "TEST_DATABASE_URL",
+    "postgresql+asyncpg://postgres:postgres@localhost:5432/nushine_test",
+)
+# Align app config with the test database so DB-specific SQL (to_char vs
+# strftime) resolves to PostgreSQL during tests, matching production.
 from app.config import settings as _settings
 _settings.DATABASE_URL = TEST_DATABASE_URL
-engine = create_async_engine(TEST_DATABASE_URL, echo=False, connect_args={"check_same_thread": False})
+engine = create_async_engine(TEST_DATABASE_URL, echo=False)
 test_async_session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 

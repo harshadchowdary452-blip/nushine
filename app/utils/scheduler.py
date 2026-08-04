@@ -121,11 +121,14 @@ async def check_missed_appointments():
                 for apt in appointments:
                     from app.models.treatment_sitting import TreatmentSitting, TreatmentSittingStatus
                     from app.models.treatment_plan import TreatmentPlan
+                    from app.models.case import Case
                     sitting_q = await db.execute(
                         select(TreatmentSitting.id).join(
                             TreatmentPlan, TreatmentSitting.treatment_plan_id == TreatmentPlan.id
+                        ).join(
+                            Case, TreatmentPlan.case_id == Case.id
                         ).where(
-                            TreatmentPlan.patient_id == apt.patient_id,
+                            Case.patient_id == apt.patient_id,
                             TreatmentSitting.status == TreatmentSittingStatus.COMPLETED.value,
                             TreatmentSitting.sitting_date == yesterday,
                         ).limit(1)

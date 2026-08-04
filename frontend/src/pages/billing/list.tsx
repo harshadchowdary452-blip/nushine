@@ -132,7 +132,7 @@ export default function BillingList() {
     queryKey: ["billings-unbilled"],
     queryFn: () => billingApi.unbilled({ page_size: 100 }),
   })
-  const unbilled: UnbilledOutstanding[] = unbilledData?.items || []
+  const unbilled: UnbilledOutstanding[] = useMemo(() => unbilledData?.items || [], [unbilledData])
 
   const { data, isLoading } = useQuery<PaginatedResponse<Billing>>({
     queryKey: ["billings"],
@@ -153,9 +153,10 @@ export default function BillingList() {
   const kpis = useMemo(() => {
     const total = billings.reduce((s, b) => s + b.total_amount, 0)
     const paid = billings.reduce((s, b) => s + b.paid_amount, 0)
-    const pending = billings.reduce((s, b) => s + b.pending_amount, 0)
-    return { total, paid, pending }
-  }, [billings])
+    const unbilledTotal = unbilled.reduce((s, u) => s + (u.outstanding_balance || 0), 0)
+    const pending = billings.reduce((s, b) => s + b.pending_amount, 0) + unbilledTotal
+    return { total, paid, pending, unbilledTotal }
+  }, [billings, unbilled])
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => billingApi.delete(id),
@@ -576,7 +577,13 @@ export default function BillingList() {
       <div className="grid gap-4 sm:grid-cols-3">
         <MetricCard title="Total Revenue" value={formatIndianRupees(kpis.total)} icon={DollarSign} />
         <MetricCard title="Paid Amount" value={formatIndianRupees(kpis.paid)} icon={CreditCard} />
-        <MetricCard title="Pending Amount" value={formatIndianRupees(kpis.pending)} icon={AlertCircle} />
+        <MetricCard
+          title="Pending Amount"
+          value={formatIndianRupees(kpis.pending)}
+          icon={AlertCircle}
+          change={kpis.unbilledTotal > 0 ? `Includes ${formatIndianRupees(kpis.unbilledTotal)} in completed, unbilled treatments` : undefined}
+          trend="neutral"
+        />
       </div>
 
       {unbilled.length > 0 && (

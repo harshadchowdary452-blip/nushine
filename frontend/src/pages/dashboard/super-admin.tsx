@@ -11,6 +11,7 @@ import type { LucideIcon } from "lucide-react"
 import { useAuthStore } from "@/store/authStore"
 import { dashboardApi } from "@/services/endpoints"
 import { useDashboardActivity } from "@/lib/dashboard-activity"
+import { useUnbilledBilling } from "@/lib/use-unbilled-billing"
 import { QuickViewDrawer } from "@/design-system"
 import {
   AlertCenter, BusinessInsights, CommandCenter, DashboardChart, DashboardHeader,
@@ -182,6 +183,8 @@ export default function SuperAdminDashboard() {
 
   const { items: activityFeed, loading: activityLoading } = useDashboardActivity()
 
+  const unbilledQuery = useUnbilledBilling()
+
   const onGroupClick = useCallback((perf?: GroupPerf) => {
     if (perf?.id) setQuickView({ type: "admin-group", id: perf.id, name: perf.name || "" })
   }, [])
@@ -273,6 +276,16 @@ export default function SuperAdminDashboard() {
 
   /* ── Critical alerts ─────────────────────────────────────────────────────── */
   const alerts: AlertItem[] = []
+  const unbilledItems = unbilledQuery.items ?? []
+  if (unbilledItems.length > 0) {
+    alerts.push({
+      id: "unbilled-treatments",
+      title: `${unbilledItems.length} completed treatment(s) not invoiced`,
+      description: `${formatIndianRupees(unbilledQuery.total)} pending — start billing to collect.`,
+      severity: "warning",
+      onClick: () => navigate("/billing"),
+    })
+  }
   const revenueChange = comparison.revenue_change ?? 0
   if (revenueChange < 0) {
     alerts.push({

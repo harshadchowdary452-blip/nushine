@@ -6,9 +6,8 @@ import pytest
 import uuid
 from datetime import datetime, date, timezone, timedelta
 from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy import select
-from app.database import Base, get_db
+from app.database import get_db
 from app.main import app
 from app.core.security import hash_password
 from app.core.permissions import Role
@@ -21,30 +20,7 @@ from app.models.billing import Billing, PaymentStatus
 from app.models.treatment_plan import TreatmentPlan, TreatmentPlanStatus
 from app.models.treatment_sitting import TreatmentSitting, TreatmentSittingStatus
 
-TEST_DB_URL = "sqlite+aiosqlite://"
-engine = create_async_engine(TEST_DB_URL, echo=False, connect_args={"check_same_thread": False})
-test_session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-
-
-@pytest.fixture(autouse=True)
-async def setup_db():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-
-
-async def override_get_db():
-    async with test_session_factory() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
-        finally:
-            await session.close()
+from tests.conftest import test_async_session_factory as test_session_factory, override_get_db
 
 
 @pytest.fixture

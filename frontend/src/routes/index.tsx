@@ -51,6 +51,8 @@ const ConsentFormList = lazy(() => import("@/pages/consent-forms/list"))
 const ConsentFormView = lazy(() => import("@/pages/consent-forms/view"))
 const ExportCenter = lazy(() => import("@/pages/exports/export-center"))
 const ClinicalSettings = lazy(() => import("@/pages/clinical-settings"))
+const DoctorPerformanceOverview = lazy(() => import("@/pages/performance/overview"))
+const DoctorPerformanceProfile = lazy(() => import("@/pages/performance/doctor-profile"))
 const NotFoundPage = lazy(() => import("@/pages/errors/not-found"))
 const RouteErrorPage = lazy(() => import("@/pages/errors/route-error"))
 
@@ -214,6 +216,14 @@ export const router = createBrowserRouter([
       { path: "/treatments/workflow", element: withRoles(<TreatmentWorkflowBoard />, ADMIN_ROLES) },
       { path: "/treatments/queue", element: withRoles(<DoctorQueue />, CARE_ROLES) },
       { path: "/tasks", element: withRoles(<TaskCenter />, [...ADMIN_ROLES, "DOCTOR"]) },
+      {
+        path: "/performance",
+        element: withRoles(<DoctorPerformanceOverview />, [...ADMIN_ROLES, "DOCTOR"]),
+      },
+      {
+        path: "/performance/:doctorId",
+        element: withRoles(<DoctorPerformanceProfile />, [...ADMIN_ROLES, "DOCTOR"]),
+      },
       { path: "/consent-forms", element: withRoles(<ConsentFormList />, CARE_ROLES) },
       { path: "/consent-forms/view/:id", element: withRoles(<ConsentFormView />, CARE_ROLES) },
       { path: "/settings/clinical", element: withRoles(<ClinicalSettings />, ["HOSPITAL_ADMIN"]) },

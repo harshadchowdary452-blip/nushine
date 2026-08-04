@@ -9,6 +9,7 @@ import { useAuthStore } from "@/store/authStore"
 import { useHospitalStore } from "@/store/hospitalStore"
 import { dashboardApi, hospitalsApi } from "@/services/endpoints"
 import { useDashboardActivity } from "@/lib/dashboard-activity"
+import { useUnbilledBilling } from "@/lib/use-unbilled-billing"
 import { QuickViewDrawer, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Label } from "@/design-system"
 import {
   AlertCenter, BusinessInsights, CommandCenter, DashboardChart, DashboardHeader,
@@ -133,6 +134,8 @@ export default function GroupAdminDashboard() {
   })
 
   const { items: activityFeed, loading: activityLoading } = useDashboardActivity()
+
+  const unbilledQuery = useUnbilledBilling()
 
   const onHospitalClick = useCallback((perf?: HospitalPerf) => {
     if (perf?.id) setQuickView({ type: "hospital", id: perf.id, name: perf.name || "" })
@@ -281,6 +284,16 @@ export default function GroupAdminDashboard() {
 
   /* ── Critical alerts ─────────────────────────────────────────────────────── */
   const alerts: AlertItem[] = []
+  const unbilledItems = unbilledQuery.items ?? []
+  if (unbilledItems.length > 0) {
+    alerts.push({
+      id: "unbilled-treatments",
+      title: `${unbilledItems.length} completed treatment(s) not invoiced`,
+      description: `${formatIndianRupees(unbilledQuery.total)} pending — start billing to collect.`,
+      severity: "warning",
+      onClick: () => navigate("/billing"),
+    })
+  }
   const revenueChange = comparison.revenue_change ?? 0
   if (revenueChange < 0) {
     alerts.push({

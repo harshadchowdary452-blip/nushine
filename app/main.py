@@ -19,7 +19,7 @@ from app.core.logging import setup_logging, correlation_id, generate_correlation
 from app.core.middleware import RequestIDMiddleware
 from app.dependencies import verify_hospital_context
 from app.utils.scheduler import check_appointment_reminders, check_same_day_appointments, check_missed_appointments, check_overdue_treatments, check_recurring_recalls
-from app.routers import auth, admin_groups, hospitals, doctors, consultants, patients, cases, consultant_notes, treatment_plans, treatment_sittings, treatment_plan_items, appointments, billings, pre_ops, post_ops, dashboards, whatsapp_messaging, whatsapp_config, notifications, hospital_monthly_expenses, reports, crm, crm_v2, calendar, status_audit, leads, doctor_working_hours, doctor_availability, doctor_leaves, doctor_blocked_slots, consent_forms, enquiries, treatment_follow_ups, recalls, exports, treatment_types, doctor_queue, clinical_progress_notes, master_data, crm_rules, crm_config_settings, crm_feedback, crm_settings, users, tasks
+from app.routers import auth, admin_groups, hospitals, doctors, consultants, patients, cases, consultant_notes, treatment_plans, treatment_sittings, treatment_plan_items, appointments, billings, pre_ops, post_ops, dashboards, doctor_performance, whatsapp_messaging, whatsapp_config, notifications, hospital_monthly_expenses, reports, crm, crm_v2, calendar, status_audit, leads, doctor_working_hours, doctor_availability, doctor_leaves, doctor_blocked_slots, consent_forms, enquiries, treatment_follow_ups, recalls, exports, treatment_types, doctor_queue, clinical_progress_notes, master_data, crm_rules, crm_config_settings, crm_feedback, crm_settings, users, tasks
 from app.crm.routers import events as crm_events
 from app.crm.routers import event_test as crm_event_test
 from app.crm.routers import automation as crm_automation
@@ -300,6 +300,7 @@ app.include_router(crm_automation.router, prefix="/api/v1/crm", dependencies=[De
 app.include_router(crm_feedback.router, prefix="/api/v1", dependencies=[Depends(verify_hospital_context)])
 app.include_router(users.router, prefix="/api/v1", dependencies=[Depends(verify_hospital_context)])
 app.include_router(tasks.router, prefix="/api/v1", dependencies=[Depends(verify_hospital_context)])
+app.include_router(doctor_performance.router, prefix="/api/v1", dependencies=[Depends(verify_hospital_context)])
 
 
 @app.get("/")

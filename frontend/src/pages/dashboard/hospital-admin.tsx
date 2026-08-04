@@ -9,6 +9,7 @@ import {
 } from "lucide-react"
 import { useAuthStore } from "@/store/authStore"
 import { consentFormsApi, dashboardApi, doctorsApi } from "@/services/endpoints"
+import { useUnbilledBilling } from "@/lib/use-unbilled-billing"
 import { getHospitalOverride, setHospitalOverride } from "@/lib/hospital-override"
 import { cn } from "@/lib/utils"
 import { formatIndianNumber, formatIndianRupees } from "@/lib/currency"
@@ -208,6 +209,8 @@ export default function HospitalAdminDashboard() {
     enabled: !!activeHospitalId,
   })
 
+  const unbilledQuery = useUnbilledBilling()
+
   const onDoctorClick = useCallback((perf?: DoctorPerf) => {
     if (perf?.id) setQuickView({ type: "doctor", id: perf.id, name: perf.name || "" })
   }, [])
@@ -372,6 +375,16 @@ export default function HospitalAdminDashboard() {
 
   /* ── Critical alerts ─────────────────────────────────────────────────────── */
   const alerts: AlertItem[] = []
+  const unbilledItems = unbilledQuery.items ?? []
+  if (unbilledItems.length > 0) {
+    alerts.push({
+      id: "unbilled-treatments",
+      title: `${unbilledItems.length} completed treatment(s) not invoiced`,
+      description: `${formatIndianRupees(unbilledQuery.total)} pending — start billing to collect.`,
+      severity: "warning",
+      onClick: () => navigate("/billing"),
+    })
+  }
   const revenueChange = cmp.revenue_change ?? 0
   if (revenueChange < 0) {
     alerts.push({
