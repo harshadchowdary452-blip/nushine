@@ -27,7 +27,8 @@ async def seed(db_session):
     }
     db_session.add_all(list(users.values()))
     await db_session.commit()
-    return {"hospital_id": hospital.id, **{k: v.id for k, v in users.items()}}
+    return {"hospital_id": hospital.id, "admin_group_id": group.id,
+            **{k: v.id for k, v in users.items()}}
 
 
 async def login(client, email):
@@ -141,7 +142,7 @@ async def test_date_wise_expenses_e2e(client: AsyncClient, seed):
 
     # Create a second hospital, add expense there, verify HA doesn't see it
     r = await client.post("/api/v1/hospitals/", headers=headers, json={
-        "name": "Other Hospital", "address": "Other", "admin_group_id": seed["hospital_id"]
+        "name": "Other Hospital", "address": "Other", "admin_group_id": seed["admin_group_id"]
     })
     assert r.status_code == 201
     other_hid = r.json()["id"]

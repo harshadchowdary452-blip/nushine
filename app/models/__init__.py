@@ -62,6 +62,14 @@ from app.models.generated_enquiry import GeneratedEnquiry
 from app.models.event_log import EventLog
 from app.models.crm_automation_log import CrmAutomationLog
 from app.models.task import Task, TaskStatus, TaskPriority
+from app.models.doctor_hospital import DoctorHospital
+from app.models.inventory_category import InventoryCategory
+from app.models.supplier import Supplier
+from app.models.inventory_master import InventoryMaster
+from app.models.hospital_inventory import HospitalInventory
+from app.models.inventory_transaction import InventoryTransaction, InventoryTransactionType
+from app.models.monthly_order import MonthlyOrder, MonthlyOrderItem, MonthlyOrderStatus
+from app.models.pending_inventory_item import PendingInventoryItem
 
 __all__ = [
     "AdminGroup", "Hospital", "User", "Patient", "Consultant",
@@ -102,4 +110,9 @@ __all__ = [
     "EventLog",
     "CrmAutomationLog",
     "Task", "TaskStatus", "TaskPriority",
+    "DoctorHospital",
+    "InventoryCategory", "Supplier", "InventoryMaster", "HospitalInventory",
+    "InventoryTransaction", "InventoryTransactionType",
+    "MonthlyOrder", "MonthlyOrderItem", "MonthlyOrderStatus",
+    "PendingInventoryItem",
 ]

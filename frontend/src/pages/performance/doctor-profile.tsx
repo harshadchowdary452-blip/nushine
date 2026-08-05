@@ -228,7 +228,7 @@ export default function DoctorPerformanceProfile() {
         title={isLoading && !data ? "Loading doctor..." : (data?.name ?? "Doctor")}
         subtitle={
           data
-            ? `${data.designation} · ${data.department}${data.hospital_name ? ` · ${data.hospital_name}` : ""}`
+            ? `${data.designation} · ${data.department}`
             : undefined
         }
         stats={[

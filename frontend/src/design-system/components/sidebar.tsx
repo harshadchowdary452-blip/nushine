@@ -10,6 +10,7 @@ import {
   Activity, IndianRupee, FileText,
   Clock, UserPlus, Search, Download, LayoutList, Kanban,
   Sun, Moon, Star, ChevronDown, Hospital, Menu, ListChecks,
+  Package,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useSidebarStore } from "@/store/sidebarStore"
@@ -56,6 +57,10 @@ const navConfig: Record<RoleKey, NavGroup[]> = {
       ],
     },
     {
+      label: "Inventory",
+      items: [{ label: "Inventory", icon: Package, path: "/inventory" }],
+    },
+    {
       label: "Configuration",
       items: [{ label: "Settings", icon: Settings, path: "/settings" }],
     },
@@ -79,6 +84,10 @@ const navConfig: Record<RoleKey, NavGroup[]> = {
     {
       label: "Clinical",
       items: [{ label: "Workflow Board", icon: Kanban, path: "/treatments/workflow" }],
+    },
+    {
+      label: "Inventory",
+      items: [{ label: "Inventory", icon: Package, path: "/inventory" }],
     },
     {
       label: "Finance",
@@ -126,6 +135,10 @@ const navConfig: Record<RoleKey, NavGroup[]> = {
       ],
     },
     {
+      label: "Inventory",
+      items: [{ label: "Inventory", icon: Package, path: "/inventory" }],
+    },
+    {
       label: "Finance",
       items: [
         { label: "Expenses", icon: IndianRupee, path: "/admin/expenses" },
@@ -168,6 +181,10 @@ const navConfig: Record<RoleKey, NavGroup[]> = {
         { label: "Billing", icon: Receipt, path: "/billing" },
         { label: "Consent Forms", icon: FileText, path: "/consent-forms" },
       ],
+    },
+    {
+      label: "Inventory",
+      items: [{ label: "Inventory", icon: Package, path: "/inventory" }],
     },
     {
       label: "Settings",

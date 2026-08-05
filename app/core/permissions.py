@@ -51,6 +51,10 @@ class Permission(str, Enum):
     MANAGE_LEADS = "MANAGE_LEADS"
     VIEW_LEADS = "VIEW_LEADS"
     VIEW_CRM_DASHBOARD = "VIEW_CRM_DASHBOARD"
+    VIEW_INVENTORY = "VIEW_INVENTORY"
+    MANAGE_INVENTORY = "MANAGE_INVENTORY"
+    VIEW_SUPPLIERS = "VIEW_SUPPLIERS"
+    MANAGE_SUPPLIERS = "MANAGE_SUPPLIERS"
 
 
 ROLE_PERMISSIONS = {
@@ -74,6 +78,8 @@ ROLE_PERMISSIONS = {
         Permission.MANAGE_LEADS, Permission.VIEW_LEADS,
         Permission.VIEW_CRM_DASHBOARD, Permission.VIEW_REVENUE_ANALYTICS,
         Permission.VIEW_DOCTOR_PERFORMANCE, Permission.VIEW_HOSPITAL_PERFORMANCE,
+        Permission.VIEW_INVENTORY, Permission.MANAGE_INVENTORY,
+        Permission.VIEW_SUPPLIERS, Permission.MANAGE_SUPPLIERS,
     ],
     Role.GROUP_ADMIN: [
         Permission.CREATE_HOSPITAL, Permission.CREATE_HOSPITAL_ADMIN,
@@ -90,6 +96,8 @@ ROLE_PERMISSIONS = {
         Permission.VIEW_TREATMENT_QUEUE,
         Permission.MANAGE_EXPENSES, Permission.VIEW_EXPENSES, Permission.DELETE_EXPENSE,
         Permission.MANAGE_LEADS, Permission.VIEW_LEADS,
+        Permission.VIEW_INVENTORY, Permission.MANAGE_INVENTORY,
+        Permission.VIEW_SUPPLIERS, Permission.MANAGE_SUPPLIERS,
     ],
     Role.HOSPITAL_ADMIN: [
         Permission.CREATE_DOCTOR, Permission.CREATE_CONSULTANT,
@@ -104,6 +112,8 @@ ROLE_PERMISSIONS = {
         Permission.MANAGE_EXPENSES, Permission.VIEW_EXPENSES,
         Permission.MANAGE_LEADS, Permission.VIEW_LEADS,
         Permission.VIEW_CRM_DASHBOARD,
+        Permission.VIEW_INVENTORY, Permission.MANAGE_INVENTORY,
+        Permission.VIEW_SUPPLIERS, Permission.MANAGE_SUPPLIERS,
     ],
     Role.DOCTOR: [
         Permission.MANAGE_PATIENTS,
@@ -116,6 +126,7 @@ ROLE_PERMISSIONS = {
         Permission.COMPLETE_TREATMENT,
         Permission.VIEW_ALL_DOCTORS, Permission.VIEW_OWN_HOSPITALS,
         Permission.MANAGE_LEADS, Permission.VIEW_LEADS,
+        Permission.VIEW_INVENTORY,
     ],
 }
 
@@ -142,6 +153,16 @@ def verify_permission(current_user: dict, *permissions: Permission):
         logger.error("VERIFY_PERMISSION FAIL: role=%s missing %s, user_permissions=%s", user_role, [p.value for p in permissions], [p.value for p in user_permissions])
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Missing required permission: {', '.join(p.value for p in permissions)}")
     logger.debug("VERIFY_PERMISSION OK: sub=%s role=%s", user_sub, user_role)
+
+
+def verify_role(current_user: dict, *roles: Role):
+    """Require the caller to hold one of the given roles (exact role check)."""
+    user_role = current_user.get("role")
+    if user_role not in [r.value for r in roles]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Required role: {', '.join(r.value for r in roles)}",
+        )
 
 
 async def _hospital_admin_group(db, hospital_id):
@@ -217,6 +238,11 @@ async def verify_tenant_access(current_user: dict, entity: object, entity_type: 
             hid = prow[0] if prow else None
     elif entity_type in ("consultant", "consent_form", "expense"):
         hid = getattr(entity, "hospital_id", None)
+    elif entity_type in ("hospital_inventory", "inventory_transaction"):
+        hid = getattr(entity, "hospital_id", None)
+    elif entity_type == "monthly_order":
+        hid = getattr(entity, "hospital_id", None)
+        entity_agid = getattr(entity, "admin_group_id", None)
 
     if role == Role.GROUP_ADMIN.value:
         if not entity_agid:

@@ -83,6 +83,10 @@ export const doctorsApi = {
     api.put(`/doctors/${id}`, data).then((r) => r.data),
   deactivate: (id: string) => api.post(`/doctors/${id}/deactivate`),
   activate: (id: string) => api.post(`/doctors/${id}/activate`),
+  delete: (id: string) => api.delete(`/doctors/${id}`).then((r) => r.data),
+  listMemberships: (id: string) => api.get(`/doctors/${id}/memberships`).then((r) => r.data),
+  setHospitalActive: (id: string, hospitalId: string, active: boolean) =>
+    api.post(`/doctors/${id}/hospitals/${hospitalId}/${active ? "activate" : "deactivate"}`).then((r) => r.data),
 }
 
 export const patientsApi = {
@@ -469,6 +473,7 @@ export interface DoctorPerformanceRow {
   hospital_name: string | null
   admin_group_id: string | null
   admin_group_name: string | null
+  is_active: boolean
   patients_seen: number
   new_patients: number
   returning_patients: number
@@ -584,6 +589,130 @@ export const expensesApi = {
   calendar: (params?: { month?: number; year?: number; hospital_id?: string }) =>
     api.get("/expenses/calendar", { params }).then((r) => r.data),
   calendarDay: (date: string) => api.get(`/expenses/calendar/${date}`).then((r) => r.data),
+}
+
+export const inventoryCategoriesApi = {
+  list: (params?: Record<string, unknown>) =>
+    api.get("/inventory/categories", { params }).then((r) => r.data),
+  tree: (params?: Record<string, unknown>) =>
+    api.get("/inventory/categories/tree", { params }).then((r) => r.data),
+  get: (id: string) => api.get(`/inventory/categories/${id}`).then((r) => r.data),
+  create: (data: Record<string, unknown>) =>
+    api.post("/inventory/categories", data).then((r) => r.data),
+  update: (id: string, data: Record<string, unknown>) =>
+    api.put(`/inventory/categories/${id}`, data).then((r) => r.data),
+  delete: (id: string) => api.delete(`/inventory/categories/${id}`).then((r) => r.data),
+}
+
+export const suppliersApi = {
+  list: (params?: Record<string, unknown>) =>
+    api.get("/inventory/suppliers", { params }).then((r) => r.data),
+  get: (id: string) => api.get(`/inventory/suppliers/${id}`).then((r) => r.data),
+  create: (data: Record<string, unknown>) =>
+    api.post("/inventory/suppliers", data).then((r) => r.data),
+  update: (id: string, data: Record<string, unknown>) =>
+    api.put(`/inventory/suppliers/${id}`, data).then((r) => r.data),
+  delete: (id: string) => api.delete(`/inventory/suppliers/${id}`).then((r) => r.data),
+}
+
+export const inventoryItemsApi = {
+  list: (params?: Record<string, unknown>) =>
+    api.get("/inventory/items", { params }).then((r) => r.data),
+  get: (id: string) => api.get(`/inventory/items/${id}`).then((r) => r.data),
+  create: (data: Record<string, unknown>) =>
+    api.post("/inventory/items", data).then((r) => r.data),
+  update: (id: string, data: Record<string, unknown>) =>
+    api.put(`/inventory/items/${id}`, data).then((r) => r.data),
+  delete: (id: string) => api.delete(`/inventory/items/${id}`).then((r) => r.data),
+}
+
+export const hospitalInventoryApi = {
+  list: (params?: Record<string, unknown>) =>
+    api.get("/inventory/hospital", { params }).then((r) => r.data),
+  get: (id: string) => api.get(`/inventory/hospital/${id}`).then((r) => r.data),
+  create: (data: Record<string, unknown>) =>
+    api.post("/inventory/hospital", data).then((r) => r.data),
+  update: (id: string, data: Record<string, unknown>) =>
+    api.put(`/inventory/hospital/${id}`, data).then((r) => r.data),
+  delete: (id: string) => api.delete(`/inventory/hospital/${id}`).then((r) => r.data),
+}
+
+export const inventoryTransactionsApi = {
+  list: (params?: Record<string, unknown>) =>
+    api.get("/inventory/transactions", { params }).then((r) => r.data),
+  get: (id: string) => api.get(`/inventory/transactions/${id}`).then((r) => r.data),
+  create: (data: Record<string, unknown>) =>
+    api.post("/inventory/transactions", data).then((r) => r.data),
+}
+
+export const monthlyOrdersApi = {
+  suggestions: (params: { hospital_id?: string; order_period?: string }) =>
+    api.get("/inventory/monthly-orders/suggestions", { params }).then((r) => r.data),
+  list: (params?: Record<string, unknown>) =>
+    api.get("/inventory/monthly-orders", { params }).then((r) => r.data),
+  get: (id: string) => api.get(`/inventory/monthly-orders/${id}`).then((r) => r.data),
+  create: (data: Record<string, unknown>) =>
+    api.post("/inventory/monthly-orders", data).then((r) => r.data),
+  submit: (data: Record<string, unknown>) =>
+    api.post("/inventory/monthly-orders/submit", data).then((r) => r.data),
+  update: (id: string, data: Record<string, unknown>) =>
+    api.put(`/inventory/monthly-orders/${id}`, data).then((r) => r.data),
+  transition: (id: string, data: Record<string, unknown>) =>
+    api.post(`/inventory/monthly-orders/${id}/transition`, data).then((r) => r.data),
+  delete: (id: string) => api.delete(`/inventory/monthly-orders/${id}`).then((r) => r.data),
+  consolidated: (params: { order_period: string; hospital_ids?: string }) =>
+    api.get("/inventory/monthly-orders/consolidated", { params }).then((r) => r.data),
+  overview: (params: { order_period: string; hospital_ids?: string }) =>
+    api.get("/inventory/monthly-orders/overview", { params }).then((r) => r.data),
+  validate: (params: { order_period: string }) =>
+    api.get("/inventory/monthly-orders/validate", { params }).then((r) => r.data),
+  generate: (params: { order_period: string }) =>
+    api.post("/inventory/monthly-orders/generate", null, { params }).then((r) => r.data),
+  audit: (params: { page?: number; page_size?: number; order_period?: string }) =>
+    api.get("/inventory/monthly-orders/audit", { params }).then((r) => r.data),
+}
+
+export const pendingInventoryItemsApi = {
+  create: (data: Record<string, unknown>) =>
+    api.post("/inventory/pending-items", data).then((r) => r.data),
+  list: (params?: {
+    page?: number
+    page_size?: number
+    hospital_id?: string
+    status?: string
+    order_period?: string
+  }) => api.get("/inventory/pending-items", { params }).then((r) => r.data),
+  get: (id: string) => api.get(`/inventory/pending-items/${id}`).then((r) => r.data),
+  update: (id: string, data: Record<string, unknown>) =>
+    api.put(`/inventory/pending-items/${id}`, data).then((r) => r.data),
+  review: (id: string, data: Record<string, unknown>) =>
+    api.post(`/inventory/pending-items/${id}/review`, data).then((r) => r.data),
+  duplicates: (name: string) =>
+    api.get("/inventory/pending-items/duplicates", { params: { name } }).then((r) => r.data),
+}
+
+export const inventoryInsightsApi = {
+  item: (params: { hospital_id?: string; item_id?: string }) =>
+    api.get("/inventory/insights/item", { params }).then((r) => r.data),
+  stock: (params: { hospital_id?: string; item_ids?: string }) =>
+    api.get("/inventory/insights/stock", { params }).then((r) => r.data),
+  transferSuggestions: (params: { hospital_ids?: string; item_ids?: string }) =>
+    api.get("/inventory/insights/transfer-suggestions", { params }).then((r) => r.data),
+}
+
+export const inventoryReportApi = {
+  get: (params: {
+    report_type: string
+    format?: string
+    hospital_id?: string
+    category_id?: string
+    supplier_id?: string
+    date_from?: string
+    date_to?: string
+    status?: string
+    order_period?: string
+    search?: string
+  }) => api.get("/reports/inventory", { params, responseType: "blob" }).then((r) => r.data),
 }
 
 export const reportsApi = {

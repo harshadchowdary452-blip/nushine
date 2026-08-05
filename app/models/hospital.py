@@ -26,3 +26,7 @@ class Hospital(Base):
     consultants = relationship("Consultant", back_populates="hospital")
     expenses = relationship("HospitalMonthlyExpense", back_populates="hospital")
     consent_forms = relationship("ConsentForm", back_populates="hospital")
+    doctor_memberships = relationship("DoctorHospital", back_populates="hospital", cascade="all, delete-orphan")
+    inventory_rows = relationship("HospitalInventory", back_populates="hospital", cascade="all, delete-orphan")
+    inventory_transactions = relationship("InventoryTransaction", back_populates="hospital")
+    monthly_orders = relationship("MonthlyOrder", back_populates="hospital")

@@ -75,3 +75,17 @@ class UserService:
         if user:
             await self.audit_log_repo.create(user_id=admin_id, action="ACTIVATE_USER", entity_type="USER", entity_id=user_id, details=f"User activated")
         return user
+
+    async def soft_delete(self, user_id: str, admin_id: str = None) -> Optional[User]:
+        from datetime import datetime, timezone
+        user = await self.repo.update(
+            user_id,
+            is_active=False, is_deleted=True,
+            deleted_at=datetime.now(timezone.utc), deleted_by=admin_id,
+        )
+        if user:
+            await self.audit_log_repo.create(
+                user_id=admin_id, action="DELETE_USER", entity_type="USER",
+                entity_id=user_id, details="User soft-deleted",
+            )
+        return user

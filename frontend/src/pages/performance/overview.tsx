@@ -8,7 +8,8 @@ import { doctorPerformanceApi, groupsApi } from "@/services/endpoints"
 import type { DoctorPerformanceOverview, DoctorPerformanceRow } from "@/services/endpoints"
 import { formatIndianNumber, formatIndianRupees } from "@/lib/currency"
 import { useServerFilters } from "@/hooks/useServerFilters"
-import { Button, DataTable, EnterpriseWorkspace, QuickExport } from "@/design-system"
+import { Avatar, AvatarFallback, Button, DataTable, EnterpriseWorkspace, QuickExport, StatusBadge } from "@/design-system"
+import { DrawerStatusPill } from "@/design-system"
 import type { DetailDrawerTab } from "@/design-system"
 import PerformanceFilterBar from "./filter-bar"
 import DoctorDetailPanel from "./doctor-drawer"
@@ -83,20 +84,41 @@ export default function DoctorPerformanceOverview() {
         accessorKey: "name",
         header: "Doctor",
         enableSorting: true,
-        cell: ({ row }) => (
-          <div className="ds-min-w-0">
-            <p className="ds-body font-medium text-[var(--ds-text)]">{row.original.name}</p>
-            <p className="ds-caption text-[var(--ds-text-tertiary)]">
-              {row.original.designation} · {row.original.department}
-            </p>
-          </div>
-        ),
+        cell: ({ row }) => {
+          const initials = (row.original.name || "?")
+            .split(" ")
+            .map((p) => p[0])
+            .filter(Boolean)
+            .slice(0, 2)
+            .join("")
+            .toUpperCase()
+          return (
+            <div className="flex items-center gap-3">
+              <Avatar className="h-9 w-9">
+                <AvatarFallback className="bg-[var(--ds-surface-secondary)] text-[var(--ds-text-secondary)] text-xs font-semibold">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <div className="ds-min-w-0">
+                <p className="ds-body font-medium text-[var(--ds-text)]">{row.original.name}</p>
+                <p className="ds-caption text-[var(--ds-text-tertiary)]">
+                  {row.original.designation} · {row.original.department}
+                </p>
+              </div>
+            </div>
+          )
+        },
       },
       {
-        accessorKey: "hospital_name",
-        header: "Hospital",
+        accessorKey: "is_active",
+        header: "Status",
         enableSorting: false,
-        cell: ({ row }) => row.original.hospital_name || "—",
+        cell: ({ row }) => (
+          <StatusBadge
+            status={row.original.is_active ? "ACTIVE" : "INACTIVE"}
+            showDot
+          />
+        ),
       },
       {
         accessorKey: "revenue",
@@ -118,7 +140,7 @@ export default function DoctorPerformanceOverview() {
       },
       {
         accessorKey: "appointments_completed",
-        header: "Appts",
+        header: "Appointments",
         enableSorting: true,
         cell: ({ row }) => (
           <span className="ds-numeric">{formatIndianNumber(row.original.appointments_completed)}</span>
@@ -148,7 +170,7 @@ export default function DoctorPerformanceOverview() {
       },
       {
         accessorKey: "no_shows",
-        header: "No Shows",
+        header: "No-Shows",
         enableSorting: true,
         cell: ({ row }) => (
           <span className="ds-numeric">{formatIndianNumber(row.original.no_shows)}</span>
@@ -189,7 +211,12 @@ export default function DoctorPerformanceOverview() {
         onClose: () => setQuickViewId(null),
         title: quickViewDoctor.name,
         subtitle: `${quickViewDoctor.designation} · ${quickViewDoctor.department}`,
-        eyebrow: quickViewDoctor.hospital_name || "Doctor",
+        eyebrow: "Doctor Profile",
+        statusPill: (
+          <DrawerStatusPill tone={quickViewDoctor.is_active ? "success" : "neutral"}>
+            {quickViewDoctor.is_active ? "Active" : "Inactive"}
+          </DrawerStatusPill>
+        ),
         tabs: DOCTOR_DRAWER_TABS,
         activeTab,
         onTabChange: setActiveTab,

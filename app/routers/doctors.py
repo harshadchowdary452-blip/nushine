@@ -9,8 +9,25 @@ from app.services.user_service import UserService
 from app.schemas.user import UserCreate, UserUpdate, UserResponse
 from app.schemas.common import MessageResponse
 from app.models.hospital import Hospital
+from app.models.doctor_hospital import DoctorHospital
 
 router = APIRouter(prefix="/doctors", tags=["Doctors"])
+
+
+async def _ensure_doctor_membership(db: AsyncSession, doctor) -> None:
+    """Create a per-hospital membership row for the doctor's primary hospital."""
+    if not doctor.hospital_id:
+        return
+    row = await db.execute(select(DoctorHospital.id).where(
+        DoctorHospital.user_id == doctor.id,
+        DoctorHospital.hospital_id == doctor.hospital_id,
+    ))
+    if not row.scalar_one_or_none():
+        db.add(DoctorHospital(
+            user_id=doctor.id, hospital_id=doctor.hospital_id,
+            is_active=bool(doctor.is_active),
+        ))
+        await db.flush()
 
 
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -45,14 +62,16 @@ async def create_doctor(data: UserCreate, db: AsyncSession = Depends(get_db), cu
             data_dict["hospital_id"] = current_user.get("hospital_id")
         if not data_dict.get("admin_group_id") and current_user.get("admin_group_id"):
             data_dict["admin_group_id"] = current_user.get("admin_group_id")
-    return await service.create(data_dict, user_id=current_user.get("sub"))
+    doctor = await service.create(data_dict, user_id=current_user.get("sub"))
+    await _ensure_doctor_membership(db, doctor)
+    return doctor
 
 
 @router.get("/")
 async def get_doctors(skip: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=200), search: Optional[str] = Query(None), hospital_id: Optional[str] = Query(None), admin_group_id: Optional[str] = Query(None), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.VIEW_ALL_DOCTORS, Permission.MANAGE_STAFF)
     service = UserService(db)
-    filters = {"role": Role.DOCTOR.value}
+    filters = {"role": Role.DOCTOR.value, "is_deleted": False}
     if search:
         filters["search"] = search
     role = current_user.get("role")
@@ -85,6 +104,23 @@ async def get_doctor(doctor_id: str, db: AsyncSession = Depends(get_db), current
     return doctor
 
 
+@router.get("/{doctor_id}/memberships")
+async def get_doctor_memberships(doctor_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.VIEW_ALL_DOCTORS, Permission.MANAGE_STAFF)
+    service = UserService(db)
+    doctor = await service.get(doctor_id)
+    if not doctor or doctor.role != Role.DOCTOR:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor not found")
+    await verify_tenant_access(current_user, doctor, "doctor", db)
+    rows = (await db.execute(
+        select(DoctorHospital, Hospital.name)
+        .join(Hospital, Hospital.id == DoctorHospital.hospital_id)
+        .where(DoctorHospital.user_id == doctor_id)
+        .order_by(Hospital.name)
+    )).all()
+    return [{"hospital_id": m.hospital_id, "hospital_name": name, "is_active": m.is_active} for m, name in rows]
+
+
 @router.put("/{doctor_id}", response_model=UserResponse)
 async def update_doctor(doctor_id: str, data: UserUpdate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.CREATE_DOCTOR)
@@ -94,6 +130,7 @@ async def update_doctor(doctor_id: str, data: UserUpdate, db: AsyncSession = Dep
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor not found")
     await verify_tenant_access(current_user, doctor, "doctor", db)
     doctor = await service.update(doctor_id, data.model_dump(exclude_none=True), admin_id=current_user.get("sub"))
+    await _ensure_doctor_membership(db, doctor)
     return doctor
 
 
@@ -123,3 +160,67 @@ async def activate_doctor(doctor_id: str, db: AsyncSession = Depends(get_db), cu
     if not doctor:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor not found")
     return MessageResponse(message="Doctor activated successfully")
+
+
+@router.post("/{doctor_id}/hospitals/{hospital_id}/deactivate", response_model=MessageResponse)
+async def deactivate_doctor_at_hospital(
+    doctor_id: str, hospital_id: str,
+    db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user),
+):
+    verify_permission(current_user, Permission.MANAGE_STAFF)
+    service = UserService(db)
+    doctor = await service.get(doctor_id)
+    if not doctor or doctor.role != Role.DOCTOR.value:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor not found")
+    await verify_tenant_access(current_user, doctor, "doctor", db)
+    member = await _get_membership(db, doctor_id, hospital_id)
+    if not member:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor is not a member of this hospital")
+    member.is_active = False
+    await db.flush()
+    return MessageResponse(message="Doctor deactivated at this hospital")
+
+
+@router.post("/{doctor_id}/hospitals/{hospital_id}/activate", response_model=MessageResponse)
+async def activate_doctor_at_hospital(
+    doctor_id: str, hospital_id: str,
+    db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user),
+):
+    verify_permission(current_user, Permission.MANAGE_STAFF)
+    service = UserService(db)
+    doctor = await service.get(doctor_id)
+    if not doctor or doctor.role != Role.DOCTOR.value:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor not found")
+    await verify_tenant_access(current_user, doctor, "doctor", db)
+    member = await _get_membership(db, doctor_id, hospital_id)
+    if not member:
+        member = DoctorHospital(user_id=doctor_id, hospital_id=hospital_id, is_active=True)
+        db.add(member)
+    else:
+        member.is_active = True
+    await db.flush()
+    return MessageResponse(message="Doctor activated at this hospital")
+
+
+async def _get_membership(db: AsyncSession, doctor_id: str, hospital_id: str):
+    row = await db.execute(select(DoctorHospital).where(
+        DoctorHospital.user_id == doctor_id,
+        DoctorHospital.hospital_id == hospital_id,
+    ))
+    return row.scalar_one_or_none()
+
+
+@router.delete("/{doctor_id}", response_model=MessageResponse)
+async def delete_doctor(doctor_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.MANAGE_STAFF)
+    service = UserService(db)
+    doctor = await service.get(doctor_id)
+    if not doctor or doctor.role != Role.DOCTOR.value:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor not found")
+    if doctor.is_deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor not found")
+    await verify_tenant_access(current_user, doctor, "doctor", db)
+    if str(doctor.id) == str(current_user.get("sub")):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You cannot delete your own account")
+    await service.soft_delete(doctor_id, admin_id=current_user.get("sub"))
+    return MessageResponse(message="Doctor deleted successfully")

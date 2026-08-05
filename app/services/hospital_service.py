@@ -35,7 +35,18 @@ class HospitalService:
             logger.exception("CREATE_HOSPITAL - Unexpected error: %s", str(e))
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create hospital: {str(e)}")
         await self.audit_log_repo.create(user_id=user_id, action="CREATE_HOSPITAL", entity_type="HOSPITAL", entity_id=str(hospital.id), details=f"Hospital '{hospital.name}' created")
+        await self._populate_inventory(hospital.id)
         return hospital
+
+    async def _populate_inventory(self, hospital_id: str):
+        """Every new hospital automatically receives the complete master inventory list."""
+        from app.services.hospital_inventory_service import HospitalInventoryService
+
+        try:
+            await HospitalInventoryService(self.db).sync_master_items_for_hospital(hospital_id)
+            await self.db.flush()
+        except Exception as e:  # noqa: BLE001 — auto-population must never block hospital creation
+            logging.getLogger(__name__).exception("Failed to auto-populate inventory for %s: %s", hospital_id, str(e))
 
     async def get(self, hospital_id: str) -> Optional[Hospital]:
         return await self.repo.get(hospital_id)

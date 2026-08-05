@@ -52,9 +52,19 @@ const NumericInput = React.forwardRef<HTMLInputElement, NumericInputProps>(
 
     const maxDecimals = decimalPlaces ?? (mode === "integer" ? 0 : mode === "percentage" ? 1 : 2)
 
-    const handleWheel = React.useCallback((e: React.WheelEvent) => {
-      e.preventDefault()
-      innerRef.current?.blur()
+    // React attaches onWheel as a passive listener, so preventDefault there is
+    // ignored and warns. Attach a native non-passive listener instead so
+    // scrolling over the field neither changes the page scroll nor nudges the
+    // value — it just blurs the input.
+    React.useEffect(() => {
+      const el = innerRef.current
+      if (!el) return
+      const onWheel = (e: WheelEvent) => {
+        e.preventDefault()
+        el.blur()
+      }
+      el.addEventListener("wheel", onWheel, { passive: false })
+      return () => el.removeEventListener("wheel", onWheel)
     }, [])
 
     const handleKeyDown = React.useCallback(
@@ -150,7 +160,6 @@ const NumericInput = React.forwardRef<HTMLInputElement, NumericInputProps>(
           value={displayValue}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
-          onWheel={handleWheel}
           onBlur={handleBlur}
           className={cn(
             "ds-input-text flex h-[var(--ds-input-height)] w-full rounded-[var(--ds-input-radius)] border border-[var(--ds-input-border)] bg-[var(--ds-surface)] text-[var(--ds-text)] shadow-[var(--ds-input-shadow)] ds-transition-colors",

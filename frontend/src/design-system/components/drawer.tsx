@@ -35,6 +35,10 @@ const DrawerContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       onCloseAutoFocus={(e) => e.preventDefault()}
+      // Drawers don't require a Description; unset the auto-generated
+      // aria-describedby (which points at a non-existent element) to silence
+      // Radix's warning. Consumers can still wire a real description via props.
+      aria-describedby={undefined}
       className={cn(
         "fixed top-0 z-[var(--ds-z-dialog)] flex h-full flex-col border-[var(--ds-border)] bg-[var(--ds-surface)] shadow-[var(--ds-shadow-drawer)]",
         // Full-bleed on phones; capped panel on anything larger.

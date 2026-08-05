@@ -63,16 +63,6 @@ function OverviewTab({ doctor, phone, loading }: { doctor: DoctorPerformanceRow;
       </div>
     )
   }
-  const rates: { label: string; value: string }[] = [
-    { label: "Attendance rate", value: `${doctor.attendance_rate}%` },
-    { label: "Retention rate", value: `${doctor.retention_rate}%` },
-    { label: "Case completion", value: `${doctor.case_completion_rate}%` },
-    { label: "Treatment completion", value: `${doctor.treatment_completion_rate}%` },
-    { label: "Treatment acceptance", value: `${doctor.treatment_acceptance_rate}%` },
-    { label: "Recall success", value: `${doctor.recall_success_rate}%` },
-    { label: "No shows", value: formatIndianNumber(doctor.no_shows) },
-    { label: "Avg rating", value: doctor.avg_rating != null ? `${doctor.avg_rating.toFixed(1)} / 5` : "—" },
-  ]
   return (
     <>
       <DrawerSection title="This Period" description="Key clinical & financial output">
@@ -83,17 +73,6 @@ function OverviewTab({ doctor, phone, loading }: { doctor: DoctorPerformanceRow;
           <MetricTile label="Cases written" value={formatIndianNumber(doctor.cases_created)} icon={ClipboardList} />
           <MetricTile label="Treatments done" value={formatIndianNumber(doctor.treatments_completed)} icon={Stethoscope} />
           <MetricTile label="Sittings completed" value={formatIndianNumber(doctor.sittings_completed)} icon={Activity} />
-        </div>
-      </DrawerSection>
-
-      <DrawerSection title="Rates" description="Quality & engagement indicators">
-        <div className="grid grid-cols-2 gap-2">
-          {rates.map((r) => (
-            <div key={r.label} className="flex items-center justify-between gap-2 rounded-[var(--ds-radius-lg)] border border-[var(--ds-border)] bg-[var(--ds-surface-secondary)] px-3 py-2">
-              <span className="ds-caption text-[var(--ds-text-tertiary)]">{r.label}</span>
-              <span className="ds-body font-semibold text-[var(--ds-text)]">{r.value}</span>
-            </div>
-          ))}
         </div>
       </DrawerSection>
 

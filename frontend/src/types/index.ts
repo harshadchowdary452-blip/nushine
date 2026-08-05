@@ -1274,6 +1274,426 @@ export interface ApiError extends Error {
   }
 }
 
+export type InventoryStatus = "ACTIVE" | "INACTIVE"
+
+export interface InventoryCategory {
+  id: string
+  name: string
+  code: string | null
+  description: string | null
+  parent_id: string | null
+  is_active: boolean
+  sort_order: number
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface InventoryCategoryTreeNode {
+  id: string
+  name: string
+  code: string | null
+  description: string | null
+  parent_id: string | null
+  is_active: boolean
+  sort_order: number
+  children: InventoryCategoryTreeNode[]
+}
+
+export interface Supplier {
+  id: string
+  name: string
+  code: string | null
+  contact_person: string | null
+  phone: string | null
+  email: string | null
+  address: string | null
+  gst_number: string | null
+  payment_terms: string | null
+  status: string
+  notes: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface InventoryItem {
+  id: string
+  name: string
+  code: string
+  category_id: string | null
+  sub_category_id: string | null
+  category_name: string | null
+  sub_category_name: string | null
+  preferred_vendor_name: string | null
+  brand: string | null
+  manufacturer: string | null
+  preferred_vendor_id: string | null
+  unit: string
+  purchase_price: number
+  average_cost: number
+  minimum_stock: number
+  reorder_level: number
+  critical_level: number
+  maximum_stock: number
+  batch_tracking: boolean
+  expiry_tracking: boolean
+  status: string
+  description: string | null
+  image_url: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface HospitalInventory {
+  id: string
+  hospital_id: string
+  hospital_name: string | null
+  item_id: string
+  item_name: string | null
+  item_code: string | null
+  category_name: string | null
+  sub_category_name: string | null
+  unit: string | null
+  quantity: number
+  minimum_stock: number | null
+  reorder_level: number | null
+  critical_level: number | null
+  maximum_stock: number | null
+  location: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export type InventoryTransactionType =
+  | "PURCHASE"
+  | "GOODS_RECEIPT"
+  | "CONSUMPTION"
+  | "MANUAL_ADJUSTMENT"
+  | "DAMAGE"
+  | "EXPIRY"
+  | "CORRECTION"
+  | "OPENING_STOCK"
+  | "TRANSFER_IN"
+  | "TRANSFER_OUT"
+  | "RETURN"
+
+export interface InventoryTransaction {
+  id: string
+  hospital_id: string
+  hospital_name: string | null
+  item_id: string
+  item_name: string | null
+  item_code: string | null
+  transaction_type: string
+  previous_balance: number
+  quantity: number
+  current_balance: number
+  batch_number: string | null
+  expiry_date: string | null
+  reference_type: string | null
+  reference_id: string | null
+  reason: string | null
+  remarks: string | null
+  transaction_date: string
+  created_by: string | null
+  created_at: string
+}
+
+export type StockStatus = "Out of Stock" | "Critical" | "Low" | "Healthy"
+
+export type MonthlyOrderStatus =
+  | "DRAFT"
+  | "SUBMITTED"
+  | "REVIEWED"
+  | "APPROVED"
+  | "ORDERED"
+  | "COMPLETED"
+
+export interface MonthlyOrderSuggestionItem {
+  item_id: string
+  item_name: string
+  item_code: string | null
+  category_name: string | null
+  unit: string | null
+  current_stock: number
+  minimum_stock: number
+  avg_monthly_usage: number
+  usage_source: "calculated" | "estimated" | null
+  status: StockStatus | null
+  remaining_days: number | null
+  suggested_quantity: number
+  preferred_supplier_id: string | null
+  preferred_supplier_name: string | null
+  unit_cost: number
+  estimated_cost: number
+}
+
+export interface MonthlyOrderSuggestions {
+  hospital_id: string
+  hospital_name: string | null
+  order_period: string
+  items: MonthlyOrderSuggestionItem[]
+  estimated_cost_total: number
+}
+
+export interface MonthlyOrderItem {
+  id: string
+  order_id: string
+  item_id: string
+  item_name: string | null
+  item_code: string | null
+  unit: string | null
+  current_stock: number
+  minimum_stock: number
+  avg_monthly_usage: number
+  remaining_days: number | null
+  suggested_quantity: number
+  required_quantity: number
+  unit_cost: number
+  estimated_cost: number
+  preferred_supplier_name: string | null
+  remarks: string | null
+}
+
+export interface MonthlyOrder {
+  id: string
+  hospital_id: string
+  hospital_name: string | null
+  admin_group_id: string | null
+  order_period: string
+  status: MonthlyOrderStatus
+  submitted_date: string | null
+  reviewed_date: string | null
+  approved_date: string | null
+  ordered_date: string | null
+  completed_date: string | null
+  estimated_cost_total: number
+  notes: string | null
+  items: MonthlyOrderItem[]
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ItemInsight {
+  item_id: string
+  hospital_id: string
+  current_stock: number
+  minimum_stock: number
+  avg_monthly_usage: number
+  usage_source: string
+  remaining_days: number | null
+  status: StockStatus
+  trend: string
+  suggested_quantity: number
+  estimated_cost: number
+  monthly_consumption: number
+  monthly_outflows: { month: string; quantity: number }[]
+  messages: string[]
+}
+
+export interface TransferSuggestion {
+  item_id: string
+  item_name: string
+  unit: string
+  from_hospital_id: string
+  to_hospital_id: string
+  suggested_quantity: number
+}
+
+export interface ConsolidatedOrderHospital {
+  hospital_id: string
+  hospital_name: string
+  has_order: boolean
+  status: MonthlyOrderStatus | null
+}
+
+export interface ConsolidatedOrderItemHospital {
+  current_stock: number
+  minimum_stock: number
+  required_quantity: number
+  estimated_cost: number
+  status: MonthlyOrderStatus | null
+}
+
+export interface ConsolidatedOrderItem {
+  item_id: string
+  item_name: string
+  item_code: string | null
+  unit: string | null
+  category_name: string | null
+  sub_category_name: string | null
+  preferred_supplier_name: string | null
+  unit_cost: number
+  hospitals: Record<string, ConsolidatedOrderItemHospital>
+  total_quantity: number
+  estimated_cost: number
+}
+
+export interface ConsolidatedOrderResponse {
+  order_period: string
+  generated_at: string
+  hospitals: ConsolidatedOrderHospital[]
+  items: ConsolidatedOrderItem[]
+  grand_total_quantity: number
+  grand_total_cost: number
+}
+
+export type PendingInventoryItemStatus = "PENDING" | "APPROVED" | "REJECTED" | "CONVERTED" | "MERGED"
+
+export type PendingItemRollout = "ALL" | "NEW_ONLY"
+
+export interface PendingInventoryItemCreate {
+  item_name: string
+  required_quantity?: number
+  estimated_cost?: number
+  remarks?: string
+  order_period?: string
+}
+
+export interface PendingInventoryItemUpdate {
+  item_name?: string
+  required_quantity?: number
+  estimated_cost?: number
+  remarks?: string
+}
+
+export interface PendingInventoryItemReview {
+  action: "APPROVE" | "REJECT" | "CONVERT" | "MERGE"
+  category_id?: string
+  unit?: string
+  merge_item_id?: string
+  rollout?: PendingItemRollout
+  review_notes?: string
+}
+
+export interface DuplicateCandidate {
+  id: string
+  name: string
+  code: string | null
+  category_name: string | null
+  sub_category_name: string | null
+  unit: string | null
+  match_type: "EXACT" | "SIMILAR"
+  similarity: number
+}
+
+export interface DuplicateCheckResponse {
+  item_name: string
+  candidates: DuplicateCandidate[]
+}
+
+export interface PendingInventoryItem {
+  id: string
+  hospital_id: string
+  hospital_name: string | null
+  item_name: string
+  unit: string
+  required_quantity: number | null
+  estimated_cost: number
+  remarks: string | null
+  order_period: string | null
+  status: PendingInventoryItemStatus
+  rollout: PendingItemRollout
+  category_id: string | null
+  category_name: string | null
+  converted_item_id: string | null
+  review_notes: string | null
+  created_by: string | null
+  requested_by_name: string | null
+  reviewed_by: string | null
+  reviewed_by_name: string | null
+  reviewed_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface PendingInventoryItemsResponse {
+  items: PendingInventoryItem[]
+  total: number
+  page: number
+  size: number
+  pages: number
+}
+
+export interface MonthlyOrderOverviewHospital {
+  hospital_id: string
+  hospital_name: string
+  has_order: boolean
+  order_id?: string
+  items_requested: number
+  estimated_cost: number
+  status: MonthlyOrderStatus | null
+  submitted_date: string | null
+  submitted_by: string | null
+  submitted_by_name: string | null
+  reviewed_date: string | null
+  approved_date: string | null
+  ordered_date: string | null
+  completed_date: string | null
+  last_updated: string | null
+  remarks: string | null
+  current_remaining_stock: number
+}
+
+export interface MonthlyOrderOverview {
+  order_period: string
+  hospitals: MonthlyOrderOverviewHospital[]
+  total_items: number
+  estimated_cost_total: number
+  orders_submitted: number
+  orders_total: number
+  status_counts: Record<string, number>
+}
+
+export interface ValidationIssue {
+  code: string
+  hospital_id: string
+  hospital_name: string
+  item_id?: string
+  item_name?: string
+  message: string
+}
+
+export interface ValidationResult {
+  order_period: string
+  is_valid: boolean
+  hospitals_checked: number
+  hospitals_submitted: number
+  errors: ValidationIssue[]
+  warnings: ValidationIssue[]
+}
+
+export interface GenerateConsolidatedResponse {
+  order_period: string
+  validated: boolean
+  validation: ValidationResult
+  consolidated: ConsolidatedOrderResponse | null
+}
+
+export interface AuditLogEntry {
+  id: string
+  action: string
+  entity_type: string
+  entity_id: string | null
+  user_id: string | null
+  user_name: string | null
+  hospital_id: string | null
+  hospital_name: string | null
+  details: string | null
+  created_at: string
+}
+
+export interface AuditHistoryResponse {
+  items: AuditLogEntry[]
+  total: number
+  skip: number
+  limit: number
+}
+
 export function extractDetail(err: unknown): string {
   const apiErr = err as ApiError
   const detail = apiErr?.response?.data?.detail

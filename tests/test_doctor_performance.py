@@ -294,14 +294,16 @@ async def test_hospital_context_denied_outside_scope(client: AsyncClient, seed, 
     assert r.status_code == 403
     assert r.json()["detail"] == "HOSPITAL_CONTEXT_DENIED"
 
-    # Own hospital context is accepted and still scoped to the group.
+    # Own hospital context is accepted; per-hospital activation means only
+    # doctors with an active membership in that hospital are in scope. DR1
+    # works at hospital A; DR2 works only at hospital B (no membership at A).
     r = await client.get(
         "/api/v1/doctor-performance",
         headers={"Authorization": f"Bearer {token}", "X-Hospital-ID": seed["HA_ID"]},
     )
     assert r.status_code == 200
-    assert r.json()["summary"]["doctors"] == 2
-    assert {d["id"] for d in r.json()["doctors"]} == {seed["DR1"], seed["DR2"]}
+    assert r.json()["summary"]["doctors"] == 1
+    assert {d["id"] for d in r.json()["doctors"]} == {seed["DR1"]}
 
 
 @pytest.mark.asyncio

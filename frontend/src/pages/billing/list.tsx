@@ -454,7 +454,6 @@ export default function BillingList() {
       selectPatient(pendingStartBilling)
       setPendingStartBilling(null)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dialogOpen, pendingStartBilling])
 
   function handleDialogOpenChange(open: boolean) {

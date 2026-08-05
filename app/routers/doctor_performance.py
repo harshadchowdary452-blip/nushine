@@ -29,6 +29,8 @@ from app.models.admin_group import AdminGroup
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.billing import Billing
 from app.models.case import Case, CaseStatus
+from app.models.consent_form import ConsentForm
+from app.models.doctor_hospital import DoctorHospital
 from app.models.feedback import PatientFeedback
 from app.models.follow_up import FollowUp
 from app.models.hospital import Hospital
@@ -63,7 +65,9 @@ _METRIC_KEYS = [
 
 
 def _pct(part: float, whole: float) -> float:
-    return round((part / whole * 100), 1) if whole > 0 else 0.0
+    if whole <= 0:
+        return 0.0
+    return round(min(100.0, (part / whole * 100)), 1)
 
 
 def _empty_metrics(doctor_ids: list[str]) -> dict[str, dict]:
@@ -126,7 +130,29 @@ async def _doctors_in_scope(db: AsyncSession, current_user: dict,
     else:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     result = await db.execute(query.order_by(User.full_name))
-    return list(result.scalars().all())
+    doctors = list(result.scalars().all())
+
+    if x_hospital_id and doctors:
+        # Per-hospital activation: when a specific hospital context is active,
+        # only doctors with an ACTIVE membership in that hospital are in scope.
+        # Doctors without an explicit membership row for the context hospital
+        # fall back to their primary hospital (legacy/backfill parity).
+        member_rows = (await db.execute(
+            select(DoctorHospital.user_id, DoctorHospital.hospital_id, DoctorHospital.is_active)
+            .where(DoctorHospital.user_id.in_([d.id for d in doctors]))
+        )).all()
+        member_map: dict[str, dict[str, bool]] = {}
+        for uid, hid, active in member_rows:
+            member_map.setdefault(uid, {})[hid] = bool(active)
+
+        def _active_at(d: User) -> bool:
+            m = member_map.get(d.id)
+            if m and x_hospital_id in m:
+                return m[x_hospital_id]
+            return d.hospital_id == x_hospital_id
+
+        doctors = [d for d in doctors if _active_at(d)]
+    return doctors
 
 
 async def _verify_doctor_scope(db: AsyncSession, current_user: dict, doctor_id: str) -> User:
@@ -636,6 +662,7 @@ def _doctor_row(doctor: User, m: dict, hospital_names: dict, group_names: dict) 
         "hospital_name": hospital_names.get(doctor.hospital_id) if doctor.hospital_id else None,
         "admin_group_id": doctor.admin_group_id,
         "admin_group_name": group_names.get(doctor.admin_group_id) if doctor.admin_group_id else None,
+        "is_active": doctor.is_active,
         "patients_seen": m["patients_seen"],
         "new_patients": m["new_patients"],
         "returning_patients": m["returning_patients"],
@@ -764,6 +791,7 @@ async def doctor_performance_overview(
     current_user: dict = Depends(get_current_user),
 ):
     doctors = await _doctors_in_scope(db, current_user, x_hospital_id, group_id)
+    doctors = [d for d in doctors if d.is_active]
     if not doctors:
         _, empty_summary = await _collect(
             db, [], datetime.now(timezone.utc), datetime.now(timezone.utc)
@@ -950,6 +978,7 @@ async def doctor_performance_detail(
         "hospital_name": hospital_names.get(doctor.hospital_id),
         "admin_group_id": doctor.admin_group_id,
         "admin_group_name": group_names.get(doctor.admin_group_id),
+        "is_active": doctor.is_active,
         "period": period,
         "metrics": row,
         "summary": _summary_payload(summary, 1),

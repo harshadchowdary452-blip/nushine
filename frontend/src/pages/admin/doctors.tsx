@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
-import { Plus, Edit, Stethoscope, UserX, UserCheck } from "lucide-react"
+import { Plus, Edit, Stethoscope, UserX, UserCheck, Trash2 } from "lucide-react"
 import { format } from "date-fns"
 import { PageHeader } from "@/design-system"
 import { Button } from "@/components/ui/button"
@@ -65,6 +65,7 @@ export default function AdminDoctors() {
   const [search, setSearch] = useState("")
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingDoctor, setEditingDoctor] = useState<User | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<User | null>(null)
   const [form, setForm] = useState<DoctorForm>(getEmptyDoctorForm)
 
   const { data: hospitals } = useQuery({
@@ -142,6 +143,44 @@ export default function AdminDoctors() {
       addToast({
         title: "Error",
         description: extractDetail(err) || "Failed to activate",
+        variant: "destructive",
+      })
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => doctorsApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["doctors"] })
+      addToast({ title: "Success", description: "Doctor deleted", variant: "success" })
+      setDeleteTarget(null)
+    },
+    onError: (err: unknown) => {
+      addToast({
+        title: "Error",
+        description: extractDetail(err) || "Failed to delete doctor",
+        variant: "destructive",
+      })
+    },
+  })
+
+  const { data: memberships } = useQuery({
+    queryKey: ["doctor-memberships", editingDoctor?.id],
+    queryFn: () => doctorsApi.listMemberships(editingDoctor!.id),
+    enabled: !!editingDoctor,
+  })
+
+  const hospitalToggleMutation = useMutation({
+    mutationFn: (vars: { doctorId: string; hospitalId: string; active: boolean }) =>
+      doctorsApi.setHospitalActive(vars.doctorId, vars.hospitalId, vars.active),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["doctor-memberships", editingDoctor?.id] })
+      addToast({ title: "Success", description: "Hospital access updated", variant: "success" })
+    },
+    onError: (err: unknown) => {
+      addToast({
+        title: "Error",
+        description: extractDetail(err) || "Failed to update hospital access",
         variant: "destructive",
       })
     },
@@ -311,6 +350,15 @@ export default function AdminDoctors() {
                               <UserCheck className="h-4 w-4" />
                             </Button>
                           )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeleteTarget(doctor)}
+                            className="text-danger hover:text-danger hover:bg-danger-soft"
+                            aria-label={`Delete ${doctor.full_name}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </td>
                     </motion.tr>
@@ -437,6 +485,36 @@ export default function AdminDoctors() {
                   </div>
                 </>
               )}
+              {editingDoctor && Array.isArray(memberships) && memberships.length > 0 && (
+                <div className="grid gap-2">
+                  <Label>Hospital Access</Label>
+                  <div className="space-y-2">
+                    {memberships.map((m) => (
+                      <div
+                        key={m.hospital_id}
+                        className="flex items-center justify-between rounded-lg border border-[var(--ds-border-light)] px-3 py-2"
+                      >
+                        <span className="text-sm">{m.hospital_name}</span>
+                        <Button
+                          type="button"
+                          variant={m.is_active ? "default" : "outline"}
+                          size="sm"
+                          disabled={hospitalToggleMutation.isPending}
+                          onClick={() =>
+                            hospitalToggleMutation.mutate({
+                              doctorId: editingDoctor.id,
+                              hospitalId: m.hospital_id,
+                              active: !m.is_active,
+                            })
+                          }
+                        >
+                          {m.is_active ? "Active" : "Inactive"}
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-[var(--ds-border-light)]">
               <Button type="button" variant="outline" onClick={closeDialog}>
@@ -447,6 +525,32 @@ export default function AdminDoctors() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Delete Doctor</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete{" "}
+              <span className="font-medium text-[var(--ds-text)]">{deleteTarget?.full_name}</span>?
+              This soft-deletes the account and removes it from all doctor listings. Clinical history
+              is preserved.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteMutation.isPending}
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

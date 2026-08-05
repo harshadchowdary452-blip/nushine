@@ -375,11 +375,24 @@ async def _csv_doctors(db, hospital_ids, date_start, date_end):
     return data, headers, len(rows)
 
 
+def _has_doctor_activity(m: dict) -> bool:
+    """True if a doctor has any measurable performance activity in the period."""
+    return any(m.get(k, 0) for k in (
+        "patients_seen", "appointments_total", "cases_created",
+        "plans_created", "treatments_completed", "sittings_completed",
+        "revenue", "no_shows", "followups_completed",
+    ))
+
+
 async def _csv_doctor_performance(db, current_user, date_start, date_end):
-    """Performance & clinical productivity summary for the caller's scope."""
-    from app.routers.doctor_performance import _collect, _doctors_in_scope, _hospital_scope_for_user
+    """Performance & clinical productivity summary for the caller's scope.
+
+    Excludes inactive doctors and doctors with zero activity in the period.
+    """
+    from app.routers.doctor_performance import _collect, _doctors_in_scope, _hospital_scope_for_user, _pct
 
     doctors = await _doctors_in_scope(db, current_user, None, None)
+    doctors = [d for d in doctors if d.is_active]
     dids = [d.id for d in doctors]
     hospital_scope = _hospital_scope_for_user(current_user)
     metrics, _ = await _collect(db, dids, date_start, date_end, hospital_scope)
@@ -398,13 +411,14 @@ async def _csv_doctor_performance(db, current_user, date_start, date_end):
     data = []
     for doc in doctors:
         m = metrics.get(doc.id, {})
+        if not _has_doctor_activity(m):
+            continue
         new_patients = max(0, m.get("patients_seen", 0) - m.get("returning_patients", 0))
         attendance_den = (m.get("appointments_completed", 0) +
                           m.get("appointments_cancelled", 0) +
                           m.get("appointments_rescheduled", 0))
         retention_den = new_patients + m.get("returning_patients", 0)
         recall_den = m.get("followups_completed", 0) + m.get("followups_lost", 0)
-        from app.routers.doctor_performance import _pct
 
         data.append([
             doc.full_name,
@@ -458,7 +472,7 @@ async def _csv_consent_forms(db, hospital_ids, date_start, date_end):
 # ═══════════════════════════════════════════════════════════════════
 #  EXCEL GENERATOR  –  professional formatting
 # ═══════════════════════════════════════════════════════════════════
-def _generate_excel(data, headers, filename):
+def _generate_excel(data, headers, filename, summary=None):
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side, numbers
     from openpyxl.utils import get_column_letter
@@ -475,6 +489,7 @@ def _generate_excel(data, headers, filename):
         bottom=Side(style="thin", color="D5D8DC"),
     )
     even_fill = PatternFill(start_color="F2F4F4", end_color="F2F4F4", fill_type="solid")
+    summary_font = Font(bold=True, size=10, name="Calibri")
     for col_idx, header in enumerate(headers, 1):
         cell = ws.cell(row=1, column=col_idx, value=header)
         cell.font = header_font
@@ -489,9 +504,17 @@ def _generate_excel(data, headers, filename):
             if row_idx % 2 == 0:
                 cell.fill = even_fill
             if isinstance(val, float) and col_idx > 1:
-                has_currency = any(kw in (headers[col_idx - 1] if col_idx - 1 < len(headers) else "") for kw in ["Amount", "Total", "Paid", "Pending", "Bill", "Revenue", "Expense"])
+                has_currency = any(kw in (headers[col_idx - 1] if col_idx - 1 < len(headers) else "") for kw in ["Amount", "Total", "Paid", "Pending", "Bill", "Revenue", "Expense", "Cost"])
                 if has_currency:
                     cell.number_format = '#,##0.00'
+    next_row = len(data) + 2
+    if summary:
+        ws.cell(row=next_row, column=1, value="Summary").font = Font(bold=True, size=11)
+        next_row += 1
+        for item in summary:
+            ws.cell(row=next_row, column=1, value=item["label"]).font = summary_font
+            ws.cell(row=next_row, column=2, value=item["value"]).font = summary_font
+            next_row += 1
     ws.freeze_panes = "A2"
     for col_idx, _ in enumerate(headers, 1):
         col_letter = get_column_letter(col_idx)
@@ -589,17 +612,33 @@ def _pdf_footer(pdf):
     pdf.cell(0, 10, f"Page {pdf.page_no()}/{{nb}}", align="C")
 
 
-async def _generate_pdf(title, headers, data, filename, info=None, date_start=None, date_end=None):
+async def _generate_pdf(title, headers, data, filename, info=None, date_start=None, date_end=None, summary=None):
     from fpdf import FPDF
     pdf = FPDF(orientation="P", unit="mm", format="A4")
     pdf.alias_nb_pages()
     pdf.add_page()
     _pdf_header(pdf, title, info or {}, date_start, date_end)
     _pdf_table(pdf, headers, data)
+    if summary:
+        _pdf_summary(pdf, summary)
     _pdf_footer(pdf)
     filepath = os.path.join(EXPORT_DIR, filename)
     pdf.output(filepath)
     return filepath
+
+
+def _pdf_summary(pdf, summary):
+    pdf.ln(4)
+    pdf.set_font("Arial", "B", 9)
+    pdf.set_text_color(44, 62, 80)
+    pdf.cell(0, 6, "Summary", new_x="LMARGIN", new_y="NEXT")
+    for item in summary:
+        pdf.set_font("Arial", "", 9)
+        pdf.set_text_color(80, 80, 80)
+        pdf.cell(50, 6, item["label"])
+        pdf.set_font("Arial", "B", 9)
+        pdf.set_text_color(0, 0, 0)
+        pdf.cell(0, 6, str(item["value"]), new_x="LMARGIN", new_y="NEXT")
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -1148,6 +1187,150 @@ async def generate_monthly_report_pdf(
 
 
 # ═══════════════════════════════════════════════════════════════════
+#  DOCTOR PERFORMANCE PDF  –  per-doctor treatment breakdown
+# ═══════════════════════════════════════════════════════════════════
+async def generate_doctor_performance_pdf(
+    db: AsyncSession, current_user: dict,
+    date_start, date_end,
+) -> str:
+    """PDF listing each active doctor with their individual treatment counts.
+
+    Excludes inactive doctors and doctors with zero activity in the period.
+    """
+    from fpdf import FPDF
+    from app.routers.doctor_performance import (
+        _collect, _doctors_in_scope, _hospital_scope_for_user, _pct,
+    )
+
+    doctors = await _doctors_in_scope(db, current_user, None, None)
+    doctors = [d for d in doctors if d.is_active]
+    dids = [d.id for d in doctors]
+    hospital_scope = _hospital_scope_for_user(current_user)
+    metrics, summary = await _collect(db, dids, date_start, date_end, hospital_scope)
+
+    active = [d for d in doctors if _has_doctor_activity(metrics.get(d.id, {}))]
+    hid = current_user.get("hospital_id")
+    info = await _hospital_info(db, hid)
+
+    pdf = FPDF(orientation="P", unit="mm", format="A4")
+    pdf.alias_nb_pages()
+    pdf.add_page()
+    _pdf_header(pdf, "Doctor Performance Report", info, date_start, date_end)
+
+    new_patients = max(0, summary["patients_seen"] - summary["returning_patients"])
+    pdf.set_text_color(44, 62, 80)
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(0, 8, "Scope Summary", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_draw_color(44, 62, 80)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(3)
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("Arial", "", 9)
+    for label, val in [
+        ("Active Doctors", str(len(active))),
+        ("Patients Seen", f"{summary['patients_seen']} (new: {new_patients}, returning: {summary['returning_patients']})"),
+        ("Appointments Completed", str(summary["appointments_completed"])),
+        ("Cases Created / Completed", f"{summary['cases_created']} / {summary['cases_completed_period']}"),
+        ("Treatments Completed", str(summary["treatments_completed"])),
+        ("Sittings Completed", str(summary["sittings_completed"])),
+        ("Revenue", f"\u20B9{summary['revenue']:,.2f}"),
+    ]:
+        pdf.set_font("Arial", "B", 9)
+        pdf.cell(48, 6, label)
+        pdf.set_font("Arial", "", 9)
+        pdf.cell(0, 6, val, new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(4)
+
+    for doc in active:
+        m = metrics[doc.id]
+        if pdf.get_y() > 220:
+            pdf.add_page()
+            _pdf_header(pdf, "Doctor Performance Report", info, date_start, date_end)
+        pdf.set_font("Arial", "B", 11)
+        pdf.set_text_color(44, 62, 80)
+        pdf.cell(0, 7, doc.full_name, new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("Arial", "", 8)
+        pdf.set_text_color(80, 80, 80)
+        header_parts = [doc.qualification or "Doctor", doc.specialization or "General Dentistry"]
+        if doc.hospital_id and info.get("name"):
+            header_parts.append(info["name"])
+        pdf.cell(0, 5, "  \u2022  ".join(header_parts), new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(1)
+
+        tpc = m.get("treatment_analytics", [])
+        summary_line = (
+            f"Patients: {m['patients_seen']}   Appointments: {m['appointments_completed']}   "
+            f"Cases: {m['cases_created']}   Treatments: {m['treatments_completed']}   "
+            f"Revenue: \u20B9{m['revenue']:,.2f}"
+        )
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font("Arial", "", 8)
+        pdf.cell(0, 5, summary_line, new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(2)
+
+        if not tpc:
+            pdf.set_font("Arial", "I", 8)
+            pdf.set_text_color(120, 120, 120)
+            pdf.cell(0, 5, "No treatment plans recorded in this period.", new_x="LMARGIN", new_y="NEXT")
+            pdf.ln(3)
+            continue
+
+        treat_headers = ["Treatment", "Count", "Completed", "Completion %", "Cost (\u20B9)", "Paid (\u20B9)"]
+        treat_widths = [70, 20, 24, 26, 25, 25]
+        pdf.set_font("Arial", "B", 7)
+        pdf.set_fill_color(44, 62, 80)
+        pdf.set_text_color(255, 255, 255)
+        for i, h in enumerate(treat_headers):
+            pdf.cell(treat_widths[i], 6, h, border=1, fill=True, align="C")
+        pdf.ln()
+        pdf.set_text_color(30, 30, 30)
+        pdf.set_font("Arial", "", 7)
+        total_count = total_completed = 0
+        total_cost = total_paid = 0.0
+        for row_idx, t in enumerate(tpc):
+            if pdf.get_y() > 265:
+                pdf.add_page()
+                pdf.set_font("Arial", "B", 7)
+                pdf.set_fill_color(44, 62, 80)
+                pdf.set_text_color(255, 255, 255)
+                for i, h in enumerate(treat_headers):
+                    pdf.cell(treat_widths[i], 6, h, border=1, fill=True, align="C")
+                pdf.ln()
+                pdf.set_text_color(30, 30, 30)
+                pdf.set_font("Arial", "", 7)
+            fill = row_idx % 2 == 1
+            if fill:
+                pdf.set_fill_color(245, 245, 245)
+            pdf.cell(treat_widths[0], 6, str(t.get("name") or "")[:40], border=1, fill=fill)
+            pdf.cell(treat_widths[1], 6, str(t.get("count", 0)), border=1, fill=fill, align="C")
+            pdf.cell(treat_widths[2], 6, str(t.get("completed", 0)), border=1, fill=fill, align="C")
+            pdf.cell(treat_widths[3], 6, f"{t.get('completion_rate', 0):.1f}", border=1, fill=fill, align="C")
+            pdf.cell(treat_widths[4], 6, f"{t.get('total_cost', 0):,.0f}", border=1, fill=fill, align="R")
+            pdf.cell(treat_widths[5], 6, f"{t.get('total_paid', 0):,.0f}", border=1, fill=fill, align="R")
+            pdf.ln()
+            total_count += t.get("count", 0)
+            total_completed += t.get("completed", 0)
+            total_cost += t.get("total_cost", 0)
+            total_paid += t.get("total_paid", 0)
+        pdf.set_font("Arial", "B", 7)
+        pdf.set_fill_color(220, 230, 240)
+        pdf.set_text_color(20, 20, 20)
+        pdf.cell(treat_widths[0], 6, "TOTAL", border=1, fill=True)
+        pdf.cell(treat_widths[1], 6, str(total_count), border=1, fill=True, align="C")
+        pdf.cell(treat_widths[2], 6, str(total_completed), border=1, fill=True, align="C")
+        pdf.cell(treat_widths[3], 6, f"{_pct(total_completed, total_count)}", border=1, fill=True, align="C")
+        pdf.cell(treat_widths[4], 6, f"{total_cost:,.0f}", border=1, fill=True, align="R")
+        pdf.cell(treat_widths[5], 6, f"{total_paid:,.0f}", border=1, fill=True, align="R")
+        pdf.ln()
+        pdf.ln(4)
+
+    _pdf_footer(pdf)
+    filepath = os.path.join(EXPORT_DIR, f"doctor_performance_{datetime.now(timezone.utc).strftime('%Y_%m_%d')}.pdf")
+    pdf.output(filepath)
+    return filepath
+
+
+# ═══════════════════════════════════════════════════════════════════
 #  MAIN EXPORT FUNCTIONS
 # ═══════════════════════════════════════════════════════════════════
 EXPORT_MODULES = {
@@ -1163,6 +1346,7 @@ EXPORT_MODULES = {
     "recalls": _csv_recalls,
     "doctors": _csv_doctors,
     "consent-forms": _csv_consent_forms,
+    "doctor-performance": _csv_doctor_performance,
 }
 
 MODULE_LABELS = {
@@ -1206,6 +1390,9 @@ async def export_data(
         return filepath, count
 
     elif format == "pdf":
+        if module == "doctor-performance":
+            filepath = await generate_doctor_performance_pdf(db, current_user, date_start, date_end)
+            return filepath, count
         safe = label.lower().replace(" ", "_")
         filename = f"{safe}_{date_str}.pdf"
         filepath = await _generate_pdf(label, headers, data, filename, info=info, date_start=date_start, date_end=date_end)

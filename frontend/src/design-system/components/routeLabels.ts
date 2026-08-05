@@ -27,6 +27,7 @@ export const routeLabels: Record<string, string> = {
   "/admin/hospitals": "Hospitals",
   "/admin/doctors": "Doctors",
   "/admin/expenses": "Expenses",
+  "/inventory": "Inventory",
   "/exports": "Export Center",
   "/settings": "Settings",
   "/settings/clinical": "Clinical Settings",

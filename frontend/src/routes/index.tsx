@@ -53,6 +53,7 @@ const ExportCenter = lazy(() => import("@/pages/exports/export-center"))
 const ClinicalSettings = lazy(() => import("@/pages/clinical-settings"))
 const DoctorPerformanceOverview = lazy(() => import("@/pages/performance/overview"))
 const DoctorPerformanceProfile = lazy(() => import("@/pages/performance/doctor-profile"))
+const InventoryPage = lazy(() => import("@/pages/inventory/index"))
 const NotFoundPage = lazy(() => import("@/pages/errors/not-found"))
 const RouteErrorPage = lazy(() => import("@/pages/errors/route-error"))
 
@@ -131,6 +132,7 @@ function withRoles(element: ReactElement, allowedRoles: Role[]) {
 
 const ADMIN_ROLES: Role[] = ["SUPER_ADMIN", "GROUP_ADMIN", "HOSPITAL_ADMIN"]
 const CARE_ROLES: Role[] = ["HOSPITAL_ADMIN", "DOCTOR"]
+const INVENTORY_ROLES: Role[] = [...ADMIN_ROLES, "DOCTOR"]
 
 export const router = createBrowserRouter([
   {
@@ -231,6 +233,10 @@ export const router = createBrowserRouter([
       { path: "/settings/whatsapp", element: withRoles(<WhatsAppConfigPage />, ADMIN_ROLES) },
       { path: "/whatsapp/templates", element: withRoles(<WhatsAppTemplates />, ADMIN_ROLES) },
       { path: "/whatsapp/broadcast", element: withRoles(<WhatsAppBroadcast />, ADMIN_ROLES) },
+      {
+        path: "/inventory",
+        element: withRoles(<InventoryPage />, INVENTORY_ROLES),
+      },
       // Unmatched routes render an explanatory 404 rather than silently
       // redirecting — a redirect hides broken links from users and telemetry.
       { path: "*", element: <NotFoundPage /> },
