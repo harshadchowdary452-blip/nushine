@@ -374,3 +374,65 @@ async def test_audit_tracks_other_item_approval_and_rejection(client: AsyncClien
     approved = next(e for e in entries if e["action"] == "REVIEW_PENDING_ITEM")
     assert approved["user_name"] == "GA"
     assert "APPROVED" in (approved["details"] or "")
+
+
+@pytest.mark.asyncio
+async def test_consolidated_export_is_item_hospital_matrix(client: AsyncClient, seed):
+    sa = await login(client, "gc_sa@t.com")
+    ha = await login(client, "gc_ha@t.com")
+    hb = await login(client, "gc_hb@t.com")
+    ga = await login(client, "gc_ga@t.com")
+
+    k21 = await seed_item(client, sa, "21mm K Files", "K-21", unit="BOX")
+    k25 = await seed_item(client, sa, "25mm K Files", "K-25", unit="BOX")
+    await seed_stock(client, sa, seed["HA_ID"], k21, 10)
+    await seed_stock(client, sa, seed["HB_ID"], k21, 20)
+    await seed_stock(client, sa, seed["HA_ID"], k25, 5)
+
+    await submit_indent(client, ha, seed["HA_ID"], "2026-08", [
+        {"item_id": k21, "required_quantity": 8, "estimated_cost": 320},
+        {"item_id": k25, "required_quantity": 4, "estimated_cost": 180},
+    ])
+    await submit_indent(client, hb, seed["HB_ID"], "2026-08", [
+        {"item_id": k21, "required_quantity": 6, "estimated_cost": 240},
+    ])
+
+    r = await client.get("/api/v1/reports/inventory", headers=auth(ga),
+                         params={"report_type": "consolidated", "format": "json",
+                                 "order_period": "2026-08"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    headers = body["headers"]
+
+    assert headers[0] == "Period"
+    assert headers[1] == "Item"
+    assert headers[2] == "Unit"
+    assert "Consolidate Hosp A" in headers
+    assert "Consolidate Hosp B" in headers
+    assert "Total Required" in headers
+    assert "Est. Cost" in headers
+    # Removed columns
+    assert "Code" not in headers
+    assert "Brand" not in headers
+    assert "Hospital" not in headers
+    assert "Current Stock" not in headers
+
+    by_name = {row[1]: row for row in body["rows"]}
+    assert set(by_name) == {"21mm K Files", "25mm K Files"}  # each item once
+
+    ha_idx = headers.index("Consolidate Hosp A")
+    hb_idx = headers.index("Consolidate Hosp B")
+    total_idx = headers.index("Total Required")
+    cost_idx = headers.index("Est. Cost")
+
+    k21_row = by_name["21mm K Files"]
+    assert k21_row[ha_idx] == 8
+    assert k21_row[hb_idx] == 6
+    assert k21_row[total_idx] == 14
+    assert k21_row[cost_idx] == 560
+
+    k25_row = by_name["25mm K Files"]
+    assert k25_row[ha_idx] == 4
+    assert k25_row[hb_idx] == 0
+    assert k25_row[total_idx] == 4
+    assert k25_row[cost_idx] == 180

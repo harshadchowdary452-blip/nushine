@@ -165,9 +165,12 @@ async def test_order_lifecycle_and_rbac(client: AsyncClient, seed):
                           json={"to_status": "REVIEWED"})
     assert r.status_code == 403
 
-    # No longer editable after submission
-    r = await client.put(f"/api/v1/inventory/monthly-orders/{oid}", headers=auth(ha), json={"notes": "x"})
-    assert r.status_code == 400
+    # Hospital can still edit a SUBMITTED order before group review
+    r = await client.put(f"/api/v1/inventory/monthly-orders/{oid}", headers=auth(ha), json={
+        "items": [{"item_id": item_id, "required_quantity": 30, "estimated_cost": 90}]})
+    assert r.status_code == 200, r.text
+    assert r.json()["items"][0]["required_quantity"] == 30
+    assert r.json()["items"][0]["estimated_cost"] == 90
 
     # GA: review -> approve -> order -> complete
     for step, expected_date in [("REVIEWED", "reviewed_date"), ("APPROVED", "approved_date"),
@@ -177,6 +180,10 @@ async def test_order_lifecycle_and_rbac(client: AsyncClient, seed):
         assert r.status_code == 200, r.text
         assert r.json()["status"] == step
         assert r.json()[expected_date] is not None
+
+    # No longer editable once the group has completed the order
+    r = await client.put(f"/api/v1/inventory/monthly-orders/{oid}", headers=auth(ha), json={"notes": "x"})
+    assert r.status_code == 400
 
     # Cannot go back / skip from COMPLETED
     r = await client.post(f"/api/v1/inventory/monthly-orders/{oid}/transition", headers=auth(ga),

@@ -246,7 +246,14 @@ async def test_consolidated_report_type(client: AsyncClient, seed):
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["report_label"] == "Group Consolidated Order"
-    assert len(body["rows"]) == 2
+    # Item appears once, with one column per hospital plus a combined total
+    assert len(body["rows"]) == 1
+    assert "Pending Hosp A" in body["headers"]
+    assert "Pending Hosp B" in body["headers"]
+    assert "Total Required" in body["headers"]
+    assert "Code" not in body["headers"]
+    assert "Brand" not in body["headers"]
+    assert "Current Stock" not in body["headers"]
     assert body["summary"] and body["summary"][0]["label"] == "Total Est. Cost"
 
     # search filters rows

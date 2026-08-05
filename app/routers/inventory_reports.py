@@ -1,15 +1,17 @@
 import asyncio
 import os
+import tempfile
 from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.background import BackgroundTask
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.core.permissions import verify_permission, Permission
 from app.services.inventory_reports_service import build_report, REPORT_TYPES, INVENTORY_HEADERS
-from app.services.export_service import _generate_excel, _generate_pdf, _stream_csv, _hospital_info
+from app.services.export_service import _generate_excel, _generate_pdf, _stream_csv, _hospital_info, EXPORT_DIR
 
 router = APIRouter(prefix="/reports/inventory", tags=["Inventory Reports"])
 
@@ -60,12 +62,19 @@ async def inventory_report(
 
     if format == "excel":
         filename = f"{safe}_{date_str}.xlsx"
-        filepath = await asyncio.to_thread(_generate_excel, rows, headers, filename, summary=summary)
-        return FileResponse(filepath, filename=filename, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        fd, tmp = tempfile.mkstemp(suffix=".xlsx", dir=EXPORT_DIR)
+        os.close(fd)
+        filepath = await asyncio.to_thread(_generate_excel, rows, headers, filename, summary=summary, filepath=tmp)
+        return FileResponse(filepath, filename=filename,
+                            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            background=BackgroundTask(os.remove, filepath))
 
     if format == "pdf":
         filename = f"{safe}_{date_str}.pdf"
-        filepath = await _generate_pdf(label, headers, rows, filename, info=info, summary=summary)
-        return FileResponse(filepath, filename=filename, media_type="application/pdf")
+        fd, tmp = tempfile.mkstemp(suffix=".pdf", dir=EXPORT_DIR)
+        os.close(fd)
+        filepath = await _generate_pdf(label, headers, rows, filename, info=info, summary=summary, filepath=tmp)
+        return FileResponse(filepath, filename=filename, media_type="application/pdf",
+                            background=BackgroundTask(os.remove, filepath))
 
     raise HTTPException(status_code=400, detail=f"Unknown format: {format}")

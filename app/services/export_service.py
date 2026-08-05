@@ -472,7 +472,7 @@ async def _csv_consent_forms(db, hospital_ids, date_start, date_end):
 # ═══════════════════════════════════════════════════════════════════
 #  EXCEL GENERATOR  –  professional formatting
 # ═══════════════════════════════════════════════════════════════════
-def _generate_excel(data, headers, filename, summary=None):
+def _generate_excel(data, headers, filename, summary=None, filepath=None):
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side, numbers
     from openpyxl.utils import get_column_letter
@@ -524,7 +524,7 @@ def _generate_excel(data, headers, filename, summary=None):
             if val:
                 max_len = max(max_len, min(len(str(val)) + 2, 50))
         ws.column_dimensions[col_letter].width = max_len
-    filepath = os.path.join(EXPORT_DIR, filename)
+    filepath = filepath or os.path.join(EXPORT_DIR, filename)
     wb.save(filepath)
     return filepath
 
@@ -612,7 +612,7 @@ def _pdf_footer(pdf):
     pdf.cell(0, 10, f"Page {pdf.page_no()}/{{nb}}", align="C")
 
 
-async def _generate_pdf(title, headers, data, filename, info=None, date_start=None, date_end=None, summary=None):
+async def _generate_pdf(title, headers, data, filename, info=None, date_start=None, date_end=None, summary=None, filepath=None):
     from fpdf import FPDF
     pdf = FPDF(orientation="P", unit="mm", format="A4")
     pdf.alias_nb_pages()
@@ -622,7 +622,7 @@ async def _generate_pdf(title, headers, data, filename, info=None, date_start=No
     if summary:
         _pdf_summary(pdf, summary)
     _pdf_footer(pdf)
-    filepath = os.path.join(EXPORT_DIR, filename)
+    filepath = filepath or os.path.join(EXPORT_DIR, filename)
     pdf.output(filepath)
     return filepath
 

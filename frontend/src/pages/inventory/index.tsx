@@ -5,17 +5,17 @@ import {
   Eye, Package, History, ClipboardList, CalendarClock, Building2,
   Loader2, CheckCircle2, X, Pencil, Power, PowerOff, Library, Inbox,
   ChevronDown, ChevronRight, Send, Layers, AlertTriangle, ShieldCheck, RefreshCw,
-  Ban, Merge, ClipboardCheck,
+  Ban, Merge, ClipboardCheck, Save,
 } from "lucide-react"
 import {
   PageContainer, PageHeader, Button, Input, Label, Textarea,
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter,
-  Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerBody, DrawerFooter,
+  Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerBody,
   StatusBadge, NumericInput, SearchBar,
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
-  DropdownMenuLabel, DropdownMenuSeparator,
+  DropdownMenuLabel,
   useToast, EmptyState, LoadingSkeleton, FullscreenDialog, Separator, Skeleton,
 } from "@/design-system"
 import { formatIndianRupees } from "@/lib/currency"
@@ -226,13 +226,7 @@ function ExportMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
         <DropdownMenuLabel>Monthly Indent</DropdownMenuLabel>
-        {(["pdf", "excel", "csv", "print"] as ExportFormat[]).map((f) => group("procurement", "Monthly Order", f))}
-        <DropdownMenuSeparator />
-        <DropdownMenuLabel>Current Inventory</DropdownMenuLabel>
-        {(["pdf", "excel", "csv", "print"] as ExportFormat[]).map((f) => group("current_stock", "Inventory", f))}
-        <DropdownMenuSeparator />
-        <DropdownMenuLabel>Current View</DropdownMenuLabel>
-        {(["pdf", "excel", "csv", "print"] as ExportFormat[]).map((f) => group("stock_status", "Stock Status", f))}
+        {(["pdf", "excel", "csv"] as ExportFormat[]).map((f) => group("procurement", "Monthly Order", f))}
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -1149,12 +1143,14 @@ function OrderDetailDialog({
   onOpenChange,
   orderId,
   isGroupAdmin,
+  canEdit,
   onChanged,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   orderId: string | null
   isGroupAdmin: boolean
+  canEdit: boolean
   onChanged: () => void
 }) {
   const { addToast } = useToast()
@@ -1168,6 +1164,7 @@ function OrderDetailDialog({
   const order = orderQuery.data
   const nextAction = order ? NEXT_ORDER_ACTION[order.status] ?? null : null
   const canAdvance = !!nextAction && (isGroupAdmin ? nextAction.to !== "SUBMITTED" : nextAction.to === "SUBMITTED")
+  const editable = !!order && canEdit && !isGroupAdmin && (order.status === "DRAFT" || order.status === "SUBMITTED")
 
   const transitionMutation = useMutation({
     mutationFn: () => monthlyOrdersApi.transition(orderId!, { to_status: nextAction!.to }),
@@ -1187,7 +1184,60 @@ function OrderDetailDialog({
     onError: (err) => addToast({ title: "Could not update order", description: extractDetail(err), variant: "destructive" }),
   })
 
-  const total = order?.items.reduce((sum, i) => sum + (i.estimated_cost || 0), 0) ?? 0
+  const [editDraft, setEditDraft] = useState<Record<string, { qty: string; cost: string; remarks: string }>>({})
+  useEffect(() => {
+    if (!order) return
+    const d: Record<string, { qty: string; cost: string; remarks: string }> = {}
+    for (const it of order.items) {
+      d[it.item_id] = {
+        qty: String(it.required_quantity),
+        cost: String(it.estimated_cost),
+        remarks: it.remarks ?? "",
+      }
+    }
+    setEditDraft(d)
+  }, [order])
+
+  const setDraftField = (itemId: string, field: "qty" | "cost" | "remarks", v: string) => {
+    setEditDraft((prev) => ({ ...prev, [itemId]: { ...(prev[itemId] ?? { qty: "", cost: "", remarks: "" }), [field]: v } }))
+  }
+
+  const updateMutation = useMutation({
+    mutationFn: () => {
+      const items = (order?.items || []).map((it) => {
+        const d = editDraft[it.item_id]
+        return {
+          item_id: it.item_id,
+          required_quantity: d ? parseFloat(d.qty) || 0 : it.required_quantity,
+          estimated_cost: d ? parseFloat(d.cost) || 0 : it.estimated_cost,
+          remarks: d?.remarks ?? it.remarks,
+        }
+      })
+      return monthlyOrdersApi.update(orderId!, { items })
+    },
+    onSuccess: async () => {
+      addToast({ title: "Order Updated", description: "Indent changes saved", variant: "success" })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["inventory-order-detail", orderId] }),
+        queryClient.invalidateQueries({ queryKey: ["inventory-orders"] }),
+        queryClient.invalidateQueries({ queryKey: ["monthly-orders-list"] }),
+      ])
+      onChanged()
+    },
+    onError: (err) => addToast({ title: "Could not update order", description: extractDetail(err), variant: "destructive" }),
+  })
+
+  const total = useMemo(() => {
+    if (!order) return 0
+    if (editable) {
+      return (order.items || []).reduce((sum, it) => {
+        const d = editDraft[it.item_id]
+        const c = d ? parseFloat(d.cost) : NaN
+        return sum + (Number.isFinite(c) ? c : it.estimated_cost || 0)
+      }, 0)
+    }
+    return order.items.reduce((sum, i) => sum + (i.estimated_cost || 0), 0)
+  }, [order, editable, editDraft])
 
   return (
     <FullscreenDialog
@@ -1198,7 +1248,7 @@ function OrderDetailDialog({
         order
           ? `${order.order_period} · Submitted ${formatDate(order.submitted_date)}${
               order.reviewed_date ? ` · Reviewed ${formatDate(order.reviewed_date)}` : ""
-            }`
+            }${editable ? " · Editable" : ""}`
           : "Loading order…"
       }
       footer={
@@ -1216,6 +1266,12 @@ function OrderDetailDialog({
           {canAdvance && (
             <Button onClick={() => transitionMutation.mutate()} loading={transitionMutation.isPending}>
               {nextAction!.label}
+            </Button>
+          )}
+          {editable && (
+            <Button onClick={() => updateMutation.mutate()} loading={updateMutation.isPending}>
+              <Save className="h-4 w-4" />
+              Save Changes
             </Button>
           )}
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
@@ -1238,18 +1294,60 @@ function OrderDetailDialog({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {(order?.items || []).map((item) => (
-              <TableRow key={item.id}>
-                <TableCell>
-                  <div className="font-medium text-[var(--ds-text)]">{item.item_name || item.item_id}</div>
-                  <div className="ds-caption text-[var(--ds-text-tertiary)]">{item.item_code || ""} {item.unit ? `· ${item.unit}` : ""}</div>
-                </TableCell>
-                <TableCell className="ds-numeric text-right">{formatNumber(item.current_stock, 0)}</TableCell>
-                <TableCell className="ds-numeric text-right font-medium text-[var(--ds-text)]">{formatNumber(item.required_quantity, 0)}</TableCell>
-                <TableCell className="ds-numeric text-right">{formatIndianRupees(item.estimated_cost)}</TableCell>
-                <TableCell className="text-[var(--ds-text-secondary)]">{item.remarks || "—"}</TableCell>
-              </TableRow>
-            ))}
+            {(order?.items || []).map((item) => {
+              const draft = editDraft[item.item_id]
+              return (
+                <TableRow key={item.id}>
+                  <TableCell>
+                    <div className="font-medium text-[var(--ds-text)]">{item.item_name || item.item_id}</div>
+                    {item.unit && <div className="ds-caption text-[var(--ds-text-tertiary)]">Unit: {item.unit}</div>}
+                  </TableCell>
+                  <TableCell className="ds-numeric text-right">{formatNumber(item.current_stock, 0)}</TableCell>
+                  <TableCell className="text-right">
+                    {editable ? (
+                      <NumericInput
+                        mode="integer"
+                        min={0}
+                        value={draft?.qty ?? ""}
+                        onChange={(v) => setDraftField(item.item_id, "qty", v)}
+                        className="w-24 text-right"
+                        aria-label={`Required quantity for ${item.item_name}`}
+                      />
+                    ) : (
+                      <span className="ds-numeric font-medium text-[var(--ds-text)]">{formatNumber(item.required_quantity, 0)}</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {editable ? (
+                      <NumericInput
+                        mode="currency"
+                        min={0}
+                        prefix="₹"
+                        value={draft?.cost ?? ""}
+                        onChange={(v) => setDraftField(item.item_id, "cost", v)}
+                        className="w-28 text-right"
+                        aria-label={`Estimated cost for ${item.item_name}`}
+                      />
+                    ) : (
+                      <span className="ds-numeric">{formatIndianRupees(item.estimated_cost)}</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {editable ? (
+                      <Input
+                        value={draft?.remarks ?? ""}
+                        onChange={(e) => setDraftField(item.item_id, "remarks", e.target.value)}
+                        placeholder="Optional"
+                        className="h-8 w-full min-w-40"
+                        aria-label={`Remarks for ${item.item_name}`}
+                      />
+                    ) : (
+                      <span className="text-[var(--ds-text-secondary)]">{item.remarks || "—"}</span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              )
+            })}
             {order && order.items.length === 0 && (
               <TableRow>
                 <TableCell colSpan={5} className="py-8 text-center text-[var(--ds-text-tertiary)]">
@@ -1356,8 +1454,6 @@ function ItemDetailDrawer({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
-  const { addToast } = useToast()
-
   const transactionsQuery = useQuery({
     queryKey: ["inventory-detail-txns", hospitalId, row?.itemId],
     queryFn: () => inventoryTransactionsApi.list({ hospital_id: hospitalId, item_id: row!.itemId, page_size: 8 }),
@@ -1368,17 +1464,6 @@ function ItemDetailDrawer({
     queryFn: () => monthlyOrdersApi.list({ hospital_id: hospitalId || undefined, page_size: 50 }),
     enabled: open && !!hospitalId,
   })
-
-  const exportItem = async () => {
-    if (!hospitalId) return
-    try {
-      const blob = await inventoryReportApi.get({ report_type: "stock_status", format: "pdf", hospital_id: hospitalId })
-      downloadBlob(blob, `stock_status_${row?.itemName?.replace(/\s+/g, "_").toLowerCase() ?? "item"}.pdf`)
-      addToast({ title: "Export Complete", description: "Stock status exported as PDF", variant: "success" })
-    } catch (err) {
-      addToast({ title: "Export Failed", description: extractDetail(err), variant: "destructive" })
-    }
-  }
 
   const transactions = (transactionsQuery.data as { items?: Array<{ id: string; transaction_type: string; quantity: number; current_balance: number; transaction_date: string }> } | undefined)?.items || []
   const previousIndents = useMemo(() => {
@@ -1411,7 +1496,6 @@ function ItemDetailDrawer({
             {row?.itemName}
           </DrawerTitle>
           <div className="flex flex-wrap items-center gap-2">
-            {row?.itemCode && <span className="ds-caption text-[var(--ds-text-tertiary)]">{row.itemCode}</span>}
             {row?.categoryName && (
               <span className="ds-caption text-[var(--ds-text-tertiary)]">
                 {row.categoryName}{row.subCategoryName ? ` / ${row.subCategoryName}` : ""}
@@ -1522,13 +1606,6 @@ function ItemDetailDrawer({
             )}
           </section>
         </DrawerBody>
-
-        <DrawerFooter>
-          <Button variant="outline" className="w-full" onClick={exportItem}>
-            <Download className="h-4 w-4" />
-            Export Report
-          </Button>
-        </DrawerFooter>
       </DrawerContent>
     </Drawer>
   )
@@ -1657,10 +1734,7 @@ function IndentTable({
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <Package className="h-4 w-4 shrink-0 text-[var(--ds-text-tertiary)]" />
-                    <div>
-                      <div className="font-medium text-[var(--ds-text)]">{row.itemName}</div>
-                      <div className="ds-caption text-[var(--ds-text-tertiary)]">{row.itemCode || ""}</div>
-                    </div>
+                    <div className="font-medium text-[var(--ds-text)]">{row.itemName}</div>
                   </div>
                 </TableCell>
                 <TableCell className="text-right">
@@ -1898,7 +1972,7 @@ function GroupConsolidatedView({
 
   const submittedCount = overview?.orders_submitted ?? 0
   const totalHospitals = overview?.orders_total ?? 0
-  const matrixColSpan = 3 + sortedHospitals.length * 2
+  const matrixColSpan = 2 + sortedHospitals.length * 2
 
   return (
     <div className="space-y-6">
@@ -1921,10 +1995,27 @@ function GroupConsolidatedView({
           })}
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => exportConsolidated("pdf")} loading={exportBusy}>
-            <Download className="h-4 w-4" />
-            Export
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" loading={exportBusy}>
+                <Download className="h-4 w-4" />
+                Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuLabel>Consolidated Monthly Indent</DropdownMenuLabel>
+              {(["pdf", "excel", "csv"] as const).map((f) => (
+                <DropdownMenuItem key={f} disabled={exportBusy} onSelect={() => exportConsolidated(f)}>
+                  {(() => {
+                    const Icon = FORMAT_ICONS[f]
+                    return <Icon className="h-4 w-4" />
+                  })()}
+                  {f.toUpperCase()}
+                  {exportBusy && <Loader2 className="ml-auto h-3.5 w-3.5 animate-spin" />}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button variant="outline" size="sm" onClick={onOpenAudit}>
             <History className="h-4 w-4" />
             Audit &amp; History
@@ -2095,7 +2186,6 @@ function GroupConsolidatedView({
                 <TableHeader>
                   <TableRow>
                     <TableHead className="min-w-44">Item</TableHead>
-                    <TableHead>Code</TableHead>
                     {sortedHospitals.map((h) => (
                       <TableHead key={h.hospital_id} className="min-w-28 px-2 text-center">
                         {h.hospital_name}
@@ -2106,7 +2196,6 @@ function GroupConsolidatedView({
                     <TableHead>Status</TableHead>
                   </TableRow>
                   <TableRow>
-                    <TableHead className="border-t border-[var(--ds-border)]" />
                     <TableHead className="border-t border-[var(--ds-border)]" />
                     {sortedHospitals.map((h) => (
                       <TableHead key={h.hospital_id} className="border-t border-[var(--ds-border)] px-2 py-1 text-center text-[10px] text-[var(--ds-text-tertiary)]">
@@ -2165,7 +2254,6 @@ function GroupConsolidatedView({
                                       <div className="font-medium text-[var(--ds-text)]">{item.item_name}</div>
                                       <div className="ds-caption text-[var(--ds-text-tertiary)]">{item.unit ? `Unit: ${item.unit}` : ""}</div>
                                     </TableCell>
-                                    <TableCell className="ds-caption text-[var(--ds-text-tertiary)]">{item.item_code || "—"}</TableCell>
                                     {sortedHospitals.map((h) => {
                                       const cell = item.hospitals[h.hospital_id]
                                       return (
@@ -2884,6 +2972,7 @@ export default function InventoryPage() {
         }}
         orderId={orderDetailId}
         isGroupAdmin={ctx.isGroupAdmin}
+        canEdit={ctx.isManager}
         onChanged={refresh}
       />
 

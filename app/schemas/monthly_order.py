@@ -30,8 +30,15 @@ class MonthlyOrderCreate(BaseModel):
     notes: Optional[str] = None
 
 
+class MonthlyOrderEditItem(BaseModel):
+    item_id: str = Field(..., min_length=1)
+    required_quantity: float = Field(..., ge=0)
+    estimated_cost: Optional[float] = Field(None, ge=0, description="Total estimated cost for the line, entered by the hospital admin")
+    remarks: Optional[str] = None
+
+
 class MonthlyOrderUpdate(BaseModel):
-    items: Optional[List[MonthlyOrderItemCreate]] = None
+    items: Optional[List[MonthlyOrderEditItem]] = None
     notes: Optional[str] = None
 
 

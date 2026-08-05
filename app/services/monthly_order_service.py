@@ -173,8 +173,9 @@ class MonthlyOrderService:
         order = await self._load(order_id)
         if not order:
             return None
-        if order.status != MonthlyOrderStatus.DRAFT:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only DRAFT orders can be edited")
+        if order.status not in (MonthlyOrderStatus.DRAFT, MonthlyOrderStatus.SUBMITTED):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="Only DRAFT or SUBMITTED orders can be edited")
 
         if "notes" in data and data.get("notes") is not None:
             order.notes = data.get("notes")

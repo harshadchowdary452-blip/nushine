@@ -35,8 +35,8 @@ INVENTORY_HEADERS = {
     "transactions": ["Date", "Hospital", "Item", "Code", "Type", "Previous Balance", "Quantity", "Current Balance", "Batch", "Reference", "Remarks"],
     "usage": ["Hospital", "Item", "Code", "Consumption (3 mo)", "Avg Monthly Usage", "Usage Source", "Outflow Records", "Span (months)", "Trend"],
     "orders": ["Period", "Hospital", "Status", "Items", "Est. Cost", "Submitted", "Reviewed", "Approved", "Ordered", "Completed"],
-    "procurement": ["Period", "Hospital", "Order Status", "Item", "Code", "Unit", "Current Stock", "Avg Monthly Usage", "Required Qty", "Unit Cost", "Est. Cost", "Preferred Supplier"],
-    "consolidated": ["Period", "Item", "Code", "Brand", "Unit", "Hospital", "Current Stock", "Required Qty", "Unit Cost", "Est. Cost"],
+    "procurement": ["Period", "Hospital", "Order Status", "Item", "Unit", "Current Stock", "Required Qty", "Unit Cost", "Est. Cost", "Preferred Supplier"],
+    "consolidated": ["Period", "Item", "Unit", "Total Required", "Est. Cost"],
 }
 
 
@@ -73,24 +73,26 @@ async def build_report(
     if hospital_id:
         hospital_ids = [hospital_id]
 
-    if report_type == "current_stock":
-        rows = await _report_current_stock(db, hospital_ids, category_id, supplier_id)
-    elif report_type == "stock_status":
-        rows = await _report_stock_status(db, hospital_ids, category_id, supplier_id)
-    elif report_type == "items":
-        rows = await _report_items(db, hospital_ids, category_id, supplier_id)
-    elif report_type == "transactions":
-        rows = await _report_transactions(db, hospital_ids, date_from, date_to)
-    elif report_type == "usage":
-        rows = await _report_usage(db, hospital_ids, category_id, supplier_id)
-    elif report_type == "orders":
-        rows = await _report_orders(db, hospital_ids, status, order_period)
-    elif report_type == "procurement":
-        rows = await _report_procurement(db, hospital_ids, status, order_period)
-    elif report_type == "consolidated":
-        rows = await _report_consolidated(db, hospital_ids, order_period)
+    if report_type == "consolidated":
+        headers, rows = await _report_consolidated(db, hospital_ids, order_period)
     else:
-        rows = []
+        headers = INVENTORY_HEADERS[report_type]
+        if report_type == "current_stock":
+            rows = await _report_current_stock(db, hospital_ids, category_id, supplier_id)
+        elif report_type == "stock_status":
+            rows = await _report_stock_status(db, hospital_ids, category_id, supplier_id)
+        elif report_type == "items":
+            rows = await _report_items(db, hospital_ids, category_id, supplier_id)
+        elif report_type == "transactions":
+            rows = await _report_transactions(db, hospital_ids, date_from, date_to)
+        elif report_type == "usage":
+            rows = await _report_usage(db, hospital_ids, category_id, supplier_id)
+        elif report_type == "orders":
+            rows = await _report_orders(db, hospital_ids, status, order_period)
+        elif report_type == "procurement":
+            rows = await _report_procurement(db, hospital_ids, status, order_period)
+        else:
+            rows = []
 
     if search:
         term = search.strip().lower()
@@ -100,18 +102,19 @@ async def build_report(
     return {
         "report_type": report_type,
         "report_label": REPORT_TYPES[report_type],
-        "headers": INVENTORY_HEADERS[report_type],
+        "headers": headers,
         "rows": rows,
-        "summary": _report_summary(report_type, rows),
+        "summary": _report_summary(report_type, rows, headers),
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "row_count": len(rows),
     }
 
 
-def _report_summary(report_type: str, rows: List[List]) -> List[Dict]:
+def _report_summary(report_type: str, rows: List[List], headers: Optional[List[str]] = None) -> List[Dict]:
     """Small label/value block rendered at the bottom of exports."""
     if report_type in ("orders", "procurement", "consolidated"):
-        cost_idx = INVENTORY_HEADERS[report_type].index("Est. Cost")
+        hs = headers or INVENTORY_HEADERS[report_type]
+        cost_idx = hs.index("Est. Cost")
         total_cost = round(sum(float(r[cost_idx] or 0) for r in rows), 2)
         return [{"label": "Total Est. Cost", "value": f"₹ {total_cost:,.2f}"}]
     if report_type == "current_stock":
@@ -359,16 +362,21 @@ async def _report_procurement(db, hospital_ids, status_filter, order_period=None
                 o.order_period,
                 hospitals.get(o.hospital_id, ""),
                 o.status.value if hasattr(o.status, "value") else o.status,
-                it.item_name or "", it.item_code or "", it.unit or "",
-                float(it.current_stock or 0), float(it.avg_monthly_usage or 0),
+                it.item_name or "", it.unit or "",
+                float(it.current_stock or 0),
                 float(it.required_quantity or 0), float(it.unit_cost or 0),
                 float(it.estimated_cost or 0), it.preferred_supplier_name or "",
             ])
     return rows
 
 
-async def _report_consolidated(db, hospital_ids, order_period=None) -> List[List]:
-    """Group Consolidated Order — item × hospital matrix flattened to rows."""
+async def _report_consolidated(db, hospital_ids, order_period=None):
+    """Group Consolidated Order — item × hospital matrix.
+
+    Each item is shown once with a required-quantity column per hospital plus
+    a combined Total Required column. Returns (headers, rows) because the
+    hospital columns are dynamic.
+    """
     q = select(MonthlyOrder).options(selectinload(MonthlyOrder.items))
     if hospital_ids is not None:
         q = q.where(MonthlyOrder.hospital_id.in_(hospital_ids))
@@ -377,31 +385,36 @@ async def _report_consolidated(db, hospital_ids, order_period=None) -> List[List
     q = q.order_by(MonthlyOrder.hospital_id)
     orders = (await db.execute(q)).scalars().all()
     hospitals = await _hospital_cache(db)
-    items = await _item_cache(db)
-    brands = {i.id: i.brand for i in items.values()}
+
+    seen_ids: List[str] = []
+    seen = set()
+    for o in orders:
+        if o.hospital_id not in seen:
+            seen.add(o.hospital_id)
+            seen_ids.append(o.hospital_id)
 
     item_rows = {}
     for o in orders:
         for it in o.items:
-            item_rows.setdefault((it.item_id, o.hospital_id), {
+            rec = item_rows.setdefault(it.item_id, {
                 "period": o.order_period,
                 "item_name": it.item_name or "",
-                "item_code": it.item_code or "",
-                "brand": brands.get(it.item_id) or "",
                 "unit": it.unit or "",
-                "hospital": hospitals.get(o.hospital_id, ""),
-                "current_stock": float(it.current_stock or 0),
-                "required_quantity": float(it.required_quantity or 0),
-                "unit_cost": float(it.unit_cost or 0),
-                "estimated_cost": float(it.estimated_cost or 0),
+                "qty": {},
+                "est": {},
             })
+            rec["qty"][o.hospital_id] = float(it.required_quantity or 0)
+            rec["est"][o.hospital_id] = float(it.estimated_cost or 0)
+
+    headers = ["Period", "Item", "Unit"]
+    headers += [hospitals.get(hid, hid) for hid in seen_ids]
+    headers += ["Total Required", "Est. Cost"]
 
     rows = []
-    for key in sorted(item_rows.keys(), key=lambda k: (item_rows[k]["item_name"].lower(), item_rows[k]["hospital"].lower())):
-        r = item_rows[key]
-        rows.append([
-            r["period"], r["item_name"], r["item_code"], r["brand"], r["unit"],
-            r["hospital"], r["current_stock"], r["required_quantity"], r["unit_cost"],
-            r["estimated_cost"],
-        ])
-    return rows
+    for item_id in sorted(item_rows.keys(), key=lambda k: item_rows[k]["item_name"].lower()):
+        r = item_rows[item_id]
+        cells = [r["qty"].get(hid, 0.0) for hid in seen_ids]
+        total = round(sum(cells), 2)
+        est_total = round(sum(r["est"].get(hid, 0.0) for hid in seen_ids), 2)
+        rows.append([r["period"], r["item_name"], r["unit"], *cells, total, est_total])
+    return headers, rows
