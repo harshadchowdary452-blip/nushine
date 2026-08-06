@@ -312,7 +312,7 @@ def _generate_description(enquiry_type: str, patient_name: str | None, lead_name
     if enquiry_type == "APPOINTMENT_REMINDER":
         if appointment_obj:
             doc_name = getattr(appointment_obj.doctor, "full_name", "") if appointment_obj.doctor else ""
-            purpose = appointment_obj.appointment_type.replace("_", " ").title() if appointment_obj.appointment_type else "Appointment"
+            purpose = appointment_obj.notes.strip().title() if appointment_obj.notes else "Appointment"
             return f"{purpose} with Dr. {doc_name}" if doc_name else f"{purpose} scheduled"
         return "Appointment reminder"
     if enquiry_type == "TREATMENT_WELLNESS":
@@ -455,12 +455,9 @@ def _build_template_variables(enquiry_type: str, patient_obj: Any, lead_obj: Any
     if appointment_obj:
         v["appointment_date"] = appointment_obj.appointment_date.isoformat() if appointment_obj.appointment_date else ""
         v["appointment_time"] = str(appointment_obj.appointment_time) if appointment_obj.appointment_time else ""
-        apt_type = appointment_obj.appointment_type
-        v["appointment_type"] = (apt_type.value if hasattr(apt_type, "value") else apt_type).replace("_", " ").title() if apt_type else ""
     else:
         v["appointment_date"] = ""
         v["appointment_time"] = ""
-        v["appointment_type"] = ""
     v["treatment_name"] = treatment_name or ""
     v["treatment_type"] = ""
     v["treatment_status"] = ""
@@ -668,7 +665,6 @@ async def get_enquiry_calendar(
                 "date": appt_obj.appointment_date.isoformat() if appt_obj.appointment_date else None,
                 "time": str(appt_obj.appointment_time) if appt_obj.appointment_time else None,
                 "doctor_name": appt_doctor_name,
-                "appointment_type": appt_obj.appointment_type.value if hasattr(appt_obj.appointment_type, "value") else appt_obj.appointment_type,
                 "purpose": getattr(appt_obj, "notes", None),
                 "status": appt_obj.status.value if hasattr(appt_obj.status, "value") else appt_obj.status,
             }
@@ -1521,7 +1517,6 @@ async def get_enriched_enquiry_detail(
             "doctor_name": appt_doctor_name,
             "department": None,
             "purpose": appt_obj.notes,
-            "type": appt_obj.appointment_type.value if hasattr(appt_obj.appointment_type, "value") else appt_obj.appointment_type,
             "status": appt_obj.status.value if hasattr(appt_obj.status, "value") else appt_obj.status,
         }
 

@@ -10,7 +10,7 @@ from app.models.clinical_progress_note import ClinicalProgressNote
 from app.models.treatment_plan import TreatmentPlan
 from app.models.treatment_plan_item import TreatmentPlanItem
 from app.models.treatment_sitting import TreatmentSitting
-from app.models.appointment import Appointment, AppointmentStatus, AppointmentType, TREATMENT_DURATIONS
+from app.models.appointment import Appointment, AppointmentStatus
 from app.models.doctor_working_hour import DoctorWorkingHour, WEEKDAYS
 from app.models.doctor_availability import DoctorAvailability
 from app.models.doctor_leave import DoctorLeave, LeaveStatus
@@ -70,6 +70,10 @@ from app.models.hospital_inventory import HospitalInventory
 from app.models.inventory_transaction import InventoryTransaction, InventoryTransactionType
 from app.models.monthly_order import MonthlyOrder, MonthlyOrderItem, MonthlyOrderStatus
 from app.models.pending_inventory_item import PendingInventoryItem
+from app.models.laboratory import Laboratory
+from app.models.lab_case import LabCase
+from app.models.lab_case_event import LabCaseEvent
+from app.models.communication_center_activity import CommunicationCenterActivity
 
 __all__ = [
     "AdminGroup", "Hospital", "User", "Patient", "Consultant",
@@ -84,7 +88,7 @@ __all__ = [
     "FollowUpResponse", "FollowUpResponseStatus", "FeedbackType", "EnquiryOutcome",
     "WhatsAppTemplate",
     "WhatsAppConfig",
-    "DoctorWorkingHour", "DoctorAvailability", "DoctorLeave", "LeaveStatus", "DoctorBlockedSlot", "WEEKDAYS", "TREATMENT_DURATIONS",
+    "DoctorWorkingHour", "DoctorAvailability", "DoctorLeave", "LeaveStatus", "DoctorBlockedSlot", "WEEKDAYS",
     "Lead", "LeadCommunication", "LeadCall", "LeadSource", "LeadStatus", "LeadCallOutcome",
     "BillingHistory",
     "ConsentForm",
@@ -115,4 +119,6 @@ __all__ = [
     "InventoryTransaction", "InventoryTransactionType",
     "MonthlyOrder", "MonthlyOrderItem", "MonthlyOrderStatus",
     "PendingInventoryItem",
+    "Laboratory", "LabCase", "LabCaseEvent",
+    "CommunicationCenterActivity",
 ]

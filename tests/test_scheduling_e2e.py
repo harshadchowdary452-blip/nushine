@@ -81,12 +81,9 @@ async def test_procedure_durations_endpoint(client: AsyncClient, seed):
     assert r.status_code == 200
     data = r.json()
     assert "procedures" in data
-    assert "defaults" in data
     assert data["procedures"]["Root Canal"] == 90
     assert data["procedures"]["Implant"] == 120
     assert data["procedures"]["Scaling"] == 30
-    assert data["defaults"]["CONSULTATION"] == 30
-    assert data["defaults"]["TREATMENT"] == 60
 
 
 @pytest.mark.asyncio
@@ -123,14 +120,14 @@ async def test_slots_with_procedure_name_case_insensitive(client: AsyncClient, s
 
 
 @pytest.mark.asyncio
-async def test_slots_with_unknown_procedure_falls_back_to_type(client: AsyncClient, seed):
+async def test_slots_with_unknown_procedure_defaults_to_30(client: AsyncClient, seed):
     token = await login(client, "sa_sched@t.com")
     headers = {"Authorization": f"Bearer {token}"}
     future_date = _next_weekday(date.today() + timedelta(days=1))
     r = await client.get(
         "/api/v1/appointments/slots",
         params={"doctor_id": seed["dr_id"], "date": future_date.isoformat(),
-                "procedure_name": "Unknown Procedure X", "appointment_type": "EMERGENCY"},
+                "procedure_name": "Unknown Procedure X"},
         headers=headers,
     )
     assert r.status_code == 200
@@ -180,15 +177,14 @@ async def test_create_appointment_with_procedure_name(client: AsyncClient, seed)
             "doctor_id": seed["dr_id"],
             "appointment_date": future_date.isoformat(),
             "appointment_time": "10:00:00",
-            "appointment_type": "TREATMENT",
             "procedure_name": "Scaling",
+            "duration_minutes": 30,
             "notes": "Test with procedure",
         },
     )
     assert r.status_code == 201, f"Create failed: {r.text}"
     data = r.json()
     assert data["duration_minutes"] == 30
-    assert data["appointment_type"] == "TREATMENT"
     appt_id = data["id"]
 
     r2 = await client.get(f"/api/v1/appointments/{appt_id}", headers=headers)
@@ -210,6 +206,7 @@ async def test_create_appointment_rct_uses_90_min(client: AsyncClient, seed):
             "appointment_date": future_date.isoformat(),
             "appointment_time": "10:00:00",
             "procedure_name": "Root Canal",
+            "duration_minutes": 90,
             "notes": "RCT test",
         },
     )
@@ -232,6 +229,7 @@ async def test_reschedule_validates_new_slot(client: AsyncClient, seed):
             "appointment_date": future_date.isoformat(),
             "appointment_time": "10:00:00",
             "procedure_name": "Consultation",
+            "duration_minutes": 20,
         },
     )
     assert r1.status_code == 201
@@ -265,6 +263,7 @@ async def test_reschedule_sets_correct_end_time(client: AsyncClient, seed):
             "appointment_date": future_date.isoformat(),
             "appointment_time": "10:00:00",
             "procedure_name": "Root Canal",
+            "duration_minutes": 90,
         },
     )
     assert r1.status_code == 201
@@ -319,6 +318,7 @@ async def test_consecutive_slots_unavailable_for_long_procedure(client: AsyncCli
             "appointment_date": future_date.isoformat(),
             "appointment_time": "10:00:00",
             "procedure_name": "Root Canal",
+            "duration_minutes": 90,
         },
     )
     assert r1.status_code == 201

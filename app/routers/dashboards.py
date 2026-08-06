@@ -12,7 +12,7 @@ from app.models.hospital import Hospital
 from app.models.user import User
 from app.models.patient import Patient, PatientStatus
 from app.models.case import Case, CaseStatus
-from app.models.appointment import Appointment, AppointmentStatus, AppointmentType
+from app.models.appointment import Appointment, AppointmentStatus
 from app.models.follow_up import FollowUp, FollowUpStatus
 from app.models.billing import Billing, PaymentStatus
 from app.models.treatment_plan import TreatmentPlan, TreatmentPlanStatus
@@ -1195,7 +1195,7 @@ async def hospital_admin_dashboard(
     if patient_ids:
         appt_q = (
             select(Appointment.id, Appointment.appointment_time, Appointment.status,
-                   Appointment.appointment_type, Appointment.notes,
+                   Appointment.notes,
                    Patient.full_name.label("patient_name"), User.full_name.label("doctor_name"))
             .join(Patient, Appointment.patient_id == Patient.id)
             .join(User, Appointment.doctor_id == User.id, isouter=True)
@@ -1208,8 +1208,7 @@ async def hospital_admin_dashboard(
             today_appt_list.append({
                 "id": row[0], "time": str(row[1])[:5] if row[1] else "",
                 "status": row[2].value if hasattr(row[2], 'value') else str(row[2]),
-                "type": row[3].value if hasattr(row[3], 'value') else str(row[3]) if row[3] else "CONSULTATION",
-                "notes": row[4] or "", "patient_name": row[5] or "", "doctor_name": row[6] or "Unassigned",
+                "notes": row[3] or "", "patient_name": row[4] or "", "doctor_name": row[5] or "Unassigned",
             })
 
     # --- Pending actions ---
@@ -2235,7 +2234,6 @@ async def quick_view_patient(patient_id: str, db: AsyncSession = Depends(get_db)
                 "date": a.appointment_date.isoformat() if hasattr(a.appointment_date, 'isoformat') else str(a.appointment_date),
                 "time": str(a.appointment_time),
                 "status": a.status.value if hasattr(a.status, 'value') else str(a.status),
-                "appointment_type": a.appointment_type.value if hasattr(a, 'appointment_type') and a.appointment_type else None,
             }
             for a in appointments
         ],

@@ -10,7 +10,7 @@ from app.models.hospital import Hospital
 from app.models.admin_group import AdminGroup
 from app.models.treatment_plan import TreatmentPlan, TreatmentPlanStatus
 from app.models.treatment_plan_item import TreatmentPlanItem
-from app.models.appointment import Appointment, AppointmentStatus, AppointmentType
+from app.models.appointment import Appointment, AppointmentStatus
 
 
 @pytest.fixture
@@ -166,7 +166,8 @@ async def test_transfer_completed_treatment_activates_target_and_schedules_appoi
     assert appt.appointment_date == date(2026, 8, 10)
     assert appt.appointment_time == time(11, 30)
     assert appt.status == AppointmentStatus.SCHEDULED
-    assert appt.appointment_type == AppointmentType.TREATMENT
+    assert appt.duration_minutes and appt.duration_minutes > 0
+    assert appt.end_time is not None
 
     # ── Guards ──
     # Transfer from a non-completed treatment is rejected.

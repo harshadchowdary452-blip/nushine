@@ -408,18 +408,18 @@
     --ds-sidebar-edge: transparent;
     --ds-sidebar-logo-grad-1: #FFFFFF;
     --ds-sidebar-logo-grad-2: #FFFFFF;
-    --ds-sidebar-width: 252px;
-    --ds-sidebar-collapsed-width: 64px;
-    --ds-sidebar-brand-h: 56px;
-    --ds-sidebar-item-h: 36px;
+    --ds-sidebar-width: 208px;
+    --ds-sidebar-collapsed-width: 56px;
+    --ds-sidebar-brand-h: 46px;
+    --ds-sidebar-item-h: 30px;
     --ds-sidebar-item-gap: 2px;
-    --ds-sidebar-section-gap: 20px;
-    --ds-sidebar-padding-x: 10px;
+    --ds-sidebar-section-gap: 16px;
+    --ds-sidebar-padding-x: 8px;
 
     /* ─── Header — white surface, solid navy accent edge + soft elevation ─── */
     --ds-header-bg: var(--ds-surface);
     --ds-header-border: var(--ds-border);
-    --ds-header-height: 50px;
+    --ds-header-height: 42px;
     --ds-header-accent: var(--ds-primary-600);
     --ds-header-shadow: 0 1px 0 rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.05);
 
@@ -593,19 +593,22 @@
     --ds-font-family-heading: 'Inter', system-ui, -apple-system, sans-serif;
     --ds-font-family-mono: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
 
-    /* ── Primitive: size scale (closed set — 11 steps) ── */
+    /* ── Primitive: size scale (closed set — 11 steps) ──
+       Compact-mode pass: every step is pulled down 1px (body 14→13, table
+       13→12, captions 12→11). Readability floor is preserved — the scale never
+       drops below 10px and body/input text stays at a comfortable 13px. */
     --ds-font-size-3xs: 10px;
-    --ds-font-size-2xs: 11px;
-    --ds-font-size-xs:  12px;
-    --ds-font-size-sm:  13px;
-    --ds-font-size-md:  14px;
-    --ds-font-size-lg:  15px;
-    --ds-font-size-xl:  16px;
-    --ds-font-size-2xl: 18px;
-    --ds-font-size-3xl: 20px;
-    --ds-font-size-4xl: 24px;
-    --ds-font-size-5xl: 30px;
-    --ds-font-size-6xl: 36px;
+    --ds-font-size-2xs: 10px;
+    --ds-font-size-xs:  11px;
+    --ds-font-size-sm:  12px;
+    --ds-font-size-md:  13px;
+    --ds-font-size-lg:  14px;
+    --ds-font-size-xl:  15px;
+    --ds-font-size-2xl: 16px;
+    --ds-font-size-3xl: 18px;
+    --ds-font-size-4xl: 21px;
+    --ds-font-size-5xl: 26px;
+    --ds-font-size-6xl: 31px;
 
     /* ── Primitive: line-height scale ── */
     --ds-leading-none:    1;
@@ -631,56 +634,56 @@
 
     /* ── Role: Display title ── */
     --ds-display-family: var(--ds-font-family-heading);
-    --ds-display-size: 32px;
+    --ds-display-size: 28px;
     --ds-display-weight: var(--ds-weight-bold);
     --ds-display-leading: var(--ds-leading-tight);
     --ds-display-tracking: var(--ds-tracking-tighter);
 
     /* ── Role: Page title ── */
     --ds-page-title-family: var(--ds-font-family-heading);
-    --ds-page-title-size: 22px;
+    --ds-page-title-size: 19px;
     --ds-page-title-weight: var(--ds-weight-bold);
     --ds-page-title-leading: var(--ds-leading-tight);
     --ds-page-title-tracking: var(--ds-tracking-tighter);
 
     /* ── Role: Section title ── */
     --ds-section-title-family: var(--ds-font-family-heading);
-    --ds-section-title-size: 18px;
+    --ds-section-title-size: 16px;
     --ds-section-title-weight: var(--ds-weight-semibold);
     --ds-section-title-leading: var(--ds-leading-snug);
     --ds-section-title-tracking: var(--ds-tracking-tight);
 
     /* ── Role: Card title ── */
     --ds-card-title-family: var(--ds-font-family-heading);
-    --ds-card-title-size: 14px;
+    --ds-card-title-size: 13px;
     --ds-card-title-weight: var(--ds-weight-semibold);
     --ds-card-title-leading: var(--ds-leading-normal);
     --ds-card-title-tracking: var(--ds-tracking-tight);
 
     /* ── Role: Widget title (dashboard tiles) ── */
     --ds-widget-title-family: var(--ds-font-family-heading);
-    --ds-widget-title-size: 13px;
+    --ds-widget-title-size: 12px;
     --ds-widget-title-weight: var(--ds-weight-semibold);
     --ds-widget-title-leading: var(--ds-leading-normal);
     --ds-widget-title-tracking: var(--ds-tracking-tight);
 
     /* ── Role: Form title (fieldset / form section) ── */
     --ds-form-title-family: var(--ds-font-family-heading);
-    --ds-form-title-size: 14px;
+    --ds-form-title-size: 13px;
     --ds-form-title-weight: var(--ds-weight-semibold);
     --ds-form-title-leading: var(--ds-leading-normal);
     --ds-form-title-tracking: var(--ds-tracking-tight);
 
     /* ── Role: Dialog title ── */
     --ds-dialog-title-family: var(--ds-font-family-heading);
-    --ds-dialog-title-size: 18px;
+    --ds-dialog-title-size: 16px;
     --ds-dialog-title-weight: var(--ds-weight-semibold);
     --ds-dialog-title-leading: var(--ds-leading-snug);
     --ds-dialog-title-tracking: var(--ds-tracking-tight);
 
     /* ── Role: Drawer title ── */
     --ds-drawer-title-family: var(--ds-font-family-heading);
-    --ds-drawer-title-size: 18px;
+    --ds-drawer-title-size: 16px;
     --ds-drawer-title-weight: var(--ds-weight-semibold);
     --ds-drawer-title-leading: var(--ds-leading-snug);
     --ds-drawer-title-tracking: var(--ds-tracking-tight);
@@ -840,11 +843,11 @@
 
     /* ── Role: Metric / KPI value ── */
     --ds-metric-family: var(--ds-font-family-heading);
-    --ds-metric-size: 22px;
+    --ds-metric-size: 19px;
     --ds-metric-weight: var(--ds-weight-bold);
     --ds-metric-leading: var(--ds-leading-tight);
     --ds-metric-tracking: var(--ds-tracking-tighter);
-    --ds-metric-lg-size: 26px;
+    --ds-metric-lg-size: 22px;
 
     /* ── Role: Code / monospace numerics ── */
     --ds-code-family: var(--ds-font-family-mono);
@@ -854,13 +857,14 @@
     --ds-code-tracking: var(--ds-tracking-normal);
 
     /* ─── Spacing ───
-       Global density pass: the mid/large steps are pulled down ~10–15%
-       (16→14, 20→16, 24→20, 32→28, 40→36) so every component that consumes
-       these tokens — cards, tables, forms, dialogs, grids — compacts together
-       and information density rises without touching the 4px alignment grid.
-       The small steps (2/4/6/8/10) are deliberately untouched: below ~10px the
-       saving is invisible and readability starts to suffer. Touch targets,
-       focus rings and body text are separate tokens and are NOT reduced. */
+       Global density pass: the mid/large steps are pulled down ~15–20%
+       (14→12, 16→14, 20→16, 24→20, 28→24, 32→28, 36→30) so every component
+       that consumes these tokens — cards, tables, forms, dialogs, grids —
+       compacts together and information density rises without touching the
+       4px alignment grid. The small steps (2/4/6/8/10/12) are deliberately
+       untouched: below ~12px the saving is invisible and readability starts
+       to suffer. Touch targets, focus rings and body text are separate
+       tokens and are NOT reduced. */
     --ds-spacing-0: 0px;
     --ds-spacing-px: 1px;
     --ds-spacing-0_5: 2px;
@@ -870,26 +874,28 @@
     --ds-spacing-2_5: 10px;
     --ds-spacing-3: 10px;
     --ds-spacing-3_5: 12px;
-    --ds-spacing-4: 14px;
-    --ds-spacing-5: 16px;
-    --ds-spacing-6: 20px;
-    --ds-spacing-7: 24px;
-    --ds-spacing-8: 28px;
-    --ds-spacing-9: 32px;
-    --ds-spacing-10: 36px;
-    --ds-spacing-12: 44px;
-    --ds-spacing-14: 50px;
-    --ds-spacing-16: 56px;
-    --ds-spacing-20: 72px;
-    --ds-spacing-24: 84px;
+    --ds-spacing-4: 12px;
+    --ds-spacing-5: 14px;
+    --ds-spacing-6: 16px;
+    --ds-spacing-7: 20px;
+    --ds-spacing-8: 24px;
+    --ds-spacing-9: 28px;
+    --ds-spacing-10: 30px;
+    --ds-spacing-12: 38px;
+    --ds-spacing-14: 44px;
+    --ds-spacing-16: 48px;
+    --ds-spacing-20: 62px;
+    --ds-spacing-24: 72px;
 
-    /* ─── Border Radius ─── */
-    --ds-radius-sm: 4px;
-    --ds-radius-md: 6px;
-    --ds-radius-lg: 8px;
-    --ds-radius-xl: 12px;
-    --ds-radius-2xl: 16px;
-    --ds-radius-3xl: 20px;
+    /* ─── Border Radius ──
+       Slightly tighter corners to match the denser geometry: large surfaces
+       (cards xl=9, dialogs 2xl=12) read crisp, controls stay soft but firm. */
+    --ds-radius-sm: 3px;
+    --ds-radius-md: 5px;
+    --ds-radius-lg: 7px;
+    --ds-radius-xl: 9px;
+    --ds-radius-2xl: 12px;
+    --ds-radius-3xl: 16px;
     --ds-radius-full: 9999px;
 
     /* ─── Shadows — deep teal-slate tone; elevation reads as depth, not dirt ─── */
@@ -979,15 +985,15 @@
     /* ─── Layout ─── */
     --ds-container-max: 1600px;
     --ds-container-narrow: 960px;
-    --ds-container-padding: var(--ds-spacing-6);
-    --ds-container-padding-sm: var(--ds-spacing-4);
-    --ds-container-padding-lg: var(--ds-spacing-8);
-    --ds-page-padding-y: var(--ds-spacing-6);
-    --ds-page-padding-y-lg: var(--ds-spacing-8);
-    --ds-section-gap: var(--ds-spacing-6);
-    --ds-section-gap-lg: var(--ds-spacing-8);
-    --ds-section-gap-sm: var(--ds-spacing-4);
-    --ds-element-gap: var(--ds-spacing-4);
+    --ds-container-padding: var(--ds-spacing-5);
+    --ds-container-padding-sm: var(--ds-spacing-3_5);
+    --ds-container-padding-lg: var(--ds-spacing-6);
+    --ds-page-padding-y: var(--ds-spacing-5);
+    --ds-page-padding-y-lg: var(--ds-spacing-6);
+    --ds-section-gap: var(--ds-spacing-5);
+    --ds-section-gap-lg: var(--ds-spacing-6);
+    --ds-section-gap-sm: var(--ds-spacing-3);
+    --ds-element-gap: var(--ds-spacing-3_5);
     --ds-element-gap-sm: var(--ds-spacing-3);
 
     /* ─── Control Sizes (buttons, inputs, segmented controls) ─── */
@@ -1001,24 +1007,24 @@
 
     /* ─── Content Grouping ─── */
     --ds-group-gap: var(--ds-spacing-5);
-    --ds-stack-gap: var(--ds-spacing-3);
-    --ds-inline-gap: var(--ds-spacing-3);
+    --ds-stack-gap: var(--ds-spacing-2_5);
+    --ds-inline-gap: var(--ds-spacing-2_5);
 
     /* ─── Cards ─── */
-    --ds-card-padding: var(--ds-spacing-5);
-    --ds-card-gap: var(--ds-spacing-4);
+    --ds-card-padding: var(--ds-spacing-3_5);
+    --ds-card-gap: var(--ds-spacing-3);
     --ds-card-radius: var(--ds-radius-xl);
     --ds-card-shadow: var(--ds-shadow-card);
     --ds-card-shadow-hover: var(--ds-shadow-card-hover);
 
     /* ─── Tables ─── */
-    --ds-table-cell-padding: var(--ds-spacing-3) var(--ds-spacing-4);
+    --ds-table-cell-padding: var(--ds-spacing-2) var(--ds-spacing-3_5);
     --ds-table-radius: var(--ds-radius-lg);
 
     /* ─── Forms ─── */
-    --ds-input-height: 36px;
+    --ds-input-height: 30px;
     --ds-input-padding: 0 var(--ds-spacing-3);
-    --ds-input-radius: var(--ds-radius-lg);
+    --ds-input-radius: var(--ds-radius-md);
     --ds-input-border: var(--ds-border);
     --ds-input-border-hover: var(--ds-border-hover);
     --ds-input-border-focus: var(--ds-primary);

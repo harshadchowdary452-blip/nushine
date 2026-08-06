@@ -87,12 +87,28 @@
 
   /* Global density lever. Legacy pages still use plain Tailwind spacing
      utilities (p-4, gap-2, h-9 …); those compile to calc(var(--spacing) * N).
-     Pulling the base from 0.25rem to 0.225rem scales every legacy control
-     down ~10% in one place so no module is resized independently. The
-     design-system's own --ds-spacing-* scale is adjusted separately in
-     tokens.css and is not affected by this value. Touch targets (44px),
+     Pulling the base from 0.25rem to 0.2rem scales every legacy control down
+     ~20% in one place so no module is resized independently. The design
+     system's own --ds-spacing-* scale is adjusted separately in tokens.css
+     and is not affected by this value. Touch targets (44px on coarse pointers),
      focus rings and body text are independent tokens and are untouched. */
-  --spacing: 0.225rem;
+  --spacing: 0.2rem;
+
+  /* Compact the legacy Tailwind text scale to mirror the design-system type
+     ramp (body 13px, table 12px, headings 13–21px). text-xs / text-sm / etc.
+     now compile to the same sizes as the corresponding --ds-* tokens so the
+     two systems cannot drift while the remaining pages are migrated. */
+  --text-3xs: 10px;
+  --text-2xs: 10px;
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-lg: 15px;
+  --text-xl: 16px;
+  --text-2xl: 18px;
+  --text-3xl: 21px;
+  --text-4xl: 26px;
+  --text-5xl: 31px;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -104,6 +120,22 @@
     text-size-adjust: 100%;
   }
   html { scroll-behavior: smooth; }
+
+  /* Enterprise numeric fields: native number-input spinners are removed
+     app-wide. The shared NumericInput renders a plain text input (inputMode
+     "decimal"/"numeric") with its own wheel-lock, key filtering and min/max
+     clamping, and this rule is the safety net that strips the browser's
+     steppers from any remaining type="number" input until it is migrated. */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
 }
 
 @layer utilities {

@@ -75,7 +75,6 @@ async def get_doctor_slots(
     date: str = Query(...),
     duration_minutes: Optional[int] = Query(None),
     procedure_name: Optional[str] = Query(None),
-    appointment_type: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
@@ -90,7 +89,6 @@ async def get_doctor_slots(
         appointment_date,
         duration_minutes=duration_minutes,
         procedure_name=procedure_name,
-        appointment_type=appointment_type,
     )
 
 
@@ -98,10 +96,9 @@ async def get_doctor_slots(
 async def get_procedure_durations(
     current_user: dict = Depends(get_current_user),
 ):
-    from app.models.appointment import PROCEDURE_DURATIONS, TREATMENT_DURATIONS
+    from app.models.appointment import PROCEDURE_DURATIONS
     return {
         "procedures": PROCEDURE_DURATIONS,
-        "defaults": {k.value: v for k, v in TREATMENT_DURATIONS.items()},
     }
 
 
@@ -206,7 +203,6 @@ async def get_appointments(
     patient_id: Optional[str] = Query(None),
     doctor_id: Optional[str] = Query(None),
     status_filter: Optional[str] = Query(None, alias="status"),
-    type_filter: Optional[str] = Query(None, alias="type"),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     patient_name: Optional[str] = Query(None),
@@ -224,8 +220,6 @@ async def get_appointments(
     filters = {}
     if status_filter:
         filters["status"] = status_filter
-    if type_filter:
-        filters["appointment_type"] = type_filter
     if date_from:
         filters["date_from"] = date_from
     if date_to:
@@ -267,7 +261,6 @@ async def get_upcoming_appointments(db: AsyncSession = Depends(get_db), current_
 async def search_appointments(
     search: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
-    type: Optional[str] = Query(None),
     doctor_id: Optional[str] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
@@ -292,8 +285,6 @@ async def search_appointments(
         filters["search"] = search
     if status:
         filters["status"] = status
-    if type:
-        filters["appointment_type"] = type
     if date_from:
         filters["date_from"] = date_from
     if date_to:
@@ -508,7 +499,6 @@ async def get_appointment_full_detail(appointment_id: str, db: AsyncSession = De
             "appointment_date": str(a.appointment_date) if a.appointment_date else None,
             "appointment_time": str(a.appointment_time) if a.appointment_time else None,
             "status": a.status.value if hasattr(a.status, "value") else a.status,
-            "appointment_type": a.appointment_type.value if hasattr(a.appointment_type, "value") else a.appointment_type,
             "doctor_name": doctor_names.get(a.doctor_id),
             "case_number": related_case_number_map.get(a.id),
         }
@@ -526,7 +516,6 @@ async def get_appointment_full_detail(appointment_id: str, db: AsyncSession = De
         "appointment_time": str(appointment.appointment_time) if appointment.appointment_time else None,
         "duration_minutes": appointment.duration_minutes,
         "end_time": str(appointment.end_time) if appointment.end_time else None,
-        "appointment_type": appointment.appointment_type.value if hasattr(appointment.appointment_type, "value") else appointment.appointment_type,
         "status": appointment.status.value if hasattr(appointment.status, "value") else appointment.status,
         "notes": appointment.notes,
         "is_active": appointment.is_active,

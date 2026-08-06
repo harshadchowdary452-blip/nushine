@@ -21,7 +21,7 @@ from app.models.case import Case
 from app.models.patient import Patient
 from app.models.hospital import Hospital
 from app.models.treatment_plan import TreatmentPlan, TreatmentPlanStatus
-from app.models.appointment import Appointment, AppointmentStatus, AppointmentType, resolve_duration
+from app.models.appointment import Appointment, AppointmentStatus, resolve_duration
 from app.models.user import User
 from app.services.timeline_helper import record_timeline_event, build_changes
 
@@ -497,7 +497,6 @@ async def transfer_treatment(plan_id: str, body: TransferTreatmentBody, db: Asyn
             if not existing.scalar_one_or_none():
                 duration = resolve_duration(
                     procedure_name=target.treatment_name,
-                    appointment_type="TREATMENT",
                     override_minutes=target.duration_minutes,
                 )
                 end_time = (datetime.combine(date.min, appt_time) + timedelta(minutes=duration)).time()
@@ -509,7 +508,6 @@ async def transfer_treatment(plan_id: str, body: TransferTreatmentBody, db: Asyn
                     duration_minutes=duration,
                     end_time=end_time,
                     status=AppointmentStatus.SCHEDULED,
-                    appointment_type=AppointmentType.TREATMENT,
                     notes=f"Auto-created from treatment transfer: {source.treatment_name} → {target.treatment_name}"
                     + (f" ({body.notes})" if body.notes else ""),
                 )
@@ -609,6 +607,38 @@ async def set_waiting(plan_id: str, waiting_type: str = Query(...), body: SetWai
     if body and body.reason:
         update_data["overdue_reason"] = body.reason
     result = await service.update(plan_id, update_data, user_id=current_user.get("sub"))
+
+    if waiting_type == "WAITING_LAB" and body:
+        try:
+            from app.services.lab_case_service import LabCaseService
+            from app.services.laboratory_service import LaboratoryService
+            from datetime import date as _date
+            lab_svc = LabCaseService(db)
+            if not await lab_svc.get_by_treatment(plan_id):
+                lab_payload = {}
+                if body.lab_name:
+                    lab = await LaboratoryService(db).create_or_get(body.lab_name, user_id=current_user.get("sub"))
+                    lab_payload["laboratory_id"] = lab.id
+                if body.lab_order_number:
+                    lab_payload["order_number"] = body.lab_order_number
+                if body.lab_sent_date:
+                    try:
+                        lab_payload["sent_date"] = _date.fromisoformat(body.lab_sent_date)
+                    except ValueError:
+                        pass
+                if body.lab_return_date:
+                    try:
+                        lab_payload["returned_date"] = _date.fromisoformat(body.lab_return_date)
+                    except ValueError:
+                        pass
+                if body.lab_cost is not None:
+                    lab_payload["lab_cost"] = body.lab_cost
+                if body.lab_tracking_notes:
+                    lab_payload["remarks"] = body.lab_tracking_notes
+                await lab_svc.create_from_treatment(current_user, plan_id, lab_payload)
+        except Exception as e:
+            logger.warning("Lab case auto-creation failed: %s", e)
+
     await db.commit()
 
     plan_result = await db.execute(select(TreatmentPlan).where(TreatmentPlan.id == plan_id))

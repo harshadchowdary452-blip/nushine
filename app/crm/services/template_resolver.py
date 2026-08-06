@@ -27,7 +27,7 @@ PATIENT_VARIABLES = {
     "staff_name", "staff_phone", "staff_email",
     "hospital_name", "branch_name", "clinic_name",
     "hospital_phone", "hospital_address",
-    "appointment_date", "appointment_time", "appointment_type",
+    "appointment_date", "appointment_time",
     "treatment_name", "treatment_type", "treatment_status",
     "treatment_completion_date",
     "visit_number", "remaining_visits", "total_visits",
@@ -302,9 +302,6 @@ class TemplateVariableResolver:
                     variables["appointment_date"] = appt.appointment_date.isoformat()
                 if appt.appointment_time:
                     variables["appointment_time"] = str(appt.appointment_time)
-                if appt.appointment_type:
-                    apt_type = appt.appointment_type
-                    variables["appointment_type"] = (apt_type.value if hasattr(apt_type, "value") else apt_type).replace("_", " ").title() if apt_type else ""
                 # Resolve doctor_name from the linked appointment's doctor if not already resolved
                 if "doctor_name" not in variables and appt.doctor_id:
                     from app.models.user import User

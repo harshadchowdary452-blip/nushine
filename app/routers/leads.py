@@ -437,7 +437,7 @@ async def book_lead_appointment(lead_id: str, data: LeadAppointmentCreate, db: A
     service = LeadService(db)
     lead = await _verify_lead_access(service, lead_id, current_user)
     from datetime import date, time, datetime, timezone
-    from app.models.appointment import Appointment, AppointmentStatus, AppointmentType
+    from app.models.appointment import Appointment, AppointmentStatus
     from app.models.patient import Patient
     from sqlalchemy import select
 
@@ -468,13 +468,15 @@ async def book_lead_appointment(lead_id: str, data: LeadAppointmentCreate, db: A
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="A doctor must be selected to book an appointment")
     appt_date = date.fromisoformat(data.appointment_date)
     appt_time = time.fromisoformat(data.appointment_time) if data.appointment_time else time(9, 0)
+    from app.services.appointment_service import compute_end_time
     appt = Appointment(
         patient_id=patient.id,
         doctor_id=doctor_id,
         appointment_date=appt_date,
         appointment_time=appt_time,
+        duration_minutes=30,
+        end_time=compute_end_time(appt_time, 30),
         status=AppointmentStatus.SCHEDULED,
-        appointment_type=AppointmentType.CONSULTATION,
         notes=data.notes or f"Appointment for lead: {lead.lead_name}",
     )
     db.add(appt)

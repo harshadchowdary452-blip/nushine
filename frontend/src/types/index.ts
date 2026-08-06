@@ -411,7 +411,6 @@ export interface Appointment {
   appointment_time: string
   duration_minutes: number
   end_time: string
-  appointment_type: string
   status: AppointmentStatus
   notes: string | null
   is_active: boolean
@@ -438,7 +437,6 @@ export interface TimeSlot {
   available: boolean
   status: "available" | "booked" | "leave" | "blocked" | "past" | "selected"
   patient_name?: string
-  appointment_type?: string
   duration_minutes?: number
   appointment_id?: string
 }
@@ -876,7 +874,6 @@ export interface QuickViewPatientAppointment {
   date: string
   time: string
   status: string
-  appointment_type: string | null
 }
 
 export interface QuickViewPatientBilling {
@@ -1152,7 +1149,6 @@ export interface RelatedAppointment {
   appointment_date: string
   appointment_time: string
   status: string
-  appointment_type: string
   doctor_name: string | null
   case_number: string | null
 }
@@ -1163,7 +1159,6 @@ export interface AppointmentSchedulerSelectData {
   appointment_time: string
   duration_minutes: number
   procedure_name?: string
-  appointment_type: string
 }
 
 export interface DoctorListItem {
@@ -1255,9 +1250,8 @@ export interface AppointmentCreatePayload {
   doctor_id: string
   appointment_date: string
   appointment_time: string
-  appointment_type?: string
   notes?: string
-  duration_minutes?: number
+  duration_minutes: number
 }
 
 export interface ReassignDoctorResponse {
@@ -1800,4 +1794,254 @@ export interface GeneratedEnquiriesDashboard {
   by_enquiry_type: Record<string, number>
   by_trigger_event: Record<string, number>
   total: number
+}
+
+export interface Laboratory {
+  id: string
+  name: string
+  code: string | null
+  contact_person: string | null
+  phone: string | null
+  whatsapp_number: string | null
+  email: string | null
+  address: string | null
+  status: string
+  notes: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type LabStatus =
+  | "PENDING"
+  | "SENT"
+  | "IN_PROGRESS"
+  | "READY"
+  | "RETURNED"
+  | "CANCELLED"
+
+export interface LabCaseEvent {
+  id: string
+  lab_case_id: string
+  event_type: string
+  from_status: string | null
+  to_status: string | null
+  note: string | null
+  actor_id: string | null
+  actor_name: string | null
+  created_at: string | null
+}
+
+export interface LabCase {
+  id: string
+  treatment_plan_id: string
+  laboratory_id: string | null
+  lab_status: LabStatus
+  order_number: string | null
+  tooth_number: string | null
+  material: string | null
+  sent_date: string | null
+  due_date: string | null
+  returned_date: string | null
+  lab_cost: number | null
+  remarks: string | null
+  created_by: string | null
+  created_at: string | null
+  updated_at: string | null
+  treatment_id: string
+  treatment_name: string | null
+  treatment_number: string | null
+  patient_id: string | null
+  patient_name: string | null
+  op_number: string | null
+  patient_phone: string | null
+  hospital_id: string | null
+  hospital_name: string | null
+  doctor_name: string | null
+  case_id: string | null
+  case_number: string | null
+  laboratory_name: string | null
+  laboratory_phone: string | null
+  laboratory_whatsapp_number: string | null
+  events: LabCaseEvent[]
+}
+
+export interface LabCandidate {
+  treatment_plan_id: string
+  treatment_number: string | null
+  treatment_name: string | null
+  patient_id: string | null
+  patient_name: string | null
+  op_number: string | null
+  patient_phone: string | null
+  hospital_id: string | null
+  hospital_name: string | null
+  doctor_name: string | null
+  case_id: string | null
+  case_number: string | null
+  tooth_number: string | null
+  lab_hint: string | null
+}
+
+export interface LabMonthlyReport {
+  month: string
+  headers: string[]
+  rows: (string | number)[][]
+  summary: { label: string; value: string | number }[]
+  total_cases: number
+  total_cost: number
+  status_breakdown: Record<string, number>
+  lab_breakdown: {
+    laboratory_id: string | null
+    laboratory_name: string
+    cases: number
+    total_cost: number
+  }[]
+}
+
+export interface LabWhatsAppResult {
+  success: boolean
+  phone: string
+  deep_link: string
+  message: string
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   COMMUNICATION CENTER (Phase 3B)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+export interface CommunicationCenterItem {
+  source_module: string
+  source_id: string
+  patient_id: string | null
+  patient_name: string | null
+  op_number: string | null
+  phone: string | null
+  lead_id: string | null
+  lead_name: string | null
+  hospital_id: string | null
+  hospital_name: string | null
+  doctor_id: string | null
+  doctor_name: string | null
+  sent_by: string | null
+  sent_by_name: string | null
+  channel: string | null
+  communication_type: string | null
+  subject: string | null
+  message: string | null
+  message_preview: string | null
+  status: string | null
+  delivery_status: string | null
+  provider_response: string | null
+  sent_at: string | null
+  delivered_at: string | null
+  created_at: string | null
+  attachment_url: string | null
+  template_name: string | null
+  sent_via: string | null
+  can_resend: boolean
+  can_download: boolean
+  audit?: CommunicationAuditEvent[]
+}
+
+export interface CommunicationCenterPage {
+  items: CommunicationCenterItem[]
+  total: number
+  page: number
+  size: number
+  pages: number
+}
+
+export interface CommunicationFilters {
+  search?: string
+  hospital_id?: string
+  source_module?: string
+  channel?: string
+  status?: string
+  communication_type?: string
+  doctor_id?: string
+  date_from?: string
+  date_to?: string
+  page?: number
+  page_size?: number
+  sort_by?: string
+  sort_dir?: string
+}
+
+export interface CommunicationStats {
+  total: number
+  today: number
+  this_week: number
+  by_channel: Record<string, number>
+  by_status: Record<string, number>
+  by_source_module: Record<string, number>
+  by_hospital: Record<string, number>
+}
+
+export interface CommunicationPreview {
+  source_module: string
+  source_id: string
+  channel: string | null
+  recipient: string | null
+  template: string
+  rendered: string
+  resolved: Record<string, string>
+  unresolved: string[]
+  missing_variables: string[]
+  can_send: boolean
+}
+
+export interface CommunicationResendResult {
+  success: boolean
+  status: string
+  channel: string | null
+  recipient: string | null
+  new_source_id: string | null
+  rendered: string
+  deep_link: string | null
+}
+
+export interface CommunicationAuditEvent {
+  id: string
+  action: string
+  details: string | null
+  created_by: string | null
+  created_by_name?: string | null
+  created_at: string | null
+  channel: string | null
+  source: string
+}
+
+export interface CommunicationCenterActivity {
+  id: string
+  communication_id: string
+  source_module: string
+  patient_id: string | null
+  lead_id: string | null
+  hospital_id: string | null
+  action: string
+  channel: string | null
+  details: string | null
+  created_by: string | null
+  created_by_name?: string | null
+  created_at: string | null
+}
+
+export interface CommunicationMeta {
+  sources: string[]
+  channels: string[]
+  statuses: string[]
+}
+
+export interface CommunicationExportRequest {
+  format: "csv" | "excel" | "pdf" | "zip"
+  search?: string
+  hospital_id?: string
+  source_module?: string
+  channel?: string
+  status?: string
+  communication_type?: string
+  doctor_id?: string
+  date_from?: string
+  date_to?: string
 }

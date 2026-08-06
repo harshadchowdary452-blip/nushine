@@ -214,7 +214,7 @@ export default function ScheduleFirstAppointment() {
                     doctor_id: form.doctor_id,
                     appointment_date: form.appointment_date,
                     appointment_time: form.appointment_time,
-                    appointment_type: "TREATMENT",
+                    duration_minutes: 30,
                     notes: form.notes,
                   })
                 }

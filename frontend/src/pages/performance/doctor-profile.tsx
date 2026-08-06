@@ -23,7 +23,6 @@ interface RecentAppointment {
   appointment_date: string
   appointment_time: string
   status: string
-  appointment_type: string
 }
 
 export default function DoctorPerformanceProfile() {
@@ -184,11 +183,6 @@ export default function DoctorPerformanceProfile() {
             {row.original.appointment_date} · {row.original.appointment_time}
           </span>
         ),
-      },
-      {
-        accessorKey: "appointment_type",
-        header: "Type",
-        cell: ({ row }) => row.original.appointment_type || "—",
       },
       {
         accessorKey: "status",

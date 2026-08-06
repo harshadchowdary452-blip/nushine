@@ -9,7 +9,7 @@ from app.models.case import Case
 from app.models.patient import Patient
 from app.models.hospital import Hospital
 from app.models.treatment_follow_up_rule import TreatmentFollowUpRule
-from app.models.appointment import Appointment, AppointmentType, AppointmentStatus
+from app.models.appointment import Appointment, AppointmentStatus
 from app.models.case_timeline import CaseTimeline
 from app.models.communication_log import CommunicationLog, CommunicationStatus, CommunicationChannel, MessageType
 from app.utils.whatsapp import WhatsAppProvider
@@ -370,7 +370,6 @@ class TreatmentEnquiryService:
             appointment_time=appt_time,
             duration_minutes=30,
             end_time=end_time,
-            appointment_type=AppointmentType.FOLLOW_UP,
             notes=f"Auto-created from {follow_up.follow_up_type.replace('_', ' ').title()}: {follow_up.notes or ''}",
         )
         self.db.add(appointment)

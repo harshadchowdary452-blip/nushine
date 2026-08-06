@@ -154,6 +154,7 @@ export default function TreatmentPlanApproval() {
     doctor_id: string
     date: string
     time: string
+    duration: number
     future_ready: boolean
     chair: string
     room: string
@@ -412,7 +413,7 @@ export default function TreatmentPlanApproval() {
           doctor_id: firstAppointment.doctor_id,
           appointment_date: firstAppointment.date,
           appointment_time: firstAppointment.time,
-          appointment_type: "TREATMENT",
+          duration_minutes: firstAppointment.duration || 30,
           notes: `First appointment for treatment plan — ${firstAppointment.future_ready ? "Future Ready" : ""}${firstAppointment.chair ? ` | Chair: ${firstAppointment.chair}` : ""}${firstAppointment.room ? ` | Room: ${firstAppointment.room}` : ""}`,
         }
         await appointmentsApi.create(apptData)
@@ -1097,6 +1098,7 @@ export default function TreatmentPlanApproval() {
                             doctor_id: prev?.doctor_id || "",
                             date: prev?.date || "",
                             time: prev?.time || "",
+                            duration: prev?.duration || 30,
                             future_ready: prev?.future_ready || false,
                             chair: prev?.chair || "",
                             room: prev?.room || "",
@@ -1127,6 +1129,7 @@ export default function TreatmentPlanApproval() {
                             treatment_item_id: prev?.treatment_item_id || "",
                             date: prev?.date || "",
                             time: prev?.time || "",
+                            duration: prev?.duration || 30,
                             future_ready: prev?.future_ready || false,
                             chair: prev?.chair || "",
                             room: prev?.room || "",
@@ -1151,11 +1154,9 @@ export default function TreatmentPlanApproval() {
                           (i: TreatmentPlanItem) => i.id === firstAppointment.treatment_item_id,
                         )?.procedure_name || ""
                       }
-                      appointmentType="TREATMENT"
                       date={firstAppointment.date || ""}
                       selectedTime={firstAppointment.time || ""}
                       showDoctorSelector={false}
-                      showTypeSelector={false}
                       showProcedureSelector={false}
                       onSelect={(data) =>
                         setFirstAppointment((prev) =>
@@ -1164,12 +1165,14 @@ export default function TreatmentPlanApproval() {
                                 ...prev,
                                 date: data.appointment_date,
                                 time: data.appointment_time,
+                                duration: data.duration_minutes,
                               }
                             : {
                                 treatment_item_id: "",
                                 doctor_id: data.doctor_id,
                                 date: data.appointment_date,
                                 time: data.appointment_time,
+                                duration: data.duration_minutes,
                                 future_ready: false,
                                 chair: "",
                                 room: "",
@@ -1194,6 +1197,7 @@ export default function TreatmentPlanApproval() {
                             doctor_id: prev?.doctor_id || "",
                             date: prev?.date || "",
                             time: prev?.time || "",
+                            duration: prev?.duration || 30,
                             chair: prev?.chair || "",
                             room: prev?.room || "",
                           }))
@@ -1221,6 +1225,7 @@ export default function TreatmentPlanApproval() {
                               doctor_id: prev?.doctor_id || "",
                               date: prev?.date || "",
                               time: prev?.time || "",
+                              duration: prev?.duration || 30,
                               future_ready: prev?.future_ready || false,
                               room: prev?.room || "",
                             }))
@@ -1242,6 +1247,7 @@ export default function TreatmentPlanApproval() {
                               doctor_id: prev?.doctor_id || "",
                               date: prev?.date || "",
                               time: prev?.time || "",
+                              duration: prev?.duration || 30,
                               future_ready: prev?.future_ready || false,
                               chair: prev?.chair || "",
                             }))

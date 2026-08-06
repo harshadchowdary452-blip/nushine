@@ -42,7 +42,7 @@ from app.models.generated_enquiry import GeneratedEnquiry
 from app.models.case import Case
 from app.models.treatment_plan import TreatmentPlan, TreatmentPlanStatus
 from app.models.billing import Billing
-from app.models.appointment import Appointment, AppointmentStatus, AppointmentType
+from app.models.appointment import Appointment, AppointmentStatus
 from app.models.communication_log import CommunicationLog, CommunicationChannel, CommunicationStatus
 from app.utils.whatsapp import WhatsAppProvider
 from app.utils.pdf import generate_invoice_pdf
@@ -130,7 +130,6 @@ class CreateAppointmentFromFu(BaseModel):
     doctor_id: str
     appointment_date: str
     appointment_time: str
-    appointment_type: Optional[str] = "FOLLOW_UP"
 
 class RescheduleFollowUp(BaseModel):
     follow_up_date: str
@@ -639,12 +638,13 @@ async def create_follow_up(
     db.add(fu)
     await db.flush()
 
-    # 2. Auto-create appointment with type FOLLOW_UP
+    # 2. Auto-create appointment
+    from app.services.appointment_service import compute_end_time
     appt = Appointment(
         patient_id=req.patient_id, doctor_id=doctor_id,
         appointment_date=follow_up_date, appointment_time=follow_up_time,
+        duration_minutes=30, end_time=compute_end_time(follow_up_time, 30),
         status=AppointmentStatus.SCHEDULED,
-        appointment_type=AppointmentType.FOLLOW_UP,
         notes=req.notes)
     db.add(appt)
     await db.flush()
@@ -867,10 +867,11 @@ async def create_appointment_from_follow_up(
     appt_date = date.fromisoformat(req.appointment_date)
     appt_time = time.fromisoformat(req.appointment_time)
     from app.models.appointment import Appointment
+    from app.services.appointment_service import compute_end_time
     appt = Appointment(
         patient_id=fu.patient_id, doctor_id=req.doctor_id,
         appointment_date=appt_date, appointment_time=appt_time,
-        appointment_type=req.appointment_type,
+        duration_minutes=30, end_time=compute_end_time(appt_time, 30),
     )
     db.add(appt)
     await db.flush()
@@ -2624,13 +2625,15 @@ async def create_follow_up_from_enquiry(
 
     # Create appointment first
     now = datetime.now(timezone.utc)
+    from app.services.appointment_service import compute_end_time
+    appt_time = req.follow_up_time or now.time()
     appt = Appointment(
         patient_id=req.patient_id,
         doctor_id=req.doctor_id,
         appointment_date=req.follow_up_date,
-        appointment_time=req.follow_up_time or now.time(),
+        appointment_time=appt_time,
+        duration_minutes=30, end_time=compute_end_time(appt_time, 30),
         status=AppointmentStatus.SCHEDULED,
-        appointment_type=AppointmentType.FOLLOW_UP,
         notes=f"Follow-Up: {req.follow_up_reason}" + (f"\n{req.notes}" if req.notes else ""))
     db.add(appt)
     await db.flush()
@@ -3382,7 +3385,7 @@ async def get_enhanced_crm_dashboard(
     if hospital_id: appt_q = appt_q.where(Appointment.patient.has(Patient.hospital_id == hospital_id))
     appts_today = (await db.execute(select(func.count()).select_from(appt_q.subquery()))).scalar() or 0
 
-    crm_appt_q = select(Appointment).where(Appointment.appointment_date >= d_start, Appointment.appointment_date <= d_end, Appointment.appointment_type == AppointmentType.FOLLOW_UP.value)
+    crm_appt_q = select(Appointment).join(FollowUp, FollowUp.appointment_id == Appointment.id).where(Appointment.appointment_date >= d_start, Appointment.appointment_date <= d_end)
     if hospital_id: crm_appt_q = crm_appt_q.where(Appointment.patient.has(Patient.hospital_id == hospital_id))
     crm_appts = (await db.execute(select(func.count()).select_from(crm_appt_q.subquery()))).scalar() or 0
 
@@ -3537,9 +3540,9 @@ async def get_enhanced_crm_dashboard(
     tt_rows = (await db.execute(tt_raw)).all()
     treatment_performance = []
     for tname, fcnt in tt_rows:
-        acnt_q = select(func.count(Appointment.id)).select_from(Appointment).join(Patient, Appointment.patient_id == Patient.id)
+        acnt_q = select(func.count(Appointment.id)).select_from(Appointment).join(FollowUp, FollowUp.appointment_id == Appointment.id).join(Patient, Appointment.patient_id == Patient.id)
         if hospital_id: acnt_q = acnt_q.where(Patient.hospital_id == hospital_id)
-        acnt = (await db.execute(acnt_q.where(Appointment.created_at >= datetime.combine(d_start, datetime.min.time()), Appointment.appointment_type == AppointmentType.FOLLOW_UP.value))).scalar() or 0
+        acnt = (await db.execute(acnt_q.where(Appointment.created_at >= datetime.combine(d_start, datetime.min.time())))).scalar() or 0
         treatment_performance.append({"name": tname or "Other", "follow_ups": fcnt, "appointments": acnt})
 
     # ─────────────────────────────────────────────────

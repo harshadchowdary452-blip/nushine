@@ -13,7 +13,7 @@ from app.models.case import Case
 from app.models.patient import Patient
 from app.models.user import User
 from app.models.hospital import Hospital
-from app.models.appointment import Appointment, AppointmentStatus, AppointmentType
+from app.models.appointment import Appointment, AppointmentStatus
 
 logger = logging.getLogger(__name__)
 
@@ -138,13 +138,21 @@ class TreatmentPlanService:
         if existing.scalar_one_or_none():
             logger.info("Appointment already exists for patient %s on %s, skipping", case.patient_id, plan.next_appointment_date)
             return None
+        from app.models.appointment import resolve_duration
+        from datetime import datetime, timedelta
+        appt_time = time(9, 0)
+        duration = resolve_duration(
+            procedure_name=plan.treatment_name,
+            override_minutes=plan.duration_minutes,
+        )
         appt = Appointment(
             patient_id=case.patient_id,
             doctor_id=case.doctor_id or "",
             appointment_date=plan.next_appointment_date,
-            appointment_time=time(9, 0),
+            appointment_time=appt_time,
+            duration_minutes=duration,
+            end_time=(datetime.combine(date.min, appt_time) + timedelta(minutes=duration)).time(),
             status=AppointmentStatus.SCHEDULED,
-            appointment_type=AppointmentType.TREATMENT,
             notes=f"Auto-created from treatment plan '{plan.treatment_name}'",
         )
         self.db.add(appt)

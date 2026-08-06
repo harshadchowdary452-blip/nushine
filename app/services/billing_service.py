@@ -16,7 +16,7 @@ from app.models.hospital import Hospital
 from app.models.user import User
 from app.models.treatment_plan import TreatmentPlan
 from app.models.treatment_sitting import TreatmentSitting
-from app.models.appointment import Appointment, AppointmentStatus, AppointmentType
+from app.models.appointment import Appointment, AppointmentStatus
 from app.services.billing_sync_service import BillingSyncService
 from app.config import settings
 

@@ -475,7 +475,6 @@ export default function PatientDetail() {
                         date={apptForm.appointment_date}
                         selectedTime={apptForm.appointment_time}
                         showDoctorSelector={false}
-                        showTypeSelector={true}
                         onSelect={(data) => setApptForm({
                           ...apptForm,
                           appointment_date: data.appointment_date,

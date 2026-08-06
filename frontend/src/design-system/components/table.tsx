@@ -66,7 +66,7 @@ const TableHead = React.forwardRef<HTMLTableCellElement, React.ThHTMLAttributes<
     <th
       ref={ref}
       className={cn(
-        "ds-table-header h-11 px-[var(--ds-spacing-4)] text-left align-middle text-[var(--ds-text-secondary)]",
+        "ds-table-header h-10 px-[var(--ds-spacing-4)] text-left align-middle text-[var(--ds-text-secondary)]",
         className
       )}
       {...props}
@@ -80,7 +80,7 @@ const TableCell = React.forwardRef<HTMLTableCellElement, React.TdHTMLAttributes<
     <td
       ref={ref}
       className={cn(
-        "ds-table-cell px-[var(--ds-spacing-4)] py-[var(--ds-spacing-3)] align-middle text-[var(--ds-text)]",
+        "ds-table-cell p-[var(--ds-table-cell-padding)] align-middle text-[var(--ds-text)]",
         className
       )}
       {...props}

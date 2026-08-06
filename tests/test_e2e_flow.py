@@ -80,6 +80,7 @@ async def test_hospital_admin_and_doctor_create_and_list(client: AsyncClient, se
         r = await client.post("/api/v1/appointments/", headers=headers, json={
             "patient_id": pat_id, "doctor_id": effective_doc_id,
             "appointment_date": "2026-07-01", "appointment_time": "09:00",
+            "duration_minutes": 30,
             "notes": f"appt_{now}",
         })
         ok = r.status_code == 201

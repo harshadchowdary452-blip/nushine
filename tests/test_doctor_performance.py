@@ -11,7 +11,7 @@ from httpx import AsyncClient
 from app.core.permissions import Role
 from app.core.security import hash_password
 from app.models.admin_group import AdminGroup
-from app.models.appointment import Appointment, AppointmentStatus, AppointmentType
+from app.models.appointment import Appointment, AppointmentStatus
 from app.models.billing import Billing, PaymentStatus
 from app.models.case import Case, CaseStatus
 from app.models.feedback import PatientFeedback
@@ -76,11 +76,11 @@ async def login(client, email):
     return r.json()["access_token"]
 
 
-async def add_appt(db_session, doctor_id, patient_id, appt_date, status, appt_type="CONSULTATION"):
+async def add_appt(db_session, doctor_id, patient_id, appt_date, status):
     appt = Appointment(
         patient_id=patient_id, doctor_id=doctor_id,
         appointment_date=appt_date, appointment_time=time(10, 0), end_time=time(10, 30),
-        duration_minutes=30, status=AppointmentStatus(status), appointment_type=AppointmentType(appt_type),
+        duration_minutes=30, status=AppointmentStatus(status),
     )
     db_session.add(appt)
     await db_session.flush()

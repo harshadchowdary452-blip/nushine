@@ -961,7 +961,6 @@ async def doctor_performance_detail(
             "appointment_date": appt.appointment_date.isoformat(),
             "appointment_time": appt.appointment_time.strftime("%H:%M"),
             "status": appt.status.value if hasattr(appt.status, "value") else appt.status,
-            "appointment_type": appt.appointment_type.value if hasattr(appt.appointment_type, "value") else appt.appointment_type,
         })
 
     return {

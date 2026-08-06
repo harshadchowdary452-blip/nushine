@@ -29,7 +29,6 @@ export interface AppointmentSchedulerProps {
   doctorId?: string
   patientId?: string
   procedureName?: string
-  appointmentType?: string
   date?: string
   selectedTime?: string
   onSelect: (data: {
@@ -38,34 +37,27 @@ export interface AppointmentSchedulerProps {
     appointment_time: string
     duration_minutes: number
     procedure_name?: string
-    appointment_type: string
   }) => void
   showDoctorSelector?: boolean
-  showTypeSelector?: boolean
   showProcedureSelector?: boolean
   procedureOptions?: Array<{ value: string; label: string }>
-  typeOptions?: Array<{ value: string; label: string; duration: number }>
   className?: string
 }
 
 export default function AppointmentScheduler({
   doctorId: initialDoctorId,
   procedureName: initialProcedureName,
-  appointmentType: initialAppointmentType,
   date: initialDate,
   selectedTime,
   onSelect,
   showDoctorSelector = false,
-  showTypeSelector = true,
   showProcedureSelector = false,
   procedureOptions,
-  typeOptions,
   className,
 }: AppointmentSchedulerProps) {
   const currentUser = useAuthStore((s) => s.user)
   const [doctorId, setDoctorId] = useState(initialDoctorId || "")
   const [appointmentDate, setAppointmentDate] = useState(initialDate || "")
-  const [appointmentType, setAppointmentType] = useState(initialAppointmentType || "CONSULTATION")
   const [procedureName, setProcedureName] = useState(initialProcedureName || "")
   const [durationMinutes, setDurationMinutes] = useState(30)
   const [internalSelectedTime, setInternalSelectedTime] = useState(selectedTime || "")
@@ -74,7 +66,6 @@ export default function AppointmentScheduler({
   useEffect(() => { if (initialDoctorId) setDoctorId(initialDoctorId) }, [initialDoctorId])
   useEffect(() => { if (initialDate) setAppointmentDate(initialDate) }, [initialDate])
   useEffect(() => { if (initialProcedureName) setProcedureName(initialProcedureName) }, [initialProcedureName])
-  useEffect(() => { if (initialAppointmentType) setAppointmentType(initialAppointmentType) }, [initialAppointmentType])
   useEffect(() => { if (selectedTime) setInternalSelectedTime(selectedTime) }, [selectedTime])
 
   const { data: doctorsData } = useQuery<PaginatedResponse<User>>({
@@ -116,15 +107,6 @@ export default function AppointmentScheduler({
     setInternalSelectedTime("")
   }, [])
 
-  const handleTypeChange = useCallback((type: string) => {
-    setAppointmentType(type)
-    if (!durationManuallyOverridden) {
-      const found = typeOptions?.find((t) => t.value === type)
-      if (found) setDurationMinutes(found.duration)
-    }
-    setInternalSelectedTime("")
-  }, [typeOptions, durationManuallyOverridden])
-
   const handleDurationChange = useCallback((mins: number) => {
     setDurationMinutes(mins)
     setDurationManuallyOverridden(true)
@@ -149,9 +131,8 @@ export default function AppointmentScheduler({
       appointment_time: time,
       duration_minutes: durationMinutes,
       procedure_name: procedureName || undefined,
-      appointment_type: appointmentType,
     })
-  }, [doctorId, appointmentDate, durationMinutes, procedureName, appointmentType, onSelect])
+  }, [doctorId, appointmentDate, durationMinutes, procedureName, onSelect])
 
   const groupedSlotTimes = useMemo(() => {
     if (!internalSelectedTime || !slotData?.slots || durationMinutes <= 30) return new Set<string>()
@@ -202,26 +183,6 @@ export default function AppointmentScheduler({
             <SelectContent>
               {procedureOptions?.map((p) => (
                 <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-
-      {showTypeSelector && (
-        <div className="grid gap-2">
-          <Label className="text-xs">Appointment Type</Label>
-          <Select value={appointmentType} onValueChange={handleTypeChange}>
-            <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
-            <SelectContent>
-              {(typeOptions || [
-                { value: "CONSULTATION", label: "Consultation", duration: 20 },
-                { value: "FOLLOW_UP", label: "Follow Up", duration: 30 },
-                { value: "TREATMENT", label: "Treatment", duration: 60 },
-                { value: "EMERGENCY", label: "Emergency", duration: 30 },
-                { value: "REVIEW", label: "Review", duration: 30 },
-              ]).map((t) => (
-                <SelectItem key={t.value} value={t.value}>{t.label} ({t.duration} min)</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -353,7 +314,7 @@ export default function AppointmentScheduler({
                       )}
                       title={
                         slot.status === "booked"
-                          ? `Booked by ${slot.patient_name || "someone"}${slot.appointment_type ? ` (${slot.appointment_type})` : ""}`
+                          ? `Booked by ${slot.patient_name || "someone"}`
                           : slot.status === "blocked"
                           ? "Blocked"
                           : slot.status === "leave"

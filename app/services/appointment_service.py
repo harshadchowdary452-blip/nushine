@@ -7,7 +7,7 @@ from sqlalchemy import select, func, extract, and_
 from fastapi import HTTPException, status
 from app.repositories.appointment_repository import AppointmentRepository
 from app.repositories.audit_log_repository import AuditLogRepository
-from app.models.appointment import Appointment, AppointmentStatus, AppointmentType, TREATMENT_DURATIONS, PROCEDURE_DURATIONS, resolve_duration
+from app.models.appointment import Appointment, AppointmentStatus, resolve_duration
 from app.models.patient import Patient
 from app.models.user import User
 from app.models.notification import Notification
@@ -146,7 +146,6 @@ class AppointmentService:
             "available": False,
             "status": "booked",
             "patient_name": patient_name,
-            "appointment_type": a.appointment_type.value if hasattr(a.appointment_type, 'value') else a.appointment_type,
             "duration_minutes": a.duration_minutes,
             "appointment_id": a.id,
         }
@@ -157,10 +156,9 @@ class AppointmentService:
         appointment_date: date,
         duration_minutes: int | None = None,
         procedure_name: str | None = None,
-        appointment_type: str | None = None,
     ) -> dict:
         if duration_minutes is None:
-            duration_minutes = resolve_duration(procedure_name, appointment_type or AppointmentType.CONSULTATION)
+            duration_minutes = resolve_duration(procedure_name)
 
         doctor_result = await self.db.execute(
             select(User.full_name, User.hospital_id, User.admin_group_id).where(User.id == doctor_id)
@@ -253,24 +251,24 @@ class AppointmentService:
             if blocked:
                 slots_result.append({
                     "time": slot_str, "available": False, "status": "blocked",
-                    "patient_name": None, "appointment_type": None, "duration_minutes": None, "appointment_id": None,
+                    "patient_name": None, "duration_minutes": None, "appointment_id": None,
                 })
             elif booked:
                 slots_result.append(await self._get_appointment_with_names(booked, slot_str))
             elif in_lunch:
                 slots_result.append({
                     "time": slot_str, "available": False, "status": "blocked",
-                    "patient_name": None, "appointment_type": None, "duration_minutes": None, "appointment_id": None,
+                    "patient_name": None, "duration_minutes": None, "appointment_id": None,
                 })
             elif is_past:
                 slots_result.append({
                     "time": slot_str, "available": False, "status": "past",
-                    "patient_name": None, "appointment_type": None, "duration_minutes": None, "appointment_id": None,
+                    "patient_name": None, "duration_minutes": None, "appointment_id": None,
                 })
             else:
                 slots_result.append({
                     "time": slot_str, "available": True, "status": "available",
-                    "patient_name": None, "appointment_type": None, "duration_minutes": None, "appointment_id": None,
+                    "patient_name": None, "duration_minutes": None, "appointment_id": None,
                 })
 
         return {
@@ -317,12 +315,10 @@ class AppointmentService:
             doctor_id = data.get("doctor_id")
             appointment_date = data.get("appointment_date")
             appointment_time = data.get("appointment_time")
-            appointment_type_str = data.get("appointment_type", "CONSULTATION")
             duration_minutes = data.get("duration_minutes")
 
-            procedure_name = data.get("procedure_name")
             if not duration_minutes:
-                duration_minutes = resolve_duration(procedure_name, appointment_type_str)
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="duration_minutes is required")
 
             end_time = compute_end_time(appointment_time, duration_minutes)
 
@@ -351,7 +347,6 @@ class AppointmentService:
                 "appointment_time": appointment_time,
                 "duration_minutes": duration_minutes,
                 "end_time": end_time,
-                "appointment_type": AppointmentType(appointment_type_str),
                 "notes": data.get("notes"),
             }
             appointment = await self.repo.create(**create_data)
@@ -476,8 +471,6 @@ class AppointmentService:
         try:
             if "status" in data:
                 data["status"] = AppointmentStatus(data["status"])
-            if "appointment_type" in data:
-                data["appointment_type"] = AppointmentType(data["appointment_type"])
             if "appointment_time" in data or "duration_minutes" in data:
                 appt = await self.get(appointment_id)
                 if appt:

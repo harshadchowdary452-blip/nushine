@@ -61,8 +61,11 @@ export function PageHeader({ title, description, actions, eyebrow, className }: 
       </div>
       {actions && (
         // Actions wrap rather than overflow; on phones they stretch to full
-        // width so the primary action stays thumb-reachable.
-        <div className="ds-cluster ds-cluster-sm shrink-0 sm:justify-end">{actions}</div>
+        // width so the primary action stays thumb-reachable. There is no
+        // shrink-0 here: a toolbar wider than the page must wrap onto a second
+        // line (e.g. the group-admin inventory header with 8 actions) instead
+        // of being clipped off the right edge of the viewport.
+        <div className="ds-cluster ds-cluster-sm sm:justify-end">{actions}</div>
       )}
     </div>
   )
@@ -191,7 +194,7 @@ export function SectionCard({ title, description, children, className, actions, 
             {title && <h2 className="ds-card-title text-[var(--ds-text)]">{title}</h2>}
             {description && <p className="ds-secondary-text mt-0.5">{description}</p>}
           </div>
-          {actions && <div className="ds-cluster ds-cluster-sm shrink-0">{actions}</div>}
+          {actions && <div className="ds-cluster ds-cluster-sm sm:justify-end">{actions}</div>}
         </div>
       )}
       <div className={cn(!flush && "px-[var(--ds-card-padding)] pb-[var(--ds-card-padding)]")}>

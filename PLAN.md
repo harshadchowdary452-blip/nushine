@@ -272,8 +272,6 @@ async def search(
     # --- Field-specific filters ---
     if filters.get("status"):
         query = query.where(Appointment.status == filters["status"])
-    if filters.get("type"):
-        query = query.where(Appointment.appointment_type == filters["type"])
     if filters.get("doctor_id"):
         query = query.where(Appointment.doctor_id == filters["doctor_id"])
     if filters.get("date_from"):

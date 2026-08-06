@@ -10,7 +10,8 @@ import {
   Activity, IndianRupee, FileText,
   Clock, UserPlus, Search, Download, LayoutList, Kanban,
   Sun, Moon, Star, ChevronDown, Hospital, Menu, ListChecks,
-  Package,
+  Package, FlaskConical,
+  Inbox,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useSidebarStore } from "@/store/sidebarStore"
@@ -54,11 +55,16 @@ const navConfig: Record<RoleKey, NavGroup[]> = {
         { label: "Hospitals", icon: Building2, path: "/admin/hospitals" },
         { label: "Doctors", icon: Stethoscope, path: "/admin/doctors" },
         { label: "Doctor Performance", icon: Activity, path: "/performance" },
+        { label: "Communication Center", icon: Inbox, path: "/communications" },
       ],
     },
     {
       label: "Inventory",
       items: [{ label: "Inventory", icon: Package, path: "/inventory" }],
+    },
+    {
+      label: "Laboratory",
+      items: [{ label: "Laboratory", icon: FlaskConical, path: "/laboratory" }],
     },
     {
       label: "Configuration",
@@ -79,11 +85,16 @@ const navConfig: Record<RoleKey, NavGroup[]> = {
         { label: "Hospitals", icon: Building2, path: "/admin/hospitals" },
         { label: "Doctors", icon: Stethoscope, path: "/admin/doctors" },
         { label: "Doctor Performance", icon: Activity, path: "/performance" },
+        { label: "Communication Center", icon: Inbox, path: "/communications" },
       ],
     },
     {
       label: "Clinical",
       items: [{ label: "Workflow Board", icon: Kanban, path: "/treatments/workflow" }],
+    },
+    {
+      label: "Laboratory",
+      items: [{ label: "Laboratory", icon: FlaskConical, path: "/laboratory" }],
     },
     {
       label: "Inventory",
@@ -126,12 +137,17 @@ const navConfig: Record<RoleKey, NavGroup[]> = {
       ],
     },
     {
+      label: "Laboratory",
+      items: [{ label: "Laboratory", icon: FlaskConical, path: "/laboratory" }],
+    },
+    {
       label: "CRM",
       items: [
         { label: "Dashboard", icon: LayoutDashboard, path: "/crm/dashboard2" },
         { label: "Leads", icon: UserPlus, path: "/leads" },
         { label: "Enquiry Calendar", icon: CalendarDays, path: "/crm/enquiry-calendar" },
         { label: "WhatsApp", icon: MessageSquare, path: "/whatsapp" },
+        { label: "Communication Center", icon: Inbox, path: "/communications" },
       ],
     },
     {
@@ -181,6 +197,10 @@ const navConfig: Record<RoleKey, NavGroup[]> = {
         { label: "Billing", icon: Receipt, path: "/billing" },
         { label: "Consent Forms", icon: FileText, path: "/consent-forms" },
       ],
+    },
+    {
+      label: "Laboratory",
+      items: [{ label: "Laboratory", icon: FlaskConical, path: "/laboratory" }],
     },
     {
       label: "Inventory",

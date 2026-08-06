@@ -7,7 +7,7 @@ from sqlalchemy import select, func, or_
 from app.models.patient import Patient, PatientStatus
 from app.models.case import Case, CaseStatus
 from app.models.treatment_plan import TreatmentPlan, TreatmentPlanStatus
-from app.models.appointment import Appointment, AppointmentStatus, AppointmentType
+from app.models.appointment import Appointment, AppointmentStatus
 from app.models.follow_up import FollowUp, FollowUpStatus, FollowUpType
 from app.models.billing import Billing, PaymentStatus
 from app.models.status_audit_log import StatusAuditLog
@@ -163,13 +163,16 @@ class StatusAutomationService:
             return None
         if fu.appointment_id:
             return None
+        from app.services.appointment_service import compute_end_time
+        appt_time = fu.follow_up_time or time(9, 0)
         appt = Appointment(
             patient_id=fu.patient_id,
             doctor_id=fu.doctor_id or "",
             appointment_date=fu.follow_up_date,
-            appointment_time=fu.follow_up_time or time(9, 0),
+            appointment_time=appt_time,
+            duration_minutes=30,
+            end_time=compute_end_time(appt_time, 30),
             status=AppointmentStatus.SCHEDULED,
-            appointment_type=AppointmentType.FOLLOW_UP,
             notes=f"Auto-created from follow-up {fu.id}",
         )
         self.db.add(appt)
@@ -206,32 +209,23 @@ class StatusAutomationService:
 
         return appt
 
-    def _infer_appointment_type(self, appt: Appointment) -> AppointmentType:
-        if appt.appointment_type:
-            return appt.appointment_type
-        return AppointmentType.CONSULTATION
+    async def _get_linked_follow_up(self, appt: Appointment) -> Optional[FollowUp]:
+        fu_r = await self.db.execute(
+            select(FollowUp).where(FollowUp.appointment_id == appt.id)
+        )
+        return fu_r.scalar_one_or_none()
 
     async def _on_appointment_completed(self, appt: Appointment):
-        appt_type = self._infer_appointment_type(appt)
-        if appt_type == AppointmentType.FOLLOW_UP:
-            fu_r = await self.db.execute(
-                select(FollowUp).where(FollowUp.appointment_id == appt.id)
-            )
-            fu = fu_r.scalar_one_or_none()
-            if fu:
-                fu.status = FollowUpStatus.COMPLETED
-                await self.db.flush()
-                await self.update_patient_status(fu.patient_id)
+        fu = await self._get_linked_follow_up(appt)
+        if fu:
+            fu.status = FollowUpStatus.COMPLETED
+            await self.db.flush()
+            await self.update_patient_status(fu.patient_id)
 
     async def _on_appointment_no_show(self, appt: Appointment):
-        appt_type = self._infer_appointment_type(appt)
-        if appt_type == AppointmentType.FOLLOW_UP:
-            fu_r = await self.db.execute(
-                select(FollowUp).where(FollowUp.appointment_id == appt.id)
-            )
-            fu = fu_r.scalar_one_or_none()
-            if fu:
-                fu.status = FollowUpStatus.LOST
+        fu = await self._get_linked_follow_up(appt)
+        if fu:
+            fu.status = FollowUpStatus.LOST
         re_engagement = FollowUp(
             patient_id=appt.patient_id,
             doctor_id=appt.doctor_id,
@@ -244,16 +238,11 @@ class StatusAutomationService:
         self.db.add(re_engagement)
 
     async def _on_appointment_confirmed(self, appt: Appointment):
-        appt_type = self._infer_appointment_type(appt)
-        if appt_type == AppointmentType.FOLLOW_UP:
-            fu_r = await self.db.execute(
-                select(FollowUp).where(FollowUp.appointment_id == appt.id)
-            )
-            fu = fu_r.scalar_one_or_none()
-            if fu:
-                fu.status = FollowUpStatus.PENDING
-                fu.reminder_sent = True
-                await self.db.flush()
+        fu = await self._get_linked_follow_up(appt)
+        if fu:
+            fu.status = FollowUpStatus.PENDING
+            fu.reminder_sent = True
+            await self.db.flush()
 
     async def _on_appointment_started(self, appt: Appointment):
         pass

@@ -839,8 +839,6 @@ export default function TreatmentDetail() {
               {nextVisitRequired && (
                 <AppointmentScheduler
                   showDoctorSelector
-                  showTypeSelector
-                  appointmentType="TREATMENT"
                   onSelect={(data) => setNextAppointmentSlot(data)}
                 />
               )}
@@ -1347,8 +1345,6 @@ export default function TreatmentDetail() {
                   <AppointmentScheduler
                     doctorId={transferTarget?.assigned_doctor_id || ""}
                     showDoctorSelector={false}
-                    showTypeSelector={false}
-                    appointmentType="TREATMENT"
                     procedureName={transferTarget?.treatment_name}
                     onSelect={(data) => setTransferSlot(data)}
                   />

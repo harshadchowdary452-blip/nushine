@@ -34,21 +34,13 @@ const DATE_PRESET_KEYS = new Set(["date_preset"])
 
 interface AppointmentForm {
   patient_id: string; doctor_id: string; appointment_date: string;
-  appointment_time: string; notes: string; appointment_type: string; duration_minutes: number
+  appointment_time: string; notes: string; duration_minutes: number
 }
-
-const APPOINTMENT_TYPES = [
-  { value: "CONSULTATION", label: "Consultation", duration: 30 },
-  { value: "FOLLOW_UP", label: "Follow Up", duration: 30 },
-  { value: "TREATMENT", label: "Treatment", duration: 60 },
-  { value: "EMERGENCY", label: "Emergency", duration: 30 },
-  { value: "REVIEW", label: "Review", duration: 30 },
-]
 
 function getEmptyAppointmentForm(): AppointmentForm {
   return {
     patient_id: "", doctor_id: "", appointment_date: "", appointment_time: "",
-    notes: "", appointment_type: "CONSULTATION", duration_minutes: 30,
+    notes: "", duration_minutes: 30,
   }
 }
 
@@ -438,7 +430,6 @@ export default function AppointmentList() {
                     { label: "Patient", value: contextPatient.full_name },
                     { label: "Phone", value: contextPatient.phone || "—" },
                     { label: "Age", value: contextPatient.age ? `${contextPatient.age} yrs` : "—" },
-                    { label: "Appointment type", value: APPOINTMENT_TYPES.find((t) => t.value === form.appointment_type)?.label ?? form.appointment_type },
                     { label: "Doctor", value: doctors.find((d) => d.id === form.doctor_id)?.full_name || "Not selected" },
                     { label: "Date", value: form.appointment_date || "Not selected" },
                   ]}
@@ -507,16 +498,6 @@ export default function AppointmentList() {
                   <SelectContent>{doctors.map((d) => <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="appointment_type">Appointment Type</Label>
-                <Select value={form.appointment_type} onValueChange={(v) => {
-                  const t = APPOINTMENT_TYPES.find((t) => t.value === v)
-                  setForm({ ...form, appointment_type: v, duration_minutes: t?.duration || 30, appointment_time: "" })
-                }}>
-                  <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
-                  <SelectContent>{APPOINTMENT_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label} ({t.duration} min)</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="date">Date</Label>
@@ -542,11 +523,9 @@ export default function AppointmentList() {
               {form.doctor_id && form.appointment_date && (
                 <AppointmentScheduler
                   doctorId={form.doctor_id}
-                  appointmentType={form.appointment_type}
                   date={form.appointment_date}
                   selectedTime={form.appointment_time}
                   showDoctorSelector={false}
-                  showTypeSelector={false}
                   onSelect={(data) => setForm({
                     ...form,
                     appointment_time: data.appointment_time,

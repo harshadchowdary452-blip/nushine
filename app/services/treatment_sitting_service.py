@@ -10,7 +10,7 @@ from app.models.treatment_sitting import TreatmentSitting, TreatmentSittingStatu
 from app.models.treatment_plan import TreatmentPlan, TreatmentPlanStatus
 from app.models.case import Case
 from app.models.patient import Patient
-from app.models.appointment import Appointment, AppointmentStatus, AppointmentType
+from app.models.appointment import Appointment, AppointmentStatus
 from app.utils.whatsapp import send_appointment_reminder
 from app.services.timeline_helper import record_timeline_event
 
@@ -56,7 +56,6 @@ class TreatmentSittingService:
         from app.models.appointment import resolve_duration
         duration = resolve_duration(
             procedure_name=sitting.procedure_performed,
-            appointment_type="TREATMENT",
             override_minutes=sitting.duration_minutes,
         )
         end_time = (datetime.combine(date.min, appt_time) + timedelta(minutes=duration)).time()
@@ -69,7 +68,6 @@ class TreatmentSittingService:
             duration_minutes=duration,
             end_time=end_time,
             status=AppointmentStatus.SCHEDULED,
-            appointment_type=AppointmentType.TREATMENT,
             notes=f"Auto-created from treatment sitting #{sitting.sitting_number}",
         )
         self.db.add(appt)

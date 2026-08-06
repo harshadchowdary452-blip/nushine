@@ -170,7 +170,6 @@ export const appointmentsApi = {
     date: string
     duration_minutes?: number
     procedure_name?: string
-    appointment_type?: string
   }) => api.get("/appointments/slots", { params }).then((r) => r.data),
   procedureDurations: () => api.get("/appointments/procedure-durations").then((r) => r.data),
   fullDetail: (id: string) => api.get(`/appointments/${id}/full-detail`).then((r) => r.data),
@@ -561,7 +560,6 @@ export interface DoctorPerformanceDetail extends DoctorPerformanceRow {
     appointment_date: string
     appointment_time: string
     status: string
-    appointment_type: string
   }[]
 }
 
@@ -978,7 +976,6 @@ export const crmApi = {
         doctor_id: string
         appointment_date: string
         appointment_time: string
-        appointment_type?: string
       },
     ) => api.post(`/crm/follow-ups/${id}/create-appointment`, data).then((r) => r.data),
     reschedule: (id: string, data: { follow_up_date: string; follow_up_time?: string }) =>
@@ -1525,4 +1522,74 @@ export const crmRulesApi = {
       }[]
     }) => api.put("/crm/rules/policies/case-journey", data).then((r) => r.data),
   },
+}
+
+export const laboratoriesApi = {
+  list: (params?: PaginationParams) =>
+    api.get("/laboratories/", { params }).then((r) => r.data),
+  get: (id: string) => api.get(`/laboratories/${id}`).then((r) => r.data),
+  create: (data: Record<string, unknown>) => api.post("/laboratories/", data).then((r) => r.data),
+  update: (id: string, data: Record<string, unknown>) =>
+    api.put(`/laboratories/${id}`, data).then((r) => r.data),
+  delete: (id: string) => api.delete(`/laboratories/${id}`).then((r) => r.data),
+}
+
+export const labCasesApi = {
+  list: (params?: PaginationParams) =>
+    api.get("/lab-cases/", { params }).then((r) => r.data),
+  get: (id: string) => api.get(`/lab-cases/${id}`).then((r) => r.data),
+  candidates: (params?: PaginationParams) =>
+    api.get("/lab-cases/candidates", { params }).then((r) => r.data),
+  byTreatment: (planId: string) => api.get(`/lab-cases/by-treatment/${planId}`).then((r) => r.data),
+  fromTreatment: (planId: string, data: Record<string, unknown>) =>
+    api.post(`/lab-cases/from-treatment/${planId}`, data).then((r) => r.data),
+  update: (id: string, data: Record<string, unknown>) =>
+    api.put(`/lab-cases/${id}`, data).then((r) => r.data),
+  setStatus: (id: string, status: string, note?: string) =>
+    api.post(`/lab-cases/${id}/status`, { status, note }).then((r) => r.data),
+  events: (id: string) => api.get(`/lab-cases/${id}/events`).then((r) => r.data),
+  addEvent: (id: string, data: { event_type: string; note?: string }) =>
+    api.post(`/lab-cases/${id}/events`, data).then((r) => r.data),
+  whatsapp: (id: string, data: { message: string; phone?: string }) =>
+    api.post(`/lab-cases/${id}/whatsapp`, data).then((r) => r.data),
+  call: (id: string, data: { note?: string; duration_seconds?: number }) =>
+    api.post(`/lab-cases/${id}/call`, data).then((r) => r.data),
+  remove: (id: string) => api.delete(`/lab-cases/${id}`).then((r) => r.data),
+  report: (month: string) =>
+    api.get("/lab-cases/report", { params: { month, format: "json" } }).then((r) => r.data),
+  reportBlob: (month: string, format: "csv" | "excel" | "pdf") =>
+    api
+      .get("/lab-cases/report", { params: { month, format }, responseType: "blob" })
+      .then((r) => r.data),
+}
+
+export const communicationCenterApi = {
+  list: (params?: Record<string, unknown>) =>
+    api.get("/communication-center/communications", { params }).then((r) => r.data),
+  stats: (params?: Record<string, unknown>) =>
+    api.get("/communication-center/communications/stats", { params }).then((r) => r.data),
+  get: (sourceModule: string, sourceId: string) =>
+    api.get(`/communication-center/communications/${sourceModule}/${sourceId}`).then((r) => r.data),
+  preview: (sourceModule: string, sourceId: string) =>
+    api.get(`/communication-center/communications/${sourceModule}/${sourceId}/preview`).then((r) => r.data),
+  resend: (sourceModule: string, sourceId: string, data?: { message?: string }) =>
+    api.post(`/communication-center/communications/${sourceModule}/${sourceId}/resend`, data).then((r) => r.data),
+  download: (sourceModule: string, sourceId: string, print = false) =>
+    api
+      .get(`/communication-center/communications/${sourceModule}/${sourceId}/download`, {
+        params: { print },
+        responseType: "blob",
+      })
+      .then((r) => r.data as Blob),
+  patientTimeline: (patientId: string, params?: Record<string, unknown>) =>
+    api.get(`/communication-center/patients/${patientId}/communications`, { params }).then((r) => r.data),
+  export: (data: Record<string, unknown>) =>
+    api.post("/communication-center/export", data).then((r) => r.data),
+  exportBlob: (data: Record<string, unknown>) =>
+    api
+      .post("/communication-center/export", data, { responseType: "blob" })
+      .then((r) => r.data as Blob),
+  activities: (params?: Record<string, unknown>) =>
+    api.get("/communication-center/activities", { params }).then((r) => r.data),
+  meta: () => api.get("/communication-center/meta").then((r) => r.data),
 }

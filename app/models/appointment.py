@@ -13,22 +13,6 @@ class AppointmentStatus(str, Enum):
     RESCHEDULED = "RESCHEDULED"
 
 
-class AppointmentType(str, Enum):
-    CONSULTATION = "CONSULTATION"
-    FOLLOW_UP = "FOLLOW_UP"
-    TREATMENT = "TREATMENT"
-    EMERGENCY = "EMERGENCY"
-    REVIEW = "REVIEW"
-
-
-TREATMENT_DURATIONS = {
-    AppointmentType.CONSULTATION: 30,
-    AppointmentType.FOLLOW_UP: 30,
-    AppointmentType.TREATMENT: 60,
-    AppointmentType.EMERGENCY: 30,
-    AppointmentType.REVIEW: 30,
-}
-
 PROCEDURE_DURATIONS: dict[str, int] = {
     "Consultation": 20,
     "Scaling": 30,
@@ -73,7 +57,7 @@ PROCEDURE_DURATIONS: dict[str, int] = {
 }
 
 
-def resolve_duration(procedure_name: str | None, appointment_type: AppointmentType | str | None, override_minutes: int | None = None) -> int:
+def resolve_duration(procedure_name: str | None, override_minutes: int | None = None) -> int:
     if override_minutes and override_minutes > 0:
         return override_minutes
     if procedure_name:
@@ -83,11 +67,7 @@ def resolve_duration(procedure_name: str | None, appointment_type: AppointmentTy
         lower_map = {k.lower(): v for k, v in PROCEDURE_DURATIONS.items()}
         if normalized.lower() in lower_map:
             return lower_map[normalized.lower()]
-    try:
-        appt_type = AppointmentType(appointment_type) if isinstance(appointment_type, str) else appointment_type
-        return TREATMENT_DURATIONS.get(appt_type, 30)
-    except (ValueError, TypeError):
-        return 30
+    return 30
 
 
 class Appointment(Base):
@@ -101,7 +81,6 @@ class Appointment(Base):
     duration_minutes: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
     end_time: Mapped[time] = mapped_column(Time, nullable=False)
     status: Mapped[AppointmentStatus] = mapped_column(SAEnum(AppointmentStatus, create_constraint=False), default=AppointmentStatus.SCHEDULED, nullable=False, index=True)
-    appointment_type: Mapped[AppointmentType] = mapped_column(SAEnum(AppointmentType, create_constraint=False), default=AppointmentType.CONSULTATION, nullable=False)
     notes: Mapped[str] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     reminder_sent: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)

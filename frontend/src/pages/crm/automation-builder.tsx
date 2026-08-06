@@ -25,6 +25,7 @@ import KpiCard from "@/components/ui/kpi-card"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { NumericInput } from "@/components/ui/numeric-input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
@@ -155,7 +156,6 @@ const CONDITION_FIELDS = [
   "patient_source",
   "procedure",
   "payment_status",
-  "appointment_type",
   "days_since_last_visit",
   "patient_phone",
   "patient_email",
@@ -1065,11 +1065,11 @@ export default function AutomationBuilder() {
                 </div>
                 <div className="space-y-2">
                   <Label>Default Delay (days)</Label>
-                  <Input
-                    type="number"
+                  <NumericInput
+                    mode="integer"
                     min={0}
                     value={formDelayDays}
-                    onChange={(e) => setFormDelayDays(parseInt(e.target.value) || 0)}
+                    onChange={(v) => setFormDelayDays(parseInt(v) || 0)}
                   />
                 </div>
               </div>
@@ -1274,28 +1274,26 @@ export default function AutomationBuilder() {
                     </div>
                     <div>
                       <Label className="text-xs">Delay Days</Label>
-                      <Input
-                        type="number"
+                      <NumericInput
+                        mode="integer"
                         min={0}
-                        className="h-8"
                         value={a.delay_days}
-                        onChange={(e) => {
+                        onChange={(v) => {
                           const na = [...formActions]
-                          na[i] = { ...na[i], delay_days: parseInt(e.target.value) || 0 }
+                          na[i] = { ...na[i], delay_days: parseInt(v) || 0 }
                           setFormActions(na)
                         }}
                       />
                     </div>
                     <div>
                       <Label className="text-xs">Delay Hours</Label>
-                      <Input
-                        type="number"
+                      <NumericInput
+                        mode="integer"
                         min={0}
-                        className="h-8"
                         value={a.delay_hours}
-                        onChange={(e) => {
+                        onChange={(v) => {
                           const na = [...formActions]
-                          na[i] = { ...na[i], delay_hours: parseInt(e.target.value) || 0 }
+                          na[i] = { ...na[i], delay_hours: parseInt(v) || 0 }
                           setFormActions(na)
                         }}
                       />
@@ -1386,14 +1384,14 @@ export default function AutomationBuilder() {
                     <div key={level} className="grid grid-cols-2 gap-4 bg-[var(--ds-background-subtle)] rounded-lg p-3">
                       <div className="space-y-1">
                         <Label className="text-xs">Level {level} — After (days)</Label>
-                        <Input
-                          type="number"
+                        <NumericInput
+                          mode="integer"
                           min={1}
                           value={level === 1 ? (formEscDays1 ?? "") : (formEscDays2 ?? "")}
-                          onChange={(e) => {
-                            const v = parseInt(e.target.value) || null
-                            if (level === 1) setFormEscDays1(v)
-                            else setFormEscDays2(v)
+                          onChange={(v) => {
+                            const parsed = parseInt(v) || null
+                            if (level === 1) setFormEscDays1(parsed)
+                            else setFormEscDays2(parsed)
                           }}
                           placeholder="Days"
                         />

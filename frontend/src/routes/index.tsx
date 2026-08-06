@@ -36,6 +36,7 @@ const TaskCenter = lazy(() => import("@/pages/tasks/task-center"))
 const BillingList = lazy(() => import("@/pages/billing/list"))
 const BillingDetail = lazy(() => import("@/pages/billing/detail"))
 const WhatsAppMessaging = lazy(() => import("@/pages/whatsapp/messaging"))
+const CommunicationCenter = lazy(() => import("@/pages/communications/center"))
 
 const EnquiryCalendar = lazy(() => import("@/pages/crm/enquiry-calendar"))
 const LeadList = lazy(() => import("@/pages/leads/list"))
@@ -54,6 +55,7 @@ const ClinicalSettings = lazy(() => import("@/pages/clinical-settings"))
 const DoctorPerformanceOverview = lazy(() => import("@/pages/performance/overview"))
 const DoctorPerformanceProfile = lazy(() => import("@/pages/performance/doctor-profile"))
 const InventoryPage = lazy(() => import("@/pages/inventory/index"))
+const LaboratoryPage = lazy(() => import("@/pages/laboratory/index"))
 const NotFoundPage = lazy(() => import("@/pages/errors/not-found"))
 const RouteErrorPage = lazy(() => import("@/pages/errors/route-error"))
 
@@ -228,6 +230,10 @@ export const router = createBrowserRouter([
       },
       { path: "/consent-forms", element: withRoles(<ConsentFormList />, CARE_ROLES) },
       { path: "/consent-forms/view/:id", element: withRoles(<ConsentFormView />, CARE_ROLES) },
+      {
+        path: "/communications",
+        element: withRoles(<CommunicationCenter />, ["SUPER_ADMIN", "GROUP_ADMIN", "HOSPITAL_ADMIN"]),
+      },
       { path: "/settings/clinical", element: withRoles(<ClinicalSettings />, ["HOSPITAL_ADMIN"]) },
       { path: "/settings", element: withRoles(<Settings />, [...ADMIN_ROLES, "DOCTOR"]) },
       { path: "/settings/whatsapp", element: withRoles(<WhatsAppConfigPage />, ADMIN_ROLES) },
@@ -236,6 +242,10 @@ export const router = createBrowserRouter([
       {
         path: "/inventory",
         element: withRoles(<InventoryPage />, INVENTORY_ROLES),
+      },
+      {
+        path: "/laboratory",
+        element: withRoles(<LaboratoryPage />, INVENTORY_ROLES),
       },
       // Unmatched routes render an explanatory 404 rather than silently
       // redirecting — a redirect hides broken links from users and telemetry.

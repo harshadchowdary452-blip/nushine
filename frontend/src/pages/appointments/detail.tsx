@@ -291,7 +291,7 @@ export default function AppointmentDetail() {
             <div>
               <h2 className="text-xl font-bold">{patient.full_name}</h2>
               <p className="text-sm text-muted-foreground">
-                {a.appointment_number} · {a.appointment_type?.replace(/_/g, " ")}
+                {a.appointment_number} · {a.duration_minutes} min
               </p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -433,12 +433,6 @@ export default function AppointmentDetail() {
             />
             <Separator />
             <InfoRow icon={Clock} label="Duration" value={`${a.duration_minutes || 30} minutes`} />
-            <Separator />
-            <InfoRow
-              icon={FileText}
-              label="Type"
-              value={a.appointment_type?.replace(/_/g, " ") || "—"}
-            />
             <Separator />
             <InfoRow
               icon={Stethoscope}
@@ -709,7 +703,6 @@ export default function AppointmentDetail() {
               date={rescheduleDate}
               selectedTime={rescheduleTime}
               showDoctorSelector={false}
-              showTypeSelector={false}
               onSelect={(data) => {
                 setRescheduleDate(data.appointment_date)
                 setRescheduleTime(data.appointment_time)

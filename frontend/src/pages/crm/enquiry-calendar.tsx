@@ -164,7 +164,6 @@ export interface CalendarItem {
     date?: string
     time?: string
     doctor_name?: string
-    appointment_type?: string
     purpose?: string
     status?: string
   }
@@ -788,7 +787,6 @@ export default function EnquiryCalendar() {
       vars.total_visits = String(item.treatment?.total_visits || "")
       vars.appointment_date = item.appointment?.date || item.appointment_date || ""
       vars.appointment_time = item.appointment?.time || ""
-      vars.appointment_type = item.appointment?.appointment_type || ""
       vars.case_name = item.case?.case_number || ""
       vars.case_completion_date = ""
       vars.completed_treatments = ""

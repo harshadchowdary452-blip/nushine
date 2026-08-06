@@ -5,6 +5,7 @@ import { Plus, Search, Edit, Trash2, Activity, Tag, Clock, IndianRupee } from "l
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { NumericInput } from "@/components/ui/numeric-input"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Label } from "@/components/ui/label"
@@ -320,24 +321,23 @@ export default function TreatmentTypesPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="tt-duration">Duration (minutes)</Label>
-                  <Input
+                  <NumericInput
                     id="tt-duration"
-                    type="number"
-                    min="0"
+                    mode="integer"
+                    min={0}
                     value={form.estimated_duration}
-                    onChange={(e) => setForm({ ...form, estimated_duration: e.target.value })}
+                    onChange={(v) => setForm({ ...form, estimated_duration: v })}
                     placeholder="e.g. 30"
                   />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="tt-cost">Default Cost</Label>
-                  <Input
+                  <NumericInput
                     id="tt-cost"
-                    type="number"
-                    min="0"
-                    step="0.01"
+                    mode="decimal"
+                    min={0}
                     value={form.default_cost}
-                    onChange={(e) => setForm({ ...form, default_cost: e.target.value })}
+                    onChange={(v) => setForm({ ...form, default_cost: v })}
                     placeholder="e.g. 5000"
                   />
                 </div>
