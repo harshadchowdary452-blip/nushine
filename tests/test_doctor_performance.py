@@ -218,9 +218,9 @@ async def test_super_admin_sees_all_doctors(client: AsyncClient, seed, db_sessio
     assert by_id[seed["DR2"]]["revenue"] == 200.0
 
     s = data["summary"]
-    assert s["patients_seen"] == 4
+    assert s["patients_seen"] == 3
     assert s["returning_patients"] == 1
-    assert s["new_patients"] == 3
+    assert s["new_patients"] == 2
     assert s["revenue"] == 1700.0
     assert s["appointments_completed"] == 4
 
@@ -313,8 +313,8 @@ async def test_dr1_aggregated_kpis(client: AsyncClient, seed, db_session):
     data = await fetch_overview(client, token)
     dr1 = data["doctors"][0]
 
-    assert dr1["patients_seen"] == 3
-    assert dr1["new_patients"] == 2
+    assert dr1["patients_seen"] == 2
+    assert dr1["new_patients"] == 1
     assert dr1["returning_patients"] == 1
     assert dr1["appointments_total"] == 4
     assert dr1["appointments_completed"] == 3
@@ -328,13 +328,13 @@ async def test_dr1_aggregated_kpis(client: AsyncClient, seed, db_session):
     assert dr1["treatments_active"] == 1
     assert dr1["sittings_completed"] == 2
     assert dr1["revenue"] == 1500.0
-    assert dr1["avg_revenue_per_patient"] == 500.0
+    assert dr1["avg_revenue_per_patient"] == 750.0
     assert dr1["avg_revenue_per_appointment"] == 500.0
     assert dr1["case_completion_rate"] == 50.0
     assert dr1["treatment_completion_rate"] == 50.0
     assert dr1["treatment_acceptance_rate"] == 100.0
     assert dr1["attendance_rate"] == 75.0
-    assert dr1["retention_rate"] == 33.3
+    assert dr1["retention_rate"] == 50.0
     assert dr1["recall_success_rate"] == 50.0
     assert dr1["avg_rating"] == 4.0
     assert dr1["designation"] == "BDS"
@@ -344,7 +344,7 @@ async def test_dr1_aggregated_kpis(client: AsyncClient, seed, db_session):
     s = data["summary"]
     assert s["doctors"] == 2
     assert s["revenue"] == 1500.0
-    assert s["patients_seen"] == 3
+    assert s["patients_seen"] == 2
     assert s["attendance_rate"] == 75.0
     assert s["avg_rating"] == 4.0
 
@@ -368,8 +368,8 @@ async def test_detail_endpoint_scoping_and_payload(client: AsyncClient, seed, db
     assert detail["qualification"] == "BDS"
     assert detail["hospital_name"] == "Perf Hosp A"
     assert detail["metrics"]["revenue"] == 1500.0
-    assert detail["metrics"]["patients_seen"] == 3
-    assert detail["summary"]["patients_seen"] == 3
+    assert detail["metrics"]["patients_seen"] == 2
+    assert detail["summary"]["patients_seen"] == 2
     assert len(detail["revenue_trend"]) >= 1
     assert any(t["month"] == "2026-07" for t in detail["revenue_trend"])
     assert any(t["month"] == "2026-07" and t["n"] == 4 for t in detail["appointment_trend"])

@@ -103,6 +103,8 @@ class LeadService:
             sent_at=datetime.now(timezone.utc) if delivery_status in ("SENT", "STORED") else None,
         )
         lead.last_contacted_at = datetime.now(timezone.utc)
+        if lead.status == "NEW":
+            lead.status = "CONTACTED"
         await self.db.flush()
         await self.audit_log_repo.create(
             user_id=user_id, action="LEAD_COMMUNICATION", entity_type="LEAD",
@@ -118,6 +120,10 @@ class LeadService:
         if not lead:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lead not found")
         call = await self.call_repo.create(lead_id=lead_id, called_by=user_id, **data)
+        lead.last_contacted_at = datetime.now(timezone.utc)
+        if lead.status == "NEW":
+            lead.status = "CONTACTED"
+        await self.db.flush()
         await self.audit_log_repo.create(
             user_id=user_id, action="LEAD_CALL", entity_type="LEAD",
             entity_id=lead_id, details=f"Call recorded with outcome: {data.get('outcome', 'UNKNOWN')}"
@@ -165,6 +171,8 @@ class LeadService:
                 await self.db.flush()
             lead.converted_patient_id = patient.id
             lead.status = LeadStatus.CONVERTED.value
+            lead.converted_at = datetime.now(timezone.utc)
+            lead.converted_by = user_id
             lead.last_contacted_at = datetime.now(timezone.utc)
             await self.db.flush()
         await self.audit_log_repo.create(

@@ -47,10 +47,10 @@ ACTIVE_CASE_STATUSES = [
     CaseStatus.OPEN.value, CaseStatus.IN_PROGRESS.value, CaseStatus.ON_HOLD.value,
 ]
 ACTIVE_PLAN_STATUSES = [
-    TreatmentPlanStatus.ASSIGNED.value, TreatmentPlanStatus.SCHEDULED.value,
-    TreatmentPlanStatus.IN_PROGRESS.value, TreatmentPlanStatus.WAITING_PATIENT.value,
-    TreatmentPlanStatus.WAITING_LAB.value, TreatmentPlanStatus.ON_HOLD.value,
-    TreatmentPlanStatus.OVERDUE.value,
+    TreatmentPlanStatus.GENERATED.value, TreatmentPlanStatus.ASSIGNED.value,
+    TreatmentPlanStatus.SCHEDULED.value, TreatmentPlanStatus.IN_PROGRESS.value,
+    TreatmentPlanStatus.WAITING_PATIENT.value, TreatmentPlanStatus.WAITING_LAB.value,
+    TreatmentPlanStatus.ON_HOLD.value, TreatmentPlanStatus.OVERDUE.value,
 ]
 
 _METRIC_KEYS = [
@@ -208,7 +208,6 @@ async def _collect(db: AsyncSession, doctor_ids: list[str],
             func.sum(sql_case((Appointment.status == AppointmentStatus.COMPLETED.value, 1), else_=0)),
             func.sum(sql_case((Appointment.status == AppointmentStatus.CANCELLED.value, 1), else_=0)),
             func.sum(sql_case((Appointment.status == AppointmentStatus.RESCHEDULED.value, 1), else_=0)),
-            func.count(func.distinct(Appointment.patient_id)),
         )
         .join(Patient, Patient.id == Appointment.patient_id)
         .where(
@@ -225,7 +224,23 @@ async def _collect(db: AsyncSession, doctor_ids: list[str],
         m["appointments_completed"] += row[2] or 0
         m["appointments_cancelled"] += row[3] or 0
         m["appointments_rescheduled"] += row[4] or 0
-        m["patients_seen"] += row[5] or 0
+
+    # Patients seen in period (distinct, excluding cancelled/no-show
+    # appointments so a cancelled visit never counts as "seen").
+    rows = (await db.execute(
+        select(Appointment.doctor_id, func.count(func.distinct(Appointment.patient_id)))
+        .join(Patient, Patient.id == Appointment.patient_id)
+        .where(
+            Appointment.doctor_id.in_(doctor_ids),
+            Appointment.is_active == True,
+            Appointment.appointment_date >= date_start.date(),
+            Appointment.appointment_date < date_end.date(),
+            Appointment.status.notin_([AppointmentStatus.CANCELLED.value]),
+            *_hospital_cond(hospital_scope),
+        ).group_by(Appointment.doctor_id)
+    )).all()
+    for row in rows:
+        metrics[row[0]]["patients_seen"] += row[1] or 0
 
     # Cases created in period
     rows = (await db.execute(
@@ -406,6 +421,7 @@ async def _collect(db: AsyncSession, doctor_ids: list[str],
             prior.doctor_id.in_(doctor_ids),
             seen.is_active == True,
             prior.is_active == True,
+            seen.status.notin_([AppointmentStatus.CANCELLED.value]),
             seen.appointment_date >= date_start.date(),
             seen.appointment_date < date_end.date(),
             prior.appointment_date < date_start.date(),
@@ -438,6 +454,7 @@ async def _collect(db: AsyncSession, doctor_ids: list[str],
             Appointment.is_active == True,
             Appointment.appointment_date >= date_start.date(),
             Appointment.appointment_date < date_end.date(),
+            Appointment.status.notin_([AppointmentStatus.CANCELLED.value]),
             *_hospital_cond(hospital_scope),
         )
     )).scalar() or 0
@@ -459,6 +476,7 @@ async def _collect(db: AsyncSession, doctor_ids: list[str],
             prior.doctor_id.in_(doctor_ids),
             seen.is_active == True,
             prior.is_active == True,
+            seen.status.notin_([AppointmentStatus.CANCELLED.value]),
             seen.appointment_date >= date_start.date(),
             seen.appointment_date < date_end.date(),
             prior.appointment_date < date_start.date(),
@@ -1002,7 +1020,7 @@ async def doctor_performance_insights(
     doctor_name = doctor.full_name or "This doctor"
 
     date_start, date_end = get_date_range(period, start_date, end_date)
-    prev_start, prev_end = get_previous_date_range(period, start_date, date_end)
+    prev_start, prev_end = get_previous_date_range(period, start_date, end_date)
 
     hospital_scope = _hospital_scope_for_user(current_user)
     metrics, summary = await _collect(db, [doctor_id], date_start, date_end, hospital_scope)

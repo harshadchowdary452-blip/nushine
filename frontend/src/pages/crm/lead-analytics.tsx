@@ -2,7 +2,7 @@ import { useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { motion } from "framer-motion"
 import {
-  Users, TrendingUp, BarChart3, PieChart,
+  Users, BarChart3, PieChart,
   Target, Star, AlertTriangle, CheckCircle2, Calendar,
 } from "lucide-react"
 import { leadsApi } from "@/services/endpoints"
@@ -39,7 +39,6 @@ export default function LeadAnalytics() {
     const total = items.length
     const statusBreakdown: Record<string, number> = {}
     const sourceBreakdown: Record<string, number> = {}
-    let totalScore = 0
     let highPriority = 0
     let converted = 0
     let followUpDue = 0
@@ -48,7 +47,6 @@ export default function LeadAnalytics() {
     items.forEach((l) => {
       statusBreakdown[l.status] = (statusBreakdown[l.status] || 0) + 1
       sourceBreakdown[l.source] = (sourceBreakdown[l.source] || 0) + 1
-      totalScore += l.lead_score || 0
       if (l.priority === "HIGH") highPriority++
       if (l.status === "CONVERTED") converted++
       if (l.status === "LOST" || l.status === "NOT_INTERESTED" || l.status === "NO_RESPONSE") lost++
@@ -58,9 +56,8 @@ export default function LeadAnalytics() {
     const statusData = Object.entries(statusBreakdown).map(([name, value]) => ({ name: name.replace(/_/g, " "), value,                 fill: STATUS_COLORS[name] || "var(--ds-chart-7)" }))
     const sourceData = Object.entries(sourceBreakdown).sort((a, b) => b[1] - a[1]).map(([name, value]) => ({ name: name.replace(/_/g, " "), value }))
     const conversionRate = total > 0 ? ((converted / total) * 100).toFixed(1) : "0.0"
-    const avgScore = total > 0 ? (totalScore / total).toFixed(0) : "0"
 
-    return { total, converted, lost, highPriority, followUpDue, conversionRate, avgScore, statusData, sourceData }
+    return { total, converted, lost, highPriority, followUpDue, conversionRate, statusData, sourceData }
   }, [leads])
 
   if (isLoading) {
@@ -90,16 +87,15 @@ export default function LeadAnalytics() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard icon={Users} title="Total Leads" value={analytics.total} color="primary" delay={0} />
         <KpiCard icon={CheckCircle2} title="Converted" value={analytics.converted} color="success" delay={0.05} />
         <KpiCard icon={Target} title="Conversion Rate" value={`${analytics.conversionRate}%`} color="info" delay={0.1} />
-        <KpiCard icon={TrendingUp} title="Avg Lead Score" value={analytics.avgScore} color="primary" delay={0.15} />
+        <KpiCard icon={Star} title="High Priority" value={analytics.highPriority} color="warning" delay={0.15} />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard icon={Star} title="High Priority" value={analytics.highPriority} color="warning" delay={0.2} />
-        <KpiCard icon={AlertTriangle} title="Lost" value={analytics.lost} color="danger" delay={0.25} />
-        <KpiCard icon={Calendar} title="Follow-ups Due Today" value={analytics.followUpDue} color="warning" delay={0.3} />
+        <KpiCard icon={Users} title="Total Leads" value={analytics.total} color="primary" delay={0} />
+        <KpiCard icon={AlertTriangle} title="Lost" value={analytics.lost} color="danger" delay={0.2} />
+        <KpiCard icon={Calendar} title="Follow-ups Due Today" value={analytics.followUpDue} color="warning" delay={0.25} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

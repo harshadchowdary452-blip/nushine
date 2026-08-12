@@ -988,6 +988,8 @@ export interface Lead {
   assigned_staff_id: string | null
   assigned_doctor_id: string | null
   converted_patient_id: string | null
+  converted_at: string | null
+  converted_by: string | null
   lead_name: string
   mobile: string
   alternate_mobile: string | null

@@ -205,6 +205,7 @@ const RW_TYPE_COLORS: Record<string, string> = {
   TREATMENT_WELLNESS: "bg-[var(--ds-success-subtle)] text-[var(--ds-success)]",
   CASE_WELLNESS: "bg-[var(--ds-success-subtle)] text-[var(--ds-success)]",
   APPOINTMENT_REMINDER: "bg-[var(--ds-info-subtle)] text-[var(--ds-info)]",
+  MISSED_APPOINTMENT: "bg-[var(--ds-danger-subtle)] text-[var(--ds-danger)]",
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -239,6 +240,7 @@ function enquiryTypeLabel(type: string): string {
     TREATMENT_WELLNESS: "Treatment Wellness",
     CASE_WELLNESS: "Case Wellness",
     APPOINTMENT_REMINDER: "Appointment Reminder",
+    MISSED_APPOINTMENT: "Missed Appointment",
     LEAD_FOLLOW_UP: "Lead Follow-Up",
     ENQUIRY: "Enquiry",
     FOLLOW_UP: "Follow-Up",

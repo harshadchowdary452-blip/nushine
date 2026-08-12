@@ -171,7 +171,13 @@ async def update_lead(lead_id: str, data: LeadUpdate, db: AsyncSession = Depends
     verify_permission(current_user, Permission.MANAGE_LEADS)
     service = LeadService(db)
     old = await _verify_lead_access(service, lead_id, current_user)
-    result = await service.update(lead_id, data.model_dump(exclude_none=True), user_id=current_user.get("sub"))
+    data_dict = data.model_dump(exclude_none=True)
+    if old.converted_patient_id and data_dict.get("status") not in (None, "CONVERTED"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Status of a converted lead cannot be changed",
+        )
+    result = await service.update(lead_id, data_dict, user_id=current_user.get("sub"))
     if result and result.converted_patient_id:
         await record_timeline_event(
             db, current_user=current_user, patient_id=result.converted_patient_id,
@@ -188,6 +194,11 @@ async def update_lead_status(lead_id: str, data: LeadStatusUpdate, db: AsyncSess
     service = LeadService(db)
     old = await _verify_lead_access(service, lead_id, current_user)
     old_status = old.status
+    if old.converted_patient_id and data.status != "CONVERTED":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Status of a converted lead cannot be changed",
+        )
     result = await service.update_status(lead_id, data.status, user_id=current_user.get("sub"))
     if result:
         await _recalc_lead_score(db, result)
@@ -236,11 +247,9 @@ async def delete_lead(lead_id: str, db: AsyncSession = Depends(get_db), current_
     service = LeadService(db)
     lead = await _verify_lead_access(service, lead_id, current_user)
     if lead.converted_patient_id:
-        await record_timeline_event(
-            db, current_user=current_user, patient_id=lead.converted_patient_id,
-            action="Lead Deleted",
-            description=f"Lead '{lead.lead_name}' deleted",
-            module="CRM",
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Lead cannot be deleted because it was converted to patient {lead.converted_patient_id}",
         )
     await service.delete(lead_id, user_id=current_user.get("sub"))
 

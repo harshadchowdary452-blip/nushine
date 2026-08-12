@@ -17,7 +17,6 @@ class LeadCreate(BaseModel):
     budget: Optional[float] = None
     preferred_visit_date: Optional[date] = None
     notes: Optional[str] = None
-    lead_score: Optional[int] = None
     priority: Optional[str] = None
     assigned_staff_id: Optional[str] = None
     assigned_doctor_id: Optional[str] = None
@@ -37,13 +36,11 @@ class LeadUpdate(BaseModel):
     preferred_visit_date: Optional[date] = None
     notes: Optional[str] = None
     status: Optional[str] = None
-    lead_score: Optional[int] = None
     priority: Optional[str] = None
     last_contacted_at: Optional[datetime] = None
     next_follow_up_date: Optional[date] = None
     assigned_staff_id: Optional[str] = None
     assigned_doctor_id: Optional[str] = None
-    converted_patient_id: Optional[str] = None
 
 
 class LeadResponse(BaseModel):
@@ -53,6 +50,8 @@ class LeadResponse(BaseModel):
     assigned_staff_id: Optional[str]
     assigned_doctor_id: Optional[str]
     converted_patient_id: Optional[str]
+    converted_at: Optional[datetime] = None
+    converted_by: Optional[str] = None
     lead_name: str
     mobile: str
     alternate_mobile: Optional[str]

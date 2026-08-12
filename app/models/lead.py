@@ -56,6 +56,8 @@ class Lead(Base):
     assigned_staff_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
     assigned_doctor_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
     converted_patient_id: Mapped[str] = mapped_column(String(36), ForeignKey("patients.id"), nullable=True)
+    converted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    converted_by: Mapped[str] = mapped_column(String(36), nullable=True)
 
     lead_name: Mapped[str] = mapped_column(String(255), nullable=False)
     mobile: Mapped[str] = mapped_column(String(50), nullable=False)

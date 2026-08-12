@@ -382,7 +382,6 @@ export function EnquiryDetailSheet({
                           <InfoRow label="Interest" value={detail.lead.interested_treatment} />
                           <InfoRow label="Status" value={detail.lead.status} />
                           <InfoRow label="Assigned To" value={detail.lead.assigned_staff || detail.lead.assigned_doctor} icon={<User className="h-3 w-3" />} />
-                          <InfoRow label="Lead Score" value={detail.lead.lead_score != null ? `${detail.lead.lead_score}` : null} />
                           <InfoRow label="City" value={detail.lead.city} icon={<MapPin className="h-3 w-3" />} />
                           <InfoRow label="Age / Gender" value={detail.lead.age ? `${detail.lead.age} yrs${detail.lead.gender ? ` / ${detail.lead.gender}` : ""}` : detail.lead.gender} />
                           <InfoRow label="Alternate Mobile" value={detail.lead.alternate_mobile} icon={<Phone className="h-3 w-3" />} />

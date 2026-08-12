@@ -34,9 +34,9 @@ def get_date_range(period: str = "this_month", start_date: Optional[str] = None,
         last_month_start = (month_start - timedelta(days=1)).replace(day=1)
         return last_month_start, last_month_end
     elif period == "last_7_days":
-        return today - timedelta(days=7), today + timedelta(days=1)
+        return today - timedelta(days=6), today + timedelta(days=1)
     elif period == "last_30_days":
-        return today - timedelta(days=30), today + timedelta(days=1)
+        return today - timedelta(days=29), today + timedelta(days=1)
     elif period == "this_week":
         week_start = today - timedelta(days=today.weekday())
         return week_start, week_start + timedelta(days=7)

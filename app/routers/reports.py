@@ -270,12 +270,25 @@ async def doctor_report(
 
     date_start, date_end = get_date_range(period, start_date, end_date)
 
+    # Scope case revenue to the caller's tenant so a HOSPITAL_ADMIN never sees
+    # a doctor's cases from other hospitals.
+    patient_ids = None
+    if current_user.get("role") == Role.HOSPITAL_ADMIN.value:
+        hospital_id = current_user.get("hospital_id")
+        patient_ids = await _get_patient_ids_for_hospitals(db, [hospital_id]) if hospital_id else []
+    elif admin_group_id:
+        hids = await _get_hospital_ids_for_group(db, admin_group_id)
+        patient_ids = await _get_patient_ids_for_hospitals(db, hids)
+
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["Doctor ID", "Name", "Hospital ID", "Active", "Revenue"])
 
     for did, dname, hid, active in doctors:
-        d_cases_r = await db.execute(select(Case.id).where(Case.doctor_id == did))
+        d_cases_q = select(Case.id).where(Case.doctor_id == did)
+        if patient_ids is not None:
+            d_cases_q = d_cases_q.where(Case.patient_id.in_(patient_ids))
+        d_cases_r = await db.execute(d_cases_q)
         d_cids = [row[0] for row in d_cases_r.all()]
         rev = 0.0
         if d_cids:
@@ -391,26 +404,48 @@ async def source_revenue_report(
     hospital_ids, _, _ = await _get_scope(db, current_user)
     date_start, date_end = get_date_range(period, start_date, end_date)
 
-    query = select(
+    patient_q = select(
         Patient.patient_source,
         func.count(Patient.id).label("patient_count"),
-        func.coalesce(func.sum(Billing.paid_amount), 0).label("total_revenue"),
-        func.coalesce(func.sum(Billing.total_amount), 0).label("total_billed"),
-    ).join(Case, Case.patient_id == Patient.id, isouter=True
-    ).join(Billing, Billing.case_id == Case.id, isouter=True
-    ).where(Patient.patient_source.isnot(None))
+    ).where(
+        Patient.patient_source.isnot(None),
+        Patient.created_at >= date_start, Patient.created_at < date_end,
+    )
     if hospital_ids is not None:
-        query = query.where(Patient.hospital_id.in_(hospital_ids))
-    query = query.group_by(Patient.patient_source).order_by(func.sum(Billing.paid_amount).desc())
+        patient_q = patient_q.where(Patient.hospital_id.in_(hospital_ids))
+    patient_q = patient_q.group_by(Patient.patient_source)
 
-    r = await db.execute(query)
-    rows = r.all()
+    revenue_q = select(
+        Patient.patient_source,
+        func.coalesce(func.sum(Billing.total_amount), 0).label("total_billed"),
+        func.coalesce(func.sum(Billing.paid_amount), 0).label("total_revenue"),
+    ).join(Case, Case.patient_id == Patient.id
+    ).join(Billing, Billing.case_id == Case.id
+    ).where(
+        Patient.patient_source.isnot(None),
+        Billing.updated_at >= date_start, Billing.updated_at < date_end,
+    )
+    if hospital_ids is not None:
+        revenue_q = revenue_q.where(Patient.hospital_id.in_(hospital_ids))
+    revenue_q = revenue_q.group_by(Patient.patient_source)
+
+    patient_rows = (await db.execute(patient_q)).all()
+    revenue_rows = {r[0]: (float(r[1]), float(r[2])) for r in (await db.execute(revenue_q)).all()}
+
+    rows = []
+    for source, pcount in patient_rows:
+        billed, rev = revenue_rows.get(source, (0.0, 0.0))
+        rows.append([source, pcount, billed, rev])
+    for source, (billed, rev) in revenue_rows.items():
+        if source not in {r[0] for r in rows}:
+            rows.append([source, 0, billed, rev])
+    rows.sort(key=lambda r: r[3], reverse=True)
 
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["Source", "Patient Count", "Total Billed", "Total Revenue"])
     for row in rows:
-        writer.writerow([row[0], row[1], float(row[3]), float(row[2])])
+        writer.writerow([row[0], row[1], float(row[2]), float(row[3])])
 
     output.seek(0)
     filename = f"source_revenue_{date_start.strftime('%Y%m%d')}_{date_end.strftime('%Y%m%d')}.{format}"

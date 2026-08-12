@@ -1098,7 +1098,6 @@ export const crmApi = {
     end_date?: string
     doctor?: string
     source?: string
-    campaign?: string
     staff?: string
     lead_status?: string
     follow_up_status?: string
@@ -1134,7 +1133,6 @@ export const crmApi = {
     end_date?: string
     doctor?: string
     source?: string
-    campaign?: string
     staff?: string
     lead_status?: string
   }) => api.get("/crm/command-center", { params }).then((r) => r.data),

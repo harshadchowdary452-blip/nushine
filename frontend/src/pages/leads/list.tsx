@@ -136,7 +136,6 @@ const columnOptions = [
   { key: "status", label: "Status", default: true },
   { key: "assigned", label: "Assigned To", default: true },
   { key: "next_follow_up", label: "Next Follow-up", default: true },
-  { key: "score", label: "Score", default: false },
   { key: "budget", label: "Budget", default: false },
   { key: "city", label: "City", default: false },
   { key: "created", label: "Created Date", default: false },
@@ -273,7 +272,6 @@ export default function LeadList() {
       if (sortField === "lead_name") cmp = a.lead_name.localeCompare(b.lead_name)
       else if (sortField === "created_at")
         cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-      else if (sortField === "lead_score") cmp = (a.lead_score ?? 0) - (b.lead_score ?? 0)
       else if (sortField === "next_follow_up_date")
         cmp = (a.next_follow_up_date || "").localeCompare(b.next_follow_up_date || "")
       else if (sortField === "budget") cmp = (a.budget ?? 0) - (b.budget ?? 0)
@@ -764,9 +762,6 @@ export default function LeadList() {
                   {visibleColumns.includes("next_follow_up") && (
                     <SortHeader field="next_follow_up_date">Follow-up</SortHeader>
                   )}
-                  {visibleColumns.includes("score") && (
-                    <SortHeader field="lead_score">Score</SortHeader>
-                  )}
                   {visibleColumns.includes("budget") && (
                     <SortHeader field="budget">Budget</SortHeader>
                   )}
@@ -889,21 +884,6 @@ export default function LeadList() {
                         ) : (
                           <span className="text-[12px] text-[var(--ds-text-tertiary)]">—</span>
                         )}
-                      </td>
-                    )}
-                    {visibleColumns.includes("score") && (
-                      <td className="px-3 py-3">
-                        <div className="flex items-center gap-1.5">
-                          <div className="h-1.5 w-12 bg-[var(--ds-surface-secondary)] rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-blue-500 rounded-full"
-                              style={{ width: `${Math.min(lead.lead_score ?? 0, 100)}%` }}
-                            />
-                          </div>
-                          <span className="text-[11px] font-medium text-[var(--ds-text-secondary)]">
-                            {lead.lead_score ?? 0}
-                          </span>
-                        </div>
                       </td>
                     )}
                     {visibleColumns.includes("budget") && (

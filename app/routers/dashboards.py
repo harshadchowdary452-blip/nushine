@@ -313,7 +313,7 @@ async def _lead_source_breakdown(db: AsyncSession, hospital_ids: list[str] | Non
         Lead.created_at >= date_start, Lead.created_at < date_end,
     )
     if doctor_id:
-        query = query.where(Lead.assigned_staff_id == doctor_id)
+        query = query.where(Lead.assigned_doctor_id == doctor_id)
     elif hospital_ids is not None:
         query = query.where(Lead.hospital_id.in_(hospital_ids))
     query = query.group_by(Lead.source).order_by(text('count DESC')).limit(limit)
@@ -370,7 +370,7 @@ async def _age_group_distribution(db: AsyncSession, hospital_ids: list[str] | No
         month_end = date_start.replace(month=date_start.month % 12 + 1, day=1) if date_start.month < 12 else date_start.replace(year=date_start.year + 1, month=1, day=1)
         date_end = month_end
 
-    query = select(Patient.date_of_birth).where(
+    query = select(Patient.age).where(
         Patient.created_at >= date_start, Patient.created_at < date_end,
     )
     if doctor_id:
@@ -379,13 +379,10 @@ async def _age_group_distribution(db: AsyncSession, hospital_ids: list[str] | No
         query = query.where(Patient.hospital_id.in_(hospital_ids))
     r = await db.execute(query)
 
-    buckets = [("0-12", 0), ("13-17", 0), ("18-24", 0), ("25-34", 0), ("35-44", 0), ("45-54", 0), ("55-64", 0), ("65+", 0)]
-    today = date.today()
-    for (dob,) in r.all():
-        if not dob:
-            continue
-        age = (today - dob).days // 365
-        if age < 0:
+    buckets = [("0-12", 0), ("13-17", 0), ("18-24", 0), ("25-34", 0), ("35-44", 0), ("45-54", 0), ("55-64", 0), ("65+", 0), ("Unknown", 0)]
+    for (age,) in r.all():
+        if age is None or age < 0:
+            buckets[8] = (buckets[8][0], buckets[8][1] + 1)
             continue
         if age <= 12:
             buckets[0] = (buckets[0][0], buckets[0][1] + 1)
@@ -956,7 +953,7 @@ async def group_admin_dashboard(
         "gender_distribution": gender_distribution,
         "age_group_distribution": age_group_distribution,
         "treatment_kpis": {
-            "active_treatments": (await db.execute(select(func.count(TreatmentPlan.id)).where(TreatmentPlan.case_id.in_(case_ids) if case_ids else text("false"), TreatmentPlan.is_active == True, TreatmentPlan.status.in_(["ASSIGNED", "SCHEDULED", "IN_PROGRESS", "WAITING_PATIENT", "WAITING_LAB", "ON_HOLD"])))).scalar() or 0 if case_ids else 0,
+            "active_treatments": (await db.execute(select(func.count(TreatmentPlan.id)).where(TreatmentPlan.case_id.in_(case_ids) if case_ids else text("false"), TreatmentPlan.is_active == True, TreatmentPlan.status.in_(["GENERATED", "ASSIGNED", "SCHEDULED", "IN_PROGRESS", "WAITING_PATIENT", "WAITING_LAB", "ON_HOLD"])))).scalar() or 0 if case_ids else 0,
             "overdue_treatments": (await db.execute(select(func.count(TreatmentPlan.id)).where(TreatmentPlan.case_id.in_(case_ids) if case_ids else text("false"), TreatmentPlan.is_active == True, TreatmentPlan.status == TreatmentPlanStatus.OVERDUE))).scalar() or 0 if case_ids else 0,
             "completed_today": (await db.execute(select(func.count(TreatmentPlan.id)).where(
                 TreatmentPlan.case_id.in_(case_ids) if case_ids else text("false"),
@@ -1278,8 +1275,9 @@ async def hospital_admin_dashboard(
 
     total_active_treatments = (await db.execute(
         select(func.count(TreatmentPlan.id)).where(*tp_base_filters, TreatmentPlan.status.in_([
-            TreatmentPlanStatus.ASSIGNED, TreatmentPlanStatus.SCHEDULED, TreatmentPlanStatus.IN_PROGRESS,
-            TreatmentPlanStatus.WAITING_PATIENT, TreatmentPlanStatus.WAITING_LAB, TreatmentPlanStatus.ON_HOLD,
+            TreatmentPlanStatus.GENERATED, TreatmentPlanStatus.ASSIGNED, TreatmentPlanStatus.SCHEDULED,
+            TreatmentPlanStatus.IN_PROGRESS, TreatmentPlanStatus.WAITING_PATIENT,
+            TreatmentPlanStatus.WAITING_LAB, TreatmentPlanStatus.ON_HOLD,
         ]))
     )).scalar() or 0
 
@@ -1486,6 +1484,7 @@ async def doctor_dashboard(
             Appointment.doctor_id == doctor_id,
             Appointment.appointment_date == today,
             Appointment.is_active == True,
+            Appointment.status.notin_([AppointmentStatus.CANCELLED.value]),
         )
     )).scalar() or 0
 
@@ -1616,6 +1615,7 @@ async def doctor_dashboard(
             Appointment.appointment_date >= period_start.date(),
             Appointment.appointment_date < period_end.date(),
             Appointment.is_active == True,
+            Appointment.status.notin_([AppointmentStatus.CANCELLED.value]),
         )
     )).scalar() or 0
 

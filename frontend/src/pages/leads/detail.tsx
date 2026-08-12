@@ -106,7 +106,6 @@ export default function LeadDetail() {
   const [budget, setBudget] = useState("")
   const [preferredVisitDate, setPreferredVisitDate] = useState("")
   const [notes, setNotes] = useState("")
-  const [leadScore, setLeadScore] = useState("")
   const [priority, setPriority] = useState("")
 
   const [callOutcome, setCallOutcome] = useState("")
@@ -240,6 +239,7 @@ export default function LeadDetail() {
       queryClient.invalidateQueries({ queryKey: ["crm-dashboard"] })
       queryClient.invalidateQueries({ queryKey: ["crm-enhanced-dashboard"] })
       queryClient.invalidateQueries({ queryKey: ["crm-command-center"], refetchType: "all" })
+      queryClient.invalidateQueries({ queryKey: ["patients"] })
       addToast({ title: "Lead converted successfully", variant: "success" })
       setConvertOpen(false)
       const patientId = (result as Record<string, unknown>)?.patient_id as string
@@ -268,7 +268,6 @@ export default function LeadDetail() {
     setBudget(l.budget?.toString() || "")
     setPreferredVisitDate(l.preferred_visit_date || "")
     setNotes(l.notes || "")
-    setLeadScore(l.lead_score?.toString() || "")
     setPriority(l.priority || "")
     setEditOpen(true)
   }, [])
@@ -479,9 +478,11 @@ export default function LeadDetail() {
                     <DropdownMenuItem onClick={() => openEdit(lead)} className="cursor-pointer">
                       <Edit3 className="h-4 w-4 mr-2.5 text-[var(--ds-text-secondary)]" /> Edit Lead
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setStatusChangeOpen(true)} className="cursor-pointer">
-                      <RefreshCw className="h-4 w-4 mr-2.5 text-[var(--ds-text-secondary)]" /> Change Status
-                    </DropdownMenuItem>
+                    {!lead.converted_patient_id && (
+                      <DropdownMenuItem onClick={() => setStatusChangeOpen(true)} className="cursor-pointer">
+                        <RefreshCw className="h-4 w-4 mr-2.5 text-[var(--ds-text-secondary)]" /> Change Status
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuSeparator className="bg-[var(--ds-background-subtle)]" />
                     <DropdownMenuItem onClick={() => setCallOutcomeOpen(true)} className="cursor-pointer">
                       <PhoneCall className="h-4 w-4 mr-2.5 text-[var(--ds-text-secondary)]" /> Log Call Outcome
@@ -490,12 +491,14 @@ export default function LeadDetail() {
                       <Target className="h-4 w-4 mr-2.5 text-[var(--ds-text-secondary)]" /> Convert to Patient
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className="bg-[var(--ds-background-subtle)]" />
-                    <DropdownMenuItem
-                      className="text-red-600 cursor-pointer focus:text-red-700 focus:bg-red-50"
-                      onClick={() => setDeleteOpen(true)}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2.5" /> Delete Lead
-                    </DropdownMenuItem>
+                    {!lead.converted_patient_id && (
+                      <DropdownMenuItem
+                        className="text-red-600 cursor-pointer focus:text-red-700 focus:bg-red-50"
+                        onClick={() => setDeleteOpen(true)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2.5" /> Delete Lead
+                      </DropdownMenuItem>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -505,17 +508,6 @@ export default function LeadDetail() {
       </Card>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <Card className="border-[var(--ds-border)]">
-          <CardContent className="p-3">
-            <p className="text-[11px] font-medium text-[var(--ds-text-tertiary)] uppercase tracking-wide">Lead Score</p>
-            <div className="flex items-center gap-2 mt-1">
-              <div className="flex-1 h-1.5 bg-[var(--ds-surface-secondary)] rounded-full overflow-hidden">
-                <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min((lead.lead_score ?? 0), 100)}%` }} />
-              </div>
-              <span className="text-sm font-bold text-[var(--ds-text)]">{lead.lead_score ?? 0}</span>
-            </div>
-          </CardContent>
-        </Card>
         <Card className="border-[var(--ds-border)]">
           <CardContent className="p-3">
             <p className="text-[11px] font-medium text-[var(--ds-text-tertiary)] uppercase tracking-wide">Age</p>
@@ -693,15 +685,6 @@ export default function LeadDetail() {
                           {priorityConfig[lead.priority]?.label}
                         </span>
                       ) : <span className="text-[var(--ds-text-tertiary)]">—</span>}
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[var(--ds-text-tertiary)] text-xs">Lead Score</span>
-                      <div className="flex items-center gap-1.5">
-                        <div className="h-1.5 w-16 bg-[var(--ds-surface-secondary)] rounded-full overflow-hidden">
-                          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min((lead.lead_score ?? 0), 100)}%` }} />
-                        </div>
-                        <span className="text-xs font-medium text-[var(--ds-text-secondary)]">{lead.lead_score ?? 0}</span>
-                      </div>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-[var(--ds-text-tertiary)] text-xs">Created</span>
@@ -1214,7 +1197,6 @@ export default function LeadDetail() {
             </div>
             <div><Label>Interested Treatment</Label><Input value={interestedTreatment} onChange={(e) => setInterestedTreatment(e.target.value)} /></div>
             <div><Label>Budget</Label><NumericInput mode="currency" prefix="₹" value={budget} onChange={(v) => setBudget(v)} /></div>
-            <div><Label>Lead Score</Label><NumericInput mode="integer" min={0} max={100} value={leadScore} onChange={(v) => setLeadScore(v)} /></div>
             <div><Label>Priority</Label>
               <Select value={priority} onValueChange={setPriority}>
                 <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
@@ -1239,7 +1221,6 @@ export default function LeadDetail() {
                 budget: budget ? parseFloat(budget) : undefined,
                 preferred_visit_date: preferredVisitDate || undefined,
                 notes: notes || undefined,
-                lead_score: leadScore ? parseInt(leadScore) : undefined,
                 priority: priority || undefined,
               })
             }} disabled={updateMutation.isPending}>Save</Button>

@@ -1212,7 +1212,6 @@ async def get_comprehensive_crm_dashboard(
     end_date: Optional[str] = Query(None, description="Custom end date (YYYY-MM-DD)"),
     doctor: Optional[str] = Query(None, description="Filter by doctor ID"),
     source: Optional[str] = Query(None, description="Filter by lead source"),
-    campaign: Optional[str] = Query(None, description="Filter by campaign"),
     staff: Optional[str] = Query(None, description="Filter by staff ID"),
     lead_status: Optional[str] = Query(None, description="Filter by lead status"),
     treatment: Optional[str] = Query(None, description="Filter by treatment name"),
@@ -1264,8 +1263,6 @@ async def get_comprehensive_crm_dashboard(
         lead_base = lead_base.where(Lead.source.ilike(f"%{source}%"))
     if doctor:
         lead_base = lead_base.where(Lead.assigned_doctor_id == doctor)
-    if campaign:
-        lead_base = lead_base.where(Lead.source.ilike(f"%{campaign}%"))
     if staff:
         lead_base = lead_base.where(Lead.assigned_staff_id == staff)
     if lead_status:
@@ -2038,9 +2035,13 @@ async def get_crm_dashboard(
     today_q = base.where(FollowUp.follow_up_date == today)
     today_fus = (await db.execute(today_q.order_by(FollowUp.follow_up_time).limit(50))).scalars().all()
 
-    # Separate treatment follow-up types vs recall types
-    treatment_fu_types = ["1_DAY_FOLLOW_UP", "7_DAY_FOLLOW_UP"]
-    recall_types = ["6_MONTH_RECALL", "12_MONTH_RECALL", "CUSTOM_FOLLOW_UP"]
+    # Separate treatment follow-up types vs recall types. Backward-compat
+    # types are included so no follow_up_type value is silently dropped from
+    # the totals. ENQUIRY / MANUAL follow-ups are counted under the enquiry
+    # and work-queue sections rather than treatment/recall buckets.
+    treatment_fu_types = ["1_DAY_FOLLOW_UP", "7_DAY_FOLLOW_UP",
+                          "1_DAY_POST_TREATMENT", "7_DAY_POST_TREATMENT", "TREATMENT_FOLLOW_UP"]
+    recall_types = ["6_MONTH_RECALL", "12_MONTH_RECALL", "CUSTOM_FOLLOW_UP", "CUSTOM_RECALL"]
 
     async def _count(extra_filters):
         q = base.where(*extra_filters)
@@ -2074,10 +2075,11 @@ async def get_crm_dashboard(
     lost_enquiries = (await db.execute(enq_base.where(Enquiry.status.in_(["NOT_INTERESTED", "LOST"])))).scalar() or 0
 
     # Response rate (treatment follow-ups only)
-    responded = await _count([FollowUp.follow_up_type.in_(treatment_fu_types), FollowUp.status.in_(["RESPONDED", "APPOINTMENT_BOOKED", "COMPLETED"])])
+    engaged_statuses = ["CONTACTED", "INTERESTED", "APPOINTMENT_REQUIRED", "APPOINTMENT_BOOKED", "COMPLETED"]
+    responded = await _count([FollowUp.follow_up_type.in_(treatment_fu_types), FollowUp.status.in_(engaged_statuses)])
     # WhatsApp messages sent (treatment follow-ups only)
     whatsapp_sent = await _count([FollowUp.follow_up_type.in_(treatment_fu_types), FollowUp.whatsapp_sent_at.isnot(None)])
-    whatsapp_responded = await _count([FollowUp.follow_up_type.in_(treatment_fu_types), FollowUp.whatsapp_sent_at.isnot(None), FollowUp.status.in_(["RESPONDED", "APPOINTMENT_BOOKED", "COMPLETED"])])
+    whatsapp_responded = await _count([FollowUp.follow_up_type.in_(treatment_fu_types), FollowUp.whatsapp_sent_at.isnot(None), FollowUp.status.in_(engaged_statuses)])
 
     # Patient source analytics
     patient_base = select(Patient)
@@ -3065,7 +3067,7 @@ async def crm_quick_view_converted_leads(
         converted_patients.append({
             "lead_id": str(l.id), "lead_name": l.lead_name, "source": l.source,
             "patient_name": pat.full_name if pat else None,
-            "converted_at": l.updated_at.isoformat() if l.updated_at else None,
+            "converted_at": (l.converted_at or l.updated_at).isoformat(),
         })
 
     # Monthly conversion trend (last 6 months)
@@ -3074,8 +3076,8 @@ async def crm_quick_view_converted_leads(
         ym = today - timedelta(days=30 * i)
         m_start = ym.replace(day=1)
         m_q = converted_base.where(
-            Lead.updated_at >= datetime.combine(m_start, datetime.min.time()),
-            Lead.updated_at < datetime.combine((m_start + timedelta(days=32)).replace(day=1), datetime.min.time()))
+            func.coalesce(Lead.converted_at, Lead.updated_at) >= datetime.combine(m_start, datetime.min.time()),
+            func.coalesce(Lead.converted_at, Lead.updated_at) < datetime.combine((m_start + timedelta(days=32)).replace(day=1), datetime.min.time()))
         m_count = (await db.execute(select(func.count()).select_from(m_q.subquery()))).scalar() or 0
         monthly_trend.append({"month": m_start.strftime("%b %Y"), "count": m_count})
 
@@ -3798,7 +3800,7 @@ def _resolve_crm_range(period: str, start_date: Optional[str], end_date: Optiona
         s, e = _start_of_quarter(today), today
     elif period == "last_quarter":
         s = _add_months(_start_of_quarter(today), -3)
-        e = s + timedelta(days=(today - _start_of_quarter(today)).days)
+        e = _start_of_quarter(today) - timedelta(days=1)
     elif period == "this_year":
         s, e = today.replace(month=1, day=1), today
     elif period == "last_year":
@@ -3820,7 +3822,6 @@ async def get_crm_command_center(
     end_date: Optional[str] = Query(None, description="Custom end date (YYYY-MM-DD)"),
     doctor: Optional[str] = Query(None, description="Filter by doctor ID"),
     source: Optional[str] = Query(None, description="Filter by lead source"),
-    campaign: Optional[str] = Query(None, description="Filter by campaign/source campaign"),
     staff: Optional[str] = Query(None, description="Filter by staff ID"),
     lead_status: Optional[str] = Query(None, description="Filter by lead status"),
     db: AsyncSession = Depends(get_db),
@@ -3849,8 +3850,6 @@ async def get_crm_command_center(
             q = q.where(Lead.assigned_staff_id == staff)
         if lead_status:
             q = q.where(Lead.status == lead_status)
-        if campaign:
-            q = q.where(Lead.source.ilike(f"%{campaign}%"))
         if start is not None:
             q = q.where(Lead.created_at >= start)
         if end is not None:
@@ -3880,7 +3879,7 @@ async def get_crm_command_center(
         new_leads = await count(base)
         open_q = base.where(Lead.status.notin_(TERMINAL_LEAD_STATUSES))
         open_leads = await count(open_q)
-        converted = await count(base.where(Lead.status == LeadStatus.CONVERTED.value, Lead.updated_at >= start, Lead.updated_at <= end))
+        converted = await count(base.where(Lead.status == LeadStatus.CONVERTED.value, func.coalesce(Lead.converted_at, Lead.updated_at) >= start, func.coalesce(Lead.converted_at, Lead.updated_at) <= end))
         return new_leads, open_leads, converted
 
     cur_new, cur_open, cur_conv = await lead_counts(s_dt, e_dt)
@@ -3891,9 +3890,9 @@ async def get_crm_command_center(
     # Response time: hours from lead creation to first outbound communication
     async def avg_response_hours(start, end):
         rows = (await db.execute(
-            select(Lead.id, Lead.created_at, func.min(LeadCommunication.created_at))
+            lead_scope(select(Lead.id, Lead.created_at, func.min(LeadCommunication.created_at)), start, end)
             .join(LeadCommunication, LeadCommunication.lead_id == Lead.id)
-            .where(Lead.created_at >= start, Lead.created_at <= end, LeadCommunication.created_at >= Lead.created_at)
+            .where(LeadCommunication.created_at >= Lead.created_at)
             .group_by(Lead.id, Lead.created_at)
         )).all()
         total_h = 0.0
@@ -3910,7 +3909,9 @@ async def get_crm_command_center(
     # Lead age: average days open leads from this period have been in pipeline
     async def avg_lead_age(start, end):
         rows = (await db.execute(
-            select(Lead.created_at).where(Lead.created_at >= start, Lead.created_at <= end, Lead.status.notin_(TERMINAL_LEAD_STATUSES))
+            lead_scope(select(Lead.created_at), start, end).where(
+                Lead.status.notin_(TERMINAL_LEAD_STATUSES)
+            )
         )).all()
         if not rows:
             return 0.0
@@ -3979,7 +3980,7 @@ async def get_crm_command_center(
 
     RECALL_TYPES = ("RECALL",)
     WELLNESS_TYPES = ("TREATMENT_WELLNESS", "CASE_WELLNESS")
-    APPT_REMINDER_TYPES = ("APPOINTMENT_REMINDER",)
+    APPT_REMINDER_TYPES = ("APPOINTMENT_REMINDER", "MISSED_APPOINTMENT")
     ENQUIRY_TERMINAL = ["COMPLETED", "CANCELLED", "LOST", "CONVERTED"]
 
     def due_scope(types, start, end):
@@ -4257,11 +4258,11 @@ async def get_crm_command_center(
     # -------------------------------------------------------------
     conv_rows = (await db.execute(
         in_range_leads.where(Lead.status == LeadStatus.CONVERTED.value)
-        .order_by(Lead.updated_at.desc()).limit(8)
+        .order_by(func.coalesce(Lead.converted_at, Lead.updated_at, Lead.created_at).desc()).limit(8)
     )).scalars().all()
     conversions = [{
         "id": str(l.id), "name": l.lead_name, "source": l.source,
-        "converted_at": (l.updated_at or l.created_at).isoformat(),
+        "converted_at": (l.converted_at or l.updated_at or l.created_at).isoformat(),
         "link": f"/leads/{l.id}",
         "converted_patient_id": str(l.converted_patient_id) if l.converted_patient_id else None,
     } for l in conv_rows]
@@ -4316,10 +4317,13 @@ async def get_crm_command_center(
     # -------------------------------------------------------------
     # TODAY'S COMMAND CENTER (what needs attention right now)
     # -------------------------------------------------------------
+    today_start = datetime.combine(today, datetime.min.time())
+    today_end = datetime.combine(today, datetime.max.time())
     follow_ups_due_today = await count(fu_scope(select(FollowUp)).where(
         FollowUp.follow_up_date == today, FollowUp.status.in_(OPEN_FOLLOW_UP_STATUSES)))
     converted_today = await count(lead_scope(select(Lead)).where(
-        Lead.status == LeadStatus.CONVERTED.value, Lead.updated_at >= s_dt, Lead.updated_at <= e_dt))
+        Lead.status == LeadStatus.CONVERTED.value, Lead.updated_at >= today_start, Lead.updated_at <= today_end))
+    today_calls, today_missed, _ = await call_stats(today_start, today_end)
 
     today_center = {
         "date": today.isoformat(),
@@ -4332,8 +4336,8 @@ async def get_crm_command_center(
         "converted_today": converted_today,
         "unread_messages": cur_unread,
         "failed_messages": cur_failed,
-        "calls_made": cur_calls,
-        "missed_calls": cur_missed,
+        "calls_made": today_calls,
+        "missed_calls": today_missed,
     }
 
     return {
