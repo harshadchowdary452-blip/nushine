@@ -78,7 +78,7 @@ export interface AdminGroup {
 
 export interface Hospital {
   id: string
-  admin_group_id: string
+  admin_group_id: string | null
   name: string
   address: string | null
   phone: string | null
@@ -145,7 +145,6 @@ export type PatientStatus =
   | "ACTIVE"
   | "INACTIVE"
   | "UNDER_TREATMENT"
-  | "TREATMENT_ONGOING"
   | "FOLLOW_UP"
   | "COMPLETED"
   | "OPD"
@@ -319,6 +318,12 @@ export interface TreatmentPlan {
   cost: number
   paid_amount: number
   pending_amount: number
+  net_cost?: number
+  discount_type?: string
+  discount_percent?: number
+  discount_amount?: number
+  discount_reason?: string
+  original_amount?: number | null
   duration_minutes: number | null
   start_date: string | null
   expected_completion_date: string | null

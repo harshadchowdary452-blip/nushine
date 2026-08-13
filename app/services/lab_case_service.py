@@ -10,7 +10,7 @@ from app.repositories.audit_log_repository import AuditLogRepository
 from app.models.lab_case import LabCase
 from app.models.lab_case_event import LabCaseEvent
 from app.models.laboratory import Laboratory
-from app.models.treatment_plan import TreatmentPlan
+from app.models.treatment_plan import TreatmentPlan, TreatmentPlanStatus
 from app.models.case import Case
 from app.models.patient import Patient
 from app.models.hospital import Hospital
@@ -49,16 +49,30 @@ class LabCaseService:
         result = await self.db.execute(select(TreatmentPlan).where(TreatmentPlan.id == plan_id))
         return result.scalar_one_or_none()
 
-    async def create_from_treatment(self, current_user: dict, plan_id: str, data: dict) -> LabCase:
+    async def create_from_treatment(self, current_user: dict, plan_id: str, data: dict):
+        """Create a lab requirement for a treatment, or update it if one already exists.
+
+        Returns (lab_case, created: bool). Idempotent: re-submitting the same lab
+        details updates the existing requirement in place instead of failing.
+        """
         plan = await self._get_treatment_plan(plan_id)
         if not plan:
             raise HTTPException(status_code=404, detail="Treatment not found")
         await verify_tenant_access(current_user, plan, "treatment_plan", self.db)
         existing = await self.get_by_treatment(plan_id)
-        if existing:
-            raise HTTPException(status_code=409, detail="A lab case already exists for this treatment")
         user_id = current_user.get("sub")
         payload = {k: v for k, v in data.items() if v is not None and v != ""}
+        if existing:
+            updatable = ("laboratory_id", "order_number", "tooth_number", "material",
+                         "sent_date", "due_date", "returned_date", "lab_cost", "remarks", "lab_status")
+            updates = {k: v for k, v in payload.items() if k in updatable}
+            if updates:
+                await self.repo.update(existing.id, **updates)
+                self.db.add(LabCaseEvent(lab_case_id=existing.id, event_type=LAB_EVENT_NOTE,
+                                         note="Lab requirement updated", actor_id=user_id))
+                await self._audit(existing.id, "UPDATE_LAB_CASE", "Lab requirement updated", user_id)
+                await self.db.flush()
+            return existing, False
         payload["treatment_plan_id"] = plan_id
         if user_id:
             payload["created_by"] = user_id
@@ -71,7 +85,7 @@ class LabCaseService:
         self.db.add(event)
         await self._audit(lab_case.id, "CREATE_LAB_CASE", f"Lab case created for '{plan.treatment_name}'", user_id)
         await self.db.flush()
-        return lab_case
+        return lab_case, True
 
     async def get_by_treatment(self, plan_id: str) -> Optional[LabCase]:
         result = await self.db.execute(select(LabCase).where(LabCase.treatment_plan_id == plan_id))
@@ -309,7 +323,43 @@ class LabCaseService:
             self.db.add(LabCaseEvent(lab_case_id=lab_case_id, event_type=LAB_EVENT_STATUS_CHANGE, from_status=old_status, to_status=new_status, note=note, actor_id=user_id))
             await self._audit(lab_case_id, "UPDATE_LAB_CASE_STATUS", f"Status changed to {new_status}", user_id)
             await self.db.flush()
+            if new_status in ("RETURNED", "CANCELLED"):
+                await self._resume_treatment_if_waiting(lab_case.treatment_plan_id, current_user,
+                                                        reason="lab item received back" if new_status == "RETURNED" else "lab requirement cancelled")
         return await self.get(lab_case_id)
+
+    async def _resume_treatment_if_waiting(self, plan_id: str, current_user: dict = None, reason: str = "lab item received back"):
+        """When a lab item is received back (RETURNED) or cancelled, a treatment that
+        is merely waiting on that lab resumes to IN_PROGRESS. It is never auto-completed."""
+        try:
+            plan = await self._get_treatment_plan(plan_id)
+            if not plan:
+                return
+            current_status = plan.status.value if hasattr(plan.status, "value") else str(plan.status)
+            if current_status != TreatmentPlanStatus.WAITING_LAB.value:
+                return
+            from app.services.status_automation import StatusAutomationService
+            await StatusAutomationService(self.db).update_treatment_status(plan_id, TreatmentPlanStatus.IN_PROGRESS)
+            await self.db.flush()
+            try:
+                case_result = await self.db.execute(
+                    select(Case.patient_id).where(Case.id == plan.case_id)
+                )
+                patient_row = case_result.one_or_none()
+                if patient_row and patient_row[0]:
+                    from app.services.timeline_helper import record_timeline_event
+                    await record_timeline_event(
+                        db=self.db,
+                        current_user=current_user,
+                        patient_id=patient_row[0],
+                        action="Treatment Resumed",
+                        description=f"{reason.capitalize()} for '{plan.treatment_name}' - treatment resumed",
+                        module="Treatments",
+                    )
+            except Exception:
+                logging.getLogger(__name__).exception("LAB_RESUME_TIMELINE - failed plan=%s", plan_id)
+        except Exception:
+            logging.getLogger(__name__).exception("LAB_RESUME_TREATMENT - failed plan=%s", plan_id)
 
     async def add_event(self, lab_case_id: str, event_type: str, note: str = None, current_user: dict = None) -> LabCaseEvent:
         lab_case = await self.repo.get(lab_case_id)
@@ -330,8 +380,21 @@ class LabCaseService:
         if not target:
             raise HTTPException(status_code=400, detail="No WhatsApp / phone number available for this laboratory")
         links = whatsapp_provider.generate_deep_link(target, message)
-        sent = await whatsapp_provider.send_message(target, message)
         user_id = (current_user or {}).get("sub")
+        recent = await self.db.execute(
+            select(LabCaseEvent).where(
+                LabCaseEvent.lab_case_id == lab_case_id,
+                LabCaseEvent.event_type == LAB_EVENT_WHATSAPP,
+                LabCaseEvent.created_at >= datetime.now(timezone.utc) - timedelta(seconds=45),
+            ).order_by(LabCaseEvent.created_at.desc()).limit(1)
+        )
+        duplicate = recent.scalar_one_or_none()
+        if duplicate and duplicate.note == message:
+            logger = logging.getLogger(__name__)
+            logger.info("Duplicate WhatsApp to lab case %s skipped (sent %s ago)",
+                        lab_case_id, datetime.now(timezone.utc) - duplicate.created_at)
+            return {"success": True, "phone": links["phone"], "deep_link": links["wa_link"], "message": message, "duplicate_skipped": True}
+        sent = await whatsapp_provider.send_message(target, message)
         self.db.add(LabCaseEvent(lab_case_id=lab_case_id, event_type=LAB_EVENT_WHATSAPP, note=message, actor_id=user_id))
         await self._audit(lab_case_id, "LAB_CASE_WHATSAPP", "WhatsApp sent to laboratory", user_id)
         await self.db.flush()
@@ -417,10 +480,16 @@ class LabCaseService:
         }
 
     async def _report_cases(self, current_user: dict, month_start: date, month_end: date) -> List[LabCase]:
-        query = select(LabCase).join(TreatmentPlan, LabCase.treatment_plan_id == TreatmentPlan.id).where(
-            or_(
-                LabCase.sent_date.isnot(None) & (LabCase.sent_date >= month_start) & (LabCase.sent_date < month_end),
-                LabCase.sent_date.is_(None) & (LabCase.created_at >= datetime(month_start.year, month_start.month, month_start.day, tzinfo=timezone.utc)) & (LabCase.created_at < datetime(month_end.year, month_end.month, month_end.day, tzinfo=timezone.utc)),
+        query = (
+            select(LabCase)
+            .join(TreatmentPlan, LabCase.treatment_plan_id == TreatmentPlan.id)
+            .join(Case, TreatmentPlan.case_id == Case.id)
+            .join(Patient, Case.patient_id == Patient.id)
+            .where(
+                or_(
+                    LabCase.sent_date.isnot(None) & (LabCase.sent_date >= month_start) & (LabCase.sent_date < month_end),
+                    LabCase.sent_date.is_(None) & (LabCase.created_at >= datetime(month_start.year, month_start.month, month_start.day, tzinfo=timezone.utc)) & (LabCase.created_at < datetime(month_end.year, month_end.month, month_end.day, tzinfo=timezone.utc)),
+                )
             )
         )
         query = await self._apply_scope(query, current_user)

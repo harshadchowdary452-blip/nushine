@@ -1,5 +1,6 @@
 import csv
 import io
+import json
 import os
 import uuid
 from datetime import datetime, timezone, timedelta
@@ -624,6 +625,183 @@ async def _generate_pdf(title, headers, data, filename, info=None, date_start=No
     _pdf_footer(pdf)
     filepath = filepath or os.path.join(EXPORT_DIR, filename)
     pdf.output(filepath)
+    return filepath
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  LAB REPORT PDF  –  clean landscape layout, no cell bleed
+# ═══════════════════════════════════════════════════════════════════
+
+LAB_PDF_WIDTHS = [22, 32, 20, 30, 13, 18, 27, 19, 19, 19, 11, 20, 20]
+
+
+def _pdf_truncate(text, width, size=7.5):
+    """Truncate text so it never overflows its PDF cell into neighbouring cells."""
+    mm_per_char = size * 0.55 / 2.8346
+    max_chars = max(int(width / mm_per_char) - 2, 2)
+    s = "" if text is None else str(text)
+    if len(s) <= max_chars:
+        return s
+    return s[: max_chars - 1] + "..."
+
+
+def _pdf_tooth_value(value):
+    """Display a JSON array tooth string like '[\"16\",\"21\"]' as '16, 21'."""
+    if isinstance(value, str):
+        v = value.strip()
+        if v.startswith("[") and v.endswith("]"):
+            try:
+                items = json.loads(v)
+                if isinstance(items, list):
+                    return ", ".join(str(x) for x in items)
+            except Exception:
+                pass
+    return value
+
+
+def _render_lab_report_pdf(title, info, report, filepath):
+    from fpdf import FPDF
+    pdf = FPDF(orientation="L", unit="mm", format="A4")
+    pdf.set_margins(10, 10, 10)
+    pdf.set_auto_page_break(auto=False)
+    pdf.alias_nb_pages()
+    _add_fonts(pdf)
+    pdf.add_page()
+
+    month = report.get("month", "")
+    summary = report.get("summary", [])
+    lab_breakdown = report.get("lab_breakdown", [])
+    rows = report.get("rows", [])
+    headers = report.get("headers") or [
+        "Order", "Patient", "OP", "Treatment", "Tooth", "Material", "Laboratory",
+        "Sent", "Due", "Returned", "Days", "Status", "Cost",
+    ]
+    widths = LAB_PDF_WIDTHS
+
+    def _footer():
+        pdf.set_y(-15)
+        pdf.set_font("Arial", "I", 7)
+        pdf.set_text_color(150, 150, 150)
+        pdf.cell(0, 10, f"Page {pdf.page_no()}/{{nb}}", align="C")
+
+    # ── Page 1 header band ──────────────────────────────────────
+    pdf.set_fill_color(44, 62, 80)
+    pdf.rect(0, 0, 297, 42, "F")
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Arial", "B", 16)
+    pdf.set_xy(10, 9)
+    pdf.cell(0, 9, title, align="C")
+    y = 20
+    if info and info.get("name"):
+        pdf.set_font("Arial", "", 9)
+        pdf.set_xy(10, y)
+        pdf.cell(0, 5, str(info["name"]), align="C")
+        y += 6
+    pdf.set_font("Arial", "", 8)
+    pdf.set_xy(10, y)
+    pdf.cell(0, 5, f"Report period: {month}   |   Generated: "
+                   f"{datetime.now(timezone.utc).strftime('%d-%b-%Y %H:%M')}", align="C")
+    pdf.set_y(48)
+
+    # ── Summary boxes ───────────────────────────────────────────
+    pdf.set_font("Arial", "B", 9)
+    pdf.set_text_color(44, 62, 80)
+    pdf.cell(0, 6, "Summary", new_x="LMARGIN", new_y="NEXT")
+    box_w, box_h, gap = 53, 14, 2
+    bx = 10
+    by = pdf.get_y()
+    pdf.set_text_color(30, 30, 30)
+    for item in summary:
+        pdf.set_fill_color(240, 244, 248)
+        pdf.set_draw_color(200, 210, 220)
+        pdf.rect(bx, by, box_w, box_h, "DF")
+        pdf.set_font("Arial", "", 7)
+        pdf.set_text_color(100, 100, 100)
+        pdf.set_xy(bx + 2, by + 1.5)
+        pdf.cell(box_w - 4, 4, _pdf_truncate(item["label"], box_w - 4, 7), align="C")
+        pdf.set_font("Arial", "B", 10)
+        pdf.set_text_color(30, 30, 30)
+        pdf.set_xy(bx + 2, by + 6)
+        pdf.cell(box_w - 4, 6, _pdf_truncate(str(item["value"]), box_w - 4, 10), align="C")
+        bx += box_w + gap
+    pdf.set_y(by + box_h + 5)
+
+    # ── By Laboratory ───────────────────────────────────────────
+    pdf.set_font("Arial", "B", 9)
+    pdf.set_text_color(44, 62, 80)
+    pdf.cell(0, 6, "By Laboratory", new_x="LMARGIN", new_y="NEXT")
+    lab_widths = [200, 38, 39]
+    pdf.set_font("Arial", "B", 7.5)
+    pdf.set_fill_color(44, 62, 80)
+    pdf.set_text_color(255, 255, 255)
+    for w, h in zip(lab_widths, ["Laboratory", "Cases", "Total Cost"]):
+        pdf.cell(w, 7, h, border=1, fill=True, align="C")
+    pdf.ln()
+    pdf.set_text_color(30, 30, 30)
+    pdf.set_font("Arial", "", 7.5)
+    fill = False
+    for lab in lab_breakdown:
+        if fill:
+            pdf.set_fill_color(245, 245, 245)
+        else:
+            pdf.set_fill_color(255, 255, 255)
+        pdf.cell(lab_widths[0], 6.5, _pdf_truncate(lab.get("laboratory_name") or "Unassigned", lab_widths[0]),
+                 border=1, fill=fill)
+        pdf.cell(lab_widths[1], 6.5, str(lab.get("cases")), border=1, fill=fill, align="C")
+        pdf.cell(lab_widths[2], 6.5, f"\u20B9{float(lab.get('total_cost') or 0):,.2f}",
+                 border=1, fill=fill, align="R")
+        pdf.ln()
+        fill = not fill
+    pdf.ln(4)
+
+    # ── Main table ──────────────────────────────────────────────
+    def _table_header():
+        pdf.set_font("Arial", "B", 7.5)
+        pdf.set_fill_color(44, 62, 80)
+        pdf.set_text_color(255, 255, 255)
+        for w, h in zip(widths, headers):
+            pdf.cell(w, 8, _pdf_truncate(h, w), border=1, fill=True, align="C")
+        pdf.ln()
+        pdf.set_text_color(30, 30, 30)
+        pdf.set_font("Arial", "", 7.5)
+
+    if pdf.get_y() > 205:
+        _footer()
+        pdf.add_page()
+    _table_header()
+
+    fill = False
+    for row in rows:
+        if pdf.get_y() > 268:
+            _footer()
+            pdf.add_page()
+            _table_header()
+            fill = False
+        if fill:
+            pdf.set_fill_color(245, 245, 245)
+        else:
+            pdf.set_fill_color(255, 255, 255)
+        for i, val in enumerate(row):
+            if i == 4:
+                txt = _pdf_tooth_value(val)
+            elif i == 12:
+                txt = f"\u20B9{float(val):,.2f}"
+            else:
+                txt = "" if val is None else str(val)
+            align = "C" if i in (0, 11, 12) else "L"
+            pdf.cell(widths[i], 7, _pdf_truncate(txt, widths[i]), border=1, fill=True, align=align)
+        pdf.ln()
+        fill = not fill
+
+    _footer()
+    pdf.output(filepath)
+    return filepath
+
+
+async def _generate_lab_report_pdf(title, info, report, filename, filepath=None):
+    import asyncio
+    filepath = filepath or os.path.join(EXPORT_DIR, filename)
+    await asyncio.to_thread(_render_lab_report_pdf, title, info, report, filepath)
     return filepath
 
 

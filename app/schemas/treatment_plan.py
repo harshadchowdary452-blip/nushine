@@ -19,6 +19,13 @@ class TreatmentPlanCreate(BaseModel):
     notes: Optional[str] = None
 
 
+class TreatmentDiscountUpdate(BaseModel):
+    discount_type: str = Field(default="PERCENTAGE", pattern="^(PERCENTAGE|FIXED)$")
+    discount_percent: float = Field(default=0.0, ge=0, le=100)
+    discount_amount: float = Field(default=0.0, ge=0)
+    discount_reason: Optional[str] = None
+
+
 class TreatmentPlanUpdate(BaseModel):
     treatment_name: Optional[str] = None
     treatment_type_id: Optional[str] = None
@@ -45,6 +52,12 @@ class TreatmentPlanResponse(BaseModel):
     cost: float
     paid_amount: float = 0.0
     pending_amount: float = 0.0
+    net_cost: float = 0.0
+    discount_type: Optional[str] = None
+    discount_percent: float = 0.0
+    discount_amount: float = 0.0
+    discount_reason: Optional[str] = None
+    original_amount: Optional[float] = None
     duration_minutes: Optional[int]
     start_date: Optional[date] = None
     expected_completion_date: Optional[date] = None

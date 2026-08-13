@@ -661,7 +661,7 @@ class BillingService:
             logger.exception("UPDATE_BILLING_PAYMENT - Error: %s", str(e))
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update payment: {str(e)}")
 
-    async def apply_discount(self, billing_id: str, discount_type: str, discount_percent: float, discount_amount: float, discount_reason: Optional[str] = None, user_id: str = None) -> Optional[Billing]:
+    async def apply_discount(self, billing_id: str, discount_type: str, discount_percent: float, discount_amount: float, discount_reason: Optional[str] = None, user_id: str = None, propagate_treatment: bool = True) -> Optional[Billing]:
         billing = await self.repo.get(billing_id)
         if not billing:
             return None
@@ -696,6 +696,21 @@ class BillingService:
         new_vals = {"discount_type": billing.discount_type, "discount_percent": billing.discount_percent, "discount_amount": billing.discount_amount, "total_amount": billing.total_amount}
         await self._record_history(billing.id, "DISCOUNT_APPLIED", previous_data=prev_data, new_data=new_vals, changes_summary=f"Discount applied: {calc_discount_percent}% / Rs.{calc_discount_amount:.2f}", user_id=user_id)
         await BillingSyncService(self.db).sync_billing(billing)
+        if propagate_treatment and billing.treatment_plan_id:
+            try:
+                from app.services.treatment_plan_service import TreatmentPlanService
+                tsvc = TreatmentPlanService(self.db)
+                await tsvc.apply_discount(
+                    plan_id=billing.treatment_plan_id,
+                    discount_type=billing.discount_type,
+                    discount_percent=billing.discount_percent,
+                    discount_amount=billing.discount_amount,
+                    discount_reason=billing.discount_reason,
+                    user_id=user_id,
+                    propagate_billing=False,
+                )
+            except Exception as e:
+                logger.warning("Treatment discount propagation failed for billing %s: %s", billing.id, e)
         return billing
 
     async def get_revenue(self, hospital_id: str = None) -> Dict[str, Any]:

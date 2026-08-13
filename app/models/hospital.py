@@ -8,7 +8,7 @@ from app.database import Base
 class Hospital(Base):
     __tablename__ = "hospitals"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    admin_group_id: Mapped[str] = mapped_column(String(36), ForeignKey("admin_groups.id"), nullable=False)
+    admin_group_id: Mapped[str] = mapped_column(String(36), ForeignKey("admin_groups.id"), nullable=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     address: Mapped[str] = mapped_column(Text, nullable=True)
     phone: Mapped[str] = mapped_column(String(50), nullable=True)

@@ -17,6 +17,11 @@ def _active(billings: list) -> list:
     return [b for b in billings if b.payment_status != _CANCELLED]
 
 
+def _net_cost(p) -> float:
+    """Treatment plan cost after any discount (edit-in-place, no compounding)."""
+    return max(0.0, float(p.cost or 0) - float(getattr(p, "discount_amount", None) or 0))
+
+
 class BillingSyncService:
     """Keeps every financial summary (case, treatment plan, treatment sitting,
     patient) consistent with the invoices/payments. Billing is the single source
@@ -51,10 +56,10 @@ class BillingSyncService:
         if not active_billings:
             return billed
         rows = await self.db.execute(
-            select(TreatmentPlan.id, TreatmentPlan.cost).where(TreatmentPlan.case_id == case_id)
+            select(TreatmentPlan).where(TreatmentPlan.case_id == case_id)
         )
-        plan_rows = rows.all()
-        total_cost = sum(float(c or 0) for _, c in plan_rows) or 0
+        plan_rows = rows.scalars().all()
+        total_cost = sum(_net_cost(p) for p in plan_rows) or 0
         for b in active_billings:
             if b.items:
                 for item in b.items:
@@ -65,8 +70,8 @@ class BillingSyncService:
             else:
                 generic = float(b.total_amount or 0)
                 if generic and total_cost > 0:
-                    for pid, cost in plan_rows:
-                        billed[pid] = billed.get(pid, 0.0) + generic * float(cost or 0) / total_cost
+                    for p in plan_rows:
+                        billed[p.id] = billed.get(p.id, 0.0) + generic * _net_cost(p) / total_cost
         return billed
 
     async def _sync_plans(self, case_id: str, billings: list):
@@ -75,7 +80,34 @@ class BillingSyncService:
         if not plans:
             return
         active = _active(billings)
-        total_cost = sum(float(p.cost or 0) for p in plans) or 0
+        total_gross = sum(float(p.cost or 0) for p in plans) or 0
+        # Case-level discount (generic billings with no plan/item attribution) is
+        # allocated to the plans proportionally by gross cost, so a plan's net
+        # cost and pending amount reflect the discount given on the invoice
+        # (e.g. a 5% discount on the total billing must not surface as a
+        # phantom outstanding balance on the completed treatment).
+        generic_discount = sum(
+            float(b.discount_amount or 0)
+            for b in active
+            if not b.treatment_plan_id and not (b.items or [])
+        )
+        for plan in plans:
+            attr = 0.0
+            for b in active:
+                if b.items:
+                    for item in b.items:
+                        if item.treatment_plan_id == plan.id:
+                            attr += float(item.discount_amount or 0)
+                elif b.treatment_plan_id == plan.id:
+                    attr += float(b.discount_amount or 0)
+            if generic_discount and total_gross > 0:
+                attr += generic_discount * float(plan.cost or 0) / total_gross
+            if attr > 0:
+                plan.discount_amount = round(attr, 2)
+                plan.discount_percent = round(attr / float(plan.cost or 0) * 100, 2) if plan.cost else 0.0
+                plan.original_amount = float(plan.cost or 0)
+                plan.discount_type = "PERCENTAGE"
+        total_cost = sum(_net_cost(p) for p in plans) or 0
         for plan in plans:
             direct = 0.0
             for b in active:
@@ -93,7 +125,7 @@ class BillingSyncService:
                     if not b.treatment_plan_id and not (b.items or [])
                 )
                 if generic:
-                    plan_paid = round(generic * float(plan.cost or 0) / total_cost, 2)
+                    plan_paid = round(generic * _net_cost(plan) / total_cost, 2)
             plan.paid_amount = round(plan_paid, 2)
 
     async def _sync_sittings(self, case_id: str, billings: list):
@@ -142,7 +174,7 @@ class BillingSyncService:
         )
         for p in r.scalars().all():
             covered = billed_by_plan.get(p.id, 0.0)
-            uncovered_completed += max(0.0, float(p.cost or 0) - covered)
+            uncovered_completed += max(0.0, _net_cost(p) - covered)
         outstanding = round(total_billed - total_paid + uncovered_completed, 2)
         if not active and uncovered_completed <= 0:
             payment_status = "NO_BILLING"

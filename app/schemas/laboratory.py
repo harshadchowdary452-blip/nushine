@@ -13,6 +13,7 @@ class LaboratoryCreate(BaseModel):
     address: Optional[str] = None
     status: Optional[str] = Field("ACTIVE", max_length=20)
     notes: Optional[str] = None
+    hospital_id: Optional[str] = None
 
 
 class LaboratoryUpdate(BaseModel):
@@ -25,6 +26,7 @@ class LaboratoryUpdate(BaseModel):
     address: Optional[str] = None
     status: Optional[str] = Field(None, max_length=20)
     notes: Optional[str] = None
+    hospital_id: Optional[str] = None
 
 
 class LaboratoryResponse(BaseModel):
@@ -38,6 +40,8 @@ class LaboratoryResponse(BaseModel):
     address: Optional[str]
     status: str
     notes: Optional[str]
+    hospital_id: Optional[str]
+    admin_group_id: Optional[str]
     created_by: Optional[str]
     created_at: datetime
     updated_at: datetime

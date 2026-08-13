@@ -98,12 +98,14 @@ function useHospitalContext() {
   const lockedHospitalId = role === "HOSPITAL_ADMIN" || role === "DOCTOR" ? ownHospitalId : null
   const effectiveHospitalId = lockedHospitalId ?? selectedHospitalId
   const showSelector = role === "GROUP_ADMIN" || role === "SUPER_ADMIN"
+  const isStandaloneIndentMaster = role === "HOSPITAL_ADMIN" && !user?.admin_group_id
 
   return {
     role,
     isManager: role === "SUPER_ADMIN" || role === "GROUP_ADMIN" || role === "HOSPITAL_ADMIN",
     isGroupAdmin: role === "GROUP_ADMIN",
     isDoctor: role === "DOCTOR",
+    isStandaloneIndentMaster,
     effectiveHospitalId,
     showSelector,
     selectedHospitalId,
@@ -692,9 +694,11 @@ function CatalogueManagerDialog({
 function PendingApprovalDrawer({
   open,
   onOpenChange,
+  isStandalone = false,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
+  isStandalone?: boolean
 }) {
   const { addToast } = useToast()
   const queryClient = useQueryClient()
@@ -971,35 +975,37 @@ function PendingApprovalDrawer({
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Rollout</Label>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    <button
-                      type="button"
-                      onClick={() => setRollout("ALL")}
-                      className={`rounded-xl border p-3 text-left transition-colors ${
-                        rollout === "ALL" ? "border-[var(--ds-primary)] bg-[var(--ds-primary)]/5" : "border-[var(--ds-border)]"
-                      }`}
-                    >
-                      <div className="text-sm font-medium text-[var(--ds-text)]">Option 1 · All existing hospitals</div>
-                      <p className="ds-caption mt-0.5 text-[var(--ds-text-tertiary)]">
-                        Add to every hospital in the group immediately. Recommended for common materials.
-                      </p>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRollout("NEW_ONLY")}
-                      className={`rounded-xl border p-3 text-left transition-colors ${
-                        rollout === "NEW_ONLY" ? "border-[var(--ds-primary)] bg-[var(--ds-primary)]/5" : "border-[var(--ds-border)]"
-                      }`}
-                    >
-                      <div className="text-sm font-medium text-[var(--ds-text)]">Option 2 · New hospitals only</div>
-                      <p className="ds-caption mt-0.5 text-[var(--ds-text-tertiary)]">
-                        Existing hospitals unchanged. The requesting hospital still receives the item now.
-                      </p>
-                    </button>
+                {!isStandalone && (
+                  <div className="space-y-2">
+                    <Label>Rollout</Label>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() => setRollout("ALL")}
+                        className={`rounded-xl border p-3 text-left transition-colors ${
+                          rollout === "ALL" ? "border-[var(--ds-primary)] bg-[var(--ds-primary)]/5" : "border-[var(--ds-border)]"
+                        }`}
+                      >
+                        <div className="text-sm font-medium text-[var(--ds-text)]">Option 1 · All existing hospitals</div>
+                        <p className="ds-caption mt-0.5 text-[var(--ds-text-tertiary)]">
+                          Add to every hospital in the group immediately. Recommended for common materials.
+                        </p>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRollout("NEW_ONLY")}
+                        className={`rounded-xl border p-3 text-left transition-colors ${
+                          rollout === "NEW_ONLY" ? "border-[var(--ds-primary)] bg-[var(--ds-primary)]/5" : "border-[var(--ds-border)]"
+                        }`}
+                      >
+                        <div className="text-sm font-medium text-[var(--ds-text)]">Option 2 · New hospitals only</div>
+                        <p className="ds-caption mt-0.5 text-[var(--ds-text-tertiary)]">
+                          Existing hospitals unchanged. The requesting hospital still receives the item now.
+                        </p>
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="space-y-1.5">
                   <Label htmlFor="pending-review-notes">Reason / Notes</Label>
@@ -1143,6 +1149,7 @@ function OrderDetailDialog({
   onOpenChange,
   orderId,
   isGroupAdmin,
+  isStandaloneIndentMaster,
   canEdit,
   onChanged,
 }: {
@@ -1150,6 +1157,7 @@ function OrderDetailDialog({
   onOpenChange: (open: boolean) => void
   orderId: string | null
   isGroupAdmin: boolean
+  isStandaloneIndentMaster: boolean
   canEdit: boolean
   onChanged: () => void
 }) {
@@ -1163,7 +1171,9 @@ function OrderDetailDialog({
   })
   const order = orderQuery.data
   const nextAction = order ? NEXT_ORDER_ACTION[order.status] ?? null : null
-  const canAdvance = !!nextAction && (isGroupAdmin ? nextAction.to !== "SUBMITTED" : nextAction.to === "SUBMITTED")
+  const canAdvance =
+    !!nextAction &&
+    (isGroupAdmin || isStandaloneIndentMaster ? nextAction.to !== "SUBMITTED" : nextAction.to === "SUBMITTED")
   const editable = !!order && canEdit && !isGroupAdmin && (order.status === "DRAFT" || order.status === "SUBMITTED")
 
   const transitionMutation = useMutation({
@@ -2808,7 +2818,7 @@ export default function InventoryPage() {
           Orders
         </Button>
       )}
-      {ctx.isGroupAdmin && (
+      {(ctx.isGroupAdmin || ctx.isStandaloneIndentMaster) && (
         <Button variant="outline" onClick={() => setPendingOpen(true)}>
           <Inbox className="h-4 w-4" />
           Pending Master Approval
@@ -2874,7 +2884,10 @@ export default function InventoryPage() {
               Monthly indent for {period} has been submitted
             </div>
             <div className="ds-caption text-[var(--ds-text-tertiary)]">
-              Status: {existingOrder?.status}. Waiting for group admin review.
+              Status: {existingOrder?.status}.
+              {ctx.isStandaloneIndentMaster
+                ? " Ready for your review and approval."
+                : " Waiting for group admin review."}
             </div>
           </div>
           {existingOrder && (
@@ -2951,7 +2964,11 @@ export default function InventoryPage() {
 
       <CatalogueManagerDialog open={catalogueOpen} onOpenChange={setCatalogueOpen} />
 
-      <PendingApprovalDrawer open={pendingOpen} onOpenChange={setPendingOpen} />
+      <PendingApprovalDrawer
+        open={pendingOpen}
+        onOpenChange={setPendingOpen}
+        isStandalone={ctx.isStandaloneIndentMaster}
+      />
 
       <AuditDialog open={auditOpen} onOpenChange={setAuditOpen} period={period} />
 
@@ -2972,6 +2989,7 @@ export default function InventoryPage() {
         }}
         orderId={orderDetailId}
         isGroupAdmin={ctx.isGroupAdmin}
+        isStandaloneIndentMaster={ctx.isStandaloneIndentMaster}
         canEdit={ctx.isManager}
         onChanged={refresh}
       />

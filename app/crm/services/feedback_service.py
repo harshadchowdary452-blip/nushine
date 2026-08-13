@@ -65,9 +65,6 @@ class FeedbackService:
         # Sync to master Lead record
         await self._sync_lead(enquiry.lead_id, fb, data.get("notes"))
 
-        # Record timeline event
-        await self._record_lead_timeline(fb, data.get("notes"))
-
         return fb
 
     async def get_lead_feedback(
@@ -220,24 +217,6 @@ class FeedbackService:
         patient.latest_recovery_status = fb.recovery_status
         patient.latest_recommendation_status = fb.would_recommend
         await self.db.flush()
-
-    async def _record_lead_timeline(
-        self, fb: LeadFeedback, notes: Optional[str]
-    ) -> None:
-        status = fb.response_status.replace("_", " ").title()
-        desc = f"Feedback recorded: {status}"
-        if fb.follow_up_required:
-            desc += " — Follow-up requested"
-        if notes:
-            desc += f" ({notes[:100]})"
-        await record_timeline_event(
-            db=self.db,
-            patient_id=fb.lead_id,
-            action="LEAD_FEEDBACK",
-            module="CRM_FEEDBACK",
-            description=desc,
-            current_user=self.current_user,
-        )
 
     async def _record_patient_timeline(
         self, fb: PatientFeedback

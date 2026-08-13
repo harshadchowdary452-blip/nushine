@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   FlaskConical, Plus, Download, FileText, FileSpreadsheet, FileDown,
@@ -125,8 +125,8 @@ function useRole() {
   const role = user?.role ?? "DOCTOR"
   return {
     role,
-    canManageLabs: role === "SUPER_ADMIN" || role === "GROUP_ADMIN",
-    canDeleteLabCase: role === "SUPER_ADMIN" || role === "GROUP_ADMIN",
+    canManageLabs: role === "SUPER_ADMIN" || role === "GROUP_ADMIN" || role === "HOSPITAL_ADMIN",
+    canDeleteLabCase: role === "SUPER_ADMIN" || role === "GROUP_ADMIN" || role === "HOSPITAL_ADMIN",
   }
 }
 
@@ -1021,7 +1021,10 @@ function LabCaseDrawer({
             )}
           </DrawerSection>
 
-          <DrawerSection title="Activity" description="Status changes, WhatsApp messages, calls and notes">
+          <DrawerSection
+            title={`Activity · ${events.length} ${events.length === 1 ? "event" : "events"}`}
+            description="Timeline of activity on this single lab case (status changes, WhatsApp, calls, notes) — not separate lab records."
+          >
             <Timeline items={timelineItems} emptyTitle="No activity yet" emptyDescription="Events will appear here as the case progresses." />
           </DrawerSection>
         </>
@@ -1250,7 +1253,14 @@ function LabCasesView({
   })
 
   const data = query.data
-  const items = data?.items ?? []
+  const items = useMemo(() => {
+    const seen = new Set<string>()
+    return (data?.items ?? []).filter((lc) => {
+      if (seen.has(lc.id)) return false
+      seen.add(lc.id)
+      return true
+    })
+  }, [data?.items])
 
   return (
     <div className="ds-stack">
@@ -1421,7 +1431,14 @@ function LaboratoriesView({
   })
 
   const data = query.data
-  const items = data?.items ?? []
+  const items = useMemo(() => {
+    const seen = new Set<string>()
+    return (data?.items ?? []).filter((lab) => {
+      if (seen.has(lab.id)) return false
+      seen.add(lab.id)
+      return true
+    })
+  }, [data?.items])
 
   return (
     <div className="ds-stack">
@@ -1654,6 +1671,9 @@ export default function LaboratoryPage() {
     queryClient.invalidateQueries({ queryKey: ["laboratories"] })
     queryClient.invalidateQueries({ queryKey: ["lab-candidates"] })
     queryClient.invalidateQueries({ queryKey: ["lab-report"] })
+    queryClient.invalidateQueries({ queryKey: ["treatment-plan"] })
+    queryClient.invalidateQueries({ queryKey: ["treatment-plans"] })
+    queryClient.invalidateQueries({ queryKey: ["treatment-plans-board"] })
   }
 
   const deleteCaseMutation = useMutation({

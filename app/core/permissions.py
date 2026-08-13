@@ -124,7 +124,7 @@ ROLE_PERMISSIONS = {
         Permission.VIEW_CRM_DASHBOARD,
         Permission.VIEW_INVENTORY, Permission.MANAGE_INVENTORY,
         Permission.VIEW_SUPPLIERS, Permission.MANAGE_SUPPLIERS,
-        Permission.VIEW_LABORATORIES,
+        Permission.VIEW_LABORATORIES, Permission.MANAGE_LABORATORIES,
         Permission.VIEW_COMMUNICATIONS, Permission.MANAGE_COMMUNICATIONS,
     ],
     Role.DOCTOR: [
@@ -260,9 +260,7 @@ async def verify_tenant_access(current_user: dict, entity: object, entity_type: 
         if not entity_agid:
             entity_agid = await _hospital_admin_group(db, hid)
         agid = current_user.get("admin_group_id")
-        if not agid:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: no admin group")
-        if entity_agid and entity_agid != str(agid):
+        if not agid or not entity_agid or str(entity_agid) != str(agid):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: not in your admin group")
         return True
 
@@ -281,7 +279,7 @@ async def verify_tenant_access(current_user: dict, entity: object, entity_type: 
         if agid:
             if hid:
                 entity_agid = entity_agid or (await _hospital_admin_group(db, hid) if db else None)
-                if entity_agid and entity_agid != str(agid):
+                if not entity_agid or str(entity_agid) != str(agid):
                     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: not in your admin group")
             return True
         if hid and user_hospital_id and str(hid) != str(user_hospital_id):

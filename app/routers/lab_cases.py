@@ -18,7 +18,7 @@ from app.schemas.lab_case import (
     WhatsAppSendBody, CallLogBody, LabCaseEventCreate,
 )
 from app.schemas.common import MessageResponse
-from app.services.export_service import _generate_excel, _generate_pdf, _stream_csv, _hospital_info, EXPORT_DIR
+from app.services.export_service import _generate_lab_report_pdf, _generate_excel, _stream_csv, _hospital_info, EXPORT_DIR
 
 router = APIRouter(prefix="/lab-cases", tags=["Lab Cases"])
 
@@ -107,12 +107,12 @@ async def get_by_treatment(plan_id: str, db: AsyncSession = Depends(get_db), cur
     return _serialize(lab_case)
 
 
-@router.post("/from-treatment/{plan_id}", status_code=201)
+@router.post("/from-treatment/{plan_id}", status_code=200)
 async def create_from_treatment(plan_id: str, data: LabCaseCreate = Body(default=None), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.CREATE_TREATMENT_PLAN)
     service = LabCaseService(db)
     payload = data.model_dump(exclude_none=True) if data else {}
-    lab_case = await service.create_from_treatment(current_user, plan_id, payload)
+    lab_case, _ = await service.create_from_treatment(current_user, plan_id, payload)
     await db.commit()
     return _serialize(await service.get(lab_case.id))
 
@@ -153,7 +153,7 @@ async def monthly_report(
         filename = f"lab_report_{month}.pdf"
         fd, tmp = tempfile.mkstemp(suffix=".pdf", dir=EXPORT_DIR)
         os.close(fd)
-        filepath = await _generate_pdf(label, headers, rows, filename, info=info, summary=summary, filepath=tmp)
+        filepath = await _generate_lab_report_pdf(label, info, report, filename, filepath=tmp)
         return FileResponse(filepath, filename=filename, media_type="application/pdf",
                             background=BackgroundTask(os.remove, filepath))
     raise HTTPException(status_code=400, detail=f"Unknown format: {format}")

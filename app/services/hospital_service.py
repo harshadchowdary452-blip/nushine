@@ -23,8 +23,6 @@ class HospitalService:
         logger = logging.getLogger(__name__)
         logger.info("CREATE_HOSPITAL - Request data: %s", data)
         clean_data = {k: v for k, v in data.items() if v is not None and v != ""}
-        if "admin_group_id" not in clean_data:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="admin_group_id is required")
         try:
             hospital = await self.repo.create(**clean_data)
             logger.info("CREATE_HOSPITAL - Success: %s", hospital.id)

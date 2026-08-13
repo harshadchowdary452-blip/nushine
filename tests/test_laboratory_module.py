@@ -80,10 +80,13 @@ async def test_laboratory_crud_and_rbac(client: AsyncClient, seed):
                           json={"name": "Dr Lab"})
     assert r.status_code == 403, r.text
 
-    # Hospital admin (VIEW only) cannot create
+    # Hospital admin can now create, scoped to their own hospital
     r = await client.post("/api/v1/laboratories/", headers=auth(ha),
                           json={"name": "HA Lab"})
-    assert r.status_code == 403, r.text
+    assert r.status_code == 201, r.text
+    ha_lab = r.json()
+    assert ha_lab["hospital_id"] == seed["HA_ID"], "HA-created lab must be bound to its hospital"
+    ha_lab_id = ha_lab["id"]
 
     # Group admin creates
     r = await client.post("/api/v1/laboratories/", headers=auth(ga), json={
@@ -100,10 +103,24 @@ async def test_laboratory_crud_and_rbac(client: AsyncClient, seed):
     r = await client.post("/api/v1/laboratories/", headers=auth(ga), json={"name": "prolab"})
     assert r.status_code == 409, r.text
 
-    # Doctor can list/search
+    # Hospital B is isolated from Hospital A's laboratory (shares only the legacy global lab)
+    hb = await login(client, "lab_hb@t.com")
+    r = await client.get("/api/v1/laboratories/", headers=auth(hb))
+    assert r.status_code == 200
+    assert r.json()["total"] == 1, "Hospital B must see only the shared global laboratory"
+    assert r.json()["items"][0]["id"] != ha_lab_id, "Hospital B must not see Hospital A's laboratory"
+    r = await client.put(f"/api/v1/laboratories/{ha_lab_id}", headers=auth(hb), json={"name": "Stolen"})
+    assert r.status_code == 403, r.text
+
+    # Hospital admin manages own laboratory
+    r = await client.put(f"/api/v1/laboratories/{ha_lab_id}", headers=auth(ha), json={"name": "HA Lab Max"})
+    assert r.status_code == 200, r.text
+    assert r.json()["name"] == "HA Lab Max"
+
+    # Doctor can list/search (sees own hospital's lab + group admin's global lab)
     r = await client.get("/api/v1/laboratories/", headers=auth(dr))
     assert r.status_code == 200, r.text
-    assert r.json()["total"] == 1
+    assert r.json()["total"] == 2
     r = await client.get("/api/v1/laboratories/", headers=auth(dr), params={"search": "PRO"})
     assert r.json()["total"] == 1
     r = await client.get("/api/v1/laboratories/", headers=auth(dr), params={"search": "zzz"})
@@ -115,13 +132,15 @@ async def test_laboratory_crud_and_rbac(client: AsyncClient, seed):
     assert r.status_code == 200, r.text
     assert r.json()["name"] == "ProLab Max"
 
-    # Delete (doctor forbidden, GA allowed)
+    # Delete (doctor forbidden, GA allowed, HA deletes own)
     r = await client.delete(f"/api/v1/laboratories/{lab_id}", headers=auth(dr))
     assert r.status_code == 403, r.text
     r = await client.delete(f"/api/v1/laboratories/{lab_id}", headers=auth(ga))
     assert r.status_code == 200, r.text
     r = await client.get(f"/api/v1/laboratories/{lab_id}", headers=auth(ga))
     assert r.status_code == 404
+    r = await client.delete(f"/api/v1/laboratories/{ha_lab_id}", headers=auth(ha))
+    assert r.status_code == 200, r.text
 
 
 @pytest.mark.asyncio
@@ -171,7 +190,7 @@ async def test_lab_case_auto_create_and_tenant_scope(client: AsyncClient, seed):
     assert lab_r.status_code == 201, lab_r.text
     r = await client.post(f"/api/v1/lab-cases/from-treatment/{plan2}", headers=auth(ga),
                           json={"laboratory_id": lab_r.json()["id"], "lab_status": "PENDING"})
-    assert r.status_code == 201, r.text
+    assert r.status_code == 200, r.text
     assert r.json()["laboratory_name"] == "BridgeLab"
 
     r = await client.get("/api/v1/lab-cases/candidates", headers=auth(dr))
@@ -293,3 +312,42 @@ async def test_lab_case_status_events_whatsapp_call_report(client: AsyncClient, 
     assert r.status_code == 403, r.text
     r = await client.delete(f"/api/v1/lab-cases/{lab_case_id}", headers=auth(ga))
     assert r.status_code == 200, r.text
+
+
+@pytest.mark.asyncio
+async def test_monthly_report_counts_each_lab_case_once_with_multiple_patients(client: AsyncClient, seed):
+    """A lab case must appear exactly once in the monthly report even when the
+    hospital has several patients. Regression: _report_cases was missing the
+    Case/Patient joins, so the tenant filter became a cross join that duplicated
+    the lab case once per patient in the hospital."""
+    ga = await login(client, "lab_ga@t.com")
+    ha = await login(client, "lab_ha@t.com")
+    dr = await login(client, "lab_dr@t.com")
+
+    plan = await create_patient_case_plan(client, auth(ha), "Solo Patient")
+    r = await client.post(f"/api/v1/treatment-plans/{plan}/set-waiting?waiting_type=WAITING_LAB",
+                          headers=auth(dr), json={
+                              "lab_name": "OneLab", "lab_order_number": "PO-300",
+                              "lab_sent_date": "2026-07-15", "lab_cost": 1200,
+                          })
+    assert r.status_code == 200, r.text
+
+    # extra patients in the same hospital must not fan out the report
+    for name in ("Second Patient", "Third Patient"):
+        await create_patient_case_plan(client, auth(ha), name)
+
+    r = await client.get("/api/v1/lab-cases/report", headers=auth(ha),
+                         params={"month": "2026-07"})
+    assert r.status_code == 200, r.text
+    rep = r.json()
+    assert rep["total_cases"] == 1, "single lab case must not be duplicated per patient"
+    assert len(rep["rows"]) == 1
+    assert rep["rows"][0][0] == "PO-300"
+    assert rep["total_cost"] == 1200.0
+    assert rep["lab_breakdown"][0]["cases"] == 1
+
+    # group admin sees the same single case
+    r = await client.get("/api/v1/lab-cases/report", headers=auth(ga),
+                         params={"month": "2026-07"})
+    assert r.status_code == 200, r.text
+    assert r.json()["total_cases"] == 1

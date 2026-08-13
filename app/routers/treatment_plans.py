@@ -2,6 +2,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, func, String as SAString
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload, joinedload
 from typing import List, Optional
 from datetime import datetime, timezone, date, time, timedelta
@@ -15,7 +16,7 @@ from app.services.treatment_notification import (
     notify_treatment_completed, notify_treatment_overdue,
     notify_treatment_assigned, notify_pending_assignment,
 )
-from app.schemas.treatment_plan import TreatmentPlanCreate, TreatmentPlanUpdate, TreatmentPlanResponse
+from app.schemas.treatment_plan import TreatmentPlanCreate, TreatmentPlanUpdate, TreatmentPlanResponse, TreatmentDiscountUpdate
 from app.schemas.common import MessageResponse
 from app.models.case import Case
 from app.models.patient import Patient
@@ -62,6 +63,19 @@ async def _get_patient_id_from_plan(db: AsyncSession, plan_id: str) -> str:
     if not row:
         raise HTTPException(status_code=404, detail="Associated case/patient not found")
     return row[0]
+
+
+async def _resolve_lab_hospital(db: AsyncSession, plan_id: str) -> Optional[str]:
+    """Resolve the hospital that owns a laboratory created for a treatment."""
+    plan_result = await db.execute(select(TreatmentPlan).where(TreatmentPlan.id == plan_id))
+    plan = plan_result.scalar_one_or_none()
+    if not plan or not plan.case_id:
+        return None
+    case = await db.get(Case, plan.case_id)
+    if not case or not case.patient_id:
+        return None
+    patient = await db.get(Patient, case.patient_id)
+    return str(patient.hospital_id) if patient and patient.hospital_id else None
 
 
 
@@ -271,6 +285,35 @@ async def update_treatment_plan_status(plan_id: str, status: str = Query(...), d
         description=f"Status changed from {old_status} to {status}",
         module="Treatments",
         changes=[{"field": "status", "old_value": old_status, "new_value": status}],
+    )
+    return updated
+
+
+@router.put("/{plan_id}/discount", response_model=TreatmentPlanResponse)
+async def apply_treatment_discount(plan_id: str, data: TreatmentDiscountUpdate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.UPDATE_BILLING)
+    service = TreatmentPlanService(db)
+    plan = await service.get(plan_id)
+    if not plan:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Treatment plan not found")
+    await verify_tenant_access(current_user, plan, "treatment_plan", db)
+    old_discount = plan.discount_amount
+    updated = await service.apply_discount(
+        plan_id=plan_id,
+        discount_type=data.discount_type,
+        discount_percent=data.discount_percent,
+        discount_amount=data.discount_amount,
+        discount_reason=data.discount_reason,
+        user_id=current_user.get("sub"),
+    )
+    await db.commit()
+    patient_id = await _get_patient_id_from_plan(db, plan_id)
+    await record_timeline_event(
+        db, current_user=current_user, patient_id=patient_id,
+        action="Discount Applied",
+        description=f"Discount of {data.discount_percent or 0}% / ₹{data.discount_amount or 0} applied",
+        module="Treatments",
+        changes=[{"field": "discount_amount", "old_value": str(old_discount), "new_value": str(updated.discount_amount)}],
     )
     return updated
 
@@ -489,12 +532,24 @@ async def transfer_treatment(plan_id: str, body: TransferTreatmentBody, db: Asyn
                 select(Appointment).where(
                     Appointment.patient_id == case.patient_id,
                     Appointment.appointment_date == appt_date,
-                    Appointment.appointment_time == appt_time,
                     Appointment.status == AppointmentStatus.SCHEDULED,
                     Appointment.is_active == True,
-                ).limit(1)
+                ).order_by(Appointment.appointment_time).limit(1)
             )
-            if not existing.scalar_one_or_none():
+            appointment = existing.scalar_one_or_none()
+            if appointment:
+                # Reuse an existing scheduled appointment for this patient/date so a
+                # transfer never creates a duplicate appointment.
+                if concern_doctor_id:
+                    appointment.doctor_id = concern_doctor_id
+                if body.appointment_time:
+                    appointment.appointment_time = body.appointment_time
+                appointment.notes = (
+                    f"Updated from treatment transfer: {source.treatment_name} → {target.treatment_name}"
+                    + (f" ({body.notes})" if body.notes else "")
+                )
+                await db.flush()
+            else:
                 duration = resolve_duration(
                     procedure_name=target.treatment_name,
                     override_minutes=target.duration_minutes,
@@ -609,33 +664,45 @@ async def set_waiting(plan_id: str, waiting_type: str = Query(...), body: SetWai
     result = await service.update(plan_id, update_data, user_id=current_user.get("sub"))
 
     if waiting_type == "WAITING_LAB" and body:
+        lab_payload = {}
         try:
             from app.services.lab_case_service import LabCaseService
             from app.services.laboratory_service import LaboratoryService
             from datetime import date as _date
-            lab_svc = LabCaseService(db)
-            if not await lab_svc.get_by_treatment(plan_id):
-                lab_payload = {}
-                if body.lab_name:
-                    lab = await LaboratoryService(db).create_or_get(body.lab_name, user_id=current_user.get("sub"))
-                    lab_payload["laboratory_id"] = lab.id
-                if body.lab_order_number:
-                    lab_payload["order_number"] = body.lab_order_number
-                if body.lab_sent_date:
-                    try:
-                        lab_payload["sent_date"] = _date.fromisoformat(body.lab_sent_date)
-                    except ValueError:
-                        pass
-                if body.lab_return_date:
-                    try:
-                        lab_payload["returned_date"] = _date.fromisoformat(body.lab_return_date)
-                    except ValueError:
-                        pass
-                if body.lab_cost is not None:
-                    lab_payload["lab_cost"] = body.lab_cost
-                if body.lab_tracking_notes:
-                    lab_payload["remarks"] = body.lab_tracking_notes
-                await lab_svc.create_from_treatment(current_user, plan_id, lab_payload)
+            if body.lab_name:
+                lab = await LaboratoryService(db).create_or_get(
+                    body.lab_name,
+                    user_id=current_user.get("sub"),
+                    hospital_id=await _resolve_lab_hospital(db, plan_id),
+                )
+                lab_payload["laboratory_id"] = lab.id
+            if body.lab_order_number:
+                lab_payload["order_number"] = body.lab_order_number
+            if body.lab_sent_date:
+                try:
+                    lab_payload["sent_date"] = _date.fromisoformat(body.lab_sent_date)
+                except ValueError:
+                    pass
+            if body.lab_return_date:
+                try:
+                    lab_payload["returned_date"] = _date.fromisoformat(body.lab_return_date)
+                except ValueError:
+                    pass
+            if body.lab_cost is not None:
+                lab_payload["lab_cost"] = body.lab_cost
+            if body.lab_tracking_notes:
+                lab_payload["remarks"] = body.lab_tracking_notes
+            if lab_payload:
+                lab_svc = LabCaseService(db)
+                try:
+                    await lab_svc.create_from_treatment(current_user, plan_id, lab_payload)
+                except IntegrityError:
+                    # A concurrent request inserted the lab requirement first.
+                    # Roll back and re-apply so the status change is preserved and
+                    # the requirement is updated (never duplicated).
+                    await db.rollback()
+                    result = await service.update(plan_id, update_data, user_id=current_user.get("sub"))
+                    await lab_svc.create_from_treatment(current_user, plan_id, lab_payload)
         except Exception as e:
             logger.warning("Lab case auto-creation failed: %s", e)
 

@@ -1170,14 +1170,22 @@ async def hospital_admin_dashboard(
             return 100.0 if current > 0 else 0.0
         return round(((current - previous) / previous) * 100, 1)
 
-    # --- Follow-up stats (PERIOD-FILTERED) ---
-    fu_base = [FollowUp.hospital_id == hospital_id, FollowUp.created_at >= date_start, FollowUp.created_at < date_end]
+    # --- Follow-up stats (PERIOD-FILTERED by due date, not creation date) ---
+    # "Due" means the follow-up's scheduled date falls within the period (or is
+    # already overdue and still pending). Future-dated recalls (e.g. a 6-month or
+    # 12-month recall created this period but due next year) must NOT be counted
+    # as due now.
+    fu_scope = [FollowUp.hospital_id == hospital_id]
     if doctor_id:
-        fu_base.append(FollowUp.doctor_id == doctor_id)
-    total_follow_ups = (await db.execute(select(func.count(FollowUp.id)).where(*fu_base))).scalar() or 0
-    pending_follow_ups = (await db.execute(select(func.count(FollowUp.id)).where(*fu_base, FollowUp.status == FollowUpStatus.PENDING.value))).scalar() or 0
-    completed_follow_ups = (await db.execute(select(func.count(FollowUp.id)).where(*fu_base, FollowUp.status == FollowUpStatus.COMPLETED.value))).scalar() or 0
-    missed_follow_ups = (await db.execute(select(func.count(FollowUp.id)).where(*fu_base, FollowUp.status == FollowUpStatus.LOST.value))).scalar() or 0
+        fu_scope.append(FollowUp.doctor_id == doctor_id)
+    total_follow_ups = (await db.execute(select(func.count(FollowUp.id)).where(
+        *fu_scope, FollowUp.follow_up_date >= sd, FollowUp.follow_up_date < ed))).scalar() or 0
+    pending_follow_ups = (await db.execute(select(func.count(FollowUp.id)).where(
+        *fu_scope, FollowUp.status == FollowUpStatus.PENDING.value, FollowUp.follow_up_date < ed))).scalar() or 0
+    completed_follow_ups = (await db.execute(select(func.count(FollowUp.id)).where(
+        *fu_scope, FollowUp.status == FollowUpStatus.COMPLETED.value, FollowUp.follow_up_date >= sd, FollowUp.follow_up_date < ed))).scalar() or 0
+    missed_follow_ups = (await db.execute(select(func.count(FollowUp.id)).where(
+        *fu_scope, FollowUp.status == FollowUpStatus.LOST.value, FollowUp.follow_up_date >= sd, FollowUp.follow_up_date < ed))).scalar() or 0
 
     # Revenue vs expenses trend (period-filtered)
     combined_trend = await revenue_trend_with_expenses(db, case_ids if case_ids else [], [hospital_id], period=period, start_date=start_date, end_date=end_date)

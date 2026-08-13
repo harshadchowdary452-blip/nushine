@@ -221,7 +221,6 @@ async def update_lead_status(lead_id: str, data: LeadStatusUpdate, db: AsyncSess
                     entity_type="LEAD",
                     entity_id=lead_id,
                     hospital_id=getattr(result, 'hospital_id', None),
-                    lead_id=lead_id,
                     payload={"status": result.status, "lead_id": lead_id},
                     db=db,
                 )
@@ -232,7 +231,6 @@ async def update_lead_status(lead_id: str, data: LeadStatusUpdate, db: AsyncSess
                     entity_type="LEAD",
                     entity_id=lead_id,
                     hospital_id=getattr(result, 'hospital_id', None),
-                    lead_id=lead_id,
                     payload={"status": result.status, "lead_id": lead_id},
                     db=db,
                 )

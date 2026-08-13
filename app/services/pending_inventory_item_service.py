@@ -67,7 +67,7 @@ class PendingInventoryItemService:
         if any(p.item_name.strip().lower() == name.lower() for p in dup):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="A pending request for this item already exists. Wait for group admin review.",
+                detail="A pending request for this item already exists. Wait for review.",
             )
 
         pending = PendingInventoryItem(
@@ -275,14 +275,16 @@ class PendingInventoryItemService:
 
         The requesting hospital always gets the item. With rollout ALL the item is
         also linked into every other hospital in the requesting hospital's group.
+        A standalone (group-less) hospital has no group to roll out to, so only the
+        requesting hospital is linked — never other standalone hospitals.
         """
         await self._ensure_hospital_link(pending.hospital_id, master.id, user_id)
         if rollout == ROLLOUT_ALL:
             hospital = await self.db.get(Hospital, pending.hospital_id)
             group_id = hospital.admin_group_id if hospital else None
-            query = select(Hospital.id)
-            if group_id:
-                query = query.where(Hospital.admin_group_id == group_id)
+            if not group_id:
+                return
+            query = select(Hospital.id).where(Hospital.admin_group_id == group_id)
             rows = (await self.db.execute(query)).all()
             for (hid,) in rows:
                 if hid == pending.hospital_id:

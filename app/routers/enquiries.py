@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete as sa_delete, func, desc, case as sa_case, and_, or_
@@ -30,6 +32,8 @@ from app.crm.services.entity_resolver import (
 )
 
 router = APIRouter(prefix="/crm/enquiries", tags=["CRM Enquiries"])
+
+logger = logging.getLogger("enquiries")
 
 LEAD_FOLLOW_UP_TEMPLATE = """Hello {{lead_name}},
 
@@ -350,8 +354,6 @@ def _resolve_latest_doctor(case_obj: Any, tp_plans: list, appointments: list, fa
     if tp_plans:
         tp_ids = [tp.id for tp in tp_plans]
         from app.models.treatment_sitting import TreatmentSitting, TreatmentSittingStatus
-        import logging
-        logger = logging.getLogger("enquiries")
         try:
             sitting_q = select(TreatmentSitting).where(
                 TreatmentSitting.treatment_plan_id.in_(tp_ids),
@@ -1161,7 +1163,6 @@ async def update_enquiry_status(
                         entity_id=ge.id,
                         hospital_id=ge.hospital_id,
                         patient_id=ge.patient_id,
-                        lead_id=ge.lead_id,
                         payload={
                             "enquiry_id": ge.id,
                             "patient_id": ge.patient_id,

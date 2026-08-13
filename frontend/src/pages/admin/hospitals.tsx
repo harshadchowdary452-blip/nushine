@@ -45,6 +45,8 @@ interface HospitalForm {
   admin_full_name: string
 }
 
+const STANDALONE_GROUP = "__standalone__"
+
 function getEmptyHospitalForm(): HospitalForm {
   return {
     name: "",
@@ -180,7 +182,7 @@ export default function AdminHospitals() {
       phone: hospital.phone || "",
       email: hospital.email || "",
       registration_number: hospital.registration_number || "",
-      admin_group_id: hospital.admin_group_id,
+      admin_group_id: hospital.admin_group_id || "",
       admin_email: "",
       admin_password: "",
       admin_full_name: "",
@@ -201,7 +203,7 @@ export default function AdminHospitals() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.admin_group_id && !editingHospital) {
+    if (isGroupAdmin && !form.admin_group_id && !editingHospital) {
       addToast({
         title: "Validation Error",
         description: "Please select an admin group",
@@ -426,17 +428,26 @@ export default function AdminHospitals() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="admin_group">
-                  Admin Group <span className="text-red-500">*</span>
+                  Admin Group
+                  {!isGroupAdmin && <span className="text-muted-foreground"> (optional — standalone clinic)</span>}
                 </Label>
                 <Select
-                  value={form.admin_group_id}
-                  onValueChange={(v) => setForm({ ...form, admin_group_id: v })}
-                  required
+                  value={form.admin_group_id || (isGroupAdmin ? form.admin_group_id : STANDALONE_GROUP)}
+                  onValueChange={(v) =>
+                    setForm({ ...form, admin_group_id: v === STANDALONE_GROUP ? "" : v })
+                  }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select admin group" />
+                    <SelectValue
+                      placeholder={
+                        isGroupAdmin ? "Select admin group" : "Select admin group or standalone"
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
+                    {!isGroupAdmin && (
+                      <SelectItem value={STANDALONE_GROUP}>Standalone (no group)</SelectItem>
+                    )}
                     {groups.map((g) => (
                       <SelectItem key={g.id} value={g.id}>
                         {g.name}

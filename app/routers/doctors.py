@@ -52,11 +52,12 @@ async def create_doctor(data: UserCreate, db: AsyncSession = Depends(get_db), cu
                 hospital_row = result.one_or_none()
                 if not hospital_row:
                     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hospital not found")
-                data_dict["admin_group_id"] = str(hospital_row[0])
+                if hospital_row[0]:
+                    data_dict["admin_group_id"] = str(hospital_row[0])
         if not data_dict.get("hospital_id") and current_user.get("hospital_id"):
             data_dict["hospital_id"] = current_user.get("hospital_id")
-        if not data_dict.get("admin_group_id"):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="admin_group_id is required when creating a doctor")
+        if not data_dict.get("admin_group_id") and not data_dict.get("hospital_id"):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="hospital_id is required when creating a doctor")
     else:
         if not data_dict.get("hospital_id") and current_user.get("hospital_id"):
             data_dict["hospital_id"] = current_user.get("hospital_id")

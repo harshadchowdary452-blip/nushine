@@ -12,7 +12,7 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: dental_hospital
+      POSTGRES_DB: nushine
     ports:
       - "5432:5432"
     volumes:
@@ -40,8 +40,8 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/dental_hospital
-      DATABASE_URL_SYNC: postgresql://postgres:postgres@db:5432/dental_hospital
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/nushine
+      DATABASE_URL_SYNC: postgresql://postgres:postgres@db:5432/nushine
       REDIS_URL: redis://redis:6379/0
       # Required at `docker compose up` time — no weak fallbacks (the app refuses
       # to boot with placeholder secrets in production).

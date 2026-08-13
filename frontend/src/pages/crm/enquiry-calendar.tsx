@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query"
 import {
   Phone,
   MessageCircle,
@@ -547,7 +547,7 @@ export default function EnquiryCalendar() {
 
   const dateRange = getRange()
 
-  const { data: calData, isFetching } = useQuery({
+  const { data: calData, isLoading } = useQuery({
     queryKey: [
       "enquiry-calendar",
       dateRange.start,
@@ -568,6 +568,7 @@ export default function EnquiryCalendar() {
         priority: priorityFilter || undefined,
         include_terminal: includeTerminal || undefined,
       }),
+    placeholderData: keepPreviousData,
     refetchInterval: 15000,
     refetchOnWindowFocus: true,
   })
@@ -606,6 +607,7 @@ export default function EnquiryCalendar() {
         end_date: dateRange.end,
         include_terminal: includeTerminal || undefined,
       }),
+    placeholderData: keepPreviousData,
     refetchInterval: 15000,
   })
 
@@ -1245,7 +1247,7 @@ export default function EnquiryCalendar() {
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            {isFetching ? (
+            {isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
@@ -1649,7 +1651,7 @@ export default function EnquiryCalendar() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            {isFetching ? (
+            {isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>

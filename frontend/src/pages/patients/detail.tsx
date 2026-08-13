@@ -792,7 +792,6 @@ export default function PatientDetail() {
                           <SelectItem value="ACTIVE">Active</SelectItem>
                           <SelectItem value="INACTIVE">Inactive</SelectItem>
                           <SelectItem value="UNDER_TREATMENT">Under Treatment</SelectItem>
-                          <SelectItem value="TREATMENT_ONGOING">Treatment Ongoing</SelectItem>
                           <SelectItem value="FOLLOW_UP">Follow Up</SelectItem>
                           <SelectItem value="COMPLETED">Completed</SelectItem>
                           <SelectItem value="OPD">OPD</SelectItem>
@@ -837,7 +836,6 @@ export default function PatientDetail() {
           <SelectItem value="ACTIVE">Active</SelectItem>
           <SelectItem value="INACTIVE">Inactive</SelectItem>
           <SelectItem value="UNDER_TREATMENT">Under Treatment</SelectItem>
-          <SelectItem value="TREATMENT_ONGOING">Treatment Ongoing</SelectItem>
           <SelectItem value="FOLLOW_UP">Follow Up</SelectItem>
           <SelectItem value="COMPLETED">Completed</SelectItem>
           <SelectItem value="OPD">OPD</SelectItem>

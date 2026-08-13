@@ -248,6 +248,8 @@ export const treatmentApi = {
     api.put(`/treatment-plans/${id}`, data).then((r) => r.data),
   updateStatus: (id: string, status: string) =>
     api.put(`/treatment-plans/${id}/status`, null, { params: { status } }).then((r) => r.data),
+  applyDiscount: (id: string, data: { discount_type?: string; discount_percent?: number; discount_amount?: number; discount_reason?: string }) =>
+    api.put(`/treatment-plans/${id}/discount`, data).then((r) => r.data),
   start: (id: string) => api.post(`/treatment-plans/${id}/start`).then((r) => r.data),
   complete: (id: string, data?: { outcome?: string; notes?: string }) =>
     api.post(`/treatment-plans/${id}/complete`, data || {}).then((r) => r.data),

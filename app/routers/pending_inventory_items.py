@@ -16,10 +16,20 @@ from app.models.hospital import Hospital
 router = APIRouter(prefix="/inventory/pending-items", tags=["Pending Inventory Items"])
 
 
-def _require_reviewer(current_user: dict):
+async def _require_reviewer(current_user: dict, db: AsyncSession, hospital_id: Optional[str] = None):
+    """Only group admins / super admins may review pending items, except the
+    hospital admin of a standalone (group-less) hospital, who is the indent
+    master for their own hospital."""
     role = current_user.get("role")
-    if role not in (Role.GROUP_ADMIN.value, Role.SUPER_ADMIN.value):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only group admins can review pending items")
+    if role in (Role.GROUP_ADMIN.value, Role.SUPER_ADMIN.value):
+        return
+    if role == Role.HOSPITAL_ADMIN.value:
+        own = current_user.get("hospital_id")
+        if own and hospital_id and str(own) == str(hospital_id):
+            row = (await db.execute(select(Hospital.admin_group_id).where(Hospital.id == hospital_id))).one_or_none()
+            if row and not row[0]:
+                return
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only group admins can review pending items")
 
 
 async def _scope_hospital_ids(current_user: dict, db: AsyncSession) -> Optional[list]:
@@ -106,11 +116,11 @@ async def get_pending_item(pending_id: str, db: AsyncSession = Depends(get_db), 
 @router.put("/{pending_id}", response_model=PendingInventoryItemResponse)
 async def update_pending_item(pending_id: str, data: PendingInventoryItemUpdate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_INVENTORY)
-    _require_reviewer(current_user)
     service = PendingInventoryItemService(db)
     pending = await service.get(pending_id)
     if not pending:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pending item not found")
+    await _require_reviewer(current_user, db, pending.hospital_id)
     hids = await _scope_hospital_ids(current_user, db)
     if hids is not None and pending.hospital_id not in hids:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="HOSPITAL_CONTEXT_DENIED")
@@ -120,11 +130,11 @@ async def update_pending_item(pending_id: str, data: PendingInventoryItemUpdate,
 @router.post("/{pending_id}/review", response_model=PendingInventoryItemResponse)
 async def review_pending_item(pending_id: str, data: PendingInventoryItemReview, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_INVENTORY)
-    _require_reviewer(current_user)
     service = PendingInventoryItemService(db)
     pending = await service.get(pending_id)
     if not pending:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pending item not found")
+    await _require_reviewer(current_user, db, pending.hospital_id)
     hids = await _scope_hospital_ids(current_user, db)
     if hids is not None and pending.hospital_id not in hids:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="HOSPITAL_CONTEXT_DENIED")

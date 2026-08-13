@@ -40,7 +40,7 @@ class HospitalBrief(BaseModel):
 
 class HospitalResponse(BaseModel):
     id: str
-    admin_group_id: str
+    admin_group_id: Optional[str]
     name: str
     address: Optional[str]
     phone: Optional[str]

@@ -456,10 +456,13 @@ class StatusAutomationService:
         )
         has_pending_follow_up = has_follow_up_r.first() is not None
 
-        if has_pending_follow_up:
-            patient.status = PatientStatus.FOLLOW_UP
-        elif has_active_treatments:
+        # Active treatment takes priority: a patient mid-treatment must stay
+        # UNDER_TREATMENT even if an earlier treatment left a pending recall or
+        # follow-up behind. FOLLOW_UP only applies once no treatment is running.
+        if has_active_treatments:
             patient.status = PatientStatus.UNDER_TREATMENT
+        elif has_pending_follow_up:
+            patient.status = PatientStatus.FOLLOW_UP
         else:
             patient.status = PatientStatus.ACTIVE
 

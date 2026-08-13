@@ -28,7 +28,8 @@ def _enrich_plan(plan: TreatmentPlan):
             "completed_sittings": completed,
             "remaining_sittings": remaining,
             "progress": round((completed / total * 100) if total > 0 else 0, 1),
-            "pending_amount": max(0, (plan.cost or 0) - (plan.paid_amount or 0)),
+            "net_cost": round(max(0.0, (plan.cost or 0) - (plan.discount_amount or 0)), 2),
+            "pending_amount": max(0, round(max(0.0, (plan.cost or 0) - (plan.discount_amount or 0)) - (plan.paid_amount or 0), 2)),
         }
         for k, v in sittings_data.items():
             setattr(plan, k, v)
@@ -202,6 +203,57 @@ class TreatmentPlanService:
         except Exception as e:
             logger.exception("UPDATE_TREATMENT_PLAN - Error: %s", str(e))
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update treatment plan: {str(e)}")
+
+    async def apply_discount(self, plan_id: str, discount_type: str, discount_percent: float, discount_amount: float, discount_reason: Optional[str] = None, user_id: str = None, propagate_billing: bool = True) -> Optional[TreatmentPlan]:
+        """Apply (or re-apply in place) a discount to a treatment plan, mirroring
+        billing behaviour. The gross cost is preserved in original_amount on the
+        first application so re-applying never compounds the discount."""
+        from app.models.billing import Billing, DiscountType, PaymentStatus
+        plan = await self.repo.get(plan_id)
+        if not plan:
+            return None
+        original_amount = plan.original_amount or float(plan.cost or 0)
+        if discount_type in (DiscountType.FIXED.value, DiscountType.FIXED_AMOUNT.value):
+            if discount_amount >= original_amount:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Discount amount cannot exceed treatment cost")
+            calc_discount_amount = discount_amount
+            calc_discount_percent = round(discount_amount / original_amount * 100, 2) if original_amount > 0 else 0.0
+        else:
+            if discount_percent > 100:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Discount percent cannot exceed 100")
+            calc_discount_amount = round(original_amount * discount_percent / 100, 2)
+            calc_discount_percent = discount_percent
+        plan.discount_type = discount_type
+        plan.discount_percent = calc_discount_percent
+        plan.discount_amount = calc_discount_amount
+        plan.discount_reason = discount_reason
+        plan.original_amount = original_amount
+        await self.db.flush()
+        await self.audit_log_repo.create(user_id=user_id, action="APPLY_TREATMENT_DISCOUNT", entity_type="TREATMENT_PLAN", entity_id=plan_id, details=f"Discount applied: {calc_discount_percent}% / Rs.{calc_discount_amount:.2f}")
+        _enrich_plan(plan)
+        if propagate_billing:
+            try:
+                from app.services.billing_service import BillingService
+                billing_result = await self.db.execute(
+                    select(Billing).where(
+                        Billing.treatment_plan_id == plan_id,
+                        Billing.payment_status != PaymentStatus.CANCELLED,
+                    )
+                )
+                bsvc = BillingService(self.db)
+                for billing in billing_result.scalars().all():
+                    await bsvc.apply_discount(
+                        billing_id=billing.id,
+                        discount_type=discount_type,
+                        discount_percent=discount_percent,
+                        discount_amount=discount_amount,
+                        discount_reason=discount_reason,
+                        user_id=user_id,
+                        propagate_treatment=False,
+                    )
+            except Exception as e:
+                logger.warning("Billing discount propagation failed for plan %s: %s", plan_id, e)
+        return plan
 
     async def _sync_billing_on_completion(self, plan: TreatmentPlan):
         """When a treatment is completed, update the linked billing's pending calculation."""

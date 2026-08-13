@@ -21,8 +21,6 @@ async def create_hospital(data: HospitalCreate, db: AsyncSession = Depends(get_d
     role = current_user.get("role")
     if role == Role.GROUP_ADMIN.value:
         data_dict["admin_group_id"] = current_user.get("admin_group_id")
-    if not data_dict.get("admin_group_id"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="admin_group_id is required")
     return await service.create(data_dict, user_id=current_user.get("sub"))
 
 

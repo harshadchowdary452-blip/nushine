@@ -19,7 +19,7 @@ interface PatientFilterBarProps {
 }
 
 const STATUS_OPTIONS = [
-  "NEW", "ACTIVE", "INACTIVE", "UNDER_TREATMENT", "TREATMENT_ONGOING",
+  "NEW", "ACTIVE", "INACTIVE", "UNDER_TREATMENT",
   "FOLLOW_UP", "COMPLETED", "OPD", "LOST", "ARCHIVED",
 ]
 

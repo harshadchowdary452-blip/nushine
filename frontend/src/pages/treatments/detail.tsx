@@ -109,6 +109,13 @@ export default function TreatmentDetail() {
   const [transferSlot, setTransferSlot] =
     useState<AppointmentSchedulerSelectData | null>(null)
   const [transferNotes, setTransferNotes] = useState("")
+  const [discountDialogOpen, setDiscountDialogOpen] = useState(false)
+  const [discountForm, setDiscountForm] = useState({
+    discount_type: "PERCENTAGE",
+    discount_percent: 0,
+    discount_amount: 0,
+    discount_reason: "",
+  })
 
   // Visit form state
   const [visitForm, setVisitForm] = useState({
@@ -267,6 +274,22 @@ export default function TreatmentDetail() {
       queryClient.invalidateQueries({ queryKey: ["treatment-plans"] })
       queryClient.invalidateQueries({ queryKey: ["treatment-plans-board"] })
       setCompleteDialogOpen(false)
+    },
+  })
+
+  const discountMutation = useMutation({
+    mutationFn: () =>
+      treatmentApi.applyDiscount(id!, {
+        discount_type: discountForm.discount_type,
+        discount_percent: discountForm.discount_percent,
+        discount_amount: discountForm.discount_amount,
+        discount_reason: discountForm.discount_reason || undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["treatment-plan", id] })
+      queryClient.invalidateQueries({ queryKey: ["treatment-plans"] })
+      queryClient.invalidateQueries({ queryKey: ["treatment-plans-board"] })
+      setDiscountDialogOpen(false)
     },
   })
 
@@ -714,6 +737,28 @@ export default function TreatmentDetail() {
                 <span className="text-muted-foreground">Estimated Cost</span>
                 <span className="font-medium">{formatIndianRupees(p.cost || 0)}</span>
               </div>
+              {Number(p.discount_amount || 0) > 0 && (
+                <>
+                  <div className="flex justify-between text-green-600">
+                    <span className="text-muted-foreground">
+                      Discount
+                      {p.discount_percent ? ` (${p.discount_percent}%)` : ""}
+                    </span>
+                    <span className="font-medium">- {formatIndianRupees(p.discount_amount || 0)}</span>
+                  </div>
+                  {p.discount_reason && (
+                    <div className="text-xs text-muted-foreground">
+                      Reason: {p.discount_reason}
+                    </div>
+                  )}
+                </>
+              )}
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Net Cost</span>
+                <span className="font-medium">
+                  {formatIndianRupees(Number(p.net_cost ?? (p.cost || 0) - (p.discount_amount || 0)))}
+                </span>
+              </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Paid</span>
                 <span className="font-medium">{formatIndianRupees(p.paid_amount || 0)}</span>
@@ -724,12 +769,150 @@ export default function TreatmentDetail() {
                   {formatIndianRupees(p.pending_amount || 0)}
                 </span>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full mt-1"
+                onClick={() => {
+                  setDiscountForm({
+                    discount_type: p.discount_type === "FIXED" ? "FIXED" : "PERCENTAGE",
+                    discount_percent: p.discount_percent || 0,
+                    discount_amount: p.discount_amount || 0,
+                    discount_reason: p.discount_reason || "",
+                  })
+                  setDiscountDialogOpen(true)
+                }}
+              >
+                {Number(p.discount_amount || 0) > 0 ? "Update Discount" : "Apply Discount"}
+              </Button>
             </CardContent>
           </Card>
         </div>
       </div>
 
       {/* === DIALOGS === */}
+
+      {/* Discount Dialog */}
+      <Dialog open={discountDialogOpen} onOpenChange={setDiscountDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Save className="h-5 w-5" /> Apply Discount
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant={discountForm.discount_type === "PERCENTAGE" ? "default" : "outline"}
+                size="sm"
+                onClick={() =>
+                  setDiscountForm({
+                    ...discountForm,
+                    discount_type: "PERCENTAGE",
+                    discount_percent: 0,
+                    discount_amount: 0,
+                  })
+                }
+              >
+                Percentage (%)
+              </Button>
+              <Button
+                type="button"
+                variant={discountForm.discount_type === "FIXED" ? "default" : "outline"}
+                size="sm"
+                onClick={() =>
+                  setDiscountForm({
+                    ...discountForm,
+                    discount_type: "FIXED",
+                    discount_percent: 0,
+                    discount_amount: 0,
+                  })
+                }
+              >
+                Fixed (Rs.)
+              </Button>
+            </div>
+            {discountForm.discount_type === "PERCENTAGE" ? (
+              <div className="grid gap-2">
+                <Label>Discount %</Label>
+                <NumericInput
+                  mode="percentage"
+                  suffix="%"
+                  min={0}
+                  max={100}
+                  step="0.1"
+                  placeholder="0"
+                  value={discountForm.discount_percent || ""}
+                  onChange={(v) => {
+                    const pct = Math.min(100, Math.max(0, Number(v) || 0))
+                    const gross = p.cost || 0
+                    const amt = Math.round((gross * pct) / 100 * 100) / 100
+                    setDiscountForm({
+                      ...discountForm,
+                      discount_percent: pct,
+                      discount_amount: amt,
+                    })
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="grid gap-2">
+                <Label>Discount Amount (Rs.)</Label>
+                <NumericInput
+                  mode="currency"
+                  prefix="₹"
+                  min={0}
+                  step="1"
+                  placeholder="0"
+                  value={discountForm.discount_amount || ""}
+                  onChange={(v) => {
+                    const gross = p.cost || 0
+                    const amt = Math.min(gross, Math.max(0, Number(v) || 0))
+                    const pct = gross > 0 ? Math.round((amt / gross) * 100 * 100) / 100 : 0
+                    setDiscountForm({
+                      ...discountForm,
+                      discount_amount: amt,
+                      discount_percent: pct,
+                    })
+                  }}
+                />
+              </div>
+            )}
+            <div className="grid gap-2">
+              <Label>Reason</Label>
+              <Input
+                placeholder="e.g. Loyalty discount"
+                value={discountForm.discount_reason}
+                onChange={(e) =>
+                  setDiscountForm({ ...discountForm, discount_reason: e.target.value })
+                }
+              />
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Net Cost</span>
+              <span className="font-medium">
+                {formatIndianRupees(
+                  Math.max(0, (p.cost || 0) - (discountForm.discount_amount || 0)),
+                )}
+              </span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDiscountDialogOpen(false)}
+              disabled={discountMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button onClick={() => discountMutation.mutate()} disabled={discountMutation.isPending}>
+              {discountMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Save Discount
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Visit Dialog */}
       <Dialog open={visitDialogOpen} onOpenChange={setVisitDialogOpen}>

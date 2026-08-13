@@ -50,6 +50,14 @@ async def _ensure_hospital_in_scope(current_user: dict, hospital_id: str, db: As
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="HOSPITAL_CONTEXT_DENIED")
 
 
+async def _hospital_is_standalone(db: AsyncSession, hospital_id: Optional[str]) -> bool:
+    """True when a hospital does not belong to an admin group (standalone clinic)."""
+    if not hospital_id:
+        return False
+    row = (await db.execute(select(Hospital.admin_group_id).where(Hospital.id == hospital_id))).one_or_none()
+    return bool(row) and not row[0]
+
+
 @router.get("/suggestions", response_model=MonthlyOrderSuggestions)
 async def get_suggestions(
     hospital_id: str = Query(...),
@@ -252,8 +260,12 @@ async def transition_order(order_id: str, data: MonthlyOrderTransition, db: Asyn
         target = MonthlyOrderStatus(data.to_status)
     except ValueError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid status: {data.to_status}")
-    if role == Role.HOSPITAL_ADMIN.value and target not in HA_SUBMIT_ONLY:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Hospital admins may only submit orders")
+    if role == Role.HOSPITAL_ADMIN.value:
+        if await _hospital_is_standalone(db, order.hospital_id):
+            if target not in (HA_SUBMIT_ONLY | GA_APPROVAL):
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Hospital admins may only submit or self-approve standalone orders")
+        elif target not in HA_SUBMIT_ONLY:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Hospital admins may only submit orders")
     if role == Role.GROUP_ADMIN.value and target not in GA_APPROVAL:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Group admins may only review, approve, order or complete")
     if role == Role.DOCTOR.value:
