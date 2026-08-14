@@ -1,9 +1,10 @@
 from datetime import datetime, date, timezone, timedelta
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, text
+from sqlalchemy import select, func, text, case
 from app.config import settings
 from app.models.billing import Billing
+from app.models.payment_transaction import PaymentTransaction
 from app.models.hospital_monthly_expense import HospitalMonthlyExpense
 from app.models.case import Case
 from app.models.patient import Patient
@@ -95,6 +96,29 @@ def get_date_range(period: str = "this_month", start_date: Optional[str] = None,
         return month_start, next_month
 
 
+def _txn_totals_subquery():
+    """Sum of all recorded payment transactions per billing (subquery)."""
+    return (
+        select(
+            PaymentTransaction.billing_id.label("billing_id"),
+            func.coalesce(func.sum(PaymentTransaction.amount), 0).label("txn_total"),
+        )
+        .group_by(PaymentTransaction.billing_id)
+        .subquery()
+    )
+
+
+def _baseline_revenue_expr(txn_totals):
+    """Amount paid when the billing was created (paid_amount minus later transactions).
+
+    Subsequent partial payments create rows in payment_transactions, so the
+    remainder of paid_amount corresponds to the initial payment made at creation.
+    Clamped at 0 so billings with no initial payment contribute nothing.
+    """
+    baseline = Billing.paid_amount - func.coalesce(txn_totals.c.txn_total, 0)
+    return case((baseline > 0, baseline), else_=0)
+
+
 async def calculate_revenue_for_range(db: AsyncSession, case_ids: list[str] = None,
                                       date_start: datetime | None = None,
                                       date_end: datetime | None = None) -> float:
@@ -104,13 +128,169 @@ async def calculate_revenue_for_range(db: AsyncSession, case_ids: list[str] = No
     if date_end is None:
         date_start = date_start.replace(day=1)
         date_end = date_start.replace(month=date_start.month % 12 + 1, day=1) if date_start.month < 12 else date_start.replace(year=date_start.year + 1, month=1, day=1)
-    query = select(func.sum(Billing.paid_amount)).where(
-        Billing.updated_at >= date_start, Billing.updated_at < date_end,
+
+    # Revenue is attributed to the period in which each rupee was actually paid.
+    # Amounts paid at billing creation belong to Billing.created_at; amounts
+    # received via later partial payments belong to the transaction's created_at.
+    # (Billing.updated_at cannot be used: any later payment updates it, which
+    # would re-attribute earlier installments to the later month.)
+    txn_totals = _txn_totals_subquery()
+    baseline_q = (
+        select(func.coalesce(func.sum(_baseline_revenue_expr(txn_totals)), 0))
+        .select_from(Billing)
+        .outerjoin(txn_totals, txn_totals.c.billing_id == Billing.id)
+        .where(Billing.created_at >= date_start, Billing.created_at < date_end)
     )
     if case_ids is not None:
-        query = query.where(Billing.case_id.in_(case_ids))
-    result = await db.execute(query)
-    return float(result.scalar() or 0)
+        baseline_q = baseline_q.where(Billing.case_id.in_(case_ids))
+    baseline = float((await db.execute(baseline_q)).scalar() or 0)
+
+    txn_q = (
+        select(func.coalesce(func.sum(PaymentTransaction.amount), 0))
+        .join(Billing, PaymentTransaction.billing_id == Billing.id)
+        .where(PaymentTransaction.created_at >= date_start, PaymentTransaction.created_at < date_end)
+    )
+    if case_ids is not None:
+        txn_q = txn_q.where(Billing.case_id.in_(case_ids))
+    txn_total = float((await db.execute(txn_q)).scalar() or 0)
+
+    return baseline + txn_total
+
+
+async def revenue_bucket_map(db: AsyncSession, case_ids: list[str] = None,
+                             date_start: datetime | None = None,
+                             date_end: datetime | None = None,
+                             python_format: str = "%Y-%m",
+                             sql_format: str = "YYYY-MM") -> dict:
+    """Revenue bucketed by the date each payment was actually received.
+
+    Returns a dict mapping bucket keys (formatted per the given formats) to the
+    revenue received within that bucket, based on payment dates rather than
+    Billing.updated_at.
+    """
+    def _bucket_expr(column):
+        if settings.DB_IS_POSTGRESQL:
+            return func.to_char(column, sql_format)
+        return func.strftime(python_format, column)
+
+    txn_totals = _txn_totals_subquery()
+
+    base_q = (
+        select(
+            _bucket_expr(Billing.created_at).label("bucket"),
+            func.sum(_baseline_revenue_expr(txn_totals)).label("revenue"),
+        )
+        .select_from(Billing)
+        .outerjoin(txn_totals, txn_totals.c.billing_id == Billing.id)
+        .where(Billing.created_at >= date_start, Billing.created_at < date_end)
+        .group_by(text("bucket"))
+    )
+    if case_ids is not None:
+        base_q = base_q.where(Billing.case_id.in_(case_ids))
+
+    txn_q = (
+        select(
+            _bucket_expr(PaymentTransaction.created_at).label("bucket"),
+            func.sum(PaymentTransaction.amount).label("revenue"),
+        )
+        .join(Billing, PaymentTransaction.billing_id == Billing.id)
+        .where(PaymentTransaction.created_at >= date_start, PaymentTransaction.created_at < date_end)
+        .group_by(text("bucket"))
+    )
+    if case_ids is not None:
+        txn_q = txn_q.where(Billing.case_id.in_(case_ids))
+
+    buckets: dict = {}
+    for row in (await db.execute(base_q)).all():
+        buckets[row[0]] = buckets.get(row[0], 0.0) + float(row[1] or 0)
+    for row in (await db.execute(txn_q)).all():
+        buckets[row[0]] = buckets.get(row[0], 0.0) + float(row[1] or 0)
+    return buckets
+
+
+async def revenue_by_doctor_for_range(db: AsyncSession, case_ids: list[str] = None,
+                                      date_start: datetime | None = None,
+                                      date_end: datetime | None = None) -> dict:
+    """Revenue per doctor in the period, attributed by actual payment dates."""
+    txn_totals = _txn_totals_subquery()
+
+    base_q = (
+        select(
+            Case.doctor_id.label("doctor_id"),
+            func.sum(_baseline_revenue_expr(txn_totals)).label("revenue"),
+        )
+        .select_from(Billing)
+        .join(Case, Billing.case_id == Case.id)
+        .outerjoin(txn_totals, txn_totals.c.billing_id == Billing.id)
+        .where(Billing.created_at >= date_start, Billing.created_at < date_end,
+               Case.doctor_id.isnot(None))
+        .group_by(Case.doctor_id)
+    )
+    if case_ids is not None:
+        base_q = base_q.where(Billing.case_id.in_(case_ids))
+
+    txn_q = (
+        select(
+            Case.doctor_id.label("doctor_id"),
+            func.sum(PaymentTransaction.amount).label("revenue"),
+        )
+        .select_from(PaymentTransaction)
+        .join(Billing, PaymentTransaction.billing_id == Billing.id)
+        .join(Case, Billing.case_id == Case.id)
+        .where(PaymentTransaction.created_at >= date_start, PaymentTransaction.created_at < date_end,
+               Case.doctor_id.isnot(None))
+        .group_by(Case.doctor_id)
+    )
+    if case_ids is not None:
+        txn_q = txn_q.where(Billing.case_id.in_(case_ids))
+
+    revenue: dict = {}
+    for row in (await db.execute(base_q)).all():
+        if row[0] is not None:
+            revenue[row[0]] = revenue.get(row[0], 0.0) + float(row[1] or 0)
+    for row in (await db.execute(txn_q)).all():
+        if row[0] is not None:
+            revenue[row[0]] = revenue.get(row[0], 0.0) + float(row[1] or 0)
+    return revenue
+
+
+async def payment_method_breakdown_for_range(db: AsyncSession, case_ids: list[str] = None,
+                                             date_start: datetime | None = None,
+                                             date_end: datetime | None = None) -> dict:
+    """Payment-method breakdown for the period, attributed by actual payment dates."""
+    txn_totals = _txn_totals_subquery()
+
+    base_q = (
+        select(
+            Billing.payment_method.label("method"),
+            func.sum(_baseline_revenue_expr(txn_totals)).label("amount"),
+        )
+        .select_from(Billing)
+        .outerjoin(txn_totals, txn_totals.c.billing_id == Billing.id)
+        .where(Billing.created_at >= date_start, Billing.created_at < date_end)
+        .group_by(Billing.payment_method)
+    )
+    if case_ids is not None:
+        base_q = base_q.where(Billing.case_id.in_(case_ids))
+
+    txn_q = (
+        select(
+            PaymentTransaction.payment_method.label("method"),
+            func.sum(PaymentTransaction.amount).label("amount"),
+        )
+        .join(Billing, PaymentTransaction.billing_id == Billing.id)
+        .where(PaymentTransaction.created_at >= date_start, PaymentTransaction.created_at < date_end)
+        .group_by(PaymentTransaction.payment_method)
+    )
+    if case_ids is not None:
+        txn_q = txn_q.where(Billing.case_id.in_(case_ids))
+
+    breakdown: dict = {}
+    for row in (await db.execute(base_q)).all():
+        breakdown[row[0]] = breakdown.get(row[0], 0.0) + float(row[1] or 0)
+    for row in (await db.execute(txn_q)).all():
+        breakdown[row[0]] = breakdown.get(row[0], 0.0) + float(row[1] or 0)
+    return breakdown
 
 
 async def calculate_revenue(db: AsyncSession, case_ids: list[str] = None, period: str = "this_month",
@@ -199,17 +379,7 @@ async def revenue_trend_with_expenses_range(db: AsyncSession, case_ids: list[str
         group_label = 'month'
 
     date_format = python_format
-    query = select(
-        (func.to_char(Billing.updated_at, sql_format) if settings.DB_IS_POSTGRESQL else func.strftime(python_format, Billing.updated_at)).label(group_label),
-        func.sum(Billing.paid_amount).label('revenue'),
-    ).where(Billing.updated_at >= date_start, Billing.updated_at < date_end)
-    if case_ids is not None:
-        query = query.where(Billing.case_id.in_(case_ids))
-    query = query.group_by(text(group_label)).order_by(text(group_label))
-    r = await db.execute(query)
-    revenue_map = {}
-    for row in r.all():
-        revenue_map[row[0]] = float(row[1] or 0)
+    revenue_map = await revenue_bucket_map(db, case_ids, date_start, date_end, python_format, sql_format)
 
     result = []
     if group_label == 'hour':

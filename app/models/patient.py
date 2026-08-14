@@ -30,7 +30,7 @@ class Patient(Base):
     doctor_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     gender: Mapped[str] = mapped_column(String(20), nullable=True)
-    patient_type: Mapped[PatientType] = mapped_column(SAEnum(PatientType, create_constraint=False), default=PatientType.ADULT, nullable=False)
+    patient_type: Mapped[PatientType] = mapped_column(SAEnum(PatientType, native_enum=False, create_constraint=False), default=PatientType.ADULT, nullable=False)
     guardian_name: Mapped[str] = mapped_column(String(255), nullable=True)
     guardian_relationship: Mapped[str] = mapped_column(String(100), nullable=True)
     guardian_phone: Mapped[str] = mapped_column(String(50), nullable=True)

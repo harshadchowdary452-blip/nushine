@@ -13,6 +13,7 @@ from app.models.patient import Patient
 from app.models.case import Case, CaseStatus
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.billing import Billing, PaymentStatus
+from app.models.payment_transaction import PaymentTransaction
 from app.models.treatment_plan import TreatmentPlan
 from datetime import datetime, date, time, timezone, timedelta
 import uuid
@@ -236,6 +237,77 @@ async def test_hospital_admin_cannot_see_other_hospital(client):
     doc_names = [d["name"] for d in data["doctor_performance"]]
     assert "Dr. Two" not in doc_names
     assert "Dr. Three" not in doc_names
+
+
+# ==========================
+# TEST: PERIOD REVENUE ATTRIBUTED BY PAYMENT DATE (CROSS-MONTH PARTIALS)
+# ==========================
+
+@pytest.mark.asyncio
+async def test_hospital_admin_period_revenue_attributes_payments_to_payment_month(client):
+    """A billing paid in two months must not shift last month's revenue into this month.
+
+    Regression test for the Tadikelapudi case: 6000 was paid last month and the
+    remaining 840 was recorded as a payment this month. Because the billing row's
+    updated_at moves to the payment date, summing paid_amount by updated_at wrongly
+    attributes all 6840 to this month. Revenue must instead be attributed by the
+    initial payment date (created_at) plus each payment transaction's created_at.
+    """
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    prev_month_start = (month_start - timedelta(days=1)).replace(day=1)
+    prev_month_created = prev_month_start + timedelta(days=10)
+
+    async with test_session_factory() as db:
+        ag = AdminGroup(id=str(uuid.uuid4()), name="Group Rev", description="rev")
+        db.add(ag)
+        await db.flush()
+        h = Hospital(id=str(uuid.uuid4()), admin_group_id=ag.id, name="Hospital Rev")
+        db.add(h)
+        await db.flush()
+        doc = User(id=str(uuid.uuid4()), email="revdoc@test.com", password_hash=hash_password("Pass123!"),
+                   full_name="Dr. Rev", role=Role.DOCTOR, hospital_id=h.id, admin_group_id=ag.id, is_verified=True)
+        ha = User(id=str(uuid.uuid4()), email="revha@test.com", password_hash=hash_password("Pass123!"),
+                  full_name="Rev Admin", role=Role.HOSPITAL_ADMIN, hospital_id=h.id, admin_group_id=ag.id, is_verified=True)
+        db.add_all([doc, ha])
+        await db.flush()
+        p = Patient(id=str(uuid.uuid4()), hospital_id=h.id, doctor_id=doc.id, full_name="Rev Patient")
+        db.add(p)
+        await db.flush()
+        c = Case(id=str(uuid.uuid4()), patient_id=p.id, doctor_id=doc.id, chief_complaint="Rev", status=CaseStatus.IN_PROGRESS)
+        db.add(c)
+        await db.flush()
+
+        # Last month: 6000 paid at creation; the remaining 840 paid this month.
+        b_old = Billing(id=str(uuid.uuid4()), case_id=c.id, total_amount=6840, paid_amount=6840,
+                        pending_amount=0, payment_status=PaymentStatus.PAID,
+                        created_at=prev_month_created, updated_at=now)
+        db.add(b_old)
+        await db.flush()
+        txn = PaymentTransaction(billing_id=b_old.id, amount=840, payment_method="CASH", created_at=now)
+        db.add(txn)
+
+        # This month: fully paid at creation.
+        b_new = Billing(id=str(uuid.uuid4()), case_id=c.id, total_amount=2000, paid_amount=2000,
+                        pending_amount=0, payment_status=PaymentStatus.PAID, created_at=now)
+        db.add(b_new)
+        await db.commit()
+
+    token, _ = await login_as(client, "revha@test.com", "Pass123!")
+
+    resp = await client.get("/api/v1/dashboards/hospital-admin", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total_revenue"] == 8840.0  # 6840 + 2000 (all-time sum of paid_amount)
+    assert data["monthly_revenue"] == 2840.0  # 840 (this month's txn) + 2000 (this month's billing)
+    assert data["period_revenue"] == 2840.0  # default period = this_month
+    # comparison vs previous period uses last month's 6000
+    assert data["comparison"]["revenue_change"] == round((2840 - 6000) / 6000 * 100, 1)
+
+    resp_prev = await client.get("/api/v1/dashboards/hospital-admin?period=last_month", headers={"Authorization": f"Bearer {token}"})
+    assert resp_prev.status_code == 200
+    prev_data = resp_prev.json()
+    assert prev_data["period_revenue"] == 6000.0
 
 
 # ==========================

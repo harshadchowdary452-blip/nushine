@@ -9,6 +9,11 @@ from datetime import datetime, timezone, date, time, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 from app.database import get_db
+from app.utils.dashboard_helpers import (
+    calculate_revenue_for_range,
+    _baseline_revenue_expr,
+    _txn_totals_subquery,
+)
 
 logger = logging.getLogger("crm-router")
 from app.dependencies import get_current_user
@@ -42,6 +47,7 @@ from app.models.generated_enquiry import GeneratedEnquiry
 from app.models.case import Case
 from app.models.treatment_plan import TreatmentPlan, TreatmentPlanStatus
 from app.models.billing import Billing
+from app.models.payment_transaction import PaymentTransaction
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.communication_log import CommunicationLog, CommunicationChannel, CommunicationStatus
 from app.utils.whatsapp import WhatsAppProvider
@@ -1293,11 +1299,12 @@ async def get_comprehensive_crm_dashboard(
         crm_case_ids_q = select(Case.id).where(Case.patient_id.in_(conv_patient_ids))
         crm_case_ids = [row[0] for row in (await db.execute(crm_case_ids_q)).all()]
         if crm_case_ids:
-            crm_rev_q = select(func.coalesce(func.sum(Billing.paid_amount), 0)).where(Billing.case_id.in_(crm_case_ids))
-            crm_rev_q = crm_rev_q.where(Billing.updated_at >= datetime.combine(date_start, datetime.min.time()))
+            crm_range_start = datetime.combine(date_start, datetime.min.time())
             if period != "custom" and period not in ["today", "this_week", "this_month", "this_quarter", "this_year"]:
-                crm_rev_q = crm_rev_q.where(Billing.updated_at <= datetime.combine(date_end, datetime.max.time()))
-            crm_revenue = float((await db.execute(crm_rev_q)).scalar() or 0)
+                crm_range_end = datetime.combine(date_end, datetime.min.time()) + timedelta(days=1)
+            else:
+                crm_range_end = datetime(9999, 12, 31, tzinfo=timezone.utc)
+            crm_revenue = await calculate_revenue_for_range(db, crm_case_ids, crm_range_start, crm_range_end)
 
     cost_per_lead = round(crm_revenue / total_leads, 2) if total_leads > 0 else 0
 
@@ -1823,7 +1830,7 @@ async def get_comprehensive_crm_dashboard(
     for i in range(5, -1, -1):
         ym = today - timedelta(days=30 * i)
         m_start = ym.replace(day=1)
-        m_end = (m_start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+        m_next_start = (m_start + timedelta(days=32)).replace(day=1)
         m_rev = 0.0
         m_cases_q = select(Case.id)
         if hospital_id:
@@ -1832,12 +1839,7 @@ async def get_comprehensive_crm_dashboard(
                 m_cases_q = m_cases_q.where(Case.patient_id.in_(m_pids))
         m_cids = [row[0] for row in (await db.execute(m_cases_q)).all()]
         if m_cids:
-            m_rev = float((await db.execute(
-                select(func.coalesce(func.sum(Billing.paid_amount), 0)).where(
-                    Billing.case_id.in_(m_cids),
-                    Billing.updated_at >= datetime.combine(m_start, datetime.min.time()),
-                    Billing.updated_at <= datetime.combine(m_end, datetime.max.time()))
-            )).scalar() or 0)
+            m_rev = await calculate_revenue_for_range(db, m_cids, m_start, m_next_start)
         revenue_trend_data.append({"month": m_start.strftime("%b %Y"), "revenue": m_rev})
 
     # =========================================================================
@@ -1894,29 +1896,60 @@ async def get_comprehensive_crm_dashboard(
     # REVENUE FROM LEADS TREND
     # =========================================================================
     revenue_from_leads_trend = []
+    txn_totals = _txn_totals_subquery()
     for i in range(5, -1, -1):
         ym = today - timedelta(days=30 * i)
         m_start = ym.replace(day=1)
         m_end = (m_start + timedelta(days=32)).replace(day=1)
-        rev_q = select(
+        m_start_dt = datetime.combine(m_start, datetime.min.time())
+        m_end_dt = datetime.combine(m_end, datetime.min.time())
+        # Revenue is attributed to the month each rupee was actually paid:
+        # the baseline amount (paid at billing creation) uses Billing.created_at,
+        # later installments use payment_transactions.created_at.
+        base_q = select(
             Lead.source,
-            func.coalesce(func.sum(Billing.paid_amount), 0).label('revenue'),
-            func.count(func.distinct(Lead.id)).label('lead_count')).select_from(Lead).join(
-            Patient, Lead.converted_patient_id == Patient.id
+            func.coalesce(func.sum(_baseline_revenue_expr(txn_totals)), 0).label('revenue'),
+        ).select_from(Billing).join(
+            Case, Case.id == Billing.case_id
         ).join(
-            Case, Case.patient_id == Patient.id
+            Patient, Patient.id == Case.patient_id
         ).join(
-            Billing, Billing.case_id == Case.id
+            Lead, Lead.converted_patient_id == Patient.id
+        ).outerjoin(
+            txn_totals, txn_totals.c.billing_id == Billing.id
         ).where(
             Lead.converted_patient_id.isnot(None),
             Billing.paid_amount > 0,
-            Billing.created_at >= datetime.combine(m_start, datetime.min.time()),
-            Billing.created_at < datetime.combine(m_end, datetime.min.time()))
+            Billing.created_at >= m_start_dt,
+            Billing.created_at < m_end_dt,
+        ).group_by(Lead.source)
+        txn_q = select(
+            Lead.source,
+            func.coalesce(func.sum(PaymentTransaction.amount), 0).label('revenue'),
+        ).select_from(PaymentTransaction).join(
+            Billing, Billing.id == PaymentTransaction.billing_id
+        ).join(
+            Case, Case.id == Billing.case_id
+        ).join(
+            Patient, Patient.id == Case.patient_id
+        ).join(
+            Lead, Lead.converted_patient_id == Patient.id
+        ).where(
+            Lead.converted_patient_id.isnot(None),
+            Billing.paid_amount > 0,
+            PaymentTransaction.created_at >= m_start_dt,
+            PaymentTransaction.created_at < m_end_dt,
+        ).group_by(Lead.source)
         if hospital_id:
-            rev_q = rev_q.where(Lead.hospital_id == hospital_id)
-        rev_q = rev_q.group_by(Lead.source)
-        rev_rows = (await db.execute(rev_q)).all()
-        sources_data = [{"source": r[0], "revenue": float(r[1] or 0), "lead_count": r[2]} for r in rev_rows]
+            base_q = base_q.where(Lead.hospital_id == hospital_id)
+            txn_q = txn_q.where(Lead.hospital_id == hospital_id)
+        sources_map: dict = {}
+        for r in (await db.execute(base_q)).all():
+            sources_map[r[0]] = sources_map.get(r[0], 0.0) + float(r[1] or 0)
+        for r in (await db.execute(txn_q)).all():
+            sources_map[r[0]] = sources_map.get(r[0], 0.0) + float(r[1] or 0)
+        sources_data = [{"source": src, "revenue": rev} for src, rev in sources_map.items()]
+        sources_data.sort(key=lambda x: x["revenue"], reverse=True)
         total_rev = sum(s["revenue"] for s in sources_data)
         revenue_from_leads_trend.append({
             "month": m_start.strftime("%b %Y"),

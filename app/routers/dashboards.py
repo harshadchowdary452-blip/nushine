@@ -25,7 +25,8 @@ from app.config import settings
 from app.utils.dashboard_helpers import (
     get_date_range, get_previous_date_range, calculate_revenue, calculate_revenue_for_range,
     calculate_expenses_for_date_range, calculate_profit, calculate_profit_margin,
-    revenue_trend_with_expenses, revenue_trend_with_expenses_range
+    revenue_trend_with_expenses, revenue_trend_with_expenses_range,
+    revenue_bucket_map, revenue_by_doctor_for_range, payment_method_breakdown_for_range,
 )
 
 router = APIRouter(prefix="/dashboards", tags=["Dashboards"])
@@ -76,17 +77,15 @@ async def _monthly_revenue_trend(db: AsyncSession, case_ids: list[str] | None = 
         date_end = datetime.now(timezone.utc)
 
     range_days = (date_end - date_start).days
+    if range_days <= 1:
+        python_format, sql_format = '%Y-%m-%d %H:00', 'YYYY-MM-DD HH24:00'
+    elif range_days <= 90:
+        python_format, sql_format = '%Y-%m-%d', 'YYYY-MM-DD'
+    else:
+        python_format, sql_format = '%Y-%m', 'YYYY-MM'
 
-    query = select(
-        _trend_group_expr(Billing.updated_at, range_days).label('month'),
-        func.sum(Billing.paid_amount).label('revenue'),
-    ).where(Billing.updated_at >= date_start, Billing.updated_at < date_end)
-    if case_ids is not None:
-        query = query.where(Billing.case_id.in_(case_ids))
-    query = query.group_by(text("month")).order_by(text("month"))
-
-    r = await db.execute(query)
-    return [{"month": row[0], "revenue": float(row[1] or 0)} for row in r.all()]
+    revenue_map = await revenue_bucket_map(db, case_ids, date_start, date_end, python_format, sql_format)
+    return [{"month": month, "revenue": revenue} for month, revenue in sorted(revenue_map.items())]
 
 
 async def _monthly_patient_trend(db: AsyncSession, hospital_ids: list[str] | None = None,
@@ -329,15 +328,10 @@ async def _payment_method_breakdown(db: AsyncSession, case_ids: list[str] | None
         month_end = date_start.replace(month=date_start.month % 12 + 1, day=1) if date_start.month < 12 else date_start.replace(year=date_start.year + 1, month=1, day=1)
         date_end = month_end
 
-    query = select(
-        Billing.payment_method,
-        func.coalesce(func.sum(Billing.paid_amount), 0).label('amount'),
-    ).where(Billing.updated_at >= date_start, Billing.updated_at < date_end)
-    if case_ids is not None:
-        query = query.where(Billing.case_id.in_(case_ids))
-    query = query.group_by(Billing.payment_method).order_by(text('amount DESC'))
-    r = await db.execute(query)
-    return [{"method": row[0] or "Unknown", "amount": float(row[1])} for row in r.all()]
+    breakdown = await payment_method_breakdown_for_range(db, case_ids, date_start, date_end)
+    rows = [{"method": m or "Unknown", "amount": amount} for m, amount in breakdown.items()]
+    rows.sort(key=lambda x: x["amount"], reverse=True)
+    return rows
 
 
 async def _gender_distribution(db: AsyncSession, hospital_ids: list[str] | None = None,
@@ -433,15 +427,8 @@ async def super_admin_dashboard(
     total_revenue_result = await db.execute(select(func.sum(Billing.paid_amount)).where())
     total_revenue = float(total_revenue_result.scalar() or 0)
 
-    monthly_revenue_result = await db.execute(
-        select(func.sum(Billing.paid_amount)).where(Billing.updated_at >= current_month_start)
-    )
-    monthly_revenue = float(monthly_revenue_result.scalar() or 0)
-
-    yearly_revenue_result = await db.execute(
-        select(func.sum(Billing.paid_amount)).where(Billing.updated_at >= current_year_start)
-    )
-    yearly_revenue = float(yearly_revenue_result.scalar() or 0)
+    monthly_revenue = await calculate_revenue(db, period="this_month")
+    yearly_revenue = await calculate_revenue(db, period="this_year")
 
     period_revenue = await calculate_revenue(db, period=period, start_date=start_date, end_date=end_date)
     date_start, date_end = get_date_range(period, start_date, end_date)
@@ -466,13 +453,7 @@ async def super_admin_dashboard(
         cids = await _get_case_ids_for_patients(db, pids)
         rev = 0.0
         if cids:
-            rev_r = await db.execute(
-                select(func.sum(Billing.paid_amount)).where(
-                    Billing.case_id.in_(cids),
-                    Billing.updated_at >= date_start, Billing.updated_at < date_end,
-                )
-            )
-            rev = float(rev_r.scalar() or 0)
+            rev = await calculate_revenue_for_range(db, cids, date_start, date_end)
         g_exp = await calculate_expenses_for_date_range(db, hids, date_start=date_start, date_end=date_end)
         g_profit = rev - g_exp
         g_margin = round((g_profit / rev * 100), 2) if rev > 0 else 0
@@ -492,13 +473,7 @@ async def super_admin_dashboard(
         h_cids = await _get_case_ids_for_patients(db, h_pids)
         rev = 0.0
         if h_cids:
-            rev_r = await db.execute(
-                select(func.sum(Billing.paid_amount)).where(
-                    Billing.case_id.in_(h_cids),
-                    Billing.updated_at >= date_start, Billing.updated_at < date_end,
-                )
-            )
-            rev = float(rev_r.scalar() or 0)
+            rev = await calculate_revenue_for_range(db, h_cids, date_start, date_end)
         h_exp = await calculate_expenses_for_date_range(db, [hid], date_start=date_start, date_end=date_end)
         h_profit = rev - h_exp
         h_margin = round((h_profit / rev * 100), 2) if rev > 0 else 0
@@ -521,27 +496,12 @@ async def super_admin_dashboard(
 
     # Doctor performance by revenue (period-filtered, system-wide)
     doctor_performance = []
-    doctor_rev_r = await db.execute(
-        select(
-            Case.doctor_id,
-            func.sum(Billing.paid_amount).label("revenue"),
-        )
-        .select_from(Billing)
-        .join(Case, Billing.case_id == Case.id)
-        .where(
-            Case.doctor_id.isnot(None),
-            Billing.updated_at >= date_start,
-            Billing.updated_at < date_end,
-        )
-        .group_by(Case.doctor_id)
-        .order_by(text("revenue DESC"))
-    )
-    for row in doctor_rev_r.all():
-        did = row[0]
-        rev = float(row[1] or 0)
+    doctor_rev_map = await revenue_by_doctor_for_range(db, None, date_start, date_end)
+    for did, rev in doctor_rev_map.items():
         dname_r = await db.execute(select(User.full_name).where(User.id == did))
         dname = dname_r.scalar() or did
         doctor_performance.append({"id": did, "name": dname, "value": rev})
+    doctor_performance.sort(key=lambda x: x["value"], reverse=True)
 
     # Monthly growth trend with expenses (respect period)
     combined_trend = await revenue_trend_with_expenses(db, hospital_ids=None, period=period, start_date=start_date, end_date=end_date)
@@ -745,16 +705,8 @@ async def group_admin_dashboard(
         total_revenue = float((await db.execute(
             select(func.sum(Billing.paid_amount)).where(Billing.case_id.in_(case_ids))
         )).scalar() or 0)
-        monthly_revenue = float((await db.execute(
-            select(func.sum(Billing.paid_amount)).where(
-                Billing.case_id.in_(case_ids), Billing.updated_at >= current_month_start
-            )
-        )).scalar() or 0)
-        yearly_revenue = float((await db.execute(
-            select(func.sum(Billing.paid_amount)).where(
-                Billing.case_id.in_(case_ids), Billing.updated_at >= current_year_start
-            )
-        )).scalar() or 0)
+        monthly_revenue = await calculate_revenue(db, case_ids, period="this_month")
+        yearly_revenue = await calculate_revenue(db, case_ids, period="this_year")
 
     period_revenue = await calculate_revenue(db, case_ids, period=period, start_date=start_date, end_date=end_date)
     date_start, date_end = get_date_range(period, start_date, end_date)
@@ -774,13 +726,7 @@ async def group_admin_dashboard(
         h_cids = await _get_case_ids_for_patients(db, h_pids)
         rev = 0.0
         if h_cids:
-            rev_r = await db.execute(
-                select(func.sum(Billing.paid_amount)).where(
-                    Billing.case_id.in_(h_cids),
-                    Billing.updated_at >= date_start, Billing.updated_at < date_end,
-                )
-            )
-            rev = float(rev_r.scalar() or 0)
+            rev = await calculate_revenue_for_range(db, h_cids, date_start, date_end)
         h_exp = await calculate_expenses_for_date_range(db, [hid], date_start=date_start, date_end=date_end)
         h_profit = rev - h_exp
         h_margin = round((h_profit / rev * 100), 2) if rev > 0 else 0
@@ -803,28 +749,12 @@ async def group_admin_dashboard(
     # Doctor performance — revenue scoped to hospital(s), period-filtered
     doctor_performance = []
     if case_ids:
-        doctor_rev_r = await db.execute(
-            select(
-                Case.doctor_id,
-                func.sum(Billing.paid_amount).label("revenue"),
-            )
-            .select_from(Billing)
-            .join(Case, Billing.case_id == Case.id)
-            .where(
-                Billing.case_id.in_(case_ids),
-                Case.doctor_id.isnot(None),
-                Billing.updated_at >= date_start,
-                Billing.updated_at < date_end,
-            )
-            .group_by(Case.doctor_id)
-            .order_by(text("revenue DESC"))
-        )
-        for row in doctor_rev_r.all():
-            did = row[0]
-            rev = float(row[1] or 0)
+        doctor_rev_map = await revenue_by_doctor_for_range(db, case_ids, date_start, date_end)
+        for did, rev in doctor_rev_map.items():
             dname_r = await db.execute(select(User.full_name).where(User.id == did))
             dname = dname_r.scalar() or did
             doctor_performance.append({"id": did, "name": dname, "value": rev})
+        doctor_performance.sort(key=lambda x: x["value"], reverse=True)
 
     # Monthly growth trend with expenses (respect period)
     combined_trend = await revenue_trend_with_expenses(db, case_ids if case_ids else [], hospital_ids, period=period, start_date=start_date, end_date=end_date)
@@ -1075,8 +1005,8 @@ async def hospital_admin_dashboard(
     total_pending_billing = 0.0
     if case_ids:
         total_revenue = float((await db.execute(select(func.sum(Billing.paid_amount)).where(Billing.case_id.in_(case_ids)))).scalar() or 0)
-        monthly_revenue = float((await db.execute(select(func.sum(Billing.paid_amount)).where(Billing.case_id.in_(case_ids), Billing.updated_at >= current_month_start))).scalar() or 0)
-        yearly_revenue = float((await db.execute(select(func.sum(Billing.paid_amount)).where(Billing.case_id.in_(case_ids), Billing.updated_at >= current_year_start))).scalar() or 0)
+        monthly_revenue = await calculate_revenue(db, case_ids, period="this_month")
+        yearly_revenue = await calculate_revenue(db, case_ids, period="this_year")
         total_pending_billing = float((await db.execute(select(func.sum(Billing.pending_amount)).where(Billing.case_id.in_(case_ids)))).scalar() or 0)
 
     # --- Period-filtered financials ---
@@ -1102,17 +1032,11 @@ async def hospital_admin_dashboard(
     # --- Doctor performance (PERIOD-FILTERED) ---
     doctor_performance = []
     if case_ids:
-        dr_q = (
-            select(Case.doctor_id, func.sum(Billing.paid_amount).label("revenue"))
-            .select_from(Billing).join(Case, Billing.case_id == Case.id)
-            .where(Billing.case_id.in_(case_ids), Case.doctor_id.isnot(None),
-                   Billing.updated_at >= date_start, Billing.updated_at < date_end)
-            .group_by(Case.doctor_id).order_by(text("revenue DESC"))
-        )
-        for row in (await db.execute(dr_q)).all():
-            did, rev = row[0], float(row[1] or 0)
+        doctor_rev_map = await revenue_by_doctor_for_range(db, case_ids, date_start, date_end)
+        for did, rev in doctor_rev_map.items():
             dname = (await db.execute(select(User.full_name).where(User.id == did))).scalar() or did
             doctor_performance.append({"id": did, "name": dname, "value": rev})
+        doctor_performance.sort(key=lambda x: x["value"], reverse=True)
 
     # --- Treatment performance (PERIOD-FILTERED) ---
     treatment_performance = []
@@ -1264,14 +1188,10 @@ async def hospital_admin_dashboard(
     # --- Revenue sources (PERIOD-FILTERED) ---
     revenue_sources = []
     if case_ids:
-        rev_src_q = (
-            select(func.coalesce(Billing.payment_method, 'Other').label("method"), func.sum(Billing.paid_amount).label("total"))
-            .where(Billing.case_id.in_(case_ids), Billing.paid_amount > 0,
-                   Billing.updated_at >= date_start, Billing.updated_at < date_end)
-            .group_by(text("method")).order_by(text("total DESC"))
-        )
-        for row in (await db.execute(rev_src_q)).all():
-            revenue_sources.append({"method": row[0], "amount": float(row[1] or 0)})
+        breakdown = await payment_method_breakdown_for_range(db, case_ids, date_start, date_end)
+        rows = [{"method": m or "Other", "amount": amount} for m, amount in breakdown.items()]
+        rows.sort(key=lambda x: x["amount"], reverse=True)
+        revenue_sources = rows
 
     # --- Treatment KPIs (hospital-wide, filtered by doctor_id if set) ---
     from app.models.treatment_plan import TreatmentPlanStatus
@@ -1512,16 +1432,8 @@ async def doctor_dashboard(
         personal_revenue = float((await db.execute(
             select(func.sum(Billing.paid_amount)).where(Billing.case_id.in_(my_case_ids))
         )).scalar() or 0)
-        monthly_revenue = float((await db.execute(
-            select(func.sum(Billing.paid_amount)).where(
-                Billing.case_id.in_(my_case_ids), Billing.updated_at >= current_month_start
-            )
-        )).scalar() or 0)
-        yearly_revenue = float((await db.execute(
-            select(func.sum(Billing.paid_amount)).where(
-                Billing.case_id.in_(my_case_ids), Billing.updated_at >= current_year_start
-            )
-        )).scalar() or 0)
+        monthly_revenue = await calculate_revenue(db, list(my_case_ids), period="this_month")
+        yearly_revenue = await calculate_revenue(db, list(my_case_ids), period="this_year")
 
     total_follow_ups_count = (await db.execute(
         select(func.count(FollowUp.id)).where(FollowUp.doctor_id == doctor_id)
@@ -1767,28 +1679,12 @@ async def quick_view_admin_group(
     # Top doctors (period-filtered)
     top_doctors = []
     if case_ids:
-        doctor_rev_r = await db.execute(
-            select(
-                Case.doctor_id,
-                func.sum(Billing.paid_amount).label("revenue"),
-            )
-            .select_from(Billing)
-            .join(Case, Billing.case_id == Case.id)
-            .where(
-                Billing.case_id.in_(case_ids),
-                Case.doctor_id.isnot(None),
-                Billing.updated_at >= date_start,
-                Billing.updated_at < date_end,
-            )
-            .group_by(Case.doctor_id)
-            .order_by(text("revenue DESC"))
-        )
-        for row in doctor_rev_r.all():
-            did = row[0]
-            rev = float(row[1] or 0)
+        doctor_rev_map = await revenue_by_doctor_for_range(db, case_ids, date_start, date_end)
+        for did, rev in doctor_rev_map.items():
             dname_r = await db.execute(select(User.full_name).where(User.id == did))
             dname = dname_r.scalar() or did
             top_doctors.append({"id": did, "name": dname, "value": rev})
+        top_doctors.sort(key=lambda x: x["value"], reverse=True)
 
     return {
         "id": group_id,
