@@ -10,6 +10,7 @@ from app.models.clinical_progress_note import ClinicalProgressNote
 from app.models.treatment_plan import TreatmentPlan
 from app.models.treatment_plan_item import TreatmentPlanItem
 from app.models.treatment_sitting import TreatmentSitting
+from app.models.medication_prescription import MedicationPrescription
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.doctor_working_hour import DoctorWorkingHour, WEEKDAYS
 from app.models.doctor_availability import DoctorAvailability
@@ -77,7 +78,7 @@ from app.models.communication_center_activity import CommunicationCenterActivity
 
 __all__ = [
     "AdminGroup", "Hospital", "User", "Patient", "Consultant",
-    "ConsultantNote", "TreatmentPlan", "TreatmentPlanItem", "TreatmentSitting",
+    "ConsultantNote", "TreatmentPlan", "TreatmentPlanItem", "TreatmentSitting", "MedicationPrescription",
     "ClinicalProgressNote",
     "Appointment", "PreOp", "PostOp", "Billing", "BillingItem", "RefreshToken", "AuditLog", "PaymentTransaction",
     "HospitalMonthlyExpense",

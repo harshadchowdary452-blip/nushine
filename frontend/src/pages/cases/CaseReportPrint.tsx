@@ -1,5 +1,5 @@
 import { format } from "date-fns"
-import type { ClinicalFinding, TreatmentPlan, ParsedTreatmentItem } from "@/types"
+import type { ClinicalFinding, TreatmentPlan, ParsedTreatmentItem, MedicationPrescription } from "@/types"
 
 interface CasePrintHospital {
   name?: string
@@ -60,6 +60,7 @@ interface CasePrintData {
   initial_treatment_plan?: string | null
   treatment_plans?: TreatmentPlan[]
   medicines_prescribed?: string | null
+  medications?: MedicationPrescription[] | null
   patient_instructions?: string | null
   follow_up_instructions?: string | null
   next_review_date?: string | null
@@ -393,12 +394,41 @@ export default function CaseReportPrint({ c }: { c: CasePrintData }) {
         })()}
 
         {/* Medicines Prescribed */}
-        {c.medicines_prescribed && (
+        {(c.medications && c.medications.length > 0) || c.medicines_prescribed ? (
           <div>
             <div className="st">Medicines Prescribed</div>
-            <div className="sc">{c.medicines_prescribed}</div>
+            {c.medications && c.medications.length > 0 ? (
+              <table className="mt" style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                <thead>
+                  <tr>
+                    {["Medicine", "Dosage", "Frequency", "Duration", "Instructions"].map((hdr) => (
+                      <th key={hdr} style={{ textAlign: "left", padding: "4px 8px", borderBottom: "1px solid #CBD5E1", color: "#1E3A5C", fontSize: 10, textTransform: "uppercase" }}>
+                        {hdr}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {c.medications.map((m, i) => (
+                    <tr key={m.id || i}>
+                      <td style={{ padding: "4px 8px", borderBottom: "1px solid #E2E8F0", fontWeight: 600 }}>{m.medication_name}</td>
+                      <td style={{ padding: "4px 8px", borderBottom: "1px solid #E2E8F0" }}>{m.dosage || "\u2014"}</td>
+                      <td style={{ padding: "4px 8px", borderBottom: "1px solid #E2E8F0" }}>{m.frequency || "\u2014"}</td>
+                      <td style={{ padding: "4px 8px", borderBottom: "1px solid #E2E8F0" }}>{m.duration || "\u2014"}</td>
+                      <td style={{ padding: "4px 8px", borderBottom: "1px solid #E2E8F0" }}>{m.instructions || "\u2014"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : null}
+            {c.medicines_prescribed && (
+              <div className="sc" style={{ paddingTop: c.medications && c.medications.length > 0 ? 6 : 0, color: "#6b7280" }}>
+                <span style={{ fontWeight: 600, color: "#1E3A5C" }}>Legacy notes: </span>
+                {c.medicines_prescribed}
+              </div>
+            )}
           </div>
-        )}
+        ) : null}
 
         {/* Patient Instructions */}
         {c.patient_instructions && (

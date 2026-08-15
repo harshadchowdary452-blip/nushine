@@ -38,6 +38,7 @@ async def _load_case_with_findings(db: AsyncSession, case_id: str) -> Case:
     result = await db.execute(
         select(Case).where(Case.id == case_id).options(
             selectinload(Case.findings),
+            selectinload(Case.medication_prescriptions),
             selectinload(Case.clinical_progress_notes),
             selectinload(Case.patient).selectinload(Patient.hospital),
             selectinload(Case.doctor),
@@ -45,7 +46,7 @@ async def _load_case_with_findings(db: AsyncSession, case_id: str) -> Case:
             selectinload(Case.updated_by),
             selectinload(Case.appointment),
             selectinload(Case.treatment_plans),
-        )
+        ).execution_options(populate_existing=True)
     )
     case = result.scalar_one_or_none()
     if case:

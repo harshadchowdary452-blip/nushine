@@ -39,6 +39,7 @@ class CommunicationLog(Base):
     patient_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("patients.id"), nullable=True)
     hospital_id: Mapped[str] = mapped_column(String(36), ForeignKey("hospitals.id"), nullable=True)
     doctor_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
+    follow_up_id: Mapped[str] = mapped_column(String(36), ForeignKey("follow_ups.id"), nullable=True, index=True)
     channel: Mapped[str] = mapped_column(String(20), nullable=False)
     message_type: Mapped[str] = mapped_column(String(40), nullable=False)
     subject: Mapped[str] = mapped_column(String(255), nullable=True)

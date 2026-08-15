@@ -123,7 +123,11 @@ class TreatmentSittingService:
 
             if "status" not in data or not data.get("status"):
                 data["status"] = "PLANNED"
+            medications_data = data.pop("medications", None)
             sitting = await self.repo.create(**data)
+            if medications_data is not None:
+                from app.services.medication_prescription_service import MedicationPrescriptionService
+                await MedicationPrescriptionService(self.db).replace_for_sitting(sitting.id, medications_data, user_id=user_id)
             await self._auto_create_appointment_from_sitting(sitting)
             await self._recalculate_plan_sitting_counts(treatment_plan_id, user_id=user_id)
             if sitting.status == TreatmentSittingStatus.COMPLETED.value:
@@ -241,8 +245,12 @@ class TreatmentSittingService:
         try:
             old = await self.repo.get(sitting_id)
             was_completed = old and old.status == TreatmentSittingStatus.COMPLETED.value
+            medications_data = data.pop("medications", None)
             sitting = await self.repo.update(sitting_id, **data)
             if sitting:
+                if medications_data is not None:
+                    from app.services.medication_prescription_service import MedicationPrescriptionService
+                    await MedicationPrescriptionService(self.db).replace_for_sitting(sitting_id, medications_data, user_id=user_id)
                 if data.get("next_appointment_date") is not None:
                     await self._auto_create_appointment_from_sitting(sitting)
                 await self.audit_log_repo.create(user_id=user_id, action="UPDATE_TREATMENT_SITTING", entity_type="TREATMENT_SITTING", entity_id=sitting_id, details="Treatment sitting updated")
@@ -298,6 +306,10 @@ class TreatmentSittingService:
         try:
             sitting = await self.repo.get(sitting_id)
             plan_id = sitting.treatment_plan_id if sitting else None
+            if sitting:
+                from app.models.medication_prescription import MedicationPrescription
+                from sqlalchemy import delete as sa_delete
+                await self.db.execute(sa_delete(MedicationPrescription).where(MedicationPrescription.treatment_sitting_id == sitting_id))
             result = await self.repo.delete(sitting_id)
             if result:
                 await self.audit_log_repo.create(user_id=user_id, action="DELETE_TREATMENT_SITTING", entity_type="TREATMENT_SITTING", entity_id=sitting_id, details="Treatment sitting deleted")

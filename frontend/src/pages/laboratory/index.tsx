@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react"
+import type { ReactNode } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   FlaskConical, Plus, Download, FileText, FileSpreadsheet, FileDown,
@@ -26,15 +27,29 @@ import type {
 } from "@/types"
 import { extractDetail } from "@/types"
 
-const LAB_STATUSES: LabStatus[] = ["PENDING", "SENT", "IN_PROGRESS", "READY", "RETURNED", "CANCELLED"]
+const LAB_STATUSES: LabStatus[] = ["PENDING", "SENT", "RECEIVED", "CANCELLED", "RESENT"]
 
 const STATUS_TONE: Record<string, "primary" | "accent" | "success" | "warning" | "danger" | "info" | "neutral"> = {
   PENDING: "warning",
   SENT: "info",
+  RECEIVED: "success",
+  CANCELLED: "danger",
+  RESENT: "accent",
   IN_PROGRESS: "accent",
   READY: "success",
   RETURNED: "success",
-  CANCELLED: "danger",
+}
+
+const RESPONSE_MARKER = "\n\n[Response]\n"
+
+function parseWhatsAppNote(note: string | null): { message: string; response: string | null } {
+  if (!note) return { message: "", response: null }
+  const idx = note.indexOf(RESPONSE_MARKER)
+  if (idx === -1) return { message: note, response: null }
+  return {
+    message: note.slice(0, idx),
+    response: note.slice(idx + RESPONSE_MARKER.length),
+  }
 }
 
 const EVENT_ICON: Record<string, typeof Activity> = {
@@ -72,7 +87,7 @@ function formatDateTime(v: string | null | undefined): string {
 
 function isOverdue(labCase: LabCase): boolean {
   if (!labCase.due_date || labCase.returned_date) return false
-  if (labCase.lab_status === "RETURNED" || labCase.lab_status === "CANCELLED") return false
+  if (labCase.lab_status === "RECEIVED" || labCase.lab_status === "CANCELLED") return false
   return new Date(labCase.due_date + "T23:59:59").getTime() < Date.now()
 }
 
@@ -100,6 +115,28 @@ function buildWhatsAppMessage(labCase: LabCase): string {
   if (labCase.tooth_number) lines.push(`Tooth: ${labCase.tooth_number}`)
   if (labCase.material) lines.push(`Material: ${labCase.material}`)
   lines.push(`Status: ${labCase.lab_status.replace(/_/g, " ")}`)
+  return lines.join("\n")
+}
+
+function buildBatchMessage(
+  candidates: LabCandidate[],
+  laboratoryName: string,
+  dueDate: string | null,
+  hospitalName: string | null,
+): string {
+  const lines = [`Hello ${laboratoryName} Team,`, "", "Please process the following dental laboratory work:"]
+  candidates.forEach((c, i) => {
+    const parts = []
+    if (c.patient_name) parts.push(`Patient: ${c.patient_name}`)
+    if (c.op_number) parts.push(`OP: ${c.op_number}`)
+    if (c.treatment_name) parts.push(`Treatment: ${c.treatment_name}`)
+    if (c.tooth_number) parts.push(`Tooth: ${c.tooth_number}`)
+    lines.push(`${i + 1}) ${parts.join(" | ")}`)
+  })
+  if (dueDate) {
+    lines.push("", `Expected return date: ${dueDate}`)
+  }
+  lines.push("", `Regards,${hospitalName || "Dental Clinic"}`)
   return lines.join("\n")
 }
 
@@ -899,6 +936,163 @@ function SendToLabDialog({
   )
 }
 
+/* ── Batch send dialog (from candidates) ──────────────────────────────── */
+
+function BatchSendDialog({
+  candidates,
+  labs,
+  open,
+  onOpenChange,
+  onSent,
+}: {
+  candidates: LabCandidate[]
+  labs: Laboratory[]
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onSent: () => void
+}) {
+  const { addToast } = useToast()
+  const [form, setForm] = useState({
+    laboratory_id: "",
+    due_date: "",
+    phone: "",
+    message: "",
+    messageTouched: false,
+  })
+
+  const selectedLab = labs.find((l) => l.id === form.laboratory_id)
+  const hospitalName = candidates.find((c) => c.hospital_name)?.hospital_name ?? null
+  const preview = buildBatchMessage(candidates, selectedLab?.name || "Lab", form.due_date || null, hospitalName)
+  const message = form.messageTouched ? form.message : preview
+
+  useEffect(() => {
+    if (open) {
+      const today = new Date()
+      const due = new Date(today)
+      due.setDate(due.getDate() + 7)
+      const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+      setForm({
+        laboratory_id: "",
+        due_date: iso(due),
+        phone: "",
+        message: "",
+        messageTouched: false,
+      })
+    }
+  }, [open])
+
+  const mutation = useMutation({
+    mutationFn: (payload: {
+      treatment_plan_ids: string[]
+      laboratory_id: string
+      due_date?: string | null
+      phone?: string | null
+      message?: string | null
+    }) => labCasesApi.batchSend(payload),
+    onSuccess: (result: { success: boolean; deep_link: string }) => {
+      onSent()
+      onOpenChange(false)
+      if (result.deep_link) {
+        window.open(result.deep_link, "_blank")
+      }
+      addToast({
+        title: result.success ? "Batch WhatsApp sent" : "Batch WhatsApp ready to send",
+        description: result.success ? `${candidates.length} item(s) sent to ${selectedLab?.name || "laboratory"}` : "Opening WhatsApp with a ready message",
+        variant: result.success ? "success" : "default",
+      })
+    },
+    onError: (err: unknown) => {
+      addToast({ title: "Batch send failed", description: extractDetail(err), variant: "destructive" })
+    },
+  })
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="w-full sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Send className="h-4 w-4 text-[var(--ds-primary)]" aria-hidden="true" />
+            Send {candidates.length} Item{candidates.length === 1 ? "" : "s"} to Laboratory
+          </DialogTitle>
+          <DialogDescription>
+            One WhatsApp message covering all selected treatments, then the items are marked Sent.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogBody>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <Label className="ds-form-label">
+                Laboratory <span className="text-[var(--ds-danger)]">*</span>
+              </Label>
+              <Select
+                value={form.laboratory_id}
+                onValueChange={(v) => {
+                  const lab = labs.find((l) => l.id === v)
+                  setForm((prev) => ({
+                    ...prev,
+                    laboratory_id: v,
+                    phone: lab?.whatsapp_number || lab?.phone || "",
+                    messageTouched: false,
+                  }))
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select laboratory" />
+                </SelectTrigger>
+                <SelectContent>
+                  {labs.map((l) => (
+                    <SelectItem key={l.id} value={l.id}>
+                      {l.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="ds-form-label">Expected Return Date</Label>
+              <Input type="date" value={form.due_date} onChange={(e) => setForm((prev) => ({ ...prev, due_date: e.target.value, messageTouched: false }))} />
+            </div>
+            <div>
+              <Label className="ds-form-label">WhatsApp / Phone</Label>
+              <Input value={form.phone} onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))} placeholder="Number of the laboratory" />
+            </div>
+            <div className="sm:col-span-2">
+              <Label className="ds-form-label">Message Preview</Label>
+              <Textarea
+                value={message}
+                onChange={(e) => setForm((prev) => ({ ...prev, message: e.target.value, messageTouched: true }))}
+                rows={9}
+                className="font-mono text-xs"
+              />
+            </div>
+          </div>
+        </DialogBody>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            loading={mutation.isPending}
+            disabled={!form.laboratory_id || !message.trim()}
+            onClick={() =>
+              mutation.mutate({
+                treatment_plan_ids: candidates.map((c) => c.treatment_plan_id),
+                laboratory_id: form.laboratory_id,
+                due_date: form.due_date || null,
+                phone: form.phone || null,
+                message: message.trim(),
+              })
+            }
+          >
+            <Send className="h-4 w-4" />
+            Send Batch WhatsApp
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 /* ── Lab case detail drawer ───────────────────────────────────────────── */
 
 function LabCaseDrawer({
@@ -923,16 +1117,33 @@ function LabCaseDrawer({
   canDelete: boolean
 }) {
   const events = labCase?.events ?? []
-  const timelineItems = [...events].reverse().map((e) => ({
-    id: e.id,
-    title: eventTitle(e),
-    description: e.note || undefined,
-    date: formatDateTime(e.created_at),
-    actor: e.actor_name || undefined,
-    tone: STATUS_TONE[e.to_status || e.event_type] || "neutral",
-    icon: EVENT_ICON[e.event_type] || Activity,
-    status: e.to_status || undefined,
-  }))
+  const timelineItems = [...events].reverse().map((e) => {
+    let description = e.note || undefined
+    let details: ReactNode | undefined
+    if (e.event_type === "WHATSAPP") {
+      const { message, response } = parseWhatsAppNote(e.note)
+      description = message || undefined
+      if (response) {
+        details = (
+          <div className="mt-2 rounded-[var(--ds-radius-xl)] bg-[var(--ds-surface-secondary)] p-3">
+            <p className="ds-caption mb-1 font-medium text-[var(--ds-text-secondary)]">WhatsApp response</p>
+            <pre className="ds-caption whitespace-pre-wrap font-mono text-[var(--ds-text-secondary)]">{response}</pre>
+          </div>
+        )
+      }
+    }
+    return {
+      id: e.id,
+      title: eventTitle(e),
+      description,
+      details,
+      date: formatDateTime(e.created_at),
+      actor: e.actor_name || undefined,
+      tone: STATUS_TONE[e.to_status || e.event_type] || "neutral",
+      icon: EVENT_ICON[e.event_type] || Activity,
+      status: e.to_status || undefined,
+    }
+  })
 
   return (
     <DetailDrawer
@@ -1554,8 +1765,15 @@ function LaboratoriesView({
 
 /* ── Candidates view ──────────────────────────────────────────────────── */
 
-function CandidatesView({ onSend }: { onSend: (candidate: LabCandidate) => void }) {
+function CandidatesView({
+  onSend,
+  onBatchSend,
+}: {
+  onSend: (candidate: LabCandidate) => void
+  onBatchSend: (candidates: LabCandidate[]) => void
+}) {
   const [search, setSearch] = useState("")
+  const [selected, setSelected] = useState<Set<string>>(new Set())
 
   const query = useQuery({
     queryKey: ["lab-candidates", search],
@@ -1563,11 +1781,38 @@ function CandidatesView({ onSend }: { onSend: (candidate: LabCandidate) => void 
   })
 
   const items = query.data ?? []
+  const selectedItems = items.filter((c) => selected.has(c.treatment_plan_id))
+
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleAll = () => {
+    setSelected((prev) => {
+      if (items.length > 0 && items.every((c) => prev.has(c.treatment_plan_id))) {
+        return new Set()
+      }
+      return new Set(items.map((c) => c.treatment_plan_id))
+    })
+  }
 
   return (
     <div className="ds-stack">
-      <div className="max-w-sm">
-        <SearchBar value={search} onChange={setSearch} placeholder="Search patient or treatment…" />
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="min-w-52 flex-1 sm:max-w-sm">
+          <SearchBar value={search} onChange={setSearch} placeholder="Search patient or treatment…" />
+        </div>
+        {selectedItems.length > 0 && (
+          <Button onClick={() => onBatchSend(selectedItems)} className="ml-auto">
+            <Send className="h-4 w-4" />
+            Send {selectedItems.length} to Lab via WhatsApp
+          </Button>
+        )}
       </div>
 
       {query.isLoading && <LoadingSkeleton rows={6} variant="table" />}
@@ -1604,6 +1849,15 @@ function CandidatesView({ onSend }: { onSend: (candidate: LabCandidate) => void 
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all"
+                      checked={items.length > 0 && items.every((c) => selected.has(c.treatment_plan_id))}
+                      onChange={toggleAll}
+                      className="h-4 w-4 rounded border-[var(--ds-border)] accent-[var(--ds-primary)]"
+                    />
+                  </TableHead>
                   <TableHead>Patient</TableHead>
                   <TableHead>Treatment</TableHead>
                   <TableHead>Case</TableHead>
@@ -1615,6 +1869,15 @@ function CandidatesView({ onSend }: { onSend: (candidate: LabCandidate) => void 
               <TableBody>
                 {items.map((c) => (
                   <TableRow key={c.treatment_plan_id}>
+                    <TableCell>
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${c.patient_name || "treatment"}`}
+                        checked={selected.has(c.treatment_plan_id)}
+                        onChange={() => toggle(c.treatment_plan_id)}
+                        className="h-4 w-4 rounded border-[var(--ds-border)] accent-[var(--ds-primary)]"
+                      />
+                    </TableCell>
                     <TableCell>
                       <div className="font-medium text-[var(--ds-text)]">{c.patient_name || "—"}</div>
                       <div className="ds-caption text-[var(--ds-text-tertiary)]">
@@ -1662,6 +1925,7 @@ export default function LaboratoryPage() {
   const [deleteLabTarget, setDeleteLabTarget] = useState<Laboratory | null>(null)
   const [labDialog, setLabDialog] = useState<{ open: boolean; editing: Laboratory | null }>({ open: false, editing: null })
   const [sendToLabTarget, setSendToLabTarget] = useState<LabCandidate | null>(null)
+  const [batchSendTargets, setBatchSendTargets] = useState<LabCandidate[]>([])
 
   const labsQuery = useLabs()
   const labs = labsQuery.data?.items ?? []
@@ -1751,7 +2015,12 @@ export default function LaboratoryPage() {
           />
         )}
 
-        {activeTab === "candidates" && <CandidatesView onSend={setSendToLabTarget} />}
+        {activeTab === "candidates" && (
+          <CandidatesView
+            onSend={setSendToLabTarget}
+            onBatchSend={(candidates) => setBatchSendTargets(candidates)}
+          />
+        )}
       </div>
 
       <LabCaseDrawer
@@ -1822,6 +2091,16 @@ export default function LaboratoryPage() {
           if (!o) setSendToLabTarget(null)
         }}
         onCreated={refreshAll}
+      />
+
+      <BatchSendDialog
+        candidates={batchSendTargets}
+        labs={labs}
+        open={batchSendTargets.length > 0}
+        onOpenChange={(o) => {
+          if (!o) setBatchSendTargets([])
+        }}
+        onSent={refreshAll}
       />
 
       <ConfirmDialog

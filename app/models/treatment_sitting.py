@@ -52,6 +52,7 @@ class TreatmentSitting(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     treatment_plan = relationship("TreatmentPlan", back_populates="sittings", lazy="selectin")
+    medication_prescriptions = relationship("MedicationPrescription", back_populates="treatment_sitting", foreign_keys="MedicationPrescription.treatment_sitting_id", cascade="all, delete-orphan", order_by="MedicationPrescription.created_at", lazy="selectin")
     doctor = relationship("User", foreign_keys=[doctor_id], lazy="selectin")
     next_appointment_doctor = relationship("User", foreign_keys=[next_appointment_doctor_id], lazy="selectin")
     completed_by = relationship("User", foreign_keys=[completed_by_id], lazy="selectin")

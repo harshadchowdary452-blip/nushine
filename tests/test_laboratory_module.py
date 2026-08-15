@@ -172,10 +172,13 @@ async def test_lab_case_auto_create_and_tenant_scope(client: AsyncClient, seed):
     assert lc["sent_date"] == "2026-07-05"
     assert lc["patient_name"] == "Crown Patient"
 
-    # plan1 no longer a candidate
+    # plan1 is WAITING_LAB so it remains a candidate (with its lab case id),
+    # even though a lab case was already auto-created.
     r = await client.get("/api/v1/lab-cases/candidates", headers=auth(dr))
     assert r.status_code == 200, r.text
-    assert all(c["treatment_plan_id"] != plan1 for c in r.json())
+    plan1_row = next((c for c in r.json() if c["treatment_plan_id"] == plan1), None)
+    assert plan1_row is not None, "WAITING_LAB treatment stays a candidate after set-waiting"
+    assert plan1_row["lab_case_id"] is not None
 
     # A WAITING_LAB plan without lab body remains a candidate, then from-treatment creates it
     plan2 = await create_patient_case_plan(client, auth(ha), "Bridge Patient")
@@ -194,7 +197,11 @@ async def test_lab_case_auto_create_and_tenant_scope(client: AsyncClient, seed):
     assert r.json()["laboratory_name"] == "BridgeLab"
 
     r = await client.get("/api/v1/lab-cases/candidates", headers=auth(dr))
-    assert all(c["treatment_plan_id"] != plan2 for c in r.json())
+    # A PENDING lab case is not yet sent to the lab, so it stays a candidate
+    # (to be sent via WhatsApp batch). It is no longer candidate once SENT.
+    plan2_row = next((c for c in r.json() if c["treatment_plan_id"] == plan2), None)
+    assert plan2_row is not None, "PENDING lab case must remain a candidate"
+    assert plan2_row["lab_case_id"] is not None
 
     # Listing is tenant-scoped: Hosp A sees 2, Hosp B sees 0, GA sees 2
     r = await client.get("/api/v1/lab-cases/", headers=auth(ha))

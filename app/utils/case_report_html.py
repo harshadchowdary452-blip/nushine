@@ -144,6 +144,7 @@ def render_case_to_html(case) -> str:
 
     tx_notes = _esc(getattr(case, "initial_treatment_plan", None) or "")
     meds = _esc(getattr(case, "medicines_prescribed", None) or "")
+    structured_meds = list(getattr(case, "medication_prescriptions", None) or [])
     pt_inst = _esc(getattr(case, "patient_instructions", None) or "")
     fu_inst = _esc(getattr(case, "follow_up_instructions", None) or "")
     next_review = getattr(case, "next_review_date", None)
@@ -350,8 +351,22 @@ def render_case_to_html(case) -> str:
         a('</div></div>')
 
     # ── Medicines Prescribed ──
-    if meds:
-        a(f'<div class="st">Medicines Prescribed</div><div class="sc">{meds}</div>')
+    if structured_meds or meds:
+        a('<div class="np"><div class="st">Medicines Prescribed</div>')
+        if structured_meds:
+            a('<table class="ft" style="margin-top:3px"><thead><tr><th>Medicine</th><th>Dosage</th><th>Frequency</th><th>Duration</th><th>Instructions</th></tr></thead><tbody>')
+            for m in structured_meds:
+                m_name = _esc(getattr(m, "medication_name", None) or "\u2014")
+                m_dosage = _esc(getattr(m, "dosage", None)) or "\u2014"
+                m_freq = _esc(getattr(m, "frequency", None)) or "\u2014"
+                m_dur = _esc(getattr(m, "duration", None)) or "\u2014"
+                m_inst = _esc(getattr(m, "instructions", None)) or "\u2014"
+                a(f'<tr><td>{m_name}</td><td>{m_dosage}</td><td>{m_freq}</td><td>{m_dur}</td><td style="font-size:9px">{m_inst}</td></tr>')
+            a('</tbody></table>')
+        if meds:
+            mt = "margin-top:4px" if structured_meds else ""
+            a(f'<div class="sc" style="{mt}"><span style="font-weight:600;color:#1E3A5F">Legacy Notes: </span>{meds}</div>')
+        a('</div>')
 
     # ── Patient Instructions ──
     if pt_inst:

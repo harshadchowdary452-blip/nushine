@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime, date, time
+from app.schemas.medication_prescription import MedicationPrescriptionCreate, MedicationPrescriptionResponse
 
 
 class TreatmentSittingCreate(BaseModel):
@@ -30,6 +31,7 @@ class TreatmentSittingCreate(BaseModel):
     lab_sent_date: Optional[date] = None
     lab_return_date: Optional[date] = None
     lab_cost: Optional[float] = None
+    medications: Optional[List[MedicationPrescriptionCreate]] = None
 
 
 class TreatmentSittingUpdate(BaseModel):
@@ -56,6 +58,7 @@ class TreatmentSittingUpdate(BaseModel):
     lab_sent_date: Optional[date] = None
     lab_return_date: Optional[date] = None
     lab_cost: Optional[float] = None
+    medications: Optional[List[MedicationPrescriptionCreate]] = None
 
 
 class TreatmentSittingResponse(BaseModel):
@@ -92,6 +95,7 @@ class TreatmentSittingResponse(BaseModel):
     completed_at: Optional[datetime] = None
     doctor_name: Optional[str] = None
     completed_by_name: Optional[str] = None
+    medications: Optional[List[MedicationPrescriptionResponse]] = Field(default=None, validation_alias="medication_prescriptions")
     charge: Optional[float] = None
     paid_amount: float = 0.0
     invoice_status: str = "NOT_INVOICED"

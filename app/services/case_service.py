@@ -151,6 +151,7 @@ class CaseService:
                 data["status"] = CaseStatus.OPEN
 
             findings_data = data.pop("findings", None)
+            medications_data = data.pop("medications", None)
 
             data["created_by_id"] = user_id
             case = await self.repo.create(**data)
@@ -162,9 +163,15 @@ class CaseService:
                     self.db.add(finding)
                 await self.db.flush()
 
+            if medications_data is not None:
+                from app.services.medication_prescription_service import MedicationPrescriptionService
+                await MedicationPrescriptionService(self.db).replace_for_case(case.id, medications_data, user_id=user_id)
+
             await self._sync_treatment_items(case.id, data.get("initial_treatment_plan"), user_id)
 
             await self._add_timeline(case.id, "Case Created", user_id=user_id, performer_role=user_role)
+            if medications_data:
+                await self._add_timeline(case.id, "Medications Updated", new_value=f"{len(medications_data)} medication(s) prescribed", user_id=user_id, performer_role=user_role)
             if findings_data:
                 for f in findings_data:
                     detail = f"{f['finding_type']}" + (f" - Tooth {f['tooth_number']}" if f.get('tooth_number') else "")
@@ -296,6 +303,12 @@ class CaseService:
                     self.db.add(finding)
                 await self.db.flush()
 
+            medications_data = data.pop("medications", None)
+            if medications_data is not None:
+                from app.services.medication_prescription_service import MedicationPrescriptionService
+                await MedicationPrescriptionService(self.db).replace_for_case(case_id, medications_data, user_id=user_id)
+                await self._add_timeline(case_id, "Medications Updated", new_value=f"{len(medications_data)} medication(s) prescribed", user_id=user_id, performer_role=user_role)
+
             data["updated_by_id"] = user_id
             case = await self.repo.update(case_id, **data)
             if case:
@@ -359,7 +372,9 @@ class CaseService:
 
     async def delete(self, case_id: str, user_id: str = None) -> bool:
         try:
+            from app.models.medication_prescription import MedicationPrescription
             await self.db.execute(sa_delete(ClinicalFinding).where(ClinicalFinding.case_id == case_id))
+            await self.db.execute(sa_delete(MedicationPrescription).where(MedicationPrescription.case_id == case_id))
             await self.db.execute(sa_delete(ClinicalProgressNote).where(ClinicalProgressNote.case_id == case_id))
             await self.db.execute(sa_delete(CaseTimeline).where(CaseTimeline.case_id == case_id))
             await self.db.execute(sa_delete(PreOp).where(PreOp.case_id == case_id))
@@ -368,6 +383,9 @@ class CaseService:
             await self.db.execute(sa_delete(TreatmentPlanItem).where(TreatmentPlanItem.case_id == case_id))
             tps = (await self.db.execute(select(TreatmentPlan).where(TreatmentPlan.case_id == case_id))).scalars().all()
             for tp in tps:
+                sitting_ids = (await self.db.execute(select(TreatmentSitting.id).where(TreatmentSitting.treatment_plan_id == tp.id))).scalars().all()
+                for sid in sitting_ids:
+                    await self.db.execute(sa_delete(MedicationPrescription).where(MedicationPrescription.treatment_sitting_id == sid))
                 await self.db.execute(sa_delete(TreatmentSitting).where(TreatmentSitting.treatment_plan_id == tp.id))
             await self.db.execute(sa_delete(TreatmentPlan).where(TreatmentPlan.case_id == case_id))
             await self.db.execute(sa_delete(Billing).where(Billing.case_id == case_id))

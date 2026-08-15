@@ -105,6 +105,8 @@ export const patientsApi = {
     api.get("/patients/duplicates", { params }).then((r) => r.data),
   getPatientTimeline: (patientId: string, params?: Record<string, unknown>) =>
     api.get(`/patients/${patientId}/timeline`, { params }).then((r) => r.data),
+  getMedications: (patientId: string) =>
+    api.get(`/patients/${patientId}/medications`).then((r) => r.data),
 }
 
 export const casesApi = {
@@ -1554,6 +1556,14 @@ export const labCasesApi = {
     api.post(`/lab-cases/${id}/whatsapp`, data).then((r) => r.data),
   call: (id: string, data: { note?: string; duration_seconds?: number }) =>
     api.post(`/lab-cases/${id}/call`, data).then((r) => r.data),
+  batchSend: (data: {
+    treatment_plan_ids: string[]
+    laboratory_id: string
+    due_date?: string | null
+    phone?: string | null
+    order_number?: string | null
+    message?: string | null
+  }) => api.post("/lab-cases/batch-send", data).then((r) => r.data),
   remove: (id: string) => api.delete(`/lab-cases/${id}`).then((r) => r.data),
   report: (month: string) =>
     api.get("/lab-cases/report", { params: { month, format: "json" } }).then((r) => r.data),

@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { patientsApi, casesApi, appointmentsApi, billingApi, treatmentApi, crmApi, doctorsApi, consentFormsApi } from "@/services/endpoints";
-import api from "@/services/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import AppointmentScheduler from "@/components/appointments/AppointmentScheduler";
@@ -32,7 +31,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast";
 import { formatIndianRupees } from "@/lib/currency";
 import SearchableSelect from "@/components/ui/searchable-select";
-import type { Case, Appointment, Billing, TreatmentPlan, PatientTimelineEntry, DoctorListItem, ApiError, ConsentForm, FollowUpResponse } from "@/types";
+import { MedicationTable } from "@/components/medications/MedicationPrescriptionEditor";
+import type { Case, Appointment, Billing, TreatmentPlan, PatientTimelineEntry, DoctorListItem, ApiError, ConsentForm, FollowUpResponse, MedicationTimelineItem } from "@/types";
 import { extractDetail } from "@/types";
 import { 
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
@@ -52,10 +52,7 @@ import {
   Clock,
   Edit,
   ChevronRight,
-  Camera,
-  ZoomIn,
-  ZoomOut,
-  RotateCcw,
+  Pill,
   MessageSquare,
   CalendarRange,
   Stethoscope,
@@ -109,7 +106,7 @@ export default function PatientDetail() {
       timelineStartDate: "",
       timelineEndDate: "",
     },
-    { version: 1 }
+    { version: 2 }
   );
   
   const [editOpen, setEditOpen] = useState(false);
@@ -348,7 +345,7 @@ export default function PatientDetail() {
     { key: "appointments", label: "Appointments", icon: Calendar, count: appointmentsList.length || undefined },
     { key: "treatments", label: "Treatments", icon: Activity, count: treatmentPlansList.length || undefined },
     { key: "billing", label: "Billing", icon: CreditCard, count: billingsList.length || undefined },
-    { key: "images", label: "Images", icon: Camera },
+    { key: "medications", label: "Medications", icon: Pill },
     { key: "responses", label: "Responses", icon: MessageSquare, count: followUpResponsesList.length || undefined },
     { key: "consent-forms", label: "Consent Forms", icon: ScrollText, count: consentFormsList.length || undefined },
     { key: "timeline", label: "Timeline", icon: Clock },
@@ -1353,21 +1350,8 @@ export default function PatientDetail() {
         </div>
       )}
 
-      {workspaceState.activeTab === "images" && (
-        <div className="overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 320px)" }}>
-          <div className="space-y-6">
-            {casesList.length === 0 ? (
-              <Card className="p-12 text-center border-border shadow-card">
-                <Camera className="h-12 w-12 text-text-muted mx-auto mb-3" />
-                <p className="text-text-secondary">No cases found for this patient</p>
-              </Card>
-            ) : (
-              casesList.map((caseItem: Case) => (
-                <CaseImages key={caseItem.id} caseId={caseItem.id} caseName={`Case #${caseItem.id.slice(0, 8)}`} />
-              ))
-            )}
-          </div>
-        </div>
+      {workspaceState.activeTab === "medications" && (
+        <MedicationsTimelineSection patientId={patient.id} />
       )}
 
       {workspaceState.activeTab === "consent-forms" && (
@@ -1427,121 +1411,81 @@ function ConsentFormsSection({ patientId }: { patientId: string }) {
   )
 }
 
-function CaseImages({ caseId, caseName }: { caseId: string; caseName: string }) {
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [zoom, setZoom] = useState(1);
-  const [activeSection, setActiveSection] = useState<string>("preop");
-
-  const { data: preOps } = useQuery({
-    queryKey: ["case-preops", caseId],
-    queryFn: async () => {
-      const r = await api.get(`/pre-ops/${caseId}`);
-      return r.data;
-    },
+function MedicationsTimelineSection({ patientId }: { patientId: string }) {
+  const navigate = useNavigate();
+  const { data, isLoading } = useQuery({
+    queryKey: ["patient-medications", patientId],
+    queryFn: () => patientsApi.getMedications(patientId),
+    enabled: !!patientId,
   });
 
-  const { data: postOps } = useQuery({
-    queryKey: ["case-postops", caseId],
-    queryFn: async () => {
-      const r = await api.get(`/post-ops/${caseId}`);
-      return r.data;
-    },
-  });
-
-  const preOpPhotos = preOps?.photo_urls
-    ? preOps.photo_urls.split(",").filter(Boolean)
-    : [];
-  const preOpXrays = preOps?.xray_urls
-    ? preOps.xray_urls.split(",").filter(Boolean)
-    : [];
-  const postOpPhotos = postOps?.photo_urls
-    ? postOps.photo_urls.split(",").filter(Boolean)
+  const items: MedicationTimelineItem[] = Array.isArray((data as { items?: MedicationTimelineItem[] } | undefined)?.items)
+    ? (data as { items: MedicationTimelineItem[] }).items
     : [];
 
-  const hasAny = preOpPhotos.length > 0 || preOpXrays.length > 0 || postOpPhotos.length > 0;
-  if (!hasAny) return null;
+  if (isLoading) {
+    return (
+      <div className="p-8 text-center text-muted-foreground text-sm">
+        Loading medications...
+      </div>
+    );
+  }
 
-  const sections = [
-    { key: "preop", label: `Pre-Op (${preOpPhotos.length})`, photos: preOpPhotos },
-    { key: "xray", label: `X-Ray (${preOpXrays.length})`, photos: preOpXrays },
-    { key: "postop", label: `Post-Op (${postOpPhotos.length})`, photos: postOpPhotos },
-  ].filter((s) => s.photos.length > 0);
-
-  const activePhotos = sections.find((s) => s.key === activeSection)?.photos || [];
+  if (items.length === 0) {
+    return (
+      <Card className="p-12 text-center border-border shadow-card">
+        <Pill className="h-12 w-12 text-text-muted mx-auto mb-3" />
+        <p className="text-text-secondary">No medications prescribed yet</p>
+        <p className="text-text-muted text-sm mt-1">
+          Medications added on case reports and treatment visits will appear here
+          in chronological order.
+        </p>
+      </Card>
+    );
+  }
 
   return (
-    <Card className="p-4 border-border shadow-card">
-      <div className="flex items-center gap-2 mb-3">
-        <Camera className="h-4 w-4 text-primary" />
-        <h4 className="font-medium text-text-primary truncate">{caseName}</h4>
-      </div>
-      <div className="flex flex-wrap gap-2 mb-3">
-        {sections.map((s) => (
-          <Button
-            key={s.key}
-            variant={activeSection === s.key ? "default" : "outline"}
-            size="sm"
-            onClick={() => setActiveSection(s.key)}
-          >
-            {s.label}
-          </Button>
+    <div className="overflow-y-auto scroll-smooth" style={{ maxHeight: "calc(100vh - 320px)" }}>
+      <div className="space-y-4">
+        {items.map((item) => (
+          <Card key={item.id} className="p-4 border-border shadow-card">
+            <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
+              <div className="flex items-center gap-2">
+                <Pill className="h-4 w-4 text-primary" />
+                <div>
+                  <p className="font-medium text-text-primary text-sm">
+                    {item.event_type === "case_report" ? "Case Report" : `Treatment Visit #${item.sitting_number ?? ""}`}
+                  </p>
+                  <p className="text-xs text-text-muted">
+                    {item.case_number}
+                    {item.treatment_name ? ` · ${item.treatment_name}` : ""}
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-medium">{item.date || "—"}</p>
+                <p className="text-xs text-text-muted">{item.doctor_name || "—"}</p>
+              </div>
+            </div>
+            <MedicationTable medications={item.medications} />
+            {item.legacy_prescription ? (
+              <p className="text-xs text-text-muted mt-2 border-t border-border pt-2">
+                <span className="font-medium">Legacy notes: </span>
+                {item.legacy_prescription}
+              </p>
+            ) : null}
+            <div className="mt-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate(item.event_type === "case_report" ? `/cases/${item.case_id}` : `/treatments/${item.treatment_plan_id}`)}
+              >
+                <ChevronRight className="h-4 w-4" /> View {item.event_type === "case_report" ? "Case Report" : "Treatment"}
+              </Button>
+            </div>
+          </Card>
         ))}
       </div>
-      {activePhotos.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {activePhotos.map((url: string, i: number) => (
-            <img
-              key={i}
-              src={url}
-              alt={`${activeSection} ${i + 1}`}
-              className="w-full h-28 object-cover rounded-lg cursor-pointer"
-              onClick={() => setPreviewUrl(url)}
-            />
-          ))}
-        </div>
-      )}
-
-      <Dialog open={!!previewUrl} onOpenChange={() => { setPreviewUrl(null); setZoom(1) }}>
-        <DialogContent className="sm:max-w-[90vw] max-h-[90vh]">
-          <DialogHeader className="flex flex-row items-center justify-between">
-            <DialogTitle>Image Preview</DialogTitle>
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-muted-foreground mr-2">{Math.round(zoom * 100)}%</span>
-              <Button variant="outline" size="icon-sm" onClick={() => setZoom(z => Math.min(z + 0.25, 5))}>
-                <ZoomIn className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="icon-sm" onClick={() => setZoom(z => Math.max(z - 0.25, 0.25))}>
-                <ZoomOut className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="icon-sm" onClick={() => setZoom(1)}>
-                <RotateCcw className="h-4 w-4" />
-              </Button>
-            </div>
-          </DialogHeader>
-          {previewUrl && (
-            <div
-              className="flex items-center justify-center overflow-auto max-h-[70vh] bg-[var(--ds-background-subtle)] rounded-lg cursor-grab active:cursor-grabbing select-none"
-              onWheel={(e) => {
-                e.preventDefault()
-                setZoom(z => {
-                  const delta = e.deltaY > 0 ? -0.1 : 0.1
-                  return Math.max(0.25, Math.min(5, z + delta))
-                })
-              }}
-              onDoubleClick={() => setZoom(z => z === 1 ? 2 : 1)}
-            >
-              <img
-                src={previewUrl}
-                alt="Preview"
-                className="transition-transform duration-200"
-                style={{ transform: `scale(${zoom})` }}
-                draggable={false}
-                loading="lazy"
-              />
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </Card>
+    </div>
   );
 }

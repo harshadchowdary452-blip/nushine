@@ -130,5 +130,6 @@ class Case(Base):
     post_ops = relationship("PostOp", back_populates="case", cascade="all, delete-orphan")
     consultant_notes = relationship("ConsultantNote", back_populates="case", cascade="all, delete-orphan")
     findings = relationship("ClinicalFinding", back_populates="case", cascade="all, delete-orphan", order_by="ClinicalFinding.created_at")
+    medication_prescriptions = relationship("MedicationPrescription", back_populates="case", foreign_keys="MedicationPrescription.case_id", cascade="all, delete-orphan", order_by="MedicationPrescription.created_at", lazy="selectin")
     clinical_progress_notes = relationship("ClinicalProgressNote", back_populates="case", cascade="all, delete-orphan", order_by="ClinicalProgressNote.note_date")
     timeline_entries = relationship("CaseTimeline", back_populates="case", cascade="all, delete-orphan", order_by="CaseTimeline.created_at")

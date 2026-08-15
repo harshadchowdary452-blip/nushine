@@ -59,6 +59,15 @@ class WhatsAppSendBody(BaseModel):
     phone: Optional[str] = Field(None, max_length=50)
 
 
+class LabCaseBatchSend(BaseModel):
+    treatment_plan_ids: list[str] = Field(..., min_length=1)
+    laboratory_id: str = Field(..., min_length=1)
+    due_date: Optional[date] = None
+    phone: Optional[str] = Field(None, max_length=50)
+    order_number: Optional[str] = Field(None, max_length=100)
+    message: Optional[str] = None
+
+
 class CallLogBody(BaseModel):
     note: Optional[str] = None
     duration_seconds: Optional[int] = None

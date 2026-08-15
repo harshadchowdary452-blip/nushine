@@ -1,14 +1,19 @@
 """add communication center activity audit table
 
-Revision ID: e1f2a3b4c5d6
+Revision ID: 9e8d7c6b5a4f
 Revises: d7e8f9a0b1c2
 Create Date: 2026-08-06 00:00:00.000000
+
+Note: this file originally reused revision id e1f2a3b4c5d6 (which already
+belonged to the discount/paid_at migration), so alembic silently ignored it
+and the communication_center_activities table was never created. The id was
+changed to a unique value so the migration can be applied.
 
 """
 from alembic import op
 import sqlalchemy as sa
 
-revision = 'e1f2a3b4c5d6'
+revision = '9e8d7c6b5a4f'
 down_revision = 'd7e8f9a0b1c2'
 branch_labels = None
 depends_on = None

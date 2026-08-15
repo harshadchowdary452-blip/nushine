@@ -15,7 +15,7 @@ from app.services.lab_case_service import LabCaseService, LAB_STATUSES
 from app.models.treatment_plan import TreatmentPlan
 from app.schemas.lab_case import (
     LabCaseCreate, LabCaseUpdate, LabCaseStatusUpdate,
-    WhatsAppSendBody, CallLogBody, LabCaseEventCreate,
+    WhatsAppSendBody, CallLogBody, LabCaseEventCreate, LabCaseBatchSend,
 )
 from app.schemas.common import MessageResponse
 from app.services.export_service import _generate_lab_report_pdf, _generate_excel, _stream_csv, _hospital_info, EXPORT_DIR
@@ -262,6 +262,15 @@ async def log_call(lab_case_id: str, data: CallLogBody, db: AsyncSession = Depen
     event = await service.call(lab_case_id, data.note, data.duration_seconds, current_user)
     await db.commit()
     return _serialize_event(event)
+
+
+@router.post("/batch-send")
+async def batch_send_lab_cases(data: LabCaseBatchSend, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.CREATE_TREATMENT_PLAN)
+    service = LabCaseService(db)
+    result = await service.batch_send(current_user, data.model_dump())
+    await db.commit()
+    return result
 
 
 @router.delete("/{lab_case_id}", response_model=MessageResponse)

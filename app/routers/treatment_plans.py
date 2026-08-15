@@ -50,6 +50,7 @@ class SetWaitingBody(BaseModel):
     reason: Optional[str] = None
     expected_followup: Optional[str] = None
     lab_name: Optional[str] = None
+    laboratory_id: Optional[str] = None
     lab_order_number: Optional[str] = None
     lab_sent_date: Optional[str] = None
     lab_return_date: Optional[str] = None
@@ -669,7 +670,9 @@ async def set_waiting(plan_id: str, waiting_type: str = Query(...), body: SetWai
             from app.services.lab_case_service import LabCaseService
             from app.services.laboratory_service import LaboratoryService
             from datetime import date as _date
-            if body.lab_name:
+            if body.laboratory_id:
+                lab_payload["laboratory_id"] = body.laboratory_id
+            elif body.lab_name:
                 lab = await LaboratoryService(db).create_or_get(
                     body.lab_name,
                     user_id=current_user.get("sub"),

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from typing import List
 import logging
 from app.database import get_db
@@ -19,6 +20,21 @@ from app.services.timeline_helper import record_timeline_event, build_changes
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/treatment-sittings", tags=["Treatment Sittings"])
+
+
+async def _load_sitting_with_medications(db: AsyncSession, sitting_id: str):
+    result = await db.execute(
+        select(TreatmentSitting)
+        .where(TreatmentSitting.id == sitting_id)
+        .options(
+            selectinload(TreatmentSitting.medication_prescriptions),
+            selectinload(TreatmentSitting.doctor),
+            selectinload(TreatmentSitting.completed_by),
+            selectinload(TreatmentSitting.treatment_plan),
+        )
+        .execution_options(populate_existing=True)
+    )
+    return result.scalar_one_or_none()
 
 
 async def _get_patient_id_from_sitting(db: AsyncSession, sitting_id: str) -> str:
@@ -71,22 +87,31 @@ async def create_sitting(data: TreatmentSittingCreate, db: AsyncSession = Depend
         description=f"Treatment sitting #{sitting.sitting_number} added (treatment: {plan_name})",
         module="Treatments",
     )
-    return sitting
+    return await _load_sitting_with_medications(db, sitting.id)
 
 
 @router.get("/by-plan/{plan_id}", response_model=List[TreatmentSittingResponse])
 async def get_sittings_by_plan(plan_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.CREATE_TREATMENT_PLAN, Permission.MANAGE_CASES)
     await _verify_plan_accessible(db, plan_id, current_user)
-    service = TreatmentSittingService(db)
-    return await service.get_by_plan(plan_id)
+    result = await db.execute(
+        select(TreatmentSitting)
+        .where(TreatmentSitting.treatment_plan_id == plan_id)
+        .options(
+            selectinload(TreatmentSitting.medication_prescriptions),
+            selectinload(TreatmentSitting.doctor),
+            selectinload(TreatmentSitting.completed_by),
+            selectinload(TreatmentSitting.treatment_plan),
+        )
+        .order_by(TreatmentSitting.sitting_number)
+    )
+    return list(result.scalars().all())
 
 
 @router.get("/{sitting_id}", response_model=TreatmentSittingResponse)
 async def get_sitting(sitting_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.CREATE_TREATMENT_PLAN, Permission.MANAGE_CASES)
-    service = TreatmentSittingService(db)
-    sitting = await service.get(sitting_id)
+    sitting = await _load_sitting_with_medications(db, sitting_id)
     if not sitting:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Treatment sitting not found")
     await verify_tenant_access(current_user, sitting, "sitting", db)
@@ -135,7 +160,7 @@ async def update_sitting(sitting_id: str, data: TreatmentSittingUpdate, db: Asyn
     except Exception:
         logger.warning("Failed to publish CRM event", exc_info=True)
     await db.commit()
-    return sitting
+    return await _load_sitting_with_medications(db, sitting_id)
 
 
 @router.delete("/{sitting_id}", response_model=MessageResponse)

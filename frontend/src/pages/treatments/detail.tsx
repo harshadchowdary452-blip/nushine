@@ -43,12 +43,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { treatmentApi, treatmentSittingsApi, casesApi, doctorsApi } from "@/services/endpoints"
+import { treatmentApi, treatmentSittingsApi, casesApi, doctorsApi, laboratoriesApi } from "@/services/endpoints"
 import { formatIndianRupees } from "@/lib/currency"
 import { cn } from "@/lib/utils"
 import { useTrackRecent } from "@/hooks/useTrackRecent"
 import { useAuthStore } from "@/store/authStore"
 import AppointmentScheduler from "@/components/appointments/AppointmentScheduler"
+import MedicationPrescriptionEditor, { MedicationTable, cleanMedications } from "@/components/medications/MedicationPrescriptionEditor"
+import type { MedicationInput } from "@/components/medications/MedicationPrescriptionEditor"
 import type {
   TreatmentPlan,
   TreatmentSitting,
@@ -59,6 +61,7 @@ import type {
   AppointmentSchedulerSelectData,
   User as UserType,
   PaginatedResponse,
+  Laboratory,
 } from "@/types"
 
 const STATUS_COLORS: Record<string, string> = {
@@ -122,6 +125,7 @@ export default function TreatmentDetail() {
     clinical_notes: "",
     procedure_performed: "",
     prescription: "",
+    medications: [] as MedicationInput[],
     materials_used: "",
     duration_minutes: "",
     notes: "",
@@ -130,6 +134,7 @@ export default function TreatmentDetail() {
 
   // Lab form state
   const [labForm, setLabForm] = useState({
+    laboratory_id: "",
     lab_name: "",
     lab_order_number: "",
     lab_sent_date: "",
@@ -137,6 +142,12 @@ export default function TreatmentDetail() {
     lab_cost: "",
     lab_tracking_notes: "",
   })
+
+  const { data: laboratoriesData } = useQuery({
+    queryKey: ["laboratories"],
+    queryFn: () => laboratoriesApi.list({ page_size: 200 }),
+  })
+  const laboratories: Laboratory[] = laboratoriesData?.items ?? []
 
   const { data: plan, isLoading } = useQuery({
     queryKey: ["treatment-plan", id],
@@ -238,6 +249,8 @@ export default function TreatmentDetail() {
         next_visit_required: nextVisitRequired,
         sitting_date: new Date().toISOString().split("T")[0],
       }
+      const medications = cleanMedications(visitForm.medications)
+      if (medications.length > 0) payload.medications = medications
       if (nextVisitRequired && nextAppointmentSlot) {
         payload.next_appointment_date = nextAppointmentSlot.appointment_date
         payload.next_appointment_time = nextAppointmentSlot.appointment_time
@@ -256,6 +269,7 @@ export default function TreatmentDetail() {
         clinical_notes: "",
         procedure_performed: "",
         prescription: "",
+        medications: [],
         materials_used: "",
         duration_minutes: "",
         notes: "",
@@ -298,6 +312,7 @@ export default function TreatmentDetail() {
       const payload: WaitingPayload = { reason: waitingReason }
       if (waitingType === "WAITING_LAB") {
         payload.lab_name = labForm.lab_name
+        payload.laboratory_id = labForm.laboratory_id || undefined
         payload.lab_order_number = labForm.lab_order_number
         payload.lab_sent_date = labForm.lab_sent_date || undefined
         payload.lab_return_date = labForm.lab_return_date || undefined
@@ -315,6 +330,7 @@ export default function TreatmentDetail() {
       setWaitingReason("")
       setWaitingFollowup("")
       setLabForm({
+        laboratory_id: "",
         lab_name: "",
         lab_order_number: "",
         lab_sent_date: "",
@@ -960,14 +976,22 @@ export default function TreatmentDetail() {
               />
             </div>
             <div>
-              <Label>Prescription</Label>
-              <Textarea
-                value={visitForm.prescription}
-                onChange={(e) => setVisitForm({ ...visitForm, prescription: e.target.value })}
-                placeholder="Medications prescribed, dosage, frequency..."
-                rows={2}
+              <Label>Medications</Label>
+              <MedicationPrescriptionEditor
+                value={visitForm.medications}
+                onChange={(items) => setVisitForm({ ...visitForm, medications: items })}
               />
             </div>
+            {visitForm.prescription ? (
+              <div className="space-y-1">
+                <Label>Legacy free-text prescription</Label>
+                <Textarea
+                  value={visitForm.prescription}
+                  onChange={(e) => setVisitForm({ ...visitForm, prescription: e.target.value })}
+                  rows={2}
+                />
+              </div>
+            ) : null}
             <div>
               <Label>Materials Used</Label>
               <Input
@@ -1140,12 +1164,18 @@ export default function TreatmentDetail() {
                       <p>{viewSitting.doctor_notes}</p>
                     </div>
                   )}
-                  {viewSitting.prescription && (
+                  {(viewSitting.medications && viewSitting.medications.length > 0) || viewSitting.prescription ? (
                     <div className="sm:col-span-2">
-                      <span className="text-muted-foreground text-xs">Prescription</span>
-                      <p>{viewSitting.prescription}</p>
+                      <span className="text-muted-foreground text-xs">Medications</span>
+                      <MedicationTable medications={viewSitting.medications} />
+                      {viewSitting.prescription && (
+                        <p className="text-sm mt-1">
+                          <span className="text-muted-foreground text-xs">Legacy notes: </span>
+                          {viewSitting.prescription}
+                        </p>
+                      )}
                     </div>
-                  )}
+                  ) : null}
                   {viewSitting.materials_used && (
                     <div className="sm:col-span-2">
                       <span className="text-muted-foreground text-xs">Materials Used</span>
@@ -1293,13 +1323,32 @@ export default function TreatmentDetail() {
             )}
             {waitingType === "WAITING_LAB" && (
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Lab Name</Label>
-                  <Input
-                    value={labForm.lab_name}
-                    onChange={(e) => setLabForm({ ...labForm, lab_name: e.target.value })}
-                    placeholder="Lab name"
-                  />
+                <div className="col-span-2">
+                  <Label>Laboratory *</Label>
+                  <Select
+                    value={labForm.laboratory_id}
+                    onValueChange={(v) => {
+                      const lab = laboratories.find((l) => l.id === v)
+                      setLabForm({ ...labForm, laboratory_id: v, lab_name: lab?.name ?? "" })
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select laboratory" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {laboratories.map((lab) => (
+                        <SelectItem key={lab.id} value={lab.id}>
+                          {lab.name}
+                          {lab.phone ? ` — ${lab.phone}` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {laboratories.length === 0 && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      No laboratories found. Create one in the Laboratory tab first.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <Label>Lab Order Number</Label>
@@ -1353,7 +1402,11 @@ export default function TreatmentDetail() {
             </Button>
             <Button
               onClick={() => waitingMutation.mutate()}
-              disabled={!waitingReason || waitingMutation.isPending}
+              disabled={
+                !waitingReason ||
+                (waitingType === "WAITING_LAB" && !labForm.laboratory_id) ||
+                waitingMutation.isPending
+              }
             >
               {waitingMutation.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-1" />

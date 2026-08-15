@@ -419,6 +419,19 @@ async def get_patient_timeline(
     return {"entries": entries, "total": total, "skip": skip, "limit": limit}
 
 
+@router.get("/{patient_id}/medications")
+async def get_patient_medications(patient_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    verify_permission(current_user, Permission.MANAGE_PATIENTS, Permission.VIEW_ALL_PATIENTS)
+    patient = await db.get(Patient, patient_id)
+    if not patient:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+    await verify_tenant_access(current_user, patient, "patient", db)
+    from app.services.medication_prescription_service import MedicationPrescriptionService
+    service = MedicationPrescriptionService(db)
+    items = await service.get_patient_medication_timeline(patient_id)
+    return {"patient_id": patient_id, "items": items, "total": len(items)}
+
+
 @router.put("/{patient_id}", response_model=PatientResponse)
 async def update_patient(patient_id: str, data: PatientUpdate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_PATIENTS)

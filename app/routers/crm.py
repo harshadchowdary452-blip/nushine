@@ -892,6 +892,23 @@ async def create_appointment_from_follow_up(
         description=f"Appointment booked from follow-up on {req.appointment_date}",
         module="CRM",
     )
+    # Resume a WAITING_PATIENT treatment: once the patient re-engages by
+    # booking an appointment, the treatment must leave the waiting queue.
+    if fu.treatment_id:
+        try:
+            plan = await db.get(TreatmentPlan, fu.treatment_id)
+            plan_status = plan.status.value if plan and hasattr(plan.status, "value") else (str(plan.status) if plan else None)
+            if plan and plan_status == TreatmentPlanStatus.WAITING_PATIENT.value:
+                await StatusAutomationService(db).update_treatment_status(plan.id, TreatmentPlanStatus.IN_PROGRESS)
+                await db.commit()
+                await record_timeline_event(
+                    db, current_user=current_user, patient_id=fu.patient_id,
+                    action="Treatment Resumed",
+                    description=f"Appointment booked for '{plan.treatment_name}' - treatment resumed from waiting for patient",
+                    module="Treatments",
+                )
+        except Exception:
+            logger.warning("Failed to resume WAITING_PATIENT treatment %s after booking appointment", fu.treatment_id, exc_info=True)
     return {"success": True, "appointment_id": str(appt.id)}
 
 

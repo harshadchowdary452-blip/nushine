@@ -5,6 +5,7 @@ from app.schemas.patient import PatientResponse
 from app.schemas.hospital import HospitalBrief
 from app.schemas.treatment_plan import TreatmentPlanResponse
 from app.schemas.clinical_progress_note import ClinicalProgressNoteResponse
+from app.schemas.medication_prescription import MedicationPrescriptionCreate, MedicationPrescriptionResponse
 
 
 class ClinicalFindingCreate(BaseModel):
@@ -68,6 +69,7 @@ class CaseCreate(BaseModel):
     doctor_specialization: Optional[str] = None
     notes: Optional[str] = None
     findings: Optional[List[ClinicalFindingCreate]] = None
+    medications: Optional[List[MedicationPrescriptionCreate]] = None
 
 
 class CaseUpdate(BaseModel):
@@ -103,6 +105,7 @@ class CaseUpdate(BaseModel):
     doctor_id: Optional[str] = None
     notes: Optional[str] = None
     findings: Optional[List[ClinicalFindingCreate]] = None
+    medications: Optional[List[MedicationPrescriptionCreate]] = None
 
 
 class UserBrief(BaseModel):
@@ -174,6 +177,7 @@ class CaseResponse(BaseModel):
     treatment_plan_approved: Optional[bool] = None
     treatment_plan_rejection_reason: Optional[str] = None
     findings: Optional[List[ClinicalFindingResponse]] = None
+    medications: Optional[List[MedicationPrescriptionResponse]] = Field(default=None, validation_alias="medication_prescriptions")
     clinical_progress_notes: Optional[List[ClinicalProgressNoteResponse]] = None
     treatment_plans: Optional[List["TreatmentPlanResponse"]] = None
     created_at: datetime

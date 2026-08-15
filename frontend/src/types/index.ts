@@ -177,6 +177,29 @@ export interface ClinicalProgressNote {
   updated_at: string
 }
 
+export interface MedicationInput {
+  medication_name: string
+  dosage?: string | null
+  frequency?: string | null
+  duration?: string | null
+  instructions?: string | null
+}
+
+export interface MedicationPrescription {
+  id: string
+  medication_name: string
+  dosage?: string | null
+  frequency?: string | null
+  duration?: string | null
+  instructions?: string | null
+  created_by_id?: string | null
+  updated_by_id?: string | null
+  created_by_name?: string | null
+  updated_by_name?: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface Case {
   id: string
   case_number?: string | null
@@ -217,6 +240,7 @@ export interface Case {
   status: CaseStatus
   notes: string | null
   findings?: ClinicalFinding[] | null
+  medications?: MedicationPrescription[] | null
   appointment_date?: string | null
   appointment_time?: string | null
   is_active: boolean
@@ -247,6 +271,28 @@ export interface CaseTimeline {
   performer_name: string | null
   performer_role: string | null
   created_at: string
+}
+
+export interface MedicationTimelineItem {
+  id: string
+  event_type: "case_report" | "treatment_sitting"
+  case_id: string
+  case_number: string
+  sitting_id?: string | null
+  sitting_number?: number | null
+  treatment_plan_id?: string | null
+  treatment_name?: string | null
+  doctor_id?: string | null
+  doctor_name?: string | null
+  date?: string | null
+  medications: MedicationPrescription[]
+  legacy_prescription?: string | null
+}
+
+export interface MedicationTimelineResponse {
+  patient_id: string
+  items: MedicationTimelineItem[]
+  total: number
 }
 
 export interface Consultant {
@@ -377,6 +423,7 @@ export interface TreatmentSitting {
   procedure_performed?: string | null
   clinical_notes?: string | null
   prescription?: string | null
+  medications?: MedicationPrescription[] | null
   next_appointment_date: string | null
   next_appointment_time: string | null
   next_appointment_doctor_id?: string | null
@@ -1201,6 +1248,7 @@ export interface WaitingPayload {
   reason: string
   expected_followup?: string
   lab_name?: string
+  laboratory_id?: string
   lab_order_number?: string
   lab_sent_date?: string
   lab_return_date?: string
@@ -1225,6 +1273,7 @@ export interface VisitPayload {
   doctor_notes: string | null
   next_visit_required: boolean
   sitting_date: string
+  medications?: MedicationInput[]
   next_appointment_date?: string
   next_appointment_time?: string
   next_appointment_doctor_id?: string
@@ -1822,10 +1871,9 @@ export interface Laboratory {
 export type LabStatus =
   | "PENDING"
   | "SENT"
-  | "IN_PROGRESS"
-  | "READY"
-  | "RETURNED"
+  | "RECEIVED"
   | "CANCELLED"
+  | "RESENT"
 
 export interface LabCaseEvent {
   id: string
@@ -1875,6 +1923,7 @@ export interface LabCase {
 
 export interface LabCandidate {
   treatment_plan_id: string
+  lab_case_id: string | null
   treatment_number: string | null
   treatment_name: string | null
   patient_id: string | null
@@ -1888,6 +1937,23 @@ export interface LabCandidate {
   case_number: string | null
   tooth_number: string | null
   lab_hint: string | null
+}
+
+export interface LabBatchSendPayload {
+  treatment_plan_ids: string[]
+  laboratory_id: string
+  due_date?: string | null
+  phone?: string | null
+  order_number?: string | null
+  message?: string | null
+}
+
+export interface LabBatchSendResult {
+  success: boolean
+  phone: string | null
+  deep_link: string | null
+  message: string | null
+  lab_case_ids: string[]
 }
 
 export interface LabMonthlyReport {

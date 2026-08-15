@@ -14,6 +14,8 @@ import type { Patient } from "@/types"
 import type { ToothFinding, ToothCondition, ToothSurface } from "@/components/toothchart/types"
 import TreatmentPlanSection from "./TreatmentPlanSection"
 import type { TreatmentItem } from "./TreatmentPlanSection"
+import MedicationPrescriptionEditor, { cleanMedications } from "@/components/medications/MedicationPrescriptionEditor"
+import type { MedicationInput } from "@/components/medications/MedicationPrescriptionEditor"
 
 interface CaseFormData {
   chief_complaint?: string
@@ -38,6 +40,7 @@ interface CaseFormData {
   treatment_plan_estimated_visits?: number | string
   patient_instructions?: string
   medicines_prescribed?: string
+  medications?: MedicationInput[]
   follow_up_instructions?: string
   next_review_date?: string
   doctor_registration_number?: string
@@ -276,6 +279,9 @@ export default function CaseReportForm({
       payload.clinical_findings_summary = payload.clinical_findings_summary || (findings.length > 0 ? findingsSummary : null)
       payload.findings = buildFindingsPayload(findings, mode)
 
+      const medications = cleanMedications((form.medications as MedicationInput[] | undefined) || [])
+      if (medications.length > 0 || mode === "edit") payload.medications = medications
+
       const cleaned = cleanPayload(payload)
       await onSubmit(cleaned)
     } catch {
@@ -466,18 +472,27 @@ export default function CaseReportForm({
           className={`flex w-full rounded-md border border-input bg-transparent px-2 py-1.5 ${compact ? "text-xs min-h-[50px]" : "text-sm min-h-[80px] px-3"}`} />
       </CollapsibleSection>
 
+      <CollapsibleSection title="16. Medicines Prescribed">
+        <MedicationPrescriptionEditor
+          value={(form.medications as MedicationInput[] | undefined) || []}
+          onChange={(items) => setV("medications", items)}
+          compact={compact}
+        />
+        {form.medicines_prescribed ? (
+          <div className="mt-3 space-y-1">
+            <Label className={compact ? "text-[10px]" : "text-xs"}>Legacy free-text notes</Label>
+            <textarea value={form.medicines_prescribed || ""} onChange={(e) => setV("medicines_prescribed", e.target.value)}
+              className={`flex w-full rounded-md border border-input bg-transparent px-2 py-1.5 ${compact ? "text-xs min-h-[50px]" : "text-sm min-h-[60px] px-3"}`} />
+          </div>
+        ) : null}
+      </CollapsibleSection>
+
       {mode === "edit" && (
         <>
-          <CollapsibleSection title="16. Patient Instructions">
+          <CollapsibleSection title="17. Patient Instructions">
             <textarea value={form.patient_instructions || ""} onChange={(e) => setV("patient_instructions", e.target.value)}
               className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[80px]"
               placeholder="Maintain oral hygiene. Brush twice daily..." />
-          </CollapsibleSection>
-
-          <CollapsibleSection title="17. Medicines Prescribed">
-            <textarea value={form.medicines_prescribed || ""} onChange={(e) => setV("medicines_prescribed", e.target.value)}
-              className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[80px]"
-              placeholder="Medicine, Dosage, Frequency, Duration..." />
           </CollapsibleSection>
 
           <CollapsibleSection title="18. Follow-Up">

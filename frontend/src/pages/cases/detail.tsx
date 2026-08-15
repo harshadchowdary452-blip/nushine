@@ -16,6 +16,7 @@ import type { Case, TreatmentPlanItem, TreatmentPlan, CaseTimeline } from "@/typ
 import ProfessionalOdontogram from "@/components/toothchart/ProfessionalOdontogram"
 import CaseReportForm, { apiToFinding } from "@/components/cases/CaseReportForm"
 import type { TreatmentItem } from "@/components/cases/TreatmentPlanSection"
+import { MedicationTable } from "@/components/medications/MedicationPrescriptionEditor"
 
 const statusColors: Record<string, string> = {
   OPEN: "bg-blue-50 text-blue-700 border-blue-200",
@@ -231,6 +232,7 @@ export default function CaseReportDetail() {
             treatment_plan_estimated_visits: c.treatment_plan_estimated_visits || "",
             patient_instructions: c.patient_instructions || "",
             medicines_prescribed: c.medicines_prescribed || "",
+            medications: c.medications || [],
             follow_up_instructions: c.follow_up_instructions || "",
             next_review_date: c.next_review_date || "",
             doctor_registration_number: c.doctor_registration_number || "",
@@ -309,7 +311,20 @@ export default function CaseReportDetail() {
               <GeneratedTreatmentsView treatmentPlans={c.treatment_plans} />
             )}
             {c.patient_instructions && <SectionCard title="Patient Instructions" content={c.patient_instructions} />}
-            {c.medicines_prescribed && <SectionCard title="Medicines Prescribed" content={c.medicines_prescribed} />}
+            {(c.medications && c.medications.length > 0) || c.medicines_prescribed ? (
+              <Card>
+                <CardHeader className="py-3"><CardTitle className="text-sm">Medicines Prescribed</CardTitle></CardHeader>
+                <CardContent>
+                  <MedicationTable medications={c.medications} />
+                  {c.medicines_prescribed && (
+                    <div className="mt-3 pt-3 border-t border-[var(--ds-border)] text-sm">
+                      <span className="text-muted-foreground text-xs">Legacy notes: </span>
+                      {c.medicines_prescribed}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ) : null}
             {c.follow_up_instructions && <SectionCard title="Follow-Up Instructions" content={c.follow_up_instructions} />}
             {c.next_review_date && (
               <Card>

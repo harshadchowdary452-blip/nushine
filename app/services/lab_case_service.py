@@ -17,13 +17,36 @@ from app.models.hospital import Hospital
 from app.models.user import User
 from app.core.permissions import verify_tenant_access
 
-LAB_STATUSES = ["PENDING", "SENT", "IN_PROGRESS", "READY", "RETURNED", "CANCELLED"]
+LAB_STATUSES = ["PENDING", "SENT", "RECEIVED", "CANCELLED", "RESENT"]
+
+# Legacy statuses that may still exist in the database from before the
+# workflow was simplified. They are accepted for reads/display so existing
+# rows keep working, but are no longer offered when changing status.
+LEGACY_LAB_STATUSES = {"IN_PROGRESS", "READY", "RETURNED"}
 
 LAB_EVENT_STATUS_CHANGE = "STATUS_CHANGE"
 LAB_EVENT_WHATSAPP = "WHATSAPP"
 LAB_EVENT_CALL = "CALL"
 LAB_EVENT_NOTE = "NOTE"
 LAB_EVENT_CREATED = "CASE_CREATED"
+
+RESPONSE_MARKER = "\n\n[Response]\n"
+
+
+def _whatsapp_note(message: str, response: dict = None) -> str:
+    if not response:
+        return message
+    try:
+        import json
+        return message + RESPONSE_MARKER + json.dumps(response, indent=2, default=str)
+    except Exception:
+        return message
+
+
+def _message_from_note(note) -> str:
+    if note and RESPONSE_MARKER in note:
+        return note.split(RESPONSE_MARKER, 1)[0]
+    return note or ""
 
 
 class LabCaseService:
@@ -172,7 +195,7 @@ class LabCaseService:
             .outerjoin(LabCase, LabCase.treatment_plan_id == TreatmentPlan.id)
             .join(Case, TreatmentPlan.case_id == Case.id)
             .join(Patient, Case.patient_id == Patient.id)
-            .where(TreatmentPlan.status == "WAITING_LAB", LabCase.id.is_(None))
+            .where(TreatmentPlan.status == "WAITING_LAB")
         )
         query = await self._apply_scope(query, current_user)
         if search:
@@ -208,11 +231,20 @@ class LabCaseService:
                 hr = await self.db.execute(select(Hospital.id, Hospital.name).where(Hospital.id.in_(hosp_ids)))
                 hospitals = {row[0]: row[1] for row in hr.all()}
         out = []
+        lab_case_map = {}
+        if plans:
+            lab_r = await self.db.execute(
+                select(LabCase.id, LabCase.treatment_plan_id)
+                .where(LabCase.treatment_plan_id.in_([p.id for p in plans]))
+            )
+            for row in lab_r.all():
+                lab_case_map[row[1]] = row[0]
         for p in plans:
             c = cases.get(p.case_id)
             pat = patients.get(c[1]) if c else None
             out.append({
                 "treatment_plan_id": p.id,
+                "lab_case_id": lab_case_map.get(p.id),
                 "treatment_number": p.treatment_number,
                 "treatment_name": p.treatment_name,
                 "patient_id": pat[0] if pat else None,
@@ -307,7 +339,8 @@ class LabCaseService:
         return await self.get(lab_case_id)
 
     async def set_status(self, lab_case_id: str, new_status: str, note: str = None, current_user: dict = None) -> Optional[LabCase]:
-        if new_status not in LAB_STATUSES:
+        valid = set(LAB_STATUSES) | LEGACY_LAB_STATUSES
+        if new_status not in valid:
             raise HTTPException(status_code=400, detail=f"status must be one of {LAB_STATUSES}")
         lab_case = await self.repo.get(lab_case_id)
         if not lab_case:
@@ -315,18 +348,57 @@ class LabCaseService:
         user_id = (current_user or {}).get("sub")
         if new_status != lab_case.lab_status:
             old_status = lab_case.lab_status
-            if new_status == "RETURNED" and not lab_case.returned_date:
-                lab_case.returned_date = date.today()
             if new_status == "SENT" and not lab_case.sent_date:
                 lab_case.sent_date = date.today()
+            if new_status == "RESENT":
+                lab_case.sent_date = date.today()
+                lab_case.returned_date = None
+            if new_status in ("RECEIVED", "RETURNED") and not lab_case.returned_date:
+                lab_case.returned_date = date.today()
             lab_case.lab_status = new_status
             self.db.add(LabCaseEvent(lab_case_id=lab_case_id, event_type=LAB_EVENT_STATUS_CHANGE, from_status=old_status, to_status=new_status, note=note, actor_id=user_id))
             await self._audit(lab_case_id, "UPDATE_LAB_CASE_STATUS", f"Status changed to {new_status}", user_id)
             await self.db.flush()
-            if new_status in ("RETURNED", "CANCELLED"):
+            if new_status == "RESENT":
+                await self._set_treatment_waiting_lab(lab_case.treatment_plan_id, current_user,
+                                                       reason="lab item re-sent to laboratory")
+            elif new_status in ("RECEIVED", "RETURNED", "CANCELLED"):
                 await self._resume_treatment_if_waiting(lab_case.treatment_plan_id, current_user,
-                                                        reason="lab item received back" if new_status == "RETURNED" else "lab requirement cancelled")
+                                                        reason="lab item received back" if new_status in ("RECEIVED", "RETURNED") else "lab requirement cancelled")
         return await self.get(lab_case_id)
+
+    async def _set_treatment_waiting_lab(self, plan_id: str, current_user: dict = None, reason: str = "lab item re-sent to laboratory"):
+        """When an item is re-sent to the laboratory (RESENT), a treatment that
+        was resumed (IN_PROGRESS) goes back to WAITING_LAB so it is tracked again."""
+        try:
+            plan = await self._get_treatment_plan(plan_id)
+            if not plan:
+                return
+            current_status = plan.status.value if hasattr(plan.status, "value") else str(plan.status)
+            if current_status == TreatmentPlanStatus.WAITING_LAB.value:
+                return
+            from app.services.status_automation import StatusAutomationService
+            await StatusAutomationService(self.db).update_treatment_status(plan_id, TreatmentPlanStatus.WAITING_LAB)
+            await self.db.flush()
+            try:
+                case_result = await self.db.execute(
+                    select(Case.patient_id).where(Case.id == plan.case_id)
+                )
+                patient_row = case_result.one_or_none()
+                if patient_row and patient_row[0]:
+                    from app.services.timeline_helper import record_timeline_event
+                    await record_timeline_event(
+                        db=self.db,
+                        current_user=current_user,
+                        patient_id=patient_row[0],
+                        action="Treatment Set to Waiting Lab",
+                        description=f"{reason.capitalize()} for '{plan.treatment_name}' - treatment set to waiting lab",
+                        module="Treatments",
+                    )
+            except Exception:
+                logging.getLogger(__name__).exception("LAB_RETURN_WAITING_TIMELINE - failed plan=%s", plan_id)
+        except Exception:
+            logging.getLogger(__name__).exception("LAB_SET_WAITING - failed plan=%s", plan_id)
 
     async def _resume_treatment_if_waiting(self, plan_id: str, current_user: dict = None, reason: str = "lab item received back"):
         """When a lab item is received back (RETURNED) or cancelled, a treatment that
@@ -389,16 +461,166 @@ class LabCaseService:
             ).order_by(LabCaseEvent.created_at.desc()).limit(1)
         )
         duplicate = recent.scalar_one_or_none()
-        if duplicate and duplicate.note == message:
+        if duplicate and _message_from_note(duplicate.note) == message:
             logger = logging.getLogger(__name__)
             logger.info("Duplicate WhatsApp to lab case %s skipped (sent %s ago)",
                         lab_case_id, datetime.now(timezone.utc) - duplicate.created_at)
             return {"success": True, "phone": links["phone"], "deep_link": links["wa_link"], "message": message, "duplicate_skipped": True}
         sent = await whatsapp_provider.send_message(target, message)
-        self.db.add(LabCaseEvent(lab_case_id=lab_case_id, event_type=LAB_EVENT_WHATSAPP, note=message, actor_id=user_id))
+        response = {"success": sent, "phone": links["phone"], "deep_link": links["wa_link"], "provider": "whatsapp"}
+        note = _whatsapp_note(message, response)
+        self.db.add(LabCaseEvent(lab_case_id=lab_case_id, event_type=LAB_EVENT_WHATSAPP, note=note, actor_id=user_id))
         await self._audit(lab_case_id, "LAB_CASE_WHATSAPP", "WhatsApp sent to laboratory", user_id)
+        if sent:
+            await self._mark_sent_after_whatsapp(lab_case, current_user)
         await self.db.flush()
         return {"success": sent, "phone": links["phone"], "deep_link": links["wa_link"], "message": message}
+
+    async def _mark_sent_after_whatsapp(self, lab_case: LabCase, current_user: dict = None):
+        """After a WhatsApp message is actually sent to the laboratory, promote the
+        lab case to SENT (first time) or RESENT (when it was received/cancelled and
+        is being sent to the lab once again)."""
+        current = lab_case.lab_status
+        if current == "RECEIVED" or current == "CANCELLED":
+            lab_case.lab_status = "RESENT"
+            lab_case.sent_date = date.today()
+            lab_case.returned_date = None
+            await self.db.flush()
+            await self._set_treatment_waiting_lab(lab_case.treatment_plan_id, current_user)
+        elif current == "PENDING":
+            lab_case.lab_status = "SENT"
+            lab_case.sent_date = date.today()
+            await self.db.flush()
+
+    async def batch_send(self, current_user: dict, payload: dict) -> dict:
+        """Send one WhatsApp message to a laboratory covering several treatments.
+
+        Creates (or reuses) a PENDING lab case for each treatment, groups them
+        into a single WhatsApp message that includes the expected return date,
+        records the sent message + provider response on every lab case and marks
+        them SENT.
+        """
+        from app.utils.whatsapp import whatsapp_provider
+        from app.services.laboratory_service import LaboratoryService
+
+        plan_ids = payload.get("treatment_plan_ids") or []
+        laboratory_id = payload.get("laboratory_id")
+        due_date = payload.get("due_date")
+        phone = payload.get("phone")
+        order_number = payload.get("order_number")
+        custom_message = payload.get("message")
+
+        if not plan_ids:
+            raise HTTPException(status_code=400, detail="No treatments selected")
+        if not laboratory_id:
+            raise HTTPException(status_code=400, detail="laboratory_id is required")
+
+        lab_result = await self.db.execute(select(Laboratory).where(Laboratory.id == laboratory_id))
+        laboratory = lab_result.scalar_one_or_none()
+        if not laboratory:
+            raise HTTPException(status_code=404, detail="Laboratory not found")
+        await LaboratoryService(self.db)._ensure_access(current_user, laboratory)
+
+        user_id = current_user.get("sub")
+        lab_cases = []
+        resend_flags = {}
+        for plan_id in plan_ids:
+            plan = await self._get_treatment_plan(plan_id)
+            if not plan:
+                raise HTTPException(status_code=404, detail=f"Treatment {plan_id} not found")
+            await verify_tenant_access(current_user, plan, "treatment_plan", self.db)
+            existing = await self.get_by_treatment(plan_id)
+            was_resend = existing is not None and existing.lab_status in ("RECEIVED", "CANCELLED")
+            updates = {"laboratory_id": laboratory_id, "lab_status": "PENDING"}
+            if due_date:
+                updates["due_date"] = due_date
+            if order_number:
+                updates["order_number"] = order_number
+            if existing:
+                await self.repo.update(existing.id, **updates)
+                resend_flags[existing.id] = was_resend
+                lab_cases.append(existing)
+            else:
+                create_data = {
+                    "treatment_plan_id": plan.id,
+                    "laboratory_id": laboratory_id,
+                    "lab_status": "PENDING",
+                    "created_by": user_id,
+                }
+                if due_date:
+                    create_data["due_date"] = due_date
+                if order_number:
+                    create_data["order_number"] = order_number
+                create_data["order_number"] = f"LAB-{plan.id[:8].upper()}"
+                created = await self.repo.create(**create_data)
+                self.db.add(LabCaseEvent(lab_case_id=created.id, event_type=LAB_EVENT_CREATED, note="Lab case created", actor_id=user_id))
+                lab_cases.append(created)
+        await self.db.flush()
+        await self._enrich_many(lab_cases)
+
+        hospital_name = lab_cases[0].hospital_name if lab_cases and lab_cases[0].hospital_name else "Dental Clinic"
+        message = custom_message if (custom_message and custom_message.strip()) else self._build_batch_message(
+            laboratory_name=laboratory.name,
+            lab_cases=lab_cases,
+            due_date=due_date,
+            hospital_name=hospital_name,
+        )
+
+        target = phone or laboratory.whatsapp_number or laboratory.phone
+        if not target:
+            raise HTTPException(status_code=400, detail="No WhatsApp / phone number available for this laboratory")
+        links = whatsapp_provider.generate_deep_link(target, message)
+        sent = await whatsapp_provider.send_message(target, message)
+        response = {"success": sent, "phone": links["phone"], "deep_link": links["wa_link"], "provider": "whatsapp", "lab_cases": [lc.id for lc in lab_cases]}
+        note = _whatsapp_note(message, response)
+
+        today = date.today()
+        for lc in lab_cases:
+            was_received_or_cancelled = lc.lab_status in ("RECEIVED", "CANCELLED")
+            lc.lab_status = "RESENT" if was_received_or_cancelled else "SENT"
+            lc.sent_date = today
+            if was_received_or_cancelled:
+                lc.returned_date = None
+            self.db.add(LabCaseEvent(lab_case_id=lc.id, event_type=LAB_EVENT_WHATSAPP, note=note, actor_id=user_id))
+            await self._audit(lc.id, "LAB_CASE_WHATSAPP", f"Batch WhatsApp sent to {laboratory.name}", user_id)
+        await self.db.flush()
+
+        if sent and lab_cases:
+            await self._set_treatment_waiting_lab(lab_cases[0].treatment_plan_id, current_user)
+
+        return {
+            "success": sent,
+            "phone": links["phone"],
+            "deep_link": links["wa_link"],
+            "message": message,
+            "lab_case_ids": [lc.id for lc in lab_cases],
+        }
+
+    def _build_batch_message(self, laboratory_name: str, lab_cases: List[LabCase], due_date=None, hospital_name: str = None) -> str:
+        lines = [f"Hello {laboratory_name} Team,", "", "Please process the following dental laboratory work:"]
+        for idx, lc in enumerate(lab_cases, start=1):
+            parts = []
+            if lc.patient_name:
+                parts.append(f"Patient: {lc.patient_name}")
+            if lc.op_number:
+                parts.append(f"OP: {lc.op_number}")
+            if lc.treatment_name:
+                parts.append(f"Treatment: {lc.treatment_name}")
+            if lc.tooth_number or lc.tooth_numbers:
+                parts.append(f"Tooth: {lc.tooth_number or lc.tooth_numbers}")
+            if lc.order_number:
+                parts.append(f"Order: {lc.order_number}")
+            if lc.material:
+                parts.append(f"Material: {lc.material}")
+            if lc.remarks:
+                parts.append(f"Note: {lc.remarks}")
+            lines.append(f"{idx}) {' | '.join(parts)}")
+        if due_date:
+            lines.append("")
+            lines.append(f"Expected return date: {due_date}")
+        lines.append("")
+        lines.append(f"Regards,{chr(10)}{hospital_name or 'Dental Clinic'}")
+        return "\n".join(lines)
 
     async def call(self, lab_case_id: str, note: str = None, duration_seconds: int = None, current_user: dict = None) -> LabCaseEvent:
         lab_case = await self.repo.get(lab_case_id)
@@ -464,8 +686,8 @@ class LabCaseService:
         summary = [
             {"label": "Total Cases", "value": len(lab_cases)},
             {"label": "Total Lab Cost", "value": f"\u20B9{round(total_cost, 2):,.2f}"},
-            {"label": "Returned", "value": status_breakdown.get("RETURNED", 0)},
-            {"label": "In Lab", "value": status_breakdown.get("IN_PROGRESS", 0) + status_breakdown.get("SENT", 0)},
+            {"label": "Returned", "value": status_breakdown.get("RECEIVED", 0) + status_breakdown.get("RETURNED", 0)},
+            {"label": "In Lab", "value": status_breakdown.get("IN_PROGRESS", 0) + status_breakdown.get("SENT", 0) + status_breakdown.get("RESENT", 0)},
             {"label": "Pending", "value": status_breakdown.get("PENDING", 0)},
         ]
         return {
