@@ -42,7 +42,7 @@ const PRESETS: Record<ErrorKind, ErrorPreset> = {
   network: {
     icon: WifiOff,
     title: "Connection problem",
-    reason: "We couldn't reach the NuShine server. Your network may be offline or unstable.",
+    reason: "We couldn't reach the Appointin server. Your network may be offline or unstable.",
     recovery: "Check your internet connection, then retry. Any unsaved work is kept on this device until you leave the page.",
     retryable: true,
     supportable: false,
@@ -179,7 +179,7 @@ export function ErrorState({
         )}
         {preset.supportable && (
           <Button asChild variant="ghost">
-            <a href="mailto:support@nushine.in?subject=NuShine%20support%20request">
+            <a href="mailto:support@appointin.com?subject=Appointin%20support%20request">
               <LifeBuoy className="h-4 w-4" aria-hidden="true" />
               Contact support
             </a>

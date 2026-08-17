@@ -131,9 +131,9 @@ export default function WhatsAppPreviewModal({ open, onClose, preview, loading, 
                   <div className="relative">
                     <div className="absolute -left-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-green-500 text-white text-xs font-bold shadow-sm">N</div>
                     <div className="ml-3 space-y-2">
-                      <p className="text-sm text-[var(--ds-text-tertiary)]">NuShine Dental</p>
+                      <p className="text-sm text-[var(--ds-text-tertiary)]">Appointin</p>
                       <p className="text-sm text-[var(--ds-text)] whitespace-pre-wrap leading-relaxed">{preview.rendered_message}</p>
-                      <p className="text-xs text-[var(--ds-text-tertiary)] pt-1">{preview.hospital_name || "NuShine Dental"}</p>
+                      <p className="text-xs text-[var(--ds-text-tertiary)] pt-1">{preview.hospital_name || "Appointin"}</p>
                     </div>
                   </div>
                 </div>

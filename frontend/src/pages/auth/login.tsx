@@ -7,7 +7,7 @@ import {
 } from "lucide-react"
 import { useAuthStore } from "@/store/authStore"
 import { authApi } from "@/services/endpoints"
-import { ToothLogo, BrandText } from "@/components/ui/brand-logo"
+import { WordmarkLogo } from "@/components/ui/brand-logo"
 
 const features = [
   { icon: Users, title: "Patient Management", desc: "Centralized and secure patient records." },
@@ -100,62 +100,16 @@ export default function LoginPage() {
           <div className="absolute bottom-[25%] left-[20%] w-44 h-44 rounded-full border border-white/[0.04]" />
         </div>
 
-        {/* Content */}
+          {/* Content */}
         <div className="relative z-10 flex flex-col w-full px-10 xl:px-14 pt-7 pb-5">
-          {/* Brand header */}
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <div className="flex items-center gap-2.5">
-              <motion.div
-                animate={{ y: [0, -3, 0] }}
-                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-              >
-                <ToothLogo size={27} />
-              </motion.div>
-              <div>
-                <h1 className="text-[18px] font-bold leading-none tracking-tight text-white">
-                  <span className="text-[var(--ds-primary-300)]">Nu</span>Shine
-                </h1>
-                <p className="text-[9px] text-[var(--ds-text-placeholder)] font-medium tracking-[0.25em] uppercase mt-0.5">
-                  Dental Management System
-                </p>
-              </div>
-            </div>
-          </motion.div>
-
           {/* Hero */}
-          <div className="flex-1 flex flex-col justify-center">
-            <motion.h2
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.1 }}
-              className="text-[30px] leading-[1.15] font-extrabold text-white tracking-[-0.02em]"
-            >
-              Smarter Dental Care.
-              <br />
-              <span className="bg-gradient-to-r from-[var(--ds-primary-300)] via-[var(--ds-primary-400)] to-[var(--ds-accent-300)] bg-clip-text text-transparent">
-                Stronger Practice.
-              </span>
-            </motion.h2>
-
-            <motion.p
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.18 }}
-              className="mt-4 text-[11px] text-[var(--ds-sidebar-text)] max-w-[480px] leading-relaxed"
-            >
-              NuShine helps dental clinics manage patients, appointments, treatments, billing, CRM, reports and operations in one intelligent platform.
-            </motion.p>
-
+          <div className="flex-1 flex flex-col items-center justify-center">
             {/* Feature cards */}
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.25 }}
-              className="mt-10 grid grid-cols-2 gap-3"
+              transition={{ duration: 0.5, delay: 0.35 }}
+              className="w-full grid grid-cols-2 gap-3"
             >
               {features.map((f) => (
                 <div
@@ -210,15 +164,7 @@ export default function LoginPage() {
             animate={{ opacity: 1 }}
             className="mb-6 flex md:hidden flex-col items-center gap-2"
           >
-            <ToothLogo size={22} />
-            <div className="text-center">
-              <h1 className="text-base font-bold tracking-tight">
-                <BrandText size="sm" />
-              </h1>
-              <p className="text-[9px] text-[var(--ds-text-placeholder)] font-medium tracking-[0.25em] uppercase mt-0.5">
-                Dental Management System
-              </p>
-            </div>
+            <WordmarkLogo height={22} />
           </motion.div>
 
           {/* Login Card */}
@@ -231,17 +177,11 @@ export default function LoginPage() {
             {/* Card header */}
             <div className="flex flex-col items-center text-center mb-5">
               <div className="mb-2">
-                <ToothLogo size={22} />
+                <WordmarkLogo height={22} />
               </div>
-              <h2 className="text-base font-bold tracking-tight">
-                <BrandText size="sm" />
-              </h2>
-              <p className="text-[9px] text-[var(--ds-text-placeholder)] font-medium tracking-[0.25em] uppercase mt-0.5">
-                Dental Management System
-              </p>
               <div className="mt-3">
                 <h3 className="text-base font-bold text-[var(--ds-text)] tracking-tight">Welcome Back!</h3>
-                <p className="text-xs text-[var(--ds-text-secondary)] mt-1">Sign in to access your NuShine account</p>
+                <p className="text-xs text-[var(--ds-text-secondary)] mt-1">Sign in to access your Appointin account</p>
               </div>
             </div>
 

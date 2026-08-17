@@ -31,6 +31,6 @@ export const useAnalyticsStore = create<AnalyticsFilterState>()(
       reset: (defaultPeriod = "this_month") =>
         set({ period: defaultPeriod, startDate: "", endDate: "" }),
     }),
-    { name: "nushine-analytics-filter" },
+    { name: "appointin-analytics-filter" },
   ),
 )

@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react"
 
-const memoryPrefix = "nushine.ws"
+const memoryPrefix = "appointin.ws"
 
 export interface WorkspaceMemoryOptions {
   /** Bump when the persisted shape changes so stale stores are discarded. */

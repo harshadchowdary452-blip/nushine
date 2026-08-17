@@ -11,13 +11,14 @@ import {
   Clock, UserPlus, Search, Download, LayoutList, Kanban,
   Sun, Moon, Star, ChevronDown, Hospital, Menu, ListChecks,
   Package, FlaskConical,
-  Inbox,
+  Inbox, ClipboardList,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useSidebarStore } from "@/store/sidebarStore"
 import { useAuthStore } from "@/store/authStore"
 import { useThemeStore } from "@/store/themeStore"
 import { useSearchStore } from "@/store/searchStore"
+import { WordmarkLogo } from "./brand-logo"
 import { useFavoriteStore } from "@/store/favoriteStore"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 
@@ -54,17 +55,8 @@ const navConfig: Record<RoleKey, NavGroup[]> = {
         { label: "Groups", icon: Shield, path: "/admin/groups" },
         { label: "Hospitals", icon: Building2, path: "/admin/hospitals" },
         { label: "Doctors", icon: Stethoscope, path: "/admin/doctors" },
-        { label: "Doctor Performance", icon: Activity, path: "/performance" },
-        { label: "Communication Center", icon: Inbox, path: "/communications" },
+        { label: "Demo Requests", icon: ClipboardList, path: "/super-admin/demo-requests" },
       ],
-    },
-    {
-      label: "Inventory",
-      items: [{ label: "Inventory", icon: Package, path: "/inventory" }],
-    },
-    {
-      label: "Laboratory",
-      items: [{ label: "Laboratory", icon: FlaskConical, path: "/laboratory" }],
     },
     {
       label: "Configuration",
@@ -417,48 +409,20 @@ export default function EnterpriseSidebar() {
 
       {/* ═══ BRAND AREA ═══ */}
       <div className={cn(
-        "flex items-center border-b border-[var(--ds-sidebar-border)] transition-all duration-[var(--ds-transition-slow)] shrink-0",
+        "flex items-center border-b border-[var(--ds-sidebar-border)] transition-all duration-[var(--ds-transition-slow)] shrink-0 bg-white",
         "min-h-[var(--ds-sidebar-brand-h)]",
-        isExpanded ? "px-5" : "px-0 justify-center"
+        isExpanded ? "px-5 justify-center" : "px-3 justify-center"
       )}>
         <Link
-          to="/"
+          to="/home"
           onClick={() => setMobileOpen(false)}
           className={cn(
-            "flex items-center gap-3 overflow-hidden transition-all duration-[var(--ds-transition-slow)]",
-            !isExpanded && "justify-center gap-0"
+            "flex items-center justify-center overflow-hidden transition-all duration-[var(--ds-transition-slow)]",
+            !isExpanded && "gap-0"
           )}
         >
-          {/* Logo mark */}
-          <div className="flex items-center justify-center w-8 h-8 rounded-[var(--ds-radius-lg)] bg-[var(--ds-accent)] shrink-0 shadow-sm">
-            <svg width="18" height="18" viewBox="0 0 56 56" fill="none" aria-hidden="true">
-              <path d="M28 14c-4.5 0-7.8 2.6-9 6.8-1 3.4-1.5 7.6-1.5 11.2s.5 7 1.4 8.8c.7 1.4 1.8 2.4 3.2 2.9 1.1.4 2.1 1 2.8 1.7l.7.8c.6.7 1.7.7 2.3 0l.7-.8c.7-.7 1.7-1.3 2.8-1.7 1.4-.5 2.5-1.5 3.2-2.9.9-1.8 1.4-5.2 1.4-8.8s-.5-7.8-1.5-11.2C35.8 16.6 32.5 14 28 14z" fill="white" opacity="0.96" />
-            </svg>
-          </div>
-
-          {/* Brand text */}
-          <div className="transition-all duration-[var(--ds-transition-slow)] overflow-hidden whitespace-nowrap"
-            style={{ maxWidth: isExpanded ? "160px" : "0", opacity: isExpanded ? 1 : 0 }}
-          >
-            <p className="text-sm font-bold text-white leading-tight">NuShine</p>
-            <p className="text-[10px] text-[var(--ds-sidebar-text)] font-medium tracking-[0.2em] uppercase">Dental Platform</p>
-          </div>
+          <WordmarkLogo height={isExpanded ? 28 : 18} />
         </Link>
-
-        {/* Spacer */}
-        <div className="flex-1" />
-
-        {/* Collapse button */}
-        <button
-          onClick={toggle}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className={cn(
-            "hidden lg:flex items-center justify-center h-7 w-7 rounded-[var(--ds-radius-lg)] text-[var(--ds-sidebar-text)] hover:bg-[var(--ds-sidebar-hover)] hover:text-white transition-all duration-200",
-            isExpanded ? "opacity-100" : "opacity-0 pointer-events-none"
-          )}
-        >
-          <ChevronLeft className={cn("h-3.5 w-3.5 transition-transform duration-300", collapsed && "rotate-180")} strokeWidth={2} />
-        </button>
       </div>
 
       {/* ═══ HOSPITAL SWITCHER ═══ */}
@@ -666,12 +630,10 @@ export default function EnterpriseSidebar() {
       {/* ─── TABLET ICON ONLY ─── */}
       <aside aria-label="Sidebar" className="hidden md:flex lg:hidden flex-col shrink-0 w-[var(--ds-sidebar-collapsed-width)] overflow-hidden bg-[var(--ds-sidebar-bg)]">
         <div className="flex h-full flex-col bg-[var(--ds-sidebar-bg)]">
-          <div className="flex h-[var(--ds-sidebar-brand-h)] items-center justify-center border-b border-[var(--ds-sidebar-border)]">
-            <div className="flex items-center justify-center w-8 h-8 rounded-[var(--ds-radius-lg)] bg-[var(--ds-accent)]">
-              <svg width="18" height="18" viewBox="0 0 56 56" fill="none" aria-hidden="true">
-                <path d="M28 14c-4.5 0-7.8 2.6-9 6.8-1 3.4-1.5 7.6-1.5 11.2s.5 7 1.4 8.8c.7 1.4 1.8 2.4 3.2 2.9 1.1.4 2.1 1 2.8 1.7l.7.8c.6.7 1.7.7 2.3 0l.7-.8c.7-.7 1.7-1.3 2.8-1.7 1.4-.5 2.5-1.5 3.2-2.9.9-1.8 1.4-5.2 1.4-8.8s-.5-7.8-1.5-11.2C35.8 16.6 32.5 14 28 14z" fill="white" opacity="0.96" />
-              </svg>
-            </div>
+          <div className="flex h-[var(--ds-sidebar-brand-h)] items-center justify-center border-b border-[var(--ds-sidebar-border)] bg-white">
+            <Link to="/home" aria-label="Appointin home">
+              <WordmarkLogo height={18} />
+            </Link>
           </div>
           <nav aria-label="Main navigation" className="flex-1 overflow-y-auto px-1.5 py-3 scrollbar-none space-y-1">
             {groups.map((group) =>

@@ -99,6 +99,6 @@ export const useDashboardPersonalizationStore = create<PersonalizationState>()(
           },
         })),
     }),
-    { name: "nushine-dashboard-personalization" },
+    { name: "appointin-dashboard-personalization" },
   ),
 )

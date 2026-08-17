@@ -10,7 +10,7 @@ import { useSidebarStore } from "@/store/sidebarStore"
 import { useAuthStore } from "@/store/authStore"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { ToothLogo, BrandText } from "@/components/ui/brand-logo"
+import { WordmarkLogo } from "@/components/ui/brand-logo"
 import { notificationsApi } from "@/services/endpoints"
 import { queryClient } from "@/lib/queryClient"
 import { format } from "date-fns"
@@ -114,11 +114,7 @@ export default function Navbar() {
             <PanelLeftOpen className="h-[22px] w-[22px]" strokeWidth={1.5} />
           </Button>
           <Link to="/" className="hidden sm:flex items-center gap-2">
-            <ToothLogo size={22} showSparkle={false} />
-            <div>
-              <p className="text-sm font-bold text-[var(--ds-text)] leading-tight"><BrandText size="sm" /></p>
-              <p className="text-[10px] text-[var(--ds-sidebar-icon)] font-medium tracking-[0.25em] uppercase -mt-px">Dental Management System</p>
-            </div>
+            <WordmarkLogo height={22} />
           </Link>
         </div>
 

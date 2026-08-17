@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils"
 import { useSidebarStore } from "@/store/sidebarStore"
 import { useAuthStore } from "@/store/authStore"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { ToothLogo, BrandText } from "@/components/ui/brand-logo"
+import { WordmarkLogo } from "@/components/ui/brand-logo"
 
 interface NavItem { label: string; icon: React.ElementType; path: string; }
 interface NavSection { label: string; items: NavItem[]; }
@@ -143,11 +143,10 @@ export default function Sidebar() {
         "flex items-center border-b border-sidebar-border transition-all duration-200 overflow-hidden",
         isExpanded ? "h-[60px] px-5" : "h-[60px] px-0 justify-center"
       )}>
-        <Link to="/" className={cn("flex items-center overflow-hidden transition-all duration-200", isExpanded ? "gap-2.5" : "gap-0")} onClick={() => setMobileOpen(false)}>
-          <ToothLogo size={isExpanded ? 27 : 24} showSparkle={false} />
-          <div className={cn("transition-all duration-200", !isExpanded ? "opacity-0 w-0" : "opacity-100")}>
-            <p className="text-sm font-bold leading-tight"><BrandText size="sm" /></p>
-            <p className="text-[10px] text-[var(--ds-sidebar-icon)] font-medium tracking-[0.25em] uppercase -mt-px">Dental Management System</p>
+        <Link to="/" className={cn("flex items-center overflow-hidden transition-all duration-200", isExpanded ? "gap-0" : "gap-0")} onClick={() => setMobileOpen(false)}>
+          <WordmarkLogo height={isExpanded ? 28 : 22} />
+          <div className={cn("transition-all duration-200", !isExpanded ? "opacity-0 w-0 ml-0" : "opacity-100 ml-2")}>
+            <p className="text-[10px] text-[var(--ds-sidebar-icon)] font-medium tracking-[0.25em] uppercase">Connect. Care. Grow.</p>
           </div>
         </Link>
         <div className="flex-1" />
@@ -266,7 +265,7 @@ export default function Sidebar() {
       <aside aria-label="Sidebar" className="hidden md:flex lg:hidden flex-col shrink-0 w-[80px]">
         <div className="sticky top-0 h-screen flex flex-col bg-[var(--ds-surface)] border-r border-sidebar-border font-['Poppins','Inter',sans-serif]">
           <div className="flex h-[60px] items-center justify-center border-b border-sidebar-border">
-            <ToothLogo size={24} showSparkle={false} />
+            <WordmarkLogo height={22} />
           </div>
           <nav aria-label="Main navigation" className="min-h-0 flex-1 overflow-y-auto px-1.5 py-3 scrollbar-hide space-y-1">
             {sections.map((section) =>

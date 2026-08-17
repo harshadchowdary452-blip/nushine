@@ -1,5 +1,5 @@
 """
-NuShine Dental - Rollback from PostgreSQL to SQLite
+Appointin - Rollback from PostgreSQL to SQLite
 
 Restores the SQLite backup and reverts configuration.
 Run this if PostgreSQL migration has issues.

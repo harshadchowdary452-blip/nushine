@@ -4,8 +4,8 @@ export interface ContextEntry {
   groupName?: string
 }
 
-const RECENTS_KEY = "nushine-context-recents"
-const FAVORITES_KEY = "nushine-context-favorites"
+const RECENTS_KEY = "appointin-context-recents"
+const FAVORITES_KEY = "appointin-context-favorites"
 const MAX_RECENTS = 5
 
 function read(key: string): ContextEntry[] {

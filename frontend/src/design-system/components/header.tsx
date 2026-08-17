@@ -11,6 +11,7 @@ import { useThemeStore } from "@/store/themeStore"
 import { useSearchStore } from "@/store/searchStore"
 import { notificationsApi } from "@/services/endpoints"
 import { Button } from "@/components/ui/button"
+import { WordmarkLogo } from "@/design-system/components/brand-logo"
 import Breadcrumb from "./breadcrumb"
 import QuickActions from "./quick-actions"
 import ContextSwitcher from "./context-switcher"
@@ -61,7 +62,7 @@ export default function EnterpriseHeader() {
       className="sticky top-0 z-[var(--ds-z-header)] flex shrink-0 flex-col bg-[var(--ds-header-bg)] shadow-[var(--ds-header-shadow)] transition-all"
     >
       {/* Brand accent edge — a thin solid Executive Navy strip that separates
-          the header from content and anchors the NuShine identity. */}
+          the header from content and anchors the Appointin identity. */}
       <div
         aria-hidden="true"
         className="h-[2px] w-full shrink-0"
@@ -94,19 +95,8 @@ export default function EnterpriseHeader() {
           >
             <PanelLeftOpen className="h-[18px] w-[18px]" strokeWidth={1.5} />
           </Button>
-          <Link to="/" className="flex shrink-0 items-center gap-2.5" aria-label="NuShine home">
-            <div className="flex h-7 w-7 items-center justify-center rounded-[var(--ds-radius-md)] bg-[var(--ds-primary)]">
-              <svg width="14" height="14" viewBox="0 0 56 56" fill="none" aria-hidden="true">
-                <path
-                  d="M28 14c-4.5 0-7.8 2.6-9 6.8-1 3.4-1.5 7.6-1.5 11.2s.5 7 1.4 8.8c.7 1.4 1.8 2.4 3.2 2.9 1.1.4 2.1 1 2.8 1.7l.7.8c.6.7 1.7.7 2.3 0l.7-.8c.7-.7 1.7-1.3 2.8-1.7 1.4-.5 2.5-1.5 3.2-2.9.9-1.8 1.4-5.2 1.4-8.8s-.5-7.8-1.5-11.2C35.8 16.6 32.5 14 28 14z"
-                  fill="white"
-                  opacity="0.96"
-                />
-              </svg>
-            </div>
-            <div className="hidden md:block">
-              <p className="text-sm font-bold leading-tight text-[var(--ds-text)]">NuShine</p>
-            </div>
+          <Link to="/home" className="flex shrink-0 items-center" aria-label="Appointin home">
+            <WordmarkLogo height={13} />
           </Link>
           <div className="mx-1 hidden h-5 w-px bg-[var(--ds-header-border)] lg:block" />
           <div className="hidden min-w-0 md:block">

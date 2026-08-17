@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    DESIGN SYSTEM · GRID & LAYOUT
-   NuShine Enterprise Dental Platform
+   Appointin Enterprise Dental Platform
 
    One grid, inherited by every page. The primitives here exist so that no
    module ever hand-authors a `grid-template-columns` or a gap, which is what

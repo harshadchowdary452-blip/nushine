@@ -21,6 +21,6 @@ export const useFavoriteStore = create<FavoriteStore>()(
       },
       isFavorite: (path) => get().items.includes(path),
     }),
-    { name: "nushine-favorites" }
+    { name: "appointin-favorites" }
   )
 )

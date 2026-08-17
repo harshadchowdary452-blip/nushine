@@ -35,30 +35,20 @@ test_async_session_factory = async_sessionmaker(engine, class_=AsyncSession, exp
 @pytest.fixture(autouse=True)
 async def setup_database():
     async with engine.begin() as conn:
-        # Clean slate: drop everything before creating to avoid stale data
-        result = await conn.execute(text(
-            "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
-        ))
-        for row in result:
-            await conn.execute(text(f'DROP TABLE IF EXISTS "{row[0]}" CASCADE'))
-        result = await conn.execute(text(
-            "SELECT typname FROM pg_type WHERE typcategory = 'E'"
-        ))
-        for row in result:
-            await conn.execute(text(f'DROP TYPE IF EXISTS "{row[0]}" CASCADE'))
+        # Nuclear option: drop the entire public schema (tables, types, sequences, etc.)
+        # and recreate it. This is the only reliable way to clean up PostgreSQL ENUM
+        # types like 'role', 'case_status', etc. that cause "already exists" errors.
+        await conn.execute(text("DROP SCHEMA public CASCADE"))
+        await conn.execute(text("CREATE SCHEMA public"))
+        await conn.execute(text("GRANT ALL ON SCHEMA public TO postgres"))
+        await conn.execute(text("GRANT ALL ON SCHEMA public TO public"))
         await conn.run_sync(Base.metadata.create_all)
     yield
     async with engine.begin() as conn:
-        result = await conn.execute(text(
-            "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
-        ))
-        for row in result:
-            await conn.execute(text(f'DROP TABLE IF EXISTS "{row[0]}" CASCADE'))
-        result = await conn.execute(text(
-            "SELECT typname FROM pg_type WHERE typcategory = 'E'"
-        ))
-        for row in result:
-            await conn.execute(text(f'DROP TYPE IF EXISTS "{row[0]}" CASCADE'))
+        await conn.execute(text("DROP SCHEMA public CASCADE"))
+        await conn.execute(text("CREATE SCHEMA public"))
+        await conn.execute(text("GRANT ALL ON SCHEMA public TO postgres"))
+        await conn.execute(text("GRANT ALL ON SCHEMA public TO public"))
 
 
 async def override_get_db():

@@ -1,5 +1,5 @@
 """
-NuShine Dental - SQLite to PostgreSQL Migration Script
+Appointin Dental - SQLite to PostgreSQL Migration Script
 ZERO DATA LOSS GUARANTEED
 
 Usage:
@@ -248,7 +248,7 @@ async def create_pg_schema(pg_url: str):
 
 
 async def main():
-    parser = argparse.ArgumentParser(description="Migrate NuShine Dental from SQLite to PostgreSQL")
+    parser = argparse.ArgumentParser(description="Migrate Appointin Dental from SQLite to PostgreSQL")
     parser.add_argument("--pg-url", required=True, help="PostgreSQL connection string (asyncpg format)")
     parser.add_argument("--skip-schema", action="store_true", help="Skip schema creation (if already exists)")
     parser.add_argument("--skip-migrate", action="store_true", help="Skip data migration (verify only)")
@@ -264,7 +264,7 @@ async def main():
 
     start_time = datetime.now()
     log.info("=" * 60)
-    log.info("NUSHINE DENTAL - SQLite TO PostgreSQL MIGRATION")
+    log.info("APPOINTIN DENTAL - SQLite TO PostgreSQL MIGRATION")
     log.info("=" * 60)
 
     log.info("\n[STEP 1] Auditing SQLite database...")

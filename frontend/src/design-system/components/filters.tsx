@@ -156,7 +156,7 @@ interface SavedFiltersProps {
 export function SavedFilters({ storageKey, current, onApply }: SavedFiltersProps) {
   const [sets, setSets] = React.useState<SavedFilterSet[]>(() => {
     try {
-      const raw = localStorage.getItem(`nushine.saved-filters.${storageKey}`)
+      const raw = localStorage.getItem(`appointin.saved-filters.${storageKey}`)
       return raw ? (JSON.parse(raw) as SavedFilterSet[]) : []
     } catch {
       return []
@@ -168,7 +168,7 @@ export function SavedFilters({ storageKey, current, onApply }: SavedFiltersProps
   const persist = (next: SavedFilterSet[]) => {
     setSets(next)
     try {
-      localStorage.setItem(`nushine.saved-filters.${storageKey}`, JSON.stringify(next))
+      localStorage.setItem(`appointin.saved-filters.${storageKey}`, JSON.stringify(next))
     } catch {
       // Storage may be unavailable (private mode) — the feature degrades to session-only.
     }

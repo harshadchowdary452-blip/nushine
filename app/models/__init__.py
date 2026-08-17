@@ -75,6 +75,7 @@ from app.models.laboratory import Laboratory
 from app.models.lab_case import LabCase
 from app.models.lab_case_event import LabCaseEvent
 from app.models.communication_center_activity import CommunicationCenterActivity
+from app.models.demo_request import DemoRequest
 
 __all__ = [
     "AdminGroup", "Hospital", "User", "Patient", "Consultant",
@@ -122,4 +123,5 @@ __all__ = [
     "PendingInventoryItem",
     "Laboratory", "LabCase", "LabCaseEvent",
     "CommunicationCenterActivity",
+    "DemoRequest",
 ]

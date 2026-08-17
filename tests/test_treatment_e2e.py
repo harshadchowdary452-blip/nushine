@@ -73,7 +73,7 @@ print("=" * 60)
 
 # ── Step 0: Login ──────────────────────────────────────────
 print("\n[0] Login as superadmin...")
-token = login("superadmin@dental.com")
+token = login("superadmin@appointin.com")
 print(f"    Token obtained: {token[:20]}...")
 
 # Get a hospital ID

@@ -18,9 +18,9 @@ from app.core.permissions import Role
 from app.core.logging import setup_logging, correlation_id, generate_correlation_id
 from app.core.middleware import RequestIDMiddleware
 from app.services.master_catalogue_seed import seed_master_inventory_catalogue
-from app.dependencies import verify_hospital_context
+from app.dependencies import verify_hospital_context, get_current_user
 from app.utils.scheduler import check_appointment_reminders, check_same_day_appointments, check_missed_appointments, check_overdue_treatments, check_recurring_recalls
-from app.routers import auth, admin_groups, hospitals, doctors, consultants, patients, cases, consultant_notes, treatment_plans, treatment_sittings, treatment_plan_items, appointments, billings, pre_ops, post_ops, dashboards, doctor_performance, whatsapp_messaging, whatsapp_config, notifications, hospital_monthly_expenses, reports, crm, crm_v2, calendar, status_audit, leads, doctor_working_hours, doctor_availability, doctor_leaves, doctor_blocked_slots, consent_forms, enquiries, treatment_follow_ups, recalls, exports, treatment_types, doctor_queue, clinical_progress_notes, master_data, crm_rules, crm_config_settings, crm_feedback, crm_settings, users, tasks, inventory_master, inventory_categories, suppliers, hospital_inventory, inventory_transactions, monthly_orders, inventory_reports, inventory_insights, pending_inventory_items, laboratories, lab_cases, communication_center
+from app.routers import auth, admin_groups, hospitals, doctors, consultants, patients, cases, consultant_notes, treatment_plans, treatment_sittings, treatment_plan_items, appointments, billings, pre_ops, post_ops, dashboards, doctor_performance, whatsapp_messaging, whatsapp_config, notifications, hospital_monthly_expenses, reports, crm, crm_v2, calendar, status_audit, leads, doctor_working_hours, doctor_availability, doctor_leaves, doctor_blocked_slots, consent_forms, enquiries, treatment_follow_ups, recalls, exports, treatment_types, doctor_queue, clinical_progress_notes, master_data, crm_rules, crm_config_settings, crm_feedback, crm_settings, users, tasks, inventory_master, inventory_categories, suppliers, hospital_inventory, inventory_transactions, monthly_orders, inventory_reports, inventory_insights, pending_inventory_items, laboratories, lab_cases, communication_center, demo_requests
 from app.crm.routers import events as crm_events
 from app.crm.routers import event_test as crm_event_test
 from app.crm.routers import automation as crm_automation
@@ -264,6 +264,8 @@ Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
 app.include_router(auth.router, prefix="/api/v1")
+app.include_router(demo_requests.router, prefix="/api/v1")
+app.include_router(demo_requests.admin_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
 app.include_router(admin_groups.router, prefix="/api/v1")
 app.include_router(hospitals.router, prefix="/api/v1")
 app.include_router(doctors.router, prefix="/api/v1", dependencies=[Depends(verify_hospital_context)])

@@ -224,7 +224,7 @@ async def seed():
                                  sent_at=datetime.now(timezone.utc) - timedelta(days=1), created_at=datetime.now(timezone.utc) - timedelta(days=1)),
                 CommunicationLog(patient_id=PATIENT_UUIDS[1], hospital_id=HOSPITAL_ID, doctor_id=DOCTOR_IDS[3],
                                  channel=CommunicationChannel.WHATSAPP.value, message_type=MessageType.GENERAL.value,
-                                 message="Thank you for visiting NUshine Dental! We hope to see you again.",
+                                 message="Thank you for visiting Appointin! We hope to see you again.",
                                  status=CommunicationStatus.DELIVERED.value,
                                  sent_at=datetime.now(timezone.utc) - timedelta(hours=12), created_at=datetime.now(timezone.utc) - timedelta(hours=12)),
                 CommunicationLog(patient_id=PATIENT_UUIDS[0], hospital_id=HOSPITAL_ID, doctor_id=DOCTOR_IDS[1],

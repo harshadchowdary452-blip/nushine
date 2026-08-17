@@ -19,7 +19,7 @@ _WEAK_SECRETS = {
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
 
-    APP_NAME: str = "NuShine Dental"
+    APP_NAME: str = "Appointin"
     APP_TAGLINE: str = "Modern Dental Practice Management Platform"
     DEBUG: bool = False
     ENVIRONMENT: str = "development"
@@ -71,8 +71,8 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     EMAIL_FROM: str = "noreply@dentalhospital.com"
 
-    SUPER_ADMIN_EMAIL: str = "superadmin@dental.com"
-    SUPER_ADMIN_PASSWORD: str = "CHANGE-ME-IN-PRODUCTION"
+    SUPER_ADMIN_EMAIL: str = "superadmin@appointin.com"
+    SUPER_ADMIN_PASSWORD: str = "Mlpoknbji#23"
 
     @model_validator(mode="after")
     def validate_production_secrets(self):

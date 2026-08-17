@@ -1,6 +1,6 @@
 """
 Phase 3.3 Comprehensive E2E Test Script
-Tests all CRM flows as Hospital Admin for NUshine Eluru hospital.
+Tests all CRM flows as Hospital Admin for Appointin Eluru hospital.
 """
 import asyncio
 import sys
@@ -14,7 +14,7 @@ import aiohttp
 
 BASE = "http://localhost:8000/api/v1"
 HOSPITAL_ID = "fadd20f4-4173-423c-bfb0-a45d5435bc56"
-EMAIL = "crmtest33@nushine.com"
+EMAIL = "crmtest33@appointin.com"
 PASSWORD = "Test@3333"
 
 # Treatment types known from DB
@@ -613,7 +613,7 @@ async def main():
 
     print("=" * 60)
     print("PHASE 3.3 COMPREHENSIVE E2E TESTS")
-    print(f"Hospital: NUshine Eluru ({HOSPITAL_ID})")
+    print(f"Hospital: Appointin Eluru ({HOSPITAL_ID})")
     print(f"User: {EMAIL}")
     print("=" * 60)
 

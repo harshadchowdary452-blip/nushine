@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useBlocker } from "react-router-dom"
 
-const draftPrefix = "nushine.form"
+const draftPrefix = "appointin.form"
 
 export interface UseFormDraftOptions {
   /** Bump when the persisted draft shape changes. */

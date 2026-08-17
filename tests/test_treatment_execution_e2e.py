@@ -47,7 +47,7 @@ def main():
     if not PASSWORD:
         print("  FAIL  Missing SUPER_ADMIN_PASSWORD env var (must match the API's seeded admin)")
         return 1
-    r = requests.post(f"{BASE}/auth/login", json={"email": "superadmin@dental.com", "password": PASSWORD})
+    r = requests.post(f"{BASE}/auth/login", json={"email": "superadmin@appointin.com", "password": PASSWORD})
     check("Login returns 200", r.status_code == 200, r.status_code)
     token = r.json()["access_token"]
     h = {"Authorization": f"Bearer {token}"}

@@ -54,7 +54,7 @@ whatsapp_provider = WhatsAppProvider()
 
 
 def _brand(hospital_name: Optional[str] = None) -> str:
-    name = hospital_name or "NuShine Dental"
+    name = hospital_name or "Appointin"
     return f"Warm Regards,\n{name}\nPatient Care Team | 9704702601"
 
 

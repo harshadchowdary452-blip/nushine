@@ -4,8 +4,8 @@ from typing import Optional
 from jose import JWTError, jwt
 from app.config import settings
 
-TOKEN_ISSUER = "nushine-dental"
-TOKEN_AUDIENCE = "nushine-web"
+TOKEN_ISSUER = "appointin"
+TOKEN_AUDIENCE = "appointin-web"
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:

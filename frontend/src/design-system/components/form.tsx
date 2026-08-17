@@ -75,7 +75,7 @@ FormField.displayName = "FormField"
  * A titled, collapsible form section. Long forms become scannable groups;
  * sections collapse to a summary so a screenful fits the viewport. Pass
  * `memoryKey` to persist each section's expanded/collapsed state across
- * sessions (keyed `nushine.ws.form.section.<memoryKey>`).
+ * sessions (keyed `appointin.ws.form.section.<memoryKey>`).
  */
 function FormSection({
   title,
@@ -97,7 +97,7 @@ function FormSection({
   const [open, setOpen] = React.useState<boolean | undefined>(() => {
     if (!memoryKey) return undefined
     try {
-      const raw = localStorage.getItem(`nushine.ws.form.section.${memoryKey}`)
+      const raw = localStorage.getItem(`appointin.ws.form.section.${memoryKey}`)
       const parsed = raw ? (JSON.parse(raw) as { v?: number; s?: { open?: boolean } }) : null
       return typeof parsed?.s?.open === "boolean" ? parsed.s.open : undefined
     } catch {
@@ -109,7 +109,7 @@ function FormSection({
     if (memoryKey) {
       try {
         localStorage.setItem(
-          `nushine.ws.form.section.${memoryKey}`,
+          `appointin.ws.form.section.${memoryKey}`,
           JSON.stringify({ v: 1, s: { open: next } }),
         )
       } catch {

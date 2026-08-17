@@ -36,7 +36,7 @@ export const useRecentItemsStore = create<RecentItemsState>()(
           items: get().items.filter((r) => !(r.kind === kind && r.id === id)),
         }),
     }),
-    { name: "nushine-recent-items", version: 1 }
+    { name: "appointin-recent-items", version: 1 }
   )
 )
 
