@@ -75,7 +75,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
             <Link to="/" className="flex items-center gap-2.5 shrink-0">
-              <img src={appointinLogo} alt="Appointin" className="h-7 w-auto object-contain" draggable={false} />
+              <img src={appointinLogo} alt="Appointin" className="h-14 w-auto object-contain" draggable={false} />
             </Link>
 
             <nav className="hidden lg:flex items-center gap-1">
@@ -125,11 +125,11 @@ export default function LandingPage() {
             <motion.h1 variants={fadeUp} transition={{ duration: 0.6 }} className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-[#0F172A] leading-[1.1]">
               One Platform for Complete{" "}
               <span className="bg-gradient-to-r from-[#1E3A5F] via-[#4F46E5] to-[#0F766E] bg-clip-text text-transparent">
-                Healthcare Operations
+                Dental Operations
               </span>
             </motion.h1>
             <motion.p variants={fadeUp} transition={{ duration: 0.6 }} className="mt-6 text-lg text-gray-500 max-w-2xl mx-auto leading-relaxed">
-              Appointin connects patients, CRM, appointments, cases, treatments, billing, laboratory, inventory, communication, and analytics in one platform built for healthcare.
+              Appointin connects patients, CRM, appointments, cases, treatments, billing, laboratory, inventory, communication, and analytics in one platform built for dental practices.
             </motion.p>
             <motion.div variants={fadeUp} transition={{ duration: 0.5 }} className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
               <a href="#demo" className="inline-flex items-center gap-2 bg-[#1E3A5F] hover:bg-[#163050] text-white font-semibold px-8 py-3.5 rounded-xl transition-all shadow-lg shadow-[#1E3A5F]/25 text-sm">
@@ -158,10 +158,10 @@ export default function LandingPage() {
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={stagger} className="text-center mb-16">
             <motion.p variants={fadeUp} transition={{ duration: 0.4 }} className="text-xs font-bold tracking-[0.2em] uppercase text-[#1E3A5F] mb-3">Why Appointin</motion.p>
             <motion.h2 variants={fadeUp} transition={{ duration: 0.5 }} className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[#0F172A]">
-              Built for Healthcare. Designed for Growth.
+              Built for Dental Practices. Designed for Scale.
             </motion.h2>
             <motion.p variants={fadeUp} transition={{ duration: 0.5 }} className="mt-5 text-gray-500 leading-relaxed max-w-2xl mx-auto">
-              Healthcare organizations need a single platform that connects clinical workflows, patient management, operations, and analytics — not another disconnected tool.
+              Dental practices need a single platform that connects clinical workflows, patient management, operations, and analytics — not another disconnected tool.
             </motion.p>
           </motion.div>
 
@@ -188,7 +188,7 @@ export default function LandingPage() {
               Everything Your Organization Needs. Connected.
             </motion.h2>
             <motion.p variants={fadeUp} transition={{ duration: 0.5 }} className="mt-5 text-gray-500 leading-relaxed max-w-2xl mx-auto">
-              A comprehensive healthcare management platform covering every workflow — from patient registration to revenue analytics.
+              A comprehensive dental practice management platform covering every workflow — from patient registration to revenue analytics.
             </motion.p>
           </motion.div>
 
@@ -219,7 +219,7 @@ export default function LandingPage() {
                 Centralized patient records that bring together history, cases, treatments, appointments, billing, medications, and follow-ups in one place.
               </motion.p>
               <motion.div variants={fadeUp} transition={{ duration: 0.4 }} className="space-y-2">
-                {["Complete medical and dental history", "Cases and treatment records", "Appointment and follow-up tracking", "Billing and payment history", "Medication and prescription records", "Clinical notes and progress"].map((item) => (
+                {["                Complete medical and dental history", "Cases and treatment records", "Appointment and follow-up tracking", "Billing and payment history", "Medication and prescription records", "Clinical notes and progress"].map((item) => (
                   <div key={item} className="flex items-center gap-2.5">
                     <Check className="h-4 w-4 text-[#059669] shrink-0" />
                     <span className="text-sm text-gray-600">{item}</span>
@@ -868,10 +868,10 @@ export default function LandingPage() {
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={stagger}>
               <motion.p variants={fadeUp} transition={{ duration: 0.4 }} className="text-xs font-bold tracking-[0.2em] uppercase text-[#A78BFA] mb-3">Why Appointin</motion.p>
               <motion.h2 variants={fadeUp} transition={{ duration: 0.5 }} className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
-                One Platform. Complete Healthcare Operations.
+                One Platform. Complete Dental Operations.
               </motion.h2>
               <motion.p variants={fadeUp} transition={{ duration: 0.5 }} className="mt-5 text-gray-400 leading-relaxed">
-                Stop managing healthcare across disconnected tools. Appointin brings everything together.
+                Stop managing your dental practice across disconnected tools. Appointin brings everything together.
               </motion.p>
             </motion.div>
           </div>
@@ -923,7 +923,7 @@ export default function LandingPage() {
             <div className="absolute -bottom-20 -left-20 w-60 h-60 rounded-full bg-[#7C3AED]/20 blur-3xl" />
             <div className="relative z-10">
               <motion.h2 variants={fadeUp} transition={{ duration: 0.5 }} className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white max-w-2xl mx-auto">
-                Ready to Connect Your Healthcare Operations?
+                Ready to Connect Your Dental Operations?
               </motion.h2>
               <motion.p variants={fadeUp} transition={{ duration: 0.5 }} className="mt-4 text-gray-300 max-w-lg mx-auto">
                 Discover how Appointin can simplify your clinic or hospital&rsquo;s complete workflow.
@@ -947,9 +947,9 @@ export default function LandingPage() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
             <div>
               <Link to="/" className="flex items-center gap-2 mb-4">
-                <img src={appointinLogo} alt="Appointin" className="h-6 w-auto object-contain" draggable={false} />
+                <img src={appointinLogo} alt="Appointin" className="h-12 w-auto object-contain" draggable={false} />
               </Link>
-              <p className="text-xs text-gray-400 leading-relaxed">One intelligent platform connecting the complete healthcare journey.</p>
+              <p className="text-xs text-gray-400 leading-relaxed">One intelligent platform connecting the complete dental journey.</p>
             </div>
             <div>
               <h4 className="text-xs font-bold text-[#0F172A] uppercase tracking-wider mb-3">Platform</h4>
@@ -978,7 +978,7 @@ export default function LandingPage() {
           </div>
           <div className="mt-10 pt-6 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3">
             <p className="text-[11px] text-gray-400">&copy; 2026 Appointin. All rights reserved.</p>
-            <p className="text-[11px] text-gray-400">Healthcare Management Platform</p>
+            <p className="text-[11px] text-gray-400">Dental Practice Management Platform</p>
           </div>
         </div>
       </footer>

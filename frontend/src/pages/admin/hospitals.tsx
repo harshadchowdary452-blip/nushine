@@ -380,7 +380,7 @@ export default function AdminHospitals() {
                 : "Fill in the details to add a new hospital."}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
+          <form noValidate onSubmit={handleSubmit} className="flex flex-col min-h-0">
             <div className="overflow-y-auto px-6 py-4 space-y-4 flex-1">
               <div className="grid gap-2">
                 <Label htmlFor="name">Name</Label>

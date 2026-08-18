@@ -421,7 +421,7 @@ export default function AppointmentList() {
             <DialogTitle>New Appointment</DialogTitle>
             <DialogDescription>Schedule a new appointment for a patient.</DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
+          <form noValidate onSubmit={handleSubmit} className="flex flex-col min-h-0">
             <div className="overflow-y-auto px-6 py-4 space-y-4 flex-1">
               {contextPatient && (
                 <WorkflowSummaryPanel

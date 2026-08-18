@@ -278,7 +278,7 @@ export default function CrmSettingsPage() {
         </div>
 
         <div className={cn("grid gap-6", showPreview ? "lg:grid-cols-[1fr,380px]" : "")}>
-          <form onSubmit={handleSubmit(handleSave)} className="space-y-5">
+          <form noValidate onSubmit={handleSubmit(handleSave)} className="space-y-5">
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeTab}

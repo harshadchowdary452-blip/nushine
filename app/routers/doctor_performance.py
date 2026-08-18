@@ -38,7 +38,7 @@ from app.models.patient import Patient
 from app.models.treatment_plan import TreatmentPlan, TreatmentPlanStatus
 from app.models.treatment_sitting import TreatmentSitting, TreatmentSittingStatus
 from app.models.user import User
-from app.routers.dashboards import _trend_group_expr
+from app.routers.dashboards.helpers import _trend_group_expr
 from app.utils.dashboard_helpers import get_date_range, get_previous_date_range
 
 router = APIRouter(prefix="/doctor-performance", tags=["Doctor Performance"])

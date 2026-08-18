@@ -301,7 +301,7 @@ export default function CaseReportForm({
   const compact = mode === "create"
 
   return (
-    <form onSubmit={handleSubmit} className={compact ? "space-y-3" : "space-y-3"}>
+    <form noValidate onSubmit={handleSubmit} className={compact ? "space-y-3" : "space-y-3"}>
       {/* Patient + Doctor selection (create mode only) */}
       {mode === "create" && (
         <>

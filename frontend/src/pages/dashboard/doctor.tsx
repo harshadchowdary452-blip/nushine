@@ -11,11 +11,12 @@ import { dashboardApi } from "@/services/endpoints"
 import { formatIndianNumber, formatIndianRupees } from "@/lib/currency"
 import { useDashboardActivity } from "@/lib/dashboard-activity"
 import { useUnbilledBilling } from "@/lib/use-unbilled-billing"
+import { cn } from "@/lib/utils"
 import {
   AlertCenter, BusinessInsights, CommandCenter, DashboardChart,
   DashboardHeader, DashboardSection, DashboardShell, DepartmentPerformance,
   DonutChart, ExecutiveSummary, KpiGrid, QuickActionCenter, RecentActivity,
-  SavedViewsMenu, downloadCSV, useDashboardFilter, useDashboardPersonalization,
+  SavedViewsMenu, WidgetCard, downloadCSV, useDashboardFilter, useDashboardPersonalization,
   BiInsightsGrid, BI_INSIGHTS_WIDGETS,
 } from "@/design-system/dashboard"
 import type { AlertItem, Insight, KpiDatum, PerformerDatum, QuickAction, SummaryHighlight, SummaryMetric } from "@/design-system/dashboard"
@@ -39,6 +40,7 @@ interface TreatmentDatum {
 interface DoctorStats {
   my_patients?: number
   today_appointments?: number
+  today_appointments_list?: Array<{ id: string; time: string; status: string; notes: string; patient_name: string; chief_complaint: string }>
   active_cases?: number
   cases_completed?: number
   treatment_success_rate?: number
@@ -74,6 +76,17 @@ function getGreeting(): string {
   if (h < 12) return "Good Morning"
   if (h < 17) return "Good Afternoon"
   return "Good Evening"
+}
+
+const STATUS_STYLE: Record<string, string> = {
+  SCHEDULED: "bg-[var(--ds-info-subtle)] text-[var(--ds-info)]",
+  CONFIRMED: "bg-[var(--ds-success-subtle)] text-[var(--ds-success)]",
+  CHECKED_IN: "bg-[var(--ds-accent-subtle)] text-[var(--ds-accent)]",
+  IN_PROGRESS: "bg-[var(--ds-warning-subtle)] text-[var(--ds-warning)]",
+  COMPLETED: "bg-[var(--ds-success-subtle)] text-[var(--ds-success)]",
+  CANCELLED: "bg-[var(--ds-danger-subtle)] text-[var(--ds-danger)]",
+  NO_SHOW: "bg-[var(--ds-surface-secondary)] text-[var(--ds-text-secondary)]",
+  RESCHEDULED: "bg-[var(--ds-warning-subtle)] text-[var(--ds-warning)]",
 }
 
 /* ──────────────────────────────────────────────────────────────────────────── */
@@ -408,6 +421,7 @@ export default function DoctorDashboard() {
     month: "long",
     day: "numeric",
   })
+  const todayAppts = s?.today_appointments_list ?? []
 
   return (
     <DashboardShell>
@@ -502,6 +516,40 @@ export default function DoctorDashboard() {
           onDrill={(entity, opts) => navigate(drill(entity, opts))}
         />
       </DashboardSection>
+
+      <WidgetCard
+        title="Today's Appointments"
+        description={`${todayAppts.length} scheduled`}
+      >
+        {todayAppts.length > 0 ? (
+          <ul className="flex max-h-[320px] flex-col gap-2 overflow-y-auto">
+            {todayAppts.map((appt) => (
+              <li
+                key={appt.id}
+                className="flex items-center justify-between gap-3 rounded-[var(--ds-radius-xl)] bg-[var(--ds-surface-secondary)] px-3 py-2.5"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--ds-radius-lg)] bg-[var(--ds-primary-subtle)]">
+                    <Clock className="h-4 w-4 text-[var(--ds-primary)]" aria-hidden="true" />
+                  </span>
+                  <div className="ds-min-w-0">
+                    <p className="ds-body truncate text-[var(--ds-text)]">{appt.patient_name}</p>
+                    <p className="ds-caption truncate text-[var(--ds-text-secondary)]">
+                      {appt.time}
+                      {appt.chief_complaint ? ` · ${appt.chief_complaint}` : appt.notes ? ` · ${appt.notes}` : ""}
+                    </p>
+                  </div>
+                </div>
+                <span className={cn("ds-caption shrink-0 rounded-full px-2 py-0.5 font-semibold", STATUS_STYLE[appt.status] || STATUS_STYLE.SCHEDULED)}>
+                  {appt.status.replace("_", " ")}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="ds-caption py-10 text-center text-[var(--ds-text-tertiary)]">No appointments scheduled for today</p>
+        )}
+      </WidgetCard>
 
       <div className="grid gap-3 lg:grid-cols-2">
         <RecentActivity items={activity.items} loading={activity.loading} />

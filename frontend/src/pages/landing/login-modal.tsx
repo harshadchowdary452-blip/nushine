@@ -100,7 +100,7 @@ export default function LoginModal({ open, onClose }: LoginModalProps) {
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form noValidate onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1.5">Email</label>
                   <div className="relative">

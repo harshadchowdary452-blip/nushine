@@ -11,7 +11,7 @@ import {
   Clock, UserPlus, Search, Download, LayoutList, Kanban,
   Sun, Moon, Star, ChevronDown, Hospital, Menu, ListChecks,
   Package, FlaskConical,
-  Inbox, ClipboardList,
+  Inbox, ClipboardList, HelpCircle,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useSidebarStore } from "@/store/sidebarStore"
@@ -98,7 +98,10 @@ const navConfig: Record<RoleKey, NavGroup[]> = {
     },
     {
       label: "Settings",
-      items: [{ label: "Settings", icon: Settings, path: "/settings" }],
+      items: [
+        { label: "Settings", icon: Settings, path: "/settings" },
+        { label: "Help", icon: HelpCircle, path: "/help" },
+      ],
     },
   ],
   HOSPITAL_ADMIN: [
@@ -160,6 +163,7 @@ const navConfig: Record<RoleKey, NavGroup[]> = {
         { label: "Clinical Settings", icon: Stethoscope, path: "/settings/clinical" },
         { label: "CRM Settings", icon: Activity, path: "/crm/settings" },
         { label: "WhatsApp Config", icon: MessageSquare, path: "/settings/whatsapp" },
+        { label: "Help", icon: HelpCircle, path: "/help" },
       ],
     },
   ],
@@ -200,7 +204,10 @@ const navConfig: Record<RoleKey, NavGroup[]> = {
     },
     {
       label: "Settings",
-      items: [{ label: "Settings", icon: Settings, path: "/settings" }],
+      items: [
+        { label: "Settings", icon: Settings, path: "/settings" },
+        { label: "Help", icon: HelpCircle, path: "/help" },
+      ],
     },
   ],
 }

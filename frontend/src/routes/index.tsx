@@ -8,6 +8,7 @@ import { getHospitalOverride, setHospitalOverride } from "@/lib/hospital-overrid
 // Deep import: the @/design-system barrel also re-exports the dashboard chart
 // modules (recharts), which would statically bundle ~450KB into the entry chunk.
 import EnterpriseAppLayout from "@/design-system/components/app-layout"
+import DocumentTitle from "@/components/document-title"
 
 const LandingPage = lazy(() => import("@/pages/landing"))
 const Login = lazy(() => import("@/pages/auth/login"))
@@ -57,6 +58,7 @@ const DoctorPerformanceOverview = lazy(() => import("@/pages/performance/overvie
 const DoctorPerformanceProfile = lazy(() => import("@/pages/performance/doctor-profile"))
 const InventoryPage = lazy(() => import("@/pages/inventory/index"))
 const LaboratoryPage = lazy(() => import("@/pages/laboratory/index"))
+const HelpPage = lazy(() => import("@/pages/help"))
 const NotFoundPage = lazy(() => import("@/pages/errors/not-found"))
 const SuperAdminDemoRequests = lazy(() => import("@/pages/admin/demo-requests"))
 
@@ -99,15 +101,26 @@ function RootLayout() {
   const { user, accessToken, refreshToken } = useAuthStore()
   const isAuthenticated = !!user && !!accessToken && !!refreshToken
 
-  // Landing page at /: no auth needed, no ERP layout wrapping
+  // Landing page at /: show landing for unauthenticated, redirect authenticated users to dashboard
   if (location.pathname === "/") {
-    return <Outlet />
+    if (isAuthenticated) return <Navigate to={getDashboardPath(user?.role)} replace />
+    return (
+      <>
+        <DocumentTitle />
+        <Outlet />
+      </>
+    )
   }
 
   // Login page: redirect to dashboard if already authenticated
   if (location.pathname === "/login") {
     if (isAuthenticated) return <Navigate to={getDashboardPath(user?.role)} replace />
-    return <Outlet />
+    return (
+      <>
+        <DocumentTitle />
+        <Outlet />
+      </>
+    )
   }
 
   // Protected routes: require auth, wrap in ERP layout
@@ -116,11 +129,14 @@ function RootLayout() {
   }
 
   return (
-    <EnterpriseAppLayout>
-      <Suspense fallback={<PageLoader />}>
-        <Outlet />
-      </Suspense>
-    </EnterpriseAppLayout>
+    <>
+      <DocumentTitle />
+      <EnterpriseAppLayout>
+        <Suspense fallback={<PageLoader />}>
+          <Outlet />
+        </Suspense>
+      </EnterpriseAppLayout>
+    </>
   )
 }
 
@@ -232,6 +248,10 @@ const protectedChildren = [
   {
     path: "/laboratory",
     element: withRoles(<LaboratoryPage />, INVENTORY_ROLES),
+  },
+  {
+    path: "/help",
+    element: withRoles(<HelpPage />, ["GROUP_ADMIN", "HOSPITAL_ADMIN", "DOCTOR"]),
   },
 ]
 

@@ -682,6 +682,7 @@ export default function HospitalAdminDashboard() {
                       <p className="ds-body truncate text-[var(--ds-text)]">{appt.patient_name}</p>
                       <p className="ds-caption truncate text-[var(--ds-text-secondary)]">
                         {appt.doctor_name} · {appt.time}
+                        {appt.chief_complaint ? ` · ${appt.chief_complaint}` : ""}
                       </p>
                     </div>
                   </div>

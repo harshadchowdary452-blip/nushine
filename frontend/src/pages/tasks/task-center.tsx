@@ -362,25 +362,25 @@ export default function TaskCenter() {
               </TabsList>
             </Tabs>
             <div className="flex flex-wrap items-center gap-2">
-              <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
+              <Select value={assigneeFilter || "__all__"} onValueChange={(v) => setAssigneeFilter(v === "__all__" ? "" : v)}>
                 <SelectTrigger className="h-9 w-full sm:w-44" aria-label="Filter by assignee">
                   <UserPlus className="h-3.5 w-3.5 shrink-0 text-[var(--ds-text-tertiary)]" />
                   <SelectValue placeholder="Assigned to anyone" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Anyone</SelectItem>
+                  <SelectItem value="__all__">Anyone</SelectItem>
                   <SelectItem value="me">Assigned to me</SelectItem>
                   {assignees.map((a) => (
                     <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={statusFilter || "__all__"} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
                 <SelectTrigger className="h-9 w-full sm:w-40" aria-label="Filter by status">
                   <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All statuses</SelectItem>
+                  <SelectItem value="__all__">All statuses</SelectItem>
                   <SelectItem value="todo">To do</SelectItem>
                   <SelectItem value="in_progress">In progress</SelectItem>
                   <SelectItem value="done">Completed</SelectItem>

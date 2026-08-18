@@ -441,7 +441,7 @@ export default function PatientDetail() {
                   <DialogTitle>Create Appointment</DialogTitle>
                   <DialogDescription>New appointment for {patient.full_name}</DialogDescription>
                 </DialogHeader>
-                <form onSubmit={(e) => {
+                <form noValidate onSubmit={(e) => {
                   e.preventDefault();
                   createApptMutation.mutate({ patient_id: id, ...apptForm });
                 }}>
@@ -518,7 +518,7 @@ export default function PatientDetail() {
                   <DialogTitle>Create Case</DialogTitle>
                   <DialogDescription>New case for {patient.full_name}</DialogDescription>
                 </DialogHeader>
-                <form onSubmit={(e) => {
+                <form noValidate onSubmit={(e) => {
                   e.preventDefault();
                   createCaseMutation.mutate({ patient_id: id, ...caseForm });
                 }}>

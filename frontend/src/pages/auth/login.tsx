@@ -8,6 +8,8 @@ import {
 import { useAuthStore } from "@/store/authStore"
 import { authApi } from "@/services/endpoints"
 import { WordmarkLogo } from "@/components/ui/brand-logo"
+import { useFormValidation } from "@/hooks/use-form-validation"
+import { getApiErrorMessage } from "@/lib/api-errors"
 
 const features = [
   { icon: Users, title: "Patient Management", desc: "Centralized and secure patient records." },
@@ -15,6 +17,11 @@ const features = [
   { icon: Receipt, title: "Billing & Invoices", desc: "Accurate billing with professional invoices." },
   { icon: BarChart3, title: "Insights & Reports", desc: "Track performance and grow your practice." },
 ]
+
+type LoginFormValues = {
+  email: string
+  password: string
+}
 
 function CapsLockIndicator({ active }: { active: boolean }) {
   if (!active) return null
@@ -42,6 +49,24 @@ export default function LoginPage() {
   const location = useLocation()
   const from = (location.state as { from?: string })?.from || "/"
 
+  const validate = (values: LoginFormValues) => {
+    const errs: Record<string, string> = {}
+    if (!values.email.trim()) {
+      errs.email = "Email is required"
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) {
+      errs.email = "Please enter a valid email address"
+    }
+    if (!values.password) {
+      errs.password = "Password is required"
+    } else if (values.password.length < 6) {
+      errs.password = "Password must be at least 6 characters"
+    }
+    return errs
+  }
+
+  const { getError, handleBlur, validateAll, firstErrorRef } =
+    useFormValidation<LoginFormValues>({ validate })
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       try { setCapsLock(e.getModifierState("CapsLock")) } catch { /* caps lock detection not supported */ }
@@ -57,22 +82,30 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
+
+    const values: LoginFormValues = { email, password }
+    if (!validateAll(values)) {
+      const firstField = firstErrorRef.current
+      if (firstField) {
+        document.getElementById(`login-${firstField}`)?.focus()
+      }
+      return
+    }
+
     setLoading(true)
     try {
       const res = await authApi.login({ email, password })
       setAuth(res.user, res.access_token, res.refresh_token)
       navigate(from, { replace: true })
     } catch (err: unknown) {
-      const apiErr = err as { code?: string; message?: string; response?: { data?: { detail?: string } } } | undefined
-      if (apiErr?.code === "ECONNABORTED" || apiErr?.message?.includes("timeout")) {
-        setError("Request timed out. The server may be busy — please try again.")
-      } else {
-        setError(apiErr?.response?.data?.detail || "Invalid credentials. Please try again.")
-      }
+      setError(getApiErrorMessage(err))
     } finally {
       setLoading(false)
     }
   }
+
+  const emailError = getError("email")
+  const passwordError = getError("password")
 
   return (
     <div className="flex min-h-screen bg-[var(--ds-background)] font-['Poppins','Inter',sans-serif]">
@@ -185,34 +218,41 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-3">
+            <form noValidate onSubmit={handleSubmit} className="space-y-3">
               {/* Email */}
               <div className="space-y-1">
-                <label htmlFor="email" className="text-[11px] font-medium text-[var(--ds-text-secondary)]">
+                <label htmlFor="login-email" className="text-[11px] font-medium text-[var(--ds-text-secondary)]">
                   Email Address
                 </label>
                 <div className="relative group">
                   <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--ds-text-placeholder)] group-focus-within:text-[var(--ds-primary)] transition-colors duration-200" strokeWidth={1.5} />
                   <input
-                    id="email"
+                    id="login-email"
                     name="email"
                     type="email"
                     placeholder="Enter your email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    onBlur={() => handleBlur("email", email, { email, password })}
                     required
                     autoFocus
                     autoComplete="email"
-                    aria-label="Email address"
+                    aria-invalid={!!emailError}
+                    aria-describedby={emailError ? "login-email-error" : undefined}
                     className="h-10 w-full rounded-[10px] border-[var(--ds-input-border)] bg-[var(--ds-background-subtle)] pl-9 pr-3.5 text-xs text-[var(--ds-input-text)] outline-none transition-all duration-200 placeholder:text-[var(--ds-input-placeholder)] hover:border-[var(--ds-input-border-hover)] focus:border-[var(--ds-primary)] focus:bg-[var(--ds-surface)] focus:ring-3 focus:ring-[var(--ds-primary)]/10"
                   />
                 </div>
+                {emailError && (
+                  <p id="login-email-error" className="text-[10px] text-red-500 mt-0.5" role="alert">
+                    {emailError}
+                  </p>
+                )}
               </div>
 
               {/* Password */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <label htmlFor="password" className="text-[11px] font-medium text-[var(--ds-text-secondary)]">
+                  <label htmlFor="login-password" className="text-[11px] font-medium text-[var(--ds-text-secondary)]">
                     Password
                   </label>
                   <button
@@ -227,15 +267,17 @@ export default function LoginPage() {
                 <div className="relative group">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--ds-text-placeholder)] group-focus-within:text-[var(--ds-primary)] transition-colors duration-200" strokeWidth={1.5} />
                   <input
-                    id="password"
+                    id="login-password"
                     name="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    onBlur={() => handleBlur("password", password, { email, password })}
                     required
                     autoComplete="current-password"
-                    aria-label="Password"
+                    aria-invalid={!!passwordError}
+                    aria-describedby={passwordError ? "login-password-error" : undefined}
                     className="h-10 w-full rounded-[10px] border-[var(--ds-input-border)] bg-[var(--ds-background-subtle)] pl-9 pr-11 text-xs text-[var(--ds-input-text)] outline-none transition-all duration-200 placeholder:text-[var(--ds-input-placeholder)] hover:border-[var(--ds-input-border-hover)] focus:border-[var(--ds-primary)] focus:bg-[var(--ds-surface)] focus:ring-3 focus:ring-[var(--ds-primary)]/10"
                   />
                   <CapsLockIndicator active={capsLock} />
@@ -249,6 +291,11 @@ export default function LoginPage() {
                     {showPassword ? <EyeOff className="h-3.5 w-3.5" strokeWidth={1.5} /> : <Eye className="h-3.5 w-3.5" strokeWidth={1.5} />}
                   </button>
                 </div>
+                {passwordError && (
+                  <p id="login-password-error" className="text-[10px] text-red-500 mt-0.5" role="alert">
+                    {passwordError}
+                  </p>
+                )}
               </div>
 
               {/* Remember me */}
@@ -270,6 +317,7 @@ export default function LoginPage() {
                   initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="flex items-center gap-2 rounded-[10px] bg-red-50 px-3 py-2 text-xs text-red-600 border border-red-100"
+                  role="alert"
                 >
                   <ShieldCheck className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
                   {error}

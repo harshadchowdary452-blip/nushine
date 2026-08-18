@@ -306,7 +306,7 @@ export default function TreatmentTypesPage() {
               {editing ? "Update the treatment type details." : "Fill in the details to add a new treatment type."}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
+          <form noValidate onSubmit={handleSubmit} className="flex flex-col min-h-0">
             <div className="overflow-y-auto px-6 py-4 space-y-4 flex-1">
               <div className="grid gap-2">
                 <Label htmlFor="tt-name">Name <span className="text-red-500">*</span></Label>

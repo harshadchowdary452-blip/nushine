@@ -146,7 +146,7 @@ export default function Settings() {
               </div>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleUpdateProfile} className="space-y-5">
+              <form noValidate onSubmit={handleUpdateProfile} className="space-y-5">
                 <div className="grid gap-5 sm:grid-cols-2">
                   <div className="space-y-2 sm:col-span-2">
                     <Label>Full Name</Label>
@@ -231,7 +231,7 @@ export default function Settings() {
               </div>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleChangePassword} className="space-y-5">
+              <form noValidate onSubmit={handleChangePassword} className="space-y-5">
                 {passwordError && (
                   <div className="flex items-center gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-600">
                     <AlertCircle className="h-4 w-4 shrink-0" />
