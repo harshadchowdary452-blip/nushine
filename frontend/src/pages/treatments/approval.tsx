@@ -56,7 +56,7 @@ import type {
   ClinicalProgressNote,
   DoctorOption,
 } from "@/types"
-import { extractDetail } from "@/types"
+import { showErrorToast } from "@/utils/showErrorToast"
 
 function calcAge(dob: string | null | undefined): number | null {
   if (!dob) return null
@@ -435,11 +435,7 @@ export default function TreatmentPlanApproval() {
       navigate("/treatments")
     },
     onError: (err: Error) =>
-      addToast({
-        title: "Error",
-        description: extractDetail(err) || "Failed to approve",
-        variant: "destructive",
-      }),
+      showErrorToast(err, addToast),
   })
 
   const rejectMutation = useMutation({
@@ -456,11 +452,7 @@ export default function TreatmentPlanApproval() {
       navigate(`/cases/${caseId}`)
     },
     onError: (err: Error) =>
-      addToast({
-        title: "Error",
-        description: extractDetail(err) || "Failed to reject",
-        variant: "destructive",
-      }),
+      showErrorToast(err, addToast),
   })
 
   const requestChangesMutation = useMutation({
@@ -476,11 +468,7 @@ export default function TreatmentPlanApproval() {
       navigate(`/cases/${caseId}`)
     },
     onError: (err: Error) =>
-      addToast({
-        title: "Error",
-        description: extractDetail(err) || "Failed to request changes",
-        variant: "destructive",
-      }),
+      showErrorToast(err, addToast),
   })
 
   useEffect(() => {

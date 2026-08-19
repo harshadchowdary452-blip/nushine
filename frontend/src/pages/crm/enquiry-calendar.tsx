@@ -35,7 +35,7 @@ import {
   startOfDay,
 } from "date-fns"
 import { enquiriesApi, crmApi, doctorsApi, whatsappTemplatesApi } from "@/services/endpoints"
-import { extractDetail } from "@/types"
+import { showErrorToast } from "@/utils/showErrorToast"
 import { PageHeader } from "@/design-system"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -678,11 +678,7 @@ export default function EnquiryCalendar() {
       invalidateCalendar()
       addToast({ title: "Marked completed", variant: "success" })
     } catch (err: unknown) {
-      addToast({
-        title: "Error",
-        description: extractDetail(err) || "Failed",
-        variant: "destructive",
-      })
+      showErrorToast(err, addToast)
     }
   }
 
@@ -700,11 +696,7 @@ export default function EnquiryCalendar() {
       addToast({ title: "Rescheduled", variant: "success" })
       setReschedOpen(null)
     } catch (err: unknown) {
-      addToast({
-        title: "Error",
-        description: extractDetail(err) || "Failed to reschedule",
-        variant: "destructive",
-      })
+      showErrorToast(err, addToast)
     }
     setReschedSaving(false)
   }
@@ -732,11 +724,7 @@ export default function EnquiryCalendar() {
         variant: "success",
       })
     } catch (err: unknown) {
-      addToast({
-        title: "Error",
-        description: extractDetail(err) || "Failed to move",
-        variant: "destructive",
-      })
+      showErrorToast(err, addToast)
     }
     setDraggedItem(null)
   }
@@ -931,7 +919,7 @@ export default function EnquiryCalendar() {
       crmApi.followUps
         .update(item.id, { status: "CONTACTED", contact_channel: "CALL" })
         .then(() => invalidateCalendar())
-        .catch((err: unknown) => addToast({ title: "Could not mark as contacted", description: extractDetail(err), variant: "destructive" }))
+        .catch((err: unknown) => showErrorToast(err, addToast))
     }
   }
 

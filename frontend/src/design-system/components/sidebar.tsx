@@ -11,7 +11,7 @@ import {
   Clock, UserPlus, Search, Download, LayoutList, Kanban,
   Sun, Moon, Star, ChevronDown, Hospital, Menu, ListChecks,
   Package, FlaskConical,
-  Inbox, ClipboardList, HelpCircle,
+  Inbox, ClipboardList, HelpCircle, CreditCard,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useSidebarStore } from "@/store/sidebarStore"
@@ -55,6 +55,7 @@ const navConfig: Record<RoleKey, NavGroup[]> = {
         { label: "Groups", icon: Shield, path: "/admin/groups" },
         { label: "Hospitals", icon: Building2, path: "/admin/hospitals" },
         { label: "Doctors", icon: Stethoscope, path: "/admin/doctors" },
+        { label: "Subscriptions", icon: CreditCard, path: "/admin/subscriptions" },
         { label: "Demo Requests", icon: ClipboardList, path: "/super-admin/demo-requests" },
       ],
     },

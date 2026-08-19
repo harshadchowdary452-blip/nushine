@@ -21,7 +21,7 @@ import { useToast } from "@/components/ui/toast"
 import CaseReportForm from "@/components/cases/CaseReportForm"
 import { PageHeader, EmptyState, StatusBadge } from "@/design-system"
 import type { Case } from "@/types"
-import { extractDetail } from "@/types"
+import { showErrorToast } from "@/utils/showErrorToast"
 import { useCreateParam } from "@/lib/use-create-param"
 
 interface CaseDoctor {
@@ -101,7 +101,7 @@ export default function CaseReportsList() {
       queryClient.invalidateQueries({ queryKey: ["case-history-list"] })
       addToast({ title: "Case Report deleted", variant: "success" })
     },
-    onError: (err: unknown) => addToast({ title: "Error", description: extractDetail(err), variant: "destructive" }),
+    onError: (err: unknown) => showErrorToast(err, addToast),
   })
 
   return (

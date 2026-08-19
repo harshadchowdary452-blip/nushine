@@ -39,7 +39,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/components/ui/toast"
-import { extractDetail } from "@/types"
+import { showErrorToast } from "@/utils/showErrorToast"
 import type { ApiError } from "@/types"
 import { formatLabel, priorityColors, PAGE_CONTAINER_VARIANTS } from "@/components/crm/index"
 import { motion } from "framer-motion"
@@ -407,7 +407,7 @@ export default function AutomationBuilder() {
       resetForm()
     },
     onError: (err: ApiError) =>
-      addToast({ title: "Error", description: extractDetail(err), variant: "destructive" }),
+      showErrorToast(err, addToast),
   })
 
   const updateMutation = useMutation({
@@ -421,7 +421,7 @@ export default function AutomationBuilder() {
       resetForm()
     },
     onError: (err: ApiError) =>
-      addToast({ title: "Error", description: extractDetail(err), variant: "destructive" }),
+      showErrorToast(err, addToast),
   })
 
   const deleteMutation = useMutation({
@@ -432,7 +432,7 @@ export default function AutomationBuilder() {
       addToast({ title: "Deleted", variant: "success" })
     },
     onError: (err: ApiError) =>
-      addToast({ title: "Error", description: extractDetail(err), variant: "destructive" }),
+      showErrorToast(err, addToast),
   })
 
   const enableMutation = useMutation({
@@ -487,7 +487,7 @@ export default function AutomationBuilder() {
       addToast({ title: "Test completed", variant: "success" })
     },
     onError: (err: ApiError) =>
-      addToast({ title: "Test error", description: extractDetail(err), variant: "destructive" }),
+      showErrorToast(err, addToast),
   })
 
   const openEdit = async (ruleId: string) => {

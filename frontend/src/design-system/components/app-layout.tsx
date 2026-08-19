@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils"
 import EnterpriseSidebar from "./sidebar"
 import EnterpriseHeader from "./header"
 import GlobalSearch from "./global-search"
+import { SubscriptionReadOnlyBanner, SubscriptionExpiredOverlay } from "@/components/subscription-banner"
 
 // Entrance travel is deliberately small (--ds-motion-distance-md ≈ 8px):
 // enough to signal "new page", not enough to read as the UI rebuilding.
@@ -38,6 +39,7 @@ export default function EnterpriseAppLayout({ children }: { children: ReactNode 
       </a>
 
       <GlobalSearch />
+      <SubscriptionExpiredOverlay />
       <EnterpriseSidebar />
 
       {/* Main workspace column — only this region participates in the frame; the
@@ -56,6 +58,7 @@ export default function EnterpriseAppLayout({ children }: { children: ReactNode 
           className="min-h-0 flex-1 overflow-y-auto outline-none"
           tabIndex={-1}
         >
+          <SubscriptionReadOnlyBanner />
           <div className={cn(
             "mx-auto flex w-full min-h-full flex-col",
             "px-[var(--ds-container-padding-sm)] sm:px-[var(--ds-container-padding)] lg:px-[var(--ds-container-padding-lg)]",

@@ -72,7 +72,7 @@ import DentalEmptyState from "@/components/ui/dental-empty-state"
 import QuickExport from "@/components/ui/quick-export"
 
 import type { Lead, LeadSource, LeadStatus } from "@/types"
-import { extractDetail } from "@/types"
+import { showErrorToast } from "@/utils/showErrorToast"
 import { useCreateParam } from "@/lib/use-create-param"
 
 const priorityColors: Record<string, string> = {
@@ -429,7 +429,7 @@ export default function LeadList() {
           message: msg,
           template_name: "GREETING",
         })
-        .catch((err: unknown) => addToast({ title: "Could not log greeting", description: extractDetail(err), variant: "destructive" }))
+        .catch((err: unknown) => showErrorToast(err, addToast))
         .finally(() => {
           window.open(`https://wa.me/${phone}?text=${encodedMsg}`, "_blank")
         })

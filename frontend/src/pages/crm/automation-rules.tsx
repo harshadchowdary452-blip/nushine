@@ -30,7 +30,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/components/ui/toast"
-import { extractDetail } from "@/types"
+import { showErrorToast } from "@/utils/showErrorToast"
 import type { ApiError } from "@/types"
 
 interface AutomationRule {
@@ -196,7 +196,7 @@ export default function AutomationRules() {
       reset()
     },
     onError: (err: ApiError) =>
-      addToast({ title: "Error", description: extractDetail(err), variant: "destructive" }),
+      showErrorToast(err, addToast),
   })
 
   const updateMutation = useMutation({
@@ -208,7 +208,7 @@ export default function AutomationRules() {
       reset()
     },
     onError: (err: ApiError) =>
-      addToast({ title: "Error", description: extractDetail(err), variant: "destructive" }),
+      showErrorToast(err, addToast),
   })
 
   const deleteMutation = useMutation({
@@ -218,7 +218,7 @@ export default function AutomationRules() {
       addToast({ title: "Deleted", variant: "success" })
     },
     onError: (err: ApiError) =>
-      addToast({ title: "Error", description: extractDetail(err), variant: "destructive" }),
+      showErrorToast(err, addToast),
   })
 
   const toggleMutation = useMutation({

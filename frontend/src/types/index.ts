@@ -2118,3 +2118,90 @@ export interface CommunicationExportRequest {
   date_from?: string
   date_to?: string
 }
+
+/* ─── Subscription types ──────────────────────────────────────────────────── */
+
+export type SubscriptionStatus = "TRIAL" | "ACTIVE" | "PAST_DUE" | "EXPIRED" | "CANCELLED"
+export type SubscriptionType = "PAID" | "FREE" | "TRIAL"
+export type SubscriberType = "ADMIN_GROUP" | "HOSPITAL"
+export type PaymentMethod = "CASH" | "UPI" | "BANK_TRANSFER" | "CHEQUE" | "OTHER"
+
+export interface SubscriptionPlan {
+  id: string
+  name: string
+  description: string | null
+  price: number
+  currency: string
+  duration_months: number
+  max_hospitals: number | null
+  max_doctors: number | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface Subscription {
+  id: string
+  subscriber_type: SubscriberType
+  subscriber_id: string
+  plan_id: string
+  plan: SubscriptionPlan | null
+  subscription_type: SubscriptionType
+  status: SubscriptionStatus
+  effective_status: SubscriptionStatus | "NO_SUBSCRIPTION"
+  current_period_start: string | null
+  current_period_end: string | null
+  trial_ends_at: string | null
+  grace_period_days: number
+  cancelled_at: string | null
+  cancelled_by: string | null
+  free_until: string | null
+  free_forever: boolean
+  free_reason: string | null
+  free_notes: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+  subscriber_name?: string | null
+  hospital_count?: number
+}
+
+export interface SubscriptionPayment {
+  id: string
+  subscription_id: string
+  amount: number
+  currency: string
+  payment_method: PaymentMethod
+  payment_date: string
+  reference_number: string | null
+  notes: string | null
+  recorded_by: string | null
+  provider: string | null
+  provider_payment_id: string | null
+  provider_order_id: string | null
+  created_at: string
+}
+
+export interface SubscriptionEvent {
+  id: string
+  subscription_id: string
+  event_type: string
+  previous_plan_id: string | null
+  new_plan_id: string | null
+  previous_status: SubscriptionStatus | null
+  new_status: SubscriptionStatus | null
+  performed_by: string | null
+  reason: string | null
+  details: Record<string, unknown> | string | null
+  created_at: string
+}
+
+export interface SubscriptionDashboardStats {
+  total_active: number
+  total_trial: number
+  total_past_due: number
+  total_expired: number
+  total_free: number
+  total_cancelled: number
+  revenue_this_month: number
+}

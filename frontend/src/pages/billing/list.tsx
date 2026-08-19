@@ -40,7 +40,7 @@ import QuickExport from "@/components/ui/quick-export"
 import { formatIndianRupees } from "@/lib/currency"
 import { PageHeader, EmptyState, LoadingSkeleton, MetricCard, StatusBadge, Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/design-system"
 import type { Billing, BillingPatientSearchResult, BillingSearchCase, CaseBillable, Patient, PaginatedResponse } from "@/types"
-import { extractDetail } from "@/types"
+import { showErrorToast } from "@/utils/showErrorToast"
 import { useAuthStore } from "@/store/authStore"
 import { useCreateParam } from "@/lib/use-create-param"
 
@@ -169,7 +169,7 @@ export default function BillingList() {
       setDeletingBilling(null)
     },
     onError: (err: unknown) => {
-      addToast({ title: "Error", description: extractDetail(err) || "Failed to delete invoice", variant: "destructive" })
+      showErrorToast(err, addToast)
     },
   })
 
@@ -194,7 +194,7 @@ export default function BillingList() {
       resetForm()
     },
     onError: (err: unknown) => {
-      addToast({ title: "Error", description: extractDetail(err) || "Failed to create invoice", variant: "destructive" })
+      showErrorToast(err, addToast)
     },
   })
 

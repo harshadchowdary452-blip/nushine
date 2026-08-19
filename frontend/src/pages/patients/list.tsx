@@ -35,7 +35,7 @@ import {
 } from "@/design-system"
 import type { EnterpriseWizardStep } from "@/design-system"
 import type { Patient, PaginatedResponse, User } from "@/types"
-import { extractDetail } from "@/types"
+import { showErrorToast } from "@/utils/showErrorToast"
 import { useAuthStore } from "@/store/authStore"
 import { useCreateParam } from "@/lib/use-create-param"
 
@@ -268,7 +268,7 @@ export default function PatientList() {
       setDeleteDialogOpen(false); setDeletingPatient(null)
     },
     onError: (err: unknown) => {
-      addToast({ title: "Error", description: extractDetail(err), variant: "destructive" })
+      showErrorToast(err, addToast)
     },
   })
 
@@ -282,7 +282,7 @@ export default function PatientList() {
       setBulkDeleteOpen(false); setBulkTargets([])
     },
     onError: (err: unknown) => {
-      addToast({ title: "Error", description: extractDetail(err), variant: "destructive" })
+      showErrorToast(err, addToast)
     },
   })
 
@@ -311,7 +311,7 @@ export default function PatientList() {
       setCompletedPatient(created)
     },
     onError: (err: unknown) => {
-      addToast({ title: "Error", description: extractDetail(err), variant: "destructive" })
+      showErrorToast(err, addToast)
     },
   })
 

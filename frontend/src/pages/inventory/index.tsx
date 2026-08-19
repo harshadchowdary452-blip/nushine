@@ -34,7 +34,7 @@ import type {
   MonthlyOrderOverview, ValidationResult, GenerateConsolidatedResponse,
   ConsolidatedOrderResponse, ConsolidatedOrderItem, AuditHistoryResponse,
 } from "@/types"
-import { extractDetail } from "@/types"
+import { showErrorToast } from "@/utils/showErrorToast"
 
 /* ── helpers ─────────────────────────────────────────────────────────── */
 
@@ -197,7 +197,7 @@ function ExportMenu({
       }
       addToast({ title: "Export Complete", description: `${label} exported`, variant: "success" })
     } catch (err) {
-      addToast({ title: "Export Failed", description: extractDetail(err), variant: "destructive" })
+      showErrorToast(err, addToast)
     } finally {
       setBusy(null)
     }
@@ -280,7 +280,7 @@ function AddOtherItemDialog({
       ])
       onOpenChange(false)
     },
-    onError: (err) => addToast({ title: "Could not submit request", description: extractDetail(err), variant: "destructive" }),
+    onError: (err) => showErrorToast(err, addToast),
   })
 
   return (
@@ -432,7 +432,7 @@ function CatalogueManagerDialog({
       await refresh()
       addToast({ title: "Category Added", description: `"${cat.name}" is ready to use`, variant: "success" })
     },
-    onError: (err) => addToast({ title: "Could not add category", description: extractDetail(err), variant: "destructive" }),
+    onError: (err) => showErrorToast(err, addToast),
   })
 
   const createItemMutation = useMutation({
@@ -456,7 +456,7 @@ function CatalogueManagerDialog({
       setNewPrice("0")
       await refresh()
     },
-    onError: (err) => addToast({ title: "Could not add item", description: extractDetail(err), variant: "destructive" }),
+    onError: (err) => showErrorToast(err, addToast),
   })
 
   const updateItemMutation = useMutation({
@@ -471,7 +471,7 @@ function CatalogueManagerDialog({
       setEditingItemId(null)
       await refresh()
     },
-    onError: (err) => addToast({ title: "Could not update item", description: extractDetail(err), variant: "destructive" }),
+    onError: (err) => showErrorToast(err, addToast),
   })
 
   const toggleStatusMutation = useMutation({
@@ -485,7 +485,7 @@ function CatalogueManagerDialog({
       })
       await refresh()
     },
-    onError: (err) => addToast({ title: "Could not change item status", description: extractDetail(err), variant: "destructive" }),
+    onError: (err) => showErrorToast(err, addToast),
   })
 
   const startEdit = (item: InventoryItem) => {
@@ -763,7 +763,7 @@ function PendingApprovalDrawer({
       setEditMode(false)
       await queryClient.invalidateQueries({ queryKey: ["inventory-pending-items"] })
     },
-    onError: (err) => addToast({ title: "Could not update request", description: extractDetail(err), variant: "destructive" }),
+    onError: (err) => showErrorToast(err, addToast),
   })
 
   const reviewMutation = useMutation({
@@ -793,7 +793,7 @@ function PendingApprovalDrawer({
       await refresh()
       setReviewingId(null)
     },
-    onError: (err) => addToast({ title: "Could not review request", description: extractDetail(err), variant: "destructive" }),
+    onError: (err) => showErrorToast(err, addToast),
   })
 
   const canReopen = (i: PendingInventoryItem) =>
@@ -811,7 +811,7 @@ function PendingApprovalDrawer({
       addToast({ title: "Item Added", description: "Linked the approved catalogue item back to the hospital inventory", variant: "success" })
       await queryClient.invalidateQueries({ queryKey: ["inventory-pending-items"] })
     },
-    onError: (err) => addToast({ title: "Could not re-add item", description: extractDetail(err), variant: "destructive" }),
+    onError: (err) => showErrorToast(err, addToast),
   })
 
   return (
@@ -1191,7 +1191,7 @@ function OrderDetailDialog({
       ])
       onChanged()
     },
-    onError: (err) => addToast({ title: "Could not update order", description: extractDetail(err), variant: "destructive" }),
+    onError: (err) => showErrorToast(err, addToast),
   })
 
   const [editDraft, setEditDraft] = useState<Record<string, { qty: string; cost: string; remarks: string }>>({})
@@ -1234,7 +1234,7 @@ function OrderDetailDialog({
       ])
       onChanged()
     },
-    onError: (err) => addToast({ title: "Could not update order", description: extractDetail(err), variant: "destructive" }),
+    onError: (err) => showErrorToast(err, addToast),
   })
 
   const total = useMemo(() => {
@@ -1900,7 +1900,7 @@ function GroupConsolidatedView({
       }
       queryClient.invalidateQueries({ queryKey: ["inventory-audit"] })
     },
-    onError: (err) => addToast({ title: "Generate Failed", description: extractDetail(err), variant: "destructive" }),
+    onError: (err) => showErrorToast(err, addToast),
   })
 
   const exportConsolidated = async (format: "pdf" | "excel" | "csv") => {
@@ -1914,7 +1914,7 @@ function GroupConsolidatedView({
       downloadBlob(blob, `consolidated_order_${period}.${format}`)
       addToast({ title: "Export Complete", description: "Group consolidated order exported", variant: "success" })
     } catch (err) {
-      addToast({ title: "Export Failed", description: extractDetail(err), variant: "destructive" })
+      showErrorToast(err, addToast)
     } finally {
       setExportBusy(false)
     }
@@ -2701,7 +2701,7 @@ export default function InventoryPage() {
     },
     onError: (err, vars) => {
       setStockSaving((prev) => ({ ...prev, [vars.recordId]: false }))
-      addToast({ title: "Could not update stock", description: extractDetail(err), variant: "destructive" })
+      showErrorToast(err, addToast)
     },
   })
 
@@ -2758,7 +2758,7 @@ export default function InventoryPage() {
       if (order?.id) setOrderDetailId(order.id)
     },
     onError: (err) => {
-      const detail = err instanceof Error ? err.message : extractDetail(err)
+      const detail = err instanceof Error ? err.message : String(err)
       if (detail.includes("already exists")) {
         addToast({ title: "Order Already Submitted", description: "This hospital and period already have a submitted indent", variant: "destructive" })
       } else {

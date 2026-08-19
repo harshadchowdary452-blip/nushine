@@ -26,7 +26,7 @@ import { casesApi, usersApi, treatmentPlanItemsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
 import { cn } from "@/lib/utils"
 import type { Case, TreatmentPlanItem, DoctorListItem, DoctorOption } from "@/types"
-import { extractDetail } from "@/types"
+import { showErrorToast } from "@/utils/showErrorToast"
 
 export default function AssignDoctor() {
   const { caseId } = useParams<{ caseId: string }>()
@@ -84,11 +84,7 @@ export default function AssignDoctor() {
       navigate(`/treatments/approve/${caseId}`)
     },
     onError: (err: Error) =>
-      addToast({
-        title: "Error",
-        description: extractDetail(err) || "Failed",
-        variant: "destructive",
-      }),
+      showErrorToast(err, addToast),
   })
 
   const isLoading = caseLoading || itemsLoading

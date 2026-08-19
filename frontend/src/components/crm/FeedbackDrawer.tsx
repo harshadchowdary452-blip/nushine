@@ -8,7 +8,7 @@ import { PatientFeedbackForm } from "./PatientFeedbackForm"
 import { NotesTimeline } from "./NotesTimeline"
 import { crmApi } from "../../services/endpoints"
 import { useToast } from "../ui/toast"
-import { extractDetail } from "../../types"
+import { showErrorToast } from "@/utils/showErrorToast"
 
 interface FeedbackEnquiry {
   id: string
@@ -72,7 +72,7 @@ export function FeedbackDrawer({ open, onOpenChange, enquiry, onSaved }: Props) 
           setFeedbackId(data.feedback.id as string)
         }
       })
-      .catch((err: unknown) => addToast({ title: "Could not load feedback summary", description: extractDetail(err), variant: "destructive" }))
+      .catch((err: unknown) => showErrorToast(err, addToast))
       .finally(() => setSummaryLoading(false))
   }, [open, enquiry, addToast])
 
@@ -84,7 +84,7 @@ export function FeedbackDrawer({ open, onOpenChange, enquiry, onSaved }: Props) 
         if (data?.feedback && "id" in data.feedback) {
           setFeedbackId(data.feedback.id as string)
         }
-      }).catch((err: unknown) => addToast({ title: "Could not refresh summary", description: extractDetail(err), variant: "destructive" }))
+      }).catch((err: unknown) => showErrorToast(err, addToast))
     }
     onSaved()
   }

@@ -38,7 +38,7 @@ import { useToast } from "@/components/ui/toast"
 import { useTrackRecent } from "@/hooks/useTrackRecent"
 import LeadTimeline from "./components/lead-timeline"
 import type { Lead, LeadCall, LeadCommunication, LeadCallOutcome, ApiError } from "@/types"
-import { extractDetail } from "@/types"
+import { showErrorToast } from "@/utils/showErrorToast"
 
 const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
   NEW: { bg: "bg-blue-500", text: "text-white", label: "New" },
@@ -303,7 +303,7 @@ export default function LeadDetail() {
         queryClient.invalidateQueries({ queryKey: ["crm-enhanced-dashboard"] })
       queryClient.invalidateQueries({ queryKey: ["crm-command-center"], refetchType: "all" })
       }).catch((err: unknown) => {
-        addToast({ title: "Could not log WhatsApp message", description: extractDetail(err), variant: "destructive" })
+        showErrorToast(err, addToast)
       }).finally(() => {
         window.open(`https://wa.me/${phone}?text=${encodedMsg}`, "_blank")
       })

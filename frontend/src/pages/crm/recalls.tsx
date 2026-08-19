@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/toast"
-import { extractDetail } from "@/types"
+import { showErrorToast } from "@/utils/showErrorToast"
 
 interface RecallItem {
   id: string
@@ -108,11 +108,7 @@ export default function Recalls() {
       setNextRecallDate("")
     },
     onError: (err: unknown) =>
-      addToast({
-        title: "Error",
-        description: extractDetail(err) || "Failed",
-        variant: "destructive",
-      }),
+      showErrorToast(err, addToast),
   })
 
   const generateMutation = useMutation({
@@ -126,11 +122,7 @@ export default function Recalls() {
       })
     },
     onError: (err: unknown) =>
-      addToast({
-        title: "Error",
-        description: extractDetail(err) || "Failed",
-        variant: "destructive",
-      }),
+      showErrorToast(err, addToast),
   })
 
   return (

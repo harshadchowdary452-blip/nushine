@@ -61,6 +61,7 @@ const LaboratoryPage = lazy(() => import("@/pages/laboratory/index"))
 const HelpPage = lazy(() => import("@/pages/help"))
 const NotFoundPage = lazy(() => import("@/pages/errors/not-found"))
 const SuperAdminDemoRequests = lazy(() => import("@/pages/admin/demo-requests"))
+const AdminSubscriptions = lazy(() => import("@/pages/admin/subscriptions"))
 
 const dashboardByRole: Record<Role, string> = {
   SUPER_ADMIN: "/super-admin",
@@ -161,6 +162,7 @@ const protectedChildren = [
   { path: "/home", element: <DashboardRedirect /> },
   { path: "/super-admin", element: withRoles(<SuperAdminDashboard />, ["SUPER_ADMIN"]) },
   { path: "/super-admin/demo-requests", element: withRoles(<SuperAdminDemoRequests />, ["SUPER_ADMIN"]) },
+  { path: "/admin/subscriptions", element: withRoles(<AdminSubscriptions />, ["SUPER_ADMIN"]) },
   { path: "/group-admin", element: withRoles(<GroupAdminDashboard />, ["GROUP_ADMIN"]) },
   {
     path: "/hospital-admin",

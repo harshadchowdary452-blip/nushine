@@ -1603,3 +1603,31 @@ export const communicationCenterApi = {
     api.get("/communication-center/activities", { params }).then((r) => r.data),
   meta: () => api.get("/communication-center/meta").then((r) => r.data),
 }
+
+export const subscriptionsApi = {
+  list: (params?: Record<string, unknown>) =>
+    api.get("/subscriptions", { params }).then((r) => r.data),
+  get: (id: string) => api.get(`/subscriptions/${id}`).then((r) => r.data),
+  plans: (activeOnly = false) =>
+    api.get("/subscriptions/plans", { params: { active_only: activeOnly } }).then((r) => r.data),
+  dashboardStats: () =>
+    api.get("/subscriptions/dashboard/stats").then((r) => r.data),
+  history: (id: string) => api.get(`/subscriptions/${id}/history`).then((r) => r.data),
+  payments: (id: string) => api.get(`/subscriptions/${id}/payments`).then((r) => r.data),
+  create: (data: Record<string, unknown>) =>
+    api.post("/subscriptions", data).then((r) => r.data),
+  recordPayment: (id: string, data: Record<string, unknown>) =>
+    api.post(`/subscriptions/${id}/record-payment`, data).then((r) => r.data),
+  renew: (id: string, data?: Record<string, unknown>) =>
+    api.post(`/subscriptions/${id}/renew`, data ?? {}).then((r) => r.data),
+  extend: (id: string, data: Record<string, unknown>) =>
+    api.post(`/subscriptions/${id}/extend`, data).then((r) => r.data),
+  grantFree: (id: string, data: Record<string, unknown>) =>
+    api.post(`/subscriptions/${id}/grant-free`, data).then((r) => r.data),
+  changePlan: (id: string, data: Record<string, unknown>) =>
+    api.post(`/subscriptions/${id}/change-plan`, data).then((r) => r.data),
+  cancel: (id: string, data?: Record<string, unknown>) =>
+    api.post(`/subscriptions/${id}/cancel`, data ?? {}).then((r) => r.data),
+  reactivate: (id: string, data?: Record<string, unknown>) =>
+    api.post(`/subscriptions/${id}/reactivate`, data ?? {}).then((r) => r.data),
+}

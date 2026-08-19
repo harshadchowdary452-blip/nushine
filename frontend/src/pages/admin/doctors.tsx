@@ -31,7 +31,7 @@ import { useAuthStore } from "@/store/authStore"
 import { useToast } from "@/components/ui/toast"
 import DentalEmptyState from "@/components/ui/dental-empty-state"
 import type { User } from "@/types"
-import { extractDetail } from "@/types"
+import { showErrorToast } from "@/utils/showErrorToast"
 
 interface DoctorForm {
   email: string
@@ -93,11 +93,7 @@ export default function AdminDoctors() {
       closeDialog()
     },
     onError: (err: unknown) => {
-      addToast({
-        title: "Error",
-        description: extractDetail(err) || "Failed to create doctor",
-        variant: "destructive",
-      })
+      showErrorToast(err, addToast)
     },
   })
 
@@ -110,11 +106,7 @@ export default function AdminDoctors() {
       closeDialog()
     },
     onError: (err: unknown) => {
-      addToast({
-        title: "Error",
-        description: extractDetail(err) || "Failed to update doctor",
-        variant: "destructive",
-      })
+      showErrorToast(err, addToast)
     },
   })
 
@@ -125,11 +117,7 @@ export default function AdminDoctors() {
       addToast({ title: "Success", description: "Doctor deactivated", variant: "success" })
     },
     onError: (err: unknown) => {
-      addToast({
-        title: "Error",
-        description: extractDetail(err) || "Failed to deactivate",
-        variant: "destructive",
-      })
+      showErrorToast(err, addToast)
     },
   })
 
@@ -140,11 +128,7 @@ export default function AdminDoctors() {
       addToast({ title: "Success", description: "Doctor activated", variant: "success" })
     },
     onError: (err: unknown) => {
-      addToast({
-        title: "Error",
-        description: extractDetail(err) || "Failed to activate",
-        variant: "destructive",
-      })
+      showErrorToast(err, addToast)
     },
   })
 
@@ -156,11 +140,7 @@ export default function AdminDoctors() {
       setDeleteTarget(null)
     },
     onError: (err: unknown) => {
-      addToast({
-        title: "Error",
-        description: extractDetail(err) || "Failed to delete doctor",
-        variant: "destructive",
-      })
+      showErrorToast(err, addToast)
     },
   })
 
@@ -178,11 +158,7 @@ export default function AdminDoctors() {
       addToast({ title: "Success", description: "Hospital access updated", variant: "success" })
     },
     onError: (err: unknown) => {
-      addToast({
-        title: "Error",
-        description: extractDetail(err) || "Failed to update hospital access",
-        variant: "destructive",
-      })
+      showErrorToast(err, addToast)
     },
   })
 

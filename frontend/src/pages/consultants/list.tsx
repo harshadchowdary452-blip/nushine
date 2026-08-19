@@ -26,7 +26,7 @@ import { consultantsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
 import { useServerFilters } from "@/hooks/useServerFilters"
 import type { Consultant, PaginatedResponse } from "@/types"
-import { extractDetail } from "@/types"
+import { showErrorToast } from "@/utils/showErrorToast"
 
 interface ConsultantForm {
   full_name: string
@@ -70,11 +70,7 @@ export default function ConsultantList() {
       resetForm()
     },
     onError: (err: unknown) => {
-      addToast({
-        title: "Error",
-        description: extractDetail(err) || "Failed to create consultant",
-        variant: "destructive",
-      })
+      showErrorToast(err, addToast)
     },
   })
 

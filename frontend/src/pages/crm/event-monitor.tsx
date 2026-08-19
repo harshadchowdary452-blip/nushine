@@ -41,7 +41,7 @@ import {
 import { SearchFilterBar } from "@/components/crm/search-filter-bar"
 import { MetricCard } from "@/components/crm/metric-card"
 import { useToast } from "@/components/ui/toast"
-import { extractDetail } from "@/types"
+import { showErrorToast } from "@/utils/showErrorToast"
 import type { ApiError } from "@/types"
 import { PAGE_CONTAINER_VARIANTS, formatLabel } from "@/components/crm/index"
 
@@ -185,7 +185,7 @@ export default function EventMonitor() {
       queryClient.invalidateQueries({ queryKey: ["crm-events-statistics"] })
     },
     onError: (err: ApiError) => {
-      addToast({ title: "Retry failed", description: extractDetail(err), variant: "destructive" })
+      showErrorToast(err, addToast)
     },
   })
 
@@ -197,7 +197,7 @@ export default function EventMonitor() {
       queryClient.invalidateQueries({ queryKey: ["crm-events-statistics"] })
     },
     onError: (err: ApiError) => {
-      addToast({ title: "Replay failed", description: extractDetail(err), variant: "destructive" })
+      showErrorToast(err, addToast)
     },
   })
 

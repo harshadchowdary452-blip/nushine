@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils"
 import { useFixedPosition, useOverlayDismiss, resolveOverlayLayer } from "@/lib/overlay"
 import { notificationsApi } from "@/services/endpoints"
 import { entityPath } from "@/lib/entity-links"
-import { extractDetail } from "@/types"
+import { showErrorToast } from "@/utils/showErrorToast"
 import { useToast } from "@/design-system/components/toast"
 import { format } from "date-fns"
 
@@ -104,7 +104,7 @@ export default function NotificationsCenter({
       setNotifications(data?.items ?? [])
     } catch (err: unknown) {
       setNotifications([])
-      addToast({ title: "Could not load notifications", description: extractDetail(err), variant: "destructive" })
+      showErrorToast(err, addToast)
     }
   }, [onUnreadCountChange, addToast])
 
@@ -114,7 +114,7 @@ export default function NotificationsCenter({
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })))
       onUnreadCountChange(0)
     } catch (err: unknown) {
-      addToast({ title: "Could not mark notifications as read", description: extractDetail(err), variant: "destructive" })
+      showErrorToast(err, addToast)
     }
   }
 
@@ -127,7 +127,7 @@ export default function NotificationsCenter({
     try {
       await notificationsApi.markRead(id)
     } catch (err: unknown) {
-      addToast({ title: "Could not update notification", description: extractDetail(err), variant: "destructive" })
+      showErrorToast(err, addToast)
     }
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)))
     const stillUnread = notifications.filter((n) => n.id !== id && !n.is_read).length
@@ -148,7 +148,7 @@ export default function NotificationsCenter({
       await notificationsApi.delete(id)
       setNotifications((prev) => prev.filter((n) => n.id !== id))
     } catch (err: unknown) {
-      addToast({ title: "Could not delete notification", description: extractDetail(err), variant: "destructive" })
+      showErrorToast(err, addToast)
     }
     try {
       const data = await notificationsApi.unreadCount()
@@ -164,7 +164,7 @@ export default function NotificationsCenter({
       setNotifications([])
       onUnreadCountChange(0)
     } catch (err: unknown) {
-      addToast({ title: "Could not clear notifications", description: extractDetail(err), variant: "destructive" })
+      showErrorToast(err, addToast)
     }
   }
 

@@ -30,7 +30,7 @@ import { useAuthStore } from "@/store/authStore"
 import { useToast } from "@/components/ui/toast"
 import DentalEmptyState from "@/components/ui/dental-empty-state"
 import type { Hospital, AdminGroup } from "@/types"
-import { extractDetail } from "@/types"
+import { showErrorToast } from "@/utils/showErrorToast"
 
 interface HospitalForm {
   [key: string]: unknown
@@ -154,8 +154,7 @@ export default function AdminHospitals() {
       setDeletingHospital(null)
     },
     onError: (err: unknown) => {
-      const msg = extractDetail(err) || "Failed to delete hospital"
-      addToast({ title: "Error", description: msg, variant: "destructive" })
+      showErrorToast(err, addToast)
     },
   })
 

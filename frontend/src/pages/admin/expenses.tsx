@@ -56,7 +56,7 @@ import { expensesApi, hospitalsApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
 import { useAuthStore } from "@/store/authStore"
 import type { HospitalMonthlyExpense, Hospital, ApiError } from "@/types"
-import { extractDetail } from "@/types"
+import { showErrorToast } from "@/utils/showErrorToast"
 
 const EXPENSE_CATEGORIES = [
   "Staff Salaries",
@@ -196,11 +196,7 @@ export default function AdminExpenses() {
       resetForm()
     },
     onError: (err: ApiError) => {
-      addToast({
-        title: "Failed to create expense",
-        description: extractDetail(err) || err.message,
-        variant: "destructive",
-      })
+      showErrorToast(err, addToast)
     },
   })
 
@@ -218,11 +214,7 @@ export default function AdminExpenses() {
       resetForm()
     },
     onError: (err: ApiError) => {
-      addToast({
-        title: "Failed to update expense",
-        description: extractDetail(err) || err.message,
-        variant: "destructive",
-      })
+      showErrorToast(err, addToast)
     },
   })
 
@@ -236,11 +228,7 @@ export default function AdminExpenses() {
       addToast({ title: "Expense deleted", variant: "success" })
     },
     onError: (err: ApiError) => {
-      addToast({
-        title: "Failed to delete expense",
-        description: extractDetail(err) || err.message,
-        variant: "destructive",
-      })
+      showErrorToast(err, addToast)
     },
   })
 

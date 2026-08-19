@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { ConsentForm } from "@/types"
-import { extractDetail } from "@/types"
+import { showErrorToast } from "@/utils/showErrorToast"
 
 interface ConsentFormPatient {
   id: string
@@ -117,7 +117,7 @@ export default function ConsentFormList() {
       setCreateOpen(false)
       resetForm()
     } catch (err: unknown) {
-      addToast({ title: "Error", description: extractDetail(err), variant: "destructive" })
+      showErrorToast(err, addToast)
     } finally {
       setCreateLoading(false)
     }

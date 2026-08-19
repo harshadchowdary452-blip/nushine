@@ -53,7 +53,7 @@ import type {
   CasePayload,
   ReassignDoctorResponse,
 } from "@/types"
-import { extractDetail } from "@/types"
+import { showErrorToast } from "@/utils/showErrorToast"
 import AppointmentScheduler from "@/components/appointments/AppointmentScheduler"
 
 const STATUS_COLORS: Record<string, string> = {
@@ -165,12 +165,7 @@ export default function AppointmentDetail() {
       setRescheduleTime("")
       setRescheduleReason("")
     },
-    onError: (err: unknown) =>
-      addToast({
-        title: "Error",
-        description: extractDetail(err) || "Failed",
-        variant: "destructive",
-      }),
+    onError: (err: unknown) => showErrorToast(err, addToast),
   })
 
   const completeMutation = useMutation({
@@ -182,12 +177,7 @@ export default function AppointmentDetail() {
       setCompleteOpen(false)
       setCompleteNotes("")
     },
-    onError: (err: unknown) =>
-      addToast({
-        title: "Error",
-        description: extractDetail(err) || "Failed",
-        variant: "destructive",
-      }),
+    onError: (err: unknown) => showErrorToast(err, addToast),
   })
 
   const cancelMutation = useMutation({
@@ -199,12 +189,7 @@ export default function AppointmentDetail() {
       setCancelOpen(false)
       setCancelReason("")
     },
-    onError: (err: unknown) =>
-      addToast({
-        title: "Error",
-        description: extractDetail(err) || "Failed",
-        variant: "destructive",
-      }),
+    onError: (err: unknown) => showErrorToast(err, addToast),
   })
 
   const reassignMutation = useMutation({

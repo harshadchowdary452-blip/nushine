@@ -5,7 +5,6 @@ import { Textarea } from "./textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select"
 import { Label } from "./label"
 import api from "@/services/api"
-import { extractDetail } from "@/types"
 
 interface ChangeStatusDialogProps {
   entityType: "patient" | "case" | "appointment" | "treatment" | "follow_up" | "billing"
@@ -50,7 +49,7 @@ export function ChangeStatusDialog({
         onStatusChanged?.()
       }
     } catch (err: unknown) {
-      setError(extractDetail(err) || "Failed to update status")
+      setError(err instanceof Error ? err.message : "Failed to update status")
     } finally {
       setSubmitting(false)
     }

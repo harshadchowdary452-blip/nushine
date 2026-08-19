@@ -21,7 +21,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { treatmentTypesApi } from "@/services/endpoints"
 import { useToast } from "@/components/ui/toast"
 import DentalEmptyState from "@/components/ui/dental-empty-state"
-import { extractDetail } from "@/types"
+import { showErrorToast } from "@/utils/showErrorToast"
 
 interface TreatmentType {
   id: string
@@ -77,7 +77,7 @@ export default function TreatmentTypesPage() {
       closeDialog()
     },
     onError: (err: unknown) => {
-      addToast({ title: "Error", description: extractDetail(err) || "Failed to create treatment type", variant: "destructive" })
+      showErrorToast(err, addToast)
     },
   })
 
@@ -95,7 +95,7 @@ export default function TreatmentTypesPage() {
       closeDialog()
     },
     onError: (err: unknown) => {
-      addToast({ title: "Error", description: extractDetail(err) || "Failed to update treatment type", variant: "destructive" })
+      showErrorToast(err, addToast)
     },
   })
 
@@ -108,7 +108,7 @@ export default function TreatmentTypesPage() {
       setDeleting(null)
     },
     onError: (err: unknown) => {
-      addToast({ title: "Error", description: extractDetail(err) || "Failed to delete treatment type", variant: "destructive" })
+      showErrorToast(err, addToast)
     },
   })
 
@@ -123,7 +123,7 @@ export default function TreatmentTypesPage() {
       })
     },
     onError: (err: unknown) => {
-      addToast({ title: "Error", description: extractDetail(err) || "Failed to seed treatment types", variant: "destructive" })
+      showErrorToast(err, addToast)
     },
   })
 

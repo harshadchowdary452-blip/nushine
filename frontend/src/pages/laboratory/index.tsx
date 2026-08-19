@@ -25,6 +25,7 @@ import type {
   Laboratory, LabCase, LabCandidate, LabMonthlyReport, LabStatus,
   LabCaseEvent, PaginatedResponse,
 } from "@/types"
+import { showErrorToast } from "@/utils/showErrorToast"
 import { extractDetail } from "@/types"
 
 const LAB_STATUSES: LabStatus[] = ["PENDING", "SENT", "RECEIVED", "CANCELLED", "RESENT"]
@@ -238,7 +239,7 @@ function WhatsAppDialog({
       })
     },
     onError: (err: unknown) => {
-      addToast({ title: "WhatsApp failed", description: extractDetail(err), variant: "destructive" })
+      showErrorToast(err, addToast)
     },
   })
 
@@ -326,7 +327,7 @@ function CallDialog({
       addToast({ title: "Call logged", description: "Phone call recorded in the lab case timeline", variant: "success" })
     },
     onError: (err: unknown) => {
-      addToast({ title: "Logging failed", description: extractDetail(err), variant: "destructive" })
+      showErrorToast(err, addToast)
     },
   })
 
@@ -413,7 +414,7 @@ function StatusDialog({
       addToast({ title: "Status updated", description: `Lab case marked ${status.replace(/_/g, " ")}`, variant: "success" })
     },
     onError: (err: unknown) => {
-      addToast({ title: "Update failed", description: extractDetail(err), variant: "destructive" })
+      showErrorToast(err, addToast)
     },
   })
 
@@ -530,7 +531,7 @@ function LabCaseEditDialog({
       addToast({ title: "Lab case updated", variant: "success" })
     },
     onError: (err: unknown) => {
-      addToast({ title: "Update failed", description: extractDetail(err), variant: "destructive" })
+      showErrorToast(err, addToast)
     },
   })
 
@@ -684,7 +685,7 @@ function LaboratoryDialog({
       })
     },
     onError: (err: unknown) => {
-      addToast({ title: "Save failed", description: extractDetail(err), variant: "destructive" })
+      showErrorToast(err, addToast)
     },
   })
 
@@ -833,7 +834,7 @@ function SendToLabDialog({
       addToast({ title: "Lab case created", description: `${candidate?.patient_name || "Patient"} sent to laboratory`, variant: "success" })
     },
     onError: (err: unknown) => {
-      addToast({ title: "Failed to send", description: extractDetail(err), variant: "destructive" })
+      showErrorToast(err, addToast)
     },
   })
 
@@ -1002,7 +1003,7 @@ function BatchSendDialog({
       })
     },
     onError: (err: unknown) => {
-      addToast({ title: "Batch send failed", description: extractDetail(err), variant: "destructive" })
+      showErrorToast(err, addToast)
     },
   })
 
@@ -1274,7 +1275,7 @@ function ReportView() {
       downloadBlob(blob, `lab_report_${month}.${format}`)
       addToast({ title: "Export Complete", description: `Laboratory report (${format.toUpperCase()}) downloaded`, variant: "success" })
     } catch (err) {
-      addToast({ title: "Export Failed", description: extractDetail(err), variant: "destructive" })
+      showErrorToast(err, addToast)
     } finally {
       setExporting(null)
     }
@@ -1949,7 +1950,7 @@ export default function LaboratoryPage() {
       addToast({ title: "Lab case deleted", variant: "success" })
     },
     onError: (err: unknown) => {
-      addToast({ title: "Delete failed", description: extractDetail(err), variant: "destructive" })
+      showErrorToast(err, addToast)
     },
   })
 
@@ -1961,7 +1962,7 @@ export default function LaboratoryPage() {
       addToast({ title: "Laboratory deleted", variant: "success" })
     },
     onError: (err: unknown) => {
-      addToast({ title: "Delete failed", description: extractDetail(err), variant: "destructive" })
+      showErrorToast(err, addToast)
     },
   })
 

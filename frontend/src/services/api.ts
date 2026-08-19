@@ -1,5 +1,6 @@
 import axios from "axios"
 import { useAuthStore, getTokenExpiry } from "@/store/authStore"
+import { useSubscriptionStore } from "@/store/subscriptionStore"
 import { queryClient } from "@/lib/queryClient"
 
 // Same-origin ("/api/v1") in dev via the Vite proxy. For deployments where the
@@ -103,6 +104,17 @@ api.interceptors.response.use(
         delete originalRequest.headers?.["X-Hospital-ID"]
         return api(originalRequest)
       }
+      return Promise.reject(error)
+    }
+
+    // Subscription-blocked 403 → update global store so banner/overlay appear
+    if (
+      error.response?.status === 403 &&
+      error.response?.data?.subscription_status
+    ) {
+      const subStatus = error.response.data.subscription_status as string
+      const msg = error.response.data.message as string | undefined
+      useSubscriptionStore.getState().setStatus(subStatus as never, msg ?? null)
       return Promise.reject(error)
     }
 

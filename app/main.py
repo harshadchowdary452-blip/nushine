@@ -21,6 +21,8 @@ from app.services.master_catalogue_seed import seed_master_inventory_catalogue
 from app.dependencies import verify_hospital_context, get_current_user
 from app.utils.scheduler import check_appointment_reminders, check_same_day_appointments, check_missed_appointments, check_overdue_treatments, check_recurring_recalls
 from app.routers import auth, admin_groups, hospitals, doctors, consultants, patients, cases, consultant_notes, treatment_plans, treatment_sittings, treatment_plan_items, appointments, billings, pre_ops, post_ops, dashboards, doctor_performance, whatsapp_messaging, whatsapp_config, notifications, hospital_monthly_expenses, reports, crm, crm_v2, calendar, status_audit, leads, doctor_working_hours, doctor_availability, doctor_leaves, doctor_blocked_slots, consent_forms, enquiries, treatment_follow_ups, recalls, exports, treatment_types, doctor_queue, clinical_progress_notes, master_data, crm_rules, crm_config_settings, crm_feedback, crm_settings, users, tasks, inventory_master, inventory_categories, suppliers, hospital_inventory, inventory_transactions, monthly_orders, inventory_reports, inventory_insights, pending_inventory_items, laboratories, lab_cases, communication_center, demo_requests
+from app.routers import subscriptions
+from app.middleware.subscription_middleware import SubscriptionMiddleware
 from app.crm.routers import events as crm_events
 from app.crm.routers import event_test as crm_event_test
 from app.crm.routers import automation as crm_automation
@@ -149,6 +151,11 @@ async def lifespan(app: FastAPI):
 
     logger.info("Seeding super admin...")
     await seed_super_admin()
+    logger.info("Seeding default subscription plans...")
+    try:
+        await seed_default_subscription_plans()
+    except Exception as e:
+        logger.warning(f"Subscription plan seeding failed (non-fatal): {e}")
     logger.info("Seeding default inventory categories...")
     await seed_default_inventory_categories()
     logger.info("Seeding master inventory catalogue...")
@@ -251,6 +258,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 app.add_middleware(RequestIDMiddleware)
+app.add_middleware(SubscriptionMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -264,6 +272,7 @@ Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
 app.include_router(auth.router, prefix="/api/v1")
+app.include_router(subscriptions.router, prefix="/api/v1")
 app.include_router(demo_requests.router, prefix="/api/v1")
 app.include_router(demo_requests.admin_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
 app.include_router(admin_groups.router, prefix="/api/v1")
@@ -406,3 +415,54 @@ async def seed_default_inventory_categories():
             db.add(InventoryCategory(name=name, sort_order=idx, is_active=True))
         await db.commit()
         logger.info(f"Seeded {len(DEFAULT_INVENTORY_CATEGORIES)} default inventory categories")
+
+
+DEFAULT_SUBSCRIPTION_PLANS = [
+    {
+        "name": "Single Hospital",
+        "description": "One hospital with full access to all ERP features, CRM, and WhatsApp.",
+        "price": 2999.00,
+        "currency": "INR",
+        "duration_months": 1,
+        "max_hospitals": 1,
+        "max_doctors": None,
+    },
+    {
+        "name": "Group",
+        "description": "Group admin with first hospital included (₹5,999/mo). Each additional hospital adds ₹2,999/mo automatically based on hospital count.",
+        "price": 5999.00,
+        "currency": "INR",
+        "duration_months": 1,
+        "max_hospitals": None,
+        "max_doctors": None,
+    },
+    {
+        "name": "Trial",
+        "description": "Free trial — full access for 30 days.",
+        "price": 0.00,
+        "currency": "INR",
+        "duration_months": 1,
+        "max_hospitals": None,
+        "max_doctors": None,
+    },
+]
+
+
+async def seed_default_subscription_plans():
+    from sqlalchemy import select, delete
+    from app.models.subscription import SubscriptionPlan
+    async with async_session_factory() as db:
+        result = await db.execute(select(SubscriptionPlan))
+        existing = {p.name: p for p in result.scalars().all()}
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        for plan_data in DEFAULT_SUBSCRIPTION_PLANS:
+            if plan_data["name"] in existing:
+                continue
+            db.add(SubscriptionPlan(**plan_data, is_active=True, created_at=now, updated_at=now))
+        stale_names = [name for name in existing if name not in {p["name"] for p in DEFAULT_SUBSCRIPTION_PLANS}]
+        if stale_names:
+            await db.execute(delete(SubscriptionPlan).where(SubscriptionPlan.name.in_(stale_names)))
+            logger.info(f"Removed stale plans: {stale_names}")
+        await db.commit()
+        logger.info(f"Subscription plans seeded/updated")

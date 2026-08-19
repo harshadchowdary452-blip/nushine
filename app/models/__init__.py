@@ -76,6 +76,10 @@ from app.models.lab_case import LabCase
 from app.models.lab_case_event import LabCaseEvent
 from app.models.communication_center_activity import CommunicationCenterActivity
 from app.models.demo_request import DemoRequest
+from app.models.subscription import (
+    SubscriptionPlan, Subscription, SubscriptionPayment, SubscriptionEvent,
+    SubscriptionStatus, SubscriptionType, SubscriberType, PaymentMethod, SubscriptionEventType,
+)
 
 __all__ = [
     "AdminGroup", "Hospital", "User", "Patient", "Consultant",
@@ -124,4 +128,6 @@ __all__ = [
     "Laboratory", "LabCase", "LabCaseEvent",
     "CommunicationCenterActivity",
     "DemoRequest",
+    "SubscriptionPlan", "Subscription", "SubscriptionPayment", "SubscriptionEvent",
+    "SubscriptionStatus", "SubscriptionType", "SubscriberType", "PaymentMethod", "SubscriptionEventType",
 ]

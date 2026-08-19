@@ -5,11 +5,11 @@ import { useQuery } from "@tanstack/react-query"
 import {
   Building2, CalendarCheck2, CalendarDays, CircleDollarSign, CreditCard, FileText,
   FolderKanban, IndianRupee, Megaphone, Send, Sparkles, Stethoscope, UserPlus,
-  UserRound, Users, Wallet,
+  UserRound, Users, Wallet, Zap,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { useAuthStore } from "@/store/authStore"
-import { dashboardApi } from "@/services/endpoints"
+import { dashboardApi, subscriptionsApi } from "@/services/endpoints"
 import { useDashboardActivity } from "@/lib/dashboard-activity"
 import { useUnbilledBilling } from "@/lib/use-unbilled-billing"
 import { QuickViewDrawer } from "@/design-system"
@@ -133,6 +133,7 @@ interface SuperAdminStats {
    ──────────────────────────────────────────────────────────────────────────── */
 
 const SUPER_ADMIN_WIDGETS = [
+  "subscription-summary",
   "executive-summary",
   "revenue-expense",
   "appointments",
@@ -148,6 +149,7 @@ const SUPER_ADMIN_WIDGETS = [
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 const WIDGET_META: Record<string, { title: string; description: string; icon: LucideIcon; span?: boolean }> = {
+  "subscription-summary": { title: "Subscription Overview", description: "Active subscriptions and monthly revenue", icon: Zap, span: true },
   "executive-summary": { title: "Executive Summary", description: "What happened this period, in plain language", icon: Sparkles, span: true },
   "revenue-expense": { title: "Revenue vs Expenses", description: "Current period against the previous period", icon: IndianRupee },
   "appointments": { title: "Appointment Volume", description: "Click a point to open those appointments", icon: CalendarCheck2 },
@@ -184,6 +186,12 @@ export default function SuperAdminDashboard() {
   const { items: activityFeed, loading: activityLoading } = useDashboardActivity()
 
   const unbilledQuery = useUnbilledBilling()
+
+  const { data: subStats } = useQuery({
+    queryKey: ["subscriptions", "dashboard"],
+    queryFn: subscriptionsApi.dashboardStats,
+    staleTime: 60000,
+  })
 
   const onGroupClick = useCallback((perf?: GroupPerf) => {
     if (perf?.id) setQuickView({ type: "admin-group", id: perf.id, name: perf.name || "" })
@@ -349,6 +357,7 @@ export default function SuperAdminDashboard() {
 
   /* ── Quick actions ────────────────────────────────────────────────────────── */
   const quickActions: QuickAction[] = [
+    { id: "manage-subscriptions", label: "Subscriptions", description: "Manage billing & access", icon: CreditCard, tone: "accent", onClick: () => navigate("/admin/subscriptions") },
     { id: "new-patient", label: "New Patient", description: "Register a patient", icon: UserPlus, tone: "accent", onClick: () => navigate("/patients") },
     { id: "book-appointment", label: "Book Appointment", description: "Schedule a visit", icon: CalendarCheck2, tone: "primary", onClick: () => navigate("/appointments") },
     { id: "open-case", label: "Open Case", description: "Start a treatment case", icon: FolderKanban, tone: "success", onClick: () => navigate("/cases") },
@@ -429,6 +438,39 @@ export default function SuperAdminDashboard() {
     }
 
     switch (id) {
+      case "subscription-summary": {
+        const rows = subStats ? [
+          { Metric: "Active", Value: subStats.total_active },
+          { Metric: "Trial", Value: subStats.total_trial },
+          { Metric: "Past Due", Value: subStats.total_past_due },
+          { Metric: "Expired", Value: subStats.total_expired },
+          { Metric: "Free", Value: subStats.total_free },
+          { Metric: "Revenue (Month)", Value: `₹${subStats.revenue_this_month.toLocaleString("en-IN")}` },
+        ] : []
+        const content = (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            {[
+              { label: "Active", value: subStats?.total_active ?? 0, color: "bg-emerald-500" },
+              { label: "Trial", value: subStats?.total_trial ?? 0, color: "bg-blue-500" },
+              { label: "Past Due", value: subStats?.total_past_due ?? 0, color: "bg-amber-500" },
+              { label: "Expired", value: subStats?.total_expired ?? 0, color: "bg-red-500" },
+              { label: "Free", value: subStats?.total_free ?? 0, color: "bg-purple-500" },
+              { label: "Revenue", value: `₹${(subStats?.revenue_this_month ?? 0).toLocaleString("en-IN")}`, color: "bg-[var(--ds-primary)]" },
+            ].map((item) => (
+              <div key={item.label} className="text-center">
+                <div className={`mx-auto mb-2 h-2 w-8 rounded-full ${item.color}`} />
+                <p className="text-lg font-bold text-[var(--ds-text)]">{item.value}</p>
+                <p className="text-xs text-[var(--ds-text-secondary)]">{item.label}</p>
+              </div>
+            ))}
+          </div>
+        )
+        return (
+          <DashboardWidget {...shared} exportRows={rows} exportColumns={["Metric", "Value"]} exportTitle="Subscription Overview" fullscreenContent={content}>
+            {content}
+          </DashboardWidget>
+        )
+      }
       case "executive-summary": {
         const rows = summaryMetrics.map((m) => ({ Metric: m.label, Value: m.value }))
         const content = (

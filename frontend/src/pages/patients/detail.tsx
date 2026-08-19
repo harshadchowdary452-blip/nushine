@@ -33,7 +33,7 @@ import { formatIndianRupees } from "@/lib/currency";
 import SearchableSelect from "@/components/ui/searchable-select";
 import { MedicationTable } from "@/components/medications/MedicationPrescriptionEditor";
 import type { Case, Appointment, Billing, TreatmentPlan, PatientTimelineEntry, DoctorListItem, ApiError, ConsentForm, FollowUpResponse, MedicationTimelineItem } from "@/types";
-import { extractDetail } from "@/types";
+import { showErrorToast } from "@/utils/showErrorToast";
 import { 
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
   EnterpriseDetailWorkspace, ProductivityPanel, ProductivitySection,
@@ -153,7 +153,7 @@ export default function PatientDetail() {
       setApptOpen(false);
     },
     onError: (err: ApiError) => {
-      addToast({ title: "Error", description: extractDetail(err) || "Failed to create appointment", variant: "destructive" });
+      showErrorToast(err, addToast);
     },
   });
 
@@ -166,7 +166,7 @@ export default function PatientDetail() {
       setCaseOpen(false);
     },
     onError: (err: ApiError) => {
-      addToast({ title: "Error", description: extractDetail(err) || "Failed to create case", variant: "destructive" });
+      showErrorToast(err, addToast);
     },
   });
 

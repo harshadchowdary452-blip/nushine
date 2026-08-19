@@ -73,7 +73,7 @@ import type {
   CommunicationCenterActivity,
   CommunicationMeta,
 } from "@/types"
-import { extractDetail } from "@/types"
+import { showErrorToast } from "@/utils/showErrorToast"
 
 const SOURCE_ICON: Record<string, typeof MessageSquare> = {
   WhatsApp: MessageSquare,
@@ -374,7 +374,7 @@ function ResendDialog({
       onDone(result)
     },
     onError: (err) => {
-      addToast({ title: "Resend failed", description: extractDetail(err), variant: "destructive" })
+      showErrorToast(err, addToast)
     },
   })
 
@@ -506,7 +506,7 @@ export default function CommunicationCenterPage() {
       addToast({ title: vars.print ? "Printing" : "Download complete", variant: "success" })
     },
     onError: (err) => {
-      addToast({ title: "Download failed", description: extractDetail(err), variant: "destructive" })
+      showErrorToast(err, addToast)
     },
   })
 
@@ -518,7 +518,7 @@ export default function CommunicationCenterPage() {
       addToast({ title: "Export complete", description: `Downloaded ${format.toUpperCase()} export`, variant: "success" })
     },
     onError: (err) => {
-      addToast({ title: "Export failed", description: extractDetail(err), variant: "destructive" })
+      showErrorToast(err, addToast)
     },
   })
 

@@ -25,7 +25,7 @@ import AppointmentFilterBar from "./filter-bar"
 import AppointmentScheduler from "@/components/appointments/AppointmentScheduler"
 import { EnterpriseWorkspace, DataTable, StatusBadge, WorkflowSummaryPanel } from "@/design-system"
 import type { Appointment, Patient, User, PaginatedResponse } from "@/types"
-import { extractDetail } from "@/types"
+import { showErrorToast } from "@/utils/showErrorToast"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/store/authStore"
 import { useCreateParam } from "@/lib/use-create-param"
@@ -182,7 +182,7 @@ export default function AppointmentList() {
       setDeleteDialogOpen(false); setDeletingAppointment(null)
     },
     onError: (err: unknown) => {
-      addToast({ title: "Error", description: extractDetail(err), variant: "destructive" })
+      showErrorToast(err, addToast)
     },
   })
 
@@ -205,7 +205,7 @@ export default function AppointmentList() {
       resetForm()
     },
     onError: (err: unknown) => {
-      addToast({ title: "Error", description: extractDetail(err), variant: "destructive" })
+      showErrorToast(err, addToast)
     },
   })
 
