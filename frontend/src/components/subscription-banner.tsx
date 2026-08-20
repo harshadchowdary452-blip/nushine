@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { AlertTriangle, XCircle, Phone, ShieldAlert } from "lucide-react"
 import { useSubscriptionStore, type SubStatus } from "@/store/subscriptionStore"
+import { useAuthStore } from "@/store/authStore"
 
 interface SubscriptionStatusResponse {
   subscription_status: string
@@ -68,6 +69,9 @@ const STATUS_MESSAGES: Record<string, { title: string; detail: string; icon: Rea
 }
 
 export function SubscriptionReadOnlyBanner() {
+  const role = useAuthStore((s) => s.user?.role)
+  if (role === "SUPER_ADMIN") return null
+
   const { data: pollData } = useMySubscriptionStatus()
   const storeStatus = useSubscriptionStore((s) => s.status)
 
@@ -92,6 +96,9 @@ export function SubscriptionReadOnlyBanner() {
 }
 
 export function SubscriptionExpiredOverlay() {
+  const role = useAuthStore((s) => s.user?.role)
+  if (role === "SUPER_ADMIN") return null
+
   const { data: pollData } = useMySubscriptionStatus()
   const storeStatus = useSubscriptionStore((s) => s.status)
 
@@ -120,6 +127,9 @@ export function SubscriptionExpiredOverlay() {
 }
 
 export function useIsSubscriptionBlocked() {
+  const role = useAuthStore((s) => s.user?.role)
+  if (role === "SUPER_ADMIN") return false
+
   const { data: pollData } = useMySubscriptionStatus()
   const storeStatus = useSubscriptionStore((s) => s.status)
   const status = mergeStatus(pollData?.subscription_status ?? null, storeStatus)
@@ -127,6 +137,9 @@ export function useIsSubscriptionBlocked() {
 }
 
 export function useSubscriptionBlockedMessage(): { blocked: boolean; title: string; detail: string } | null {
+  const role = useAuthStore((s) => s.user?.role)
+  if (role === "SUPER_ADMIN") return null
+
   const { data: pollData } = useMySubscriptionStatus()
   const storeStatus = useSubscriptionStore((s) => s.status)
   const status = mergeStatus(pollData?.subscription_status ?? null, storeStatus)

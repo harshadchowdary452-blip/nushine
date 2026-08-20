@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
-import { Plus, Search, Edit, Trash2, Building2 } from "lucide-react"
+import { Plus, Search, Edit, Trash2, Building2, KeyRound } from "lucide-react"
 
 import { PageHeader } from "@/design-system"
 import { Button } from "@/components/ui/button"
@@ -25,7 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Card, CardContent } from "@/components/ui/card"
-import { hospitalsApi, groupsApi } from "@/services/endpoints"
+import { hospitalsApi, groupsApi, authApi, usersApi } from "@/services/endpoints"
 import { useAuthStore } from "@/store/authStore"
 import { useToast } from "@/components/ui/toast"
 import DentalEmptyState from "@/components/ui/dental-empty-state"
@@ -72,6 +72,9 @@ export default function AdminHospitals() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [editingHospital, setEditingHospital] = useState<Hospital | null>(null)
   const [deletingHospital, setDeletingHospital] = useState<Hospital | null>(null)
+  const [resetHospital, setResetHospital] = useState<Hospital | null>(null)
+  const [resetPassword, setResetPassword] = useState("")
+  const [resetConfirm, setResetConfirm] = useState("")
   const [form, setForm] = useState<HospitalForm>(getEmptyHospitalForm)
 
   const { data: hospitalsData, isLoading } = useQuery({
@@ -157,6 +160,29 @@ export default function AdminHospitals() {
       showErrorToast(err, addToast)
     },
   })
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: (data: { user_id: string; new_password: string }) => authApi.resetPassword(data),
+    onSuccess: () => {
+      addToast({ title: "Success", description: "Admin password reset successfully", variant: "success" })
+      setResetHospital(null)
+      setResetPassword("")
+      setResetConfirm("")
+    },
+    onError: (err: unknown) => {
+      showErrorToast(err, addToast)
+    },
+  })
+
+  const { data: resetHospitalAdmins } = useQuery({
+    queryKey: ["hospital-admin-user", resetHospital?.id],
+    queryFn: () => usersApi.list({ hospital_id: resetHospital!.id, role: "HOSPITAL_ADMIN", page_size: 100 }),
+    enabled: !!resetHospital,
+  })
+
+  const hospitalAdminUser = Array.isArray(resetHospitalAdmins)
+    ? resetHospitalAdmins.find((u) => u.hospital_id === resetHospital?.id) || resetHospitalAdmins[0]
+    : null
 
   const hospitals: Hospital[] = (hospitalsData || []).filter((h: Hospital) => {
     if (statusFilter === "all") return true
@@ -354,6 +380,14 @@ export default function AdminHospitals() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            onClick={() => { setResetHospital(hospital); setResetPassword(""); setResetConfirm("") }}
+                            title="Reset Admin Password"
+                          >
+                            <KeyRound className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={() => confirmDelete(hospital)}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -524,6 +558,65 @@ export default function AdminHospitals() {
               disabled={deleteMutation.isPending}
             >
               {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!resetHospital} onOpenChange={(open) => { if (!open) { setResetHospital(null); setResetPassword(""); setResetConfirm("") } }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Reset Admin Password</DialogTitle>
+            <DialogDescription>
+              Set a new password for the admin of <span className="font-medium text-[var(--ds-text)]">{resetHospital?.name}</span>.
+              Their existing sessions will be revoked.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {hospitalAdminUser ? (
+              <p className="text-xs text-[var(--ds-text-secondary)]">
+                Admin: {hospitalAdminUser.full_name} ({hospitalAdminUser.email})
+              </p>
+            ) : resetHospital ? (
+              <p className="text-xs text-amber-600">No admin user found for this hospital. Create one first.</p>
+            ) : null}
+            <div className="grid gap-2">
+              <Label htmlFor="reset-pw">New Password</Label>
+              <Input
+                id="reset-pw"
+                type="password"
+                value={resetPassword}
+                onChange={(e) => setResetPassword(e.target.value)}
+                placeholder="Min. 8 characters"
+                autoComplete="new-password"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="reset-pw-confirm">Confirm Password</Label>
+              <Input
+                id="reset-pw-confirm"
+                type="password"
+                value={resetConfirm}
+                onChange={(e) => setResetConfirm(e.target.value)}
+                placeholder="Re-enter password"
+                autoComplete="new-password"
+              />
+            </div>
+            {resetPassword && resetConfirm && resetPassword !== resetConfirm && (
+              <p className="text-xs text-red-500">Passwords do not match</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setResetHospital(null); setResetPassword(""); setResetConfirm("") }}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!resetPassword || resetPassword.length < 8 || resetPassword !== resetConfirm || resetPasswordMutation.isPending || !hospitalAdminUser}
+              onClick={() => {
+                if (hospitalAdminUser) resetPasswordMutation.mutate({ user_id: hospitalAdminUser.id, new_password: resetPassword })
+              }}
+            >
+              {resetPasswordMutation.isPending ? "Resetting..." : "Reset Password"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -63,7 +63,7 @@ export function BrandLogo({ className = "", size = "md", showTagline = false, ta
         <BrandText size={s.brand} darkBg={darkBg} />
         {showTagline && (
           <p className={cn(s.tagline, "text-[var(--ds-text-tertiary)] font-medium tracking-[0.25em] uppercase")}>
-            {tagline || "Connect. Care. Grow."}
+            {tagline || "Appointin"}
           </p>
         )}
       </div>

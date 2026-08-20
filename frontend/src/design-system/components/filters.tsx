@@ -128,9 +128,10 @@ interface FilterFieldProps {
 
 /** Labelled field used inside a FilterBar. */
 export function FilterField({ label, children, className }: FilterFieldProps) {
+  const fieldId = React.useId()
   return (
     <div className={cn("flex flex-col gap-1", className)}>
-      <label className="ds-form-label text-[var(--ds-text-tertiary)]">{label}</label>
+      <label htmlFor={fieldId} className="ds-form-label text-[var(--ds-text-tertiary)]">{label}</label>
       {children}
     </div>
   )
@@ -224,6 +225,7 @@ export function SavedFilters({ storageKey, current, onApply }: SavedFiltersProps
                 if (e.key === "Escape") setSaving(false)
               }}
               placeholder="Filter name"
+              aria-label="Filter name"
               className="ds-focus-ring h-8 flex-1 rounded-[var(--ds-radius-lg)] border border-[var(--ds-input-border)] bg-[var(--ds-surface)] px-2 text-sm"
             />
             <Button size="icon-sm" className="h-8 w-8" onClick={saveCurrent} disabled={saveDisabled} aria-label="Save">

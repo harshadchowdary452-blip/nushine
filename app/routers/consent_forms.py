@@ -300,6 +300,12 @@ async def get_patient_consent_forms(
     current_user: dict = Depends(get_current_user),
 ):
     verify_permission(current_user, Permission.MANAGE_BILLING)
+    from app.models.patient import Patient
+    patient_result = await db.execute(select(Patient).where(Patient.id == patient_id))
+    patient = patient_result.scalar_one_or_none()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    await verify_tenant_access(current_user, patient, "patient", db)
     service = ConsentFormService(db)
     return await service.get_by_patient(patient_id)
 
@@ -311,6 +317,12 @@ async def get_case_consent_forms(
     current_user: dict = Depends(get_current_user),
 ):
     verify_permission(current_user, Permission.MANAGE_BILLING)
+    from app.models.case import Case
+    case_result = await db.execute(select(Case).where(Case.id == case_id))
+    case = case_result.scalar_one_or_none()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+    await verify_tenant_access(current_user, case, "case", db)
     service = ConsentFormService(db)
     return await service.get_by_case(case_id)
 
@@ -322,6 +334,12 @@ async def get_treatment_consent_forms(
     current_user: dict = Depends(get_current_user),
 ):
     verify_permission(current_user, Permission.MANAGE_BILLING)
+    from app.models.treatment_plan import TreatmentPlan
+    tp_result = await db.execute(select(TreatmentPlan).where(TreatmentPlan.id == treatment_plan_id))
+    tp = tp_result.scalar_one_or_none()
+    if not tp:
+        raise HTTPException(status_code=404, detail="Treatment plan not found")
+    await verify_tenant_access(current_user, tp, "treatment_plan", db)
     service = ConsentFormService(db)
     return await service.get_by_treatment(treatment_plan_id)
 
@@ -333,5 +351,15 @@ async def get_consent_form_stats(
     current_user: dict = Depends(get_current_user),
 ):
     verify_permission(current_user, Permission.MANAGE_BILLING)
+    role = current_user.get("role")
+    if role == Role.HOSPITAL_ADMIN.value or role == Role.DOCTOR.value:
+        if current_user.get("hospital_id") != hospital_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+    elif role == Role.GROUP_ADMIN.value:
+        agid = current_user.get("admin_group_id")
+        if agid:
+            hosp_check = await db.execute(select(Hospital.id).where(Hospital.id == hospital_id, Hospital.admin_group_id == agid))
+            if not hosp_check.scalar_one_or_none():
+                raise HTTPException(status_code=403, detail="Access denied")
     service = ConsentFormService(db)
     return await service.get_stats(hospital_id)

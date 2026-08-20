@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import random
 from datetime import datetime, timedelta, date, timezone
 from sqlalchemy import select, and_
 from app.database import async_session_factory
@@ -53,7 +54,6 @@ async def check_appointment_reminders():
                         except Exception:
                             offset = 1
                     if offset <= 0:
-                        # Same-day reminders are handled by check_same_day_appointments
                         continue
                     target = apt.appointment_date - timedelta(days=offset)
                     if target != today:
@@ -72,7 +72,7 @@ async def check_appointment_reminders():
                     await db.commit()
         except Exception as e:
             logger.exception("check_appointment_reminders failed: %s", e)
-        await asyncio.sleep(3600)
+        await asyncio.sleep(3600 + random.randint(0, 300))
 
 
 async def check_same_day_appointments():
@@ -96,7 +96,7 @@ async def check_same_day_appointments():
                 await db.commit()
         except Exception as e:
             logger.exception("check_same_day_appointments failed: %s", e)
-        await asyncio.sleep(1800)
+        await asyncio.sleep(1800 + random.randint(0, 120))
 
 
 async def check_overdue_treatments():
@@ -106,7 +106,7 @@ async def check_overdue_treatments():
             await _check()
         except Exception as e:
             logger.exception("check_overdue_treatments failed: %s", e)
-        await asyncio.sleep(3600)
+        await asyncio.sleep(3600 + random.randint(0, 300))
 
 
 async def check_missed_appointments():
@@ -163,7 +163,7 @@ async def check_missed_appointments():
                 await db.commit()
         except Exception as e:
             logger.exception("check_missed_appointments failed: %s", e)
-        await asyncio.sleep(43200)
+        await asyncio.sleep(43200 + random.randint(0, 600))
 
 
 async def _run_recurring_recall_pass(factory):
@@ -290,4 +290,4 @@ async def check_recurring_recalls():
             await _run_recurring_recall_pass(async_session_factory)
         except Exception as e:
             logger.exception("check_recurring_recalls failed: %s", e)
-        await asyncio.sleep(3600)
+        await asyncio.sleep(3600 + random.randint(0, 300))

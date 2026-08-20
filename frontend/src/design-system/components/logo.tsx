@@ -35,7 +35,7 @@ export default function Logo({ className, variant = "default", showTagline = fal
         )}
         {showTagline && (
             <p className={cn(s.tagline, isSidebar ? "mt-0.5 text-[var(--ds-sidebar-icon)]" : isWhite ? "text-white/60" : "text-[var(--ds-text-tertiary)]", "-mt-0.5")}>
-            Connect. Care. Grow.
+            Appointin
           </p>
         )}
       </div>

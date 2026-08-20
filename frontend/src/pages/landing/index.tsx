@@ -20,6 +20,7 @@ const platformNav = [
   { label: "Platform", href: "#platform" },
   { label: "Features", href: "#features" },
   { label: "How It Works", href: "#how-it-works" },
+  { label: "Pricing", href: "#pricing" },
   { label: "For Organizations", href: "#organizations" },
   { label: "Book a Demo", href: "#demo" },
 ]
@@ -73,25 +74,25 @@ export default function LandingPage() {
       {/* ═══════════════════ HEADER ═══════════════════ */}
       <header className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${scrolled ? "bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100 dark:border-gray-700 dark:bg-gray-900/95" : "bg-transparent"}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex h-24 items-center justify-between">
+          <div className="flex h-16 sm:h-20 lg:h-24 items-center justify-between">
             <Link to="/" className="flex items-center gap-2.5 shrink-0">
-              <img src={appointinLogo} alt="Appointin" className="h-[5.25rem] w-auto object-contain" draggable={false} />
+              <img src={appointinLogo} alt="Appointin" className="h-10 sm:h-14 lg:h-[5.25rem] w-auto object-contain" draggable={false} />
             </Link>
 
-            <nav className="hidden lg:flex items-center gap-1">
+            <nav className="flex items-center gap-0.5 overflow-x-auto scrollbar-hide">
               {platformNav.map((l) => (
-                <a key={l.href + l.label} href={l.href} className="px-3 py-1.5 text-[13px] font-medium text-gray-500 dark:text-gray-400 hover:text-[#1E3A5F] dark:hover:text-[#5B8DBF] transition-colors rounded-lg hover:bg-gray-50 dark:hover:bg-white/5">{l.label}</a>
+                <a key={l.href + l.label} href={l.href} className="px-2 sm:px-3 py-1.5 text-[11px] sm:text-[13px] font-medium text-gray-500 dark:text-gray-400 hover:text-[#1E3A5F] dark:hover:text-[#5B8DBF] transition-colors rounded-lg hover:bg-gray-50 dark:hover:bg-white/5 whitespace-nowrap shrink-0">{l.label}</a>
               ))}
             </nav>
 
             <div className="flex items-center gap-2">
-              <button onClick={() => navigate("/login")} className="hidden sm:inline-flex text-[13px] font-medium text-[#1E3A5F] dark:text-[#5B8DBF] hover:bg-blue-50 dark:hover:bg-white/5 px-4 py-2 rounded-lg transition-colors">
+              <button onClick={() => navigate("/login")} className="inline-flex text-[13px] font-medium text-[#1E3A5F] dark:text-[#5B8DBF] hover:bg-blue-50 dark:hover:bg-white/5 px-4 py-2 rounded-lg transition-colors">
                 Login
               </button>
               <a href="#demo" className="inline-flex items-center gap-1.5 bg-[#1E3A5F] hover:bg-[#163050] text-white text-[13px] font-semibold px-5 py-2 rounded-xl transition-all shadow-md shadow-[#1E3A5F]/20">
                 Book a Demo <ArrowRight className="h-3.5 w-3.5" />
               </a>
-              <button onClick={() => setMobileNav(!mobileNav)} className="lg:hidden p-2 text-gray-500 dark:text-gray-400 hover:text-[#1E3A5F] dark:hover:text-[#5B8DBF]" aria-label="Toggle menu">
+              <button onClick={() => setMobileNav(!mobileNav)} className="p-2 text-gray-500 dark:text-gray-400 hover:text-[#1E3A5F] dark:hover:text-[#5B8DBF]" aria-label="Toggle menu">
                 {mobileNav ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               </button>
             </div>
@@ -855,6 +856,146 @@ export default function LandingPage() {
                 </div>
                 <h3 className="text-sm font-bold text-[#0F172A] dark:text-white mb-1.5">{s.title}</h3>
                 <p className="text-xs text-gray-400 dark:text-gray-300 leading-relaxed">{s.desc}</p>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ═══════════════════ PRICING ═══════════════════ */}
+      <section id="pricing" className="py-20 sm:py-28 bg-gray-50/50 dark:bg-gray-800/50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-3xl mx-auto text-center mb-16">
+            <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={stagger}>
+              <motion.p variants={fadeUp} transition={{ duration: 0.4 }} className="text-[0.8rem] font-bold tracking-[0.2em] uppercase text-[#4F46E5] mb-3">Simple Pricing</motion.p>
+              <motion.h2 variants={fadeUp} transition={{ duration: 0.5 }} className="text-[2rem] sm:text-[2.4rem] font-extrabold tracking-tight text-[#0F172A] dark:text-white">
+                Transparent Plans for Every Practice
+              </motion.h2>
+              <motion.p variants={fadeUp} transition={{ duration: 0.5 }} className="mt-5 text-gray-500 dark:text-gray-400 leading-relaxed">
+                No hidden fees. No long-term contracts. Start with a 30-day free trial and scale as you grow.
+              </motion.p>
+            </motion.div>
+          </div>
+
+          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-50px" }} variants={stagger} className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-12">
+            {/* Standalone Hospital */}
+            <motion.div variants={fadeUp} transition={{ duration: 0.4 }} className="relative bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-700 p-8 hover:shadow-xl transition-all duration-300">
+              <div className="mb-6">
+                <div className="w-12 h-12 rounded-2xl bg-[#1E3A5F]/10 flex items-center justify-center mb-4">
+                  <Building className="h-6 w-6 text-[#1E3A5F]" strokeWidth={1.5} />
+                </div>
+                <h3 className="text-lg font-bold text-[#0F172A] dark:text-white mb-1">Single Hospital</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Perfect for independent dental practices</p>
+              </div>
+              <div className="mb-6">
+                <div className="flex items-baseline gap-1">
+                  <span className="text-[2.5rem] font-extrabold text-[#0F172A] dark:text-white">₹2,999</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">/month</span>
+                </div>
+                <p className="text-xs text-gray-400 dark:text-gray-300 mt-2">Billed monthly. Cancel anytime.</p>
+              </div>
+              <ul className="space-y-3 mb-8">
+                {[
+                  "Unlimited patients & appointments",
+                  "All core modules (CRM, Billing, Cases, Treatments)",
+                  "Doctor performance analytics",
+                  "WhatsApp integration",
+                  "Inventory management",
+                  "Role-based access control",
+                  "Email & phone support",
+                  "30-day free trial",
+                ].map((f) => (
+                  <li key={f} className="flex items-start gap-2.5">
+                    <Check className="h-4 w-4 text-[#0F766E] mt-0.5 shrink-0" strokeWidth={2.5} />
+                    <span className="text-sm text-gray-600 dark:text-gray-300">{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <a href="#demo" className="block w-full text-center bg-[#1E3A5F] hover:bg-[#163050] text-white font-semibold py-3 rounded-xl transition-all text-sm">
+                Start Free Trial
+              </a>
+            </motion.div>
+
+            {/* Group Plan */}
+            <motion.div variants={fadeUp} transition={{ duration: 0.4 }} className="relative bg-white dark:bg-gray-900 rounded-3xl border-2 border-[#4F46E5] p-8 hover:shadow-xl transition-all duration-300">
+              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
+                <span className="bg-gradient-to-r from-[#4F46E5] to-[#7C3AED] text-white text-[10px] font-bold uppercase tracking-wider px-4 py-1.5 rounded-full shadow-lg">
+                  Most Popular
+                </span>
+              </div>
+              <div className="mb-6">
+                <div className="w-12 h-12 rounded-2xl bg-[#4F46E5]/10 flex items-center justify-center mb-4">
+                  <Building2 className="h-6 w-6 text-[#4F46E5]" strokeWidth={1.5} />
+                </div>
+                <h3 className="text-lg font-bold text-[#0F172A] dark:text-white mb-1">Multi-Hospital Group</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">For dental chains and hospital networks</p>
+              </div>
+              <div className="mb-6">
+                <div className="flex items-baseline gap-1">
+                  <span className="text-[2.5rem] font-extrabold text-[#0F172A] dark:text-white">₹4,999</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">/month base</span>
+                </div>
+                <p className="text-xs text-gray-400 dark:text-gray-300 mt-2">First hospital included. +₹2,999/mo per additional hospital.</p>
+              </div>
+              <ul className="space-y-3 mb-8">
+                {[
+                  "Everything in Single Hospital, plus:",
+                  "Multi-hospital management from one dashboard",
+                  "Group-level analytics & reporting",
+                  "Cross-hospital patient records",
+                  "Centralized inventory & procurement",
+                  "Dedicated group admin portal",
+                  "Priority support & onboarding",
+                  "Custom role configurations",
+                ].map((f) => (
+                  <li key={f} className="flex items-start gap-2.5">
+                    <Check className="h-4 w-4 text-[#4F46E5] mt-0.5 shrink-0" strokeWidth={2.5} />
+                    <span className="text-sm text-gray-600 dark:text-gray-300">{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <a href="#demo" className="block w-full text-center bg-gradient-to-r from-[#4F46E5] to-[#7C3AED] hover:from-[#4338CA] hover:to-[#6D28D9] text-white font-semibold py-3 rounded-xl transition-all text-sm shadow-lg shadow-[#4F46E5]/25">
+                Start Free Trial
+              </a>
+            </motion.div>
+          </motion.div>
+
+          {/* Pricing Calculator */}
+          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-50px" }} variants={stagger} className="max-w-2xl mx-auto mb-16">
+            <motion.div variants={fadeUp} transition={{ duration: 0.4 }} className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 sm:p-8">
+              <h3 className="text-base font-bold text-[#0F172A] dark:text-white mb-4 text-center">Group Pricing Calculator</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400 text-center mb-6">See your monthly cost based on the number of hospitals in your group.</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { hospitals: 1, price: "₹2,999" },
+                  { hospitals: 2, price: "₹7,998" },
+                  { hospitals: 3, price: "₹10,997" },
+                  { hospitals: 5, price: "₹16,995" },
+                ].map((t) => (
+                  <div key={t.hospitals} className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 text-center border border-gray-100 dark:border-gray-700">
+                    <p className="text-2xl font-extrabold text-[#0F172A] dark:text-white">{t.hospitals}</p>
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">{t.hospitals === 1 ? "Hospital" : "Hospitals"}</p>
+                    <p className="text-sm font-bold text-[#4F46E5]">{t.price}<span className="text-[10px] text-gray-400">/mo</span></p>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] text-gray-400 dark:text-gray-300 text-center mt-4">Formula: ₹4,999 base + (N−1) × ₹2,999. First hospital included in base price.</p>
+            </motion.div>
+          </motion.div>
+
+          {/* Trust Signals */}
+          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={stagger} className="grid sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
+            {[
+              { icon: Lock, title: "No Hidden Fees", desc: "What you see is what you pay. No setup fees or surprise charges." },
+              { icon: Clock, title: "30-Day Free Trial", desc: "Full access to all features. No credit card required to start." },
+              { icon: Globe, title: "Cancel Anytime", desc: "No long-term contracts. Upgrade, downgrade, or cancel with one click." },
+            ].map((t) => (
+              <motion.div key={t.title} variants={fadeUp} transition={{ duration: 0.3 }} className="text-center p-4">
+                <div className="w-10 h-10 rounded-xl bg-[#4F46E5]/10 flex items-center justify-center mx-auto mb-3">
+                  <t.icon className="h-5 w-5 text-[#4F46E5]" strokeWidth={1.5} />
+                </div>
+                <h4 className="text-sm font-bold text-[#0F172A] dark:text-white mb-1">{t.title}</h4>
+                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">{t.desc}</p>
               </motion.div>
             ))}
           </motion.div>

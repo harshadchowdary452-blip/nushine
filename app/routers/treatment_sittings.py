@@ -124,6 +124,7 @@ async def update_sitting(sitting_id: str, data: TreatmentSittingUpdate, db: Asyn
     old = await db.get(TreatmentSitting, sitting_id)
     if not old:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Treatment sitting not found")
+    await verify_tenant_access(current_user, old, "sitting", db)
     service = TreatmentSittingService(db)
     old_data = {"sitting_number": old.sitting_number, "work_done": old.work_done, "status": old.status.value if hasattr(old.status, 'value') else old.status, "doctor_notes": old.doctor_notes}
     sitting = await service.update(sitting_id, data.model_dump(exclude_none=True), user_id=current_user.get("sub"))

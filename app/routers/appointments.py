@@ -145,6 +145,21 @@ async def create_appointment(data: AppointmentCreate, db: AsyncSession = Depends
         if not doctor_row or doctor_row[0] != admin_group_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Doctor not in your admin group")
 
+    elif role == Role.DOCTOR.value:
+        hid = current_user.get("hospital_id")
+        if hid:
+            patient_result = await db.execute(select(Patient).where(Patient.id == data.patient_id, Patient.hospital_id == hid))
+        else:
+            from app.models.doctor_hospital import DoctorHospital
+            dh_result = await db.execute(select(DoctorHospital.hospital_id).where(DoctorHospital.user_id == current_user.get("sub")))
+            hids = [r[0] for r in dh_result.all()]
+            if not hids:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No hospital membership found")
+            patient_result = await db.execute(select(Patient).where(Patient.id == data.patient_id, Patient.hospital_id.in_(hids)))
+        patient = patient_result.scalar_one_or_none()
+        if not patient:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found in your hospital")
+
     service = AppointmentService(db)
     appointment = await service.create(data.model_dump(), user_id=current_user.get("sub"))
 

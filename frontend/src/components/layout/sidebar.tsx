@@ -146,7 +146,7 @@ export default function Sidebar() {
         <Link to="/" className={cn("flex items-center overflow-hidden transition-all duration-200", isExpanded ? "gap-0" : "gap-0")} onClick={() => setMobileOpen(false)}>
           <WordmarkLogo height={isExpanded ? 28 : 22} />
           <div className={cn("transition-all duration-200", !isExpanded ? "opacity-0 w-0 ml-0" : "opacity-100 ml-2")}>
-            <p className="text-[10px] text-[var(--ds-sidebar-icon)] font-medium tracking-[0.25em] uppercase">Connect. Care. Grow.</p>
+            <p className="text-[10px] text-[var(--ds-sidebar-icon)] font-medium tracking-[0.25em] uppercase">Appointin</p>
           </div>
         </Link>
         <div className="flex-1" />

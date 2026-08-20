@@ -83,7 +83,13 @@ async def get_doctors(skip: int = Query(0, ge=0), limit: int = Query(100, ge=1, 
             if hid:
                 row = await db.execute(select(Hospital.admin_group_id).where(Hospital.id == hid))
                 resolved_admin_group_id = str(row.scalar_one_or_none()) if row.scalar_one_or_none() else None
-        filters["admin_group_id"] = resolved_admin_group_id
+        if resolved_admin_group_id:
+            filters["admin_group_id"] = resolved_admin_group_id
+        else:
+            # Standalone hospital — no admin group. Scope to user's own hospital.
+            hid = current_user.get("hospital_id")
+            if hid:
+                filters["hospital_id"] = hid
     elif role == Role.GROUP_ADMIN.value:
         filters["admin_group_id"] = current_user.get("admin_group_id")
     elif role == Role.SUPER_ADMIN.value:

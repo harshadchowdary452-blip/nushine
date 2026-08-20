@@ -36,6 +36,11 @@ async def _get_patient_id_from_billing(db: AsyncSession, billing_id: str) -> str
 @router.post("/", response_model=BillingResponse, status_code=status.HTTP_201_CREATED)
 async def create_billing(data: BillingCreate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_BILLING)
+    case_result = await db.execute(select(Case).where(Case.id == data.case_id))
+    case = case_result.scalar_one_or_none()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+    await verify_tenant_access(current_user, case, "case", db)
     service = BillingService(db)
     billing = await service.create(data.model_dump(), user_id=current_user.get("sub"))
     billing_id = billing.id
@@ -444,6 +449,10 @@ async def _check_billing_hospital(billing_id: str, current_user: dict, db: Async
 async def get_billing_pdf(billing_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_BILLING)
     await _check_billing_hospital(billing_id, current_user, db)
+    billing_obj = await db.get(BillingModel, billing_id)
+    if not billing_obj:
+        raise HTTPException(status_code=404, detail="Billing not found")
+    await verify_tenant_access(current_user, billing_obj, "billing", db)
     service = BillingService(db)
     pdf_path, error = await service.get_pdf_path(billing_id, user_id=current_user.get("sub"))
     if not pdf_path:
@@ -459,6 +468,10 @@ async def get_billing_pdf(billing_id: str, db: AsyncSession = Depends(get_db), c
 async def regenerate_billing_pdf(billing_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.MANAGE_BILLING)
     await _check_billing_hospital(billing_id, current_user, db)
+    billing_obj = await db.get(BillingModel, billing_id)
+    if not billing_obj:
+        raise HTTPException(status_code=404, detail="Billing not found")
+    await verify_tenant_access(current_user, billing_obj, "billing", db)
     service = BillingService(db)
     pdf_path, error = await service.regenerate_pdf(billing_id, user_id=current_user.get("sub"))
     if not pdf_path:

@@ -22,6 +22,7 @@ class WhatsAppProvider:
     def __init__(self):
         self.provider = settings.WHATSAPP_PROVIDER
         self.deeplink = DeepLinkProvider()
+        self._twilio_client = None
 
     async def send_message(self, to: str, message: str) -> bool:
         if self.provider == "twilio":
@@ -34,10 +35,15 @@ class WhatsAppProvider:
     def generate_deep_link(self, phone: str, message: str = "") -> dict:
         return self.deeplink.generate_link(phone, message)
 
+    def _get_twilio_client(self):
+        if self._twilio_client is None:
+            from twilio.rest import Client
+            self._twilio_client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+        return self._twilio_client
+
     async def _send_twilio(self, to: str, message: str) -> bool:
         try:
-            from twilio.rest import Client
-            client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+            client = self._get_twilio_client()
             client.messages.create(body=message, from_=f"whatsapp:{settings.TWILIO_WHATSAPP_NUMBER}", to=f"whatsapp:{to}")
             return True
         except Exception:

@@ -57,6 +57,11 @@ class Settings(BaseSettings):
 
     CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
 
+    DB_POOL_SIZE: int = 30
+    DB_MAX_OVERFLOW: int = 50
+    DB_POOL_TIMEOUT: int = 30
+    DB_POOL_RECYCLE: int = 1800
+
     UPLOAD_DIR: str = "app/uploads"
     MAX_UPLOAD_SIZE: int = 5 * 1024 * 1024
 

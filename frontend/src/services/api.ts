@@ -74,6 +74,7 @@ api.interceptors.response.use((response) => {
 
 const forceLogout = () => {
   queryClient.clear()
+  useSubscriptionStore.getState().clearBlocked()
   useAuthStore.getState().logout()
   if (window.location.pathname !== "/login") {
     window.location.assign("/login")

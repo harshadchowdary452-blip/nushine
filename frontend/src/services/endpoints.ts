@@ -36,6 +36,8 @@ export const authApi = {
     specialization?: string
     license_number?: string
   }) => api.put("/auth/me", data).then((r) => r.data),
+  resetPassword: (data: { user_id: string; new_password: string }) =>
+    api.post("/auth/reset-password", data).then((r) => r.data),
   switchContext: (data: { hospital_id?: string | null }) =>
     api.post<ContextSwitchResponse>("/auth/context/switch", data).then((r) => r.data),
 }

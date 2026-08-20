@@ -4,7 +4,7 @@ import { useLocation } from "react-router-dom"
 const APP_NAME = "Appointin"
 
 const routeTitles: Record<string, string> = {
-  "/": `Care. Connect. Grow. — ${APP_NAME}`,
+  "/": APP_NAME,
   "/login": `Login — ${APP_NAME}`,
   "/home": `Dashboard — ${APP_NAME}`,
   "/super-admin": `Super Admin Dashboard — ${APP_NAME}`,

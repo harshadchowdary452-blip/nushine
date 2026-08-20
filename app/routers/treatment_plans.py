@@ -120,7 +120,7 @@ async def get_treatment_plans(
         if role == Role.DOCTOR.value:
             query = query.where(Case.doctor_id == uid)
         elif role == Role.HOSPITAL_ADMIN.value:
-            hid = hospital_id or current_user.get("hospital_id")
+            hid = current_user.get("hospital_id")
             if hid:
                 query = query.where(Patient.hospital_id == hid)
         elif role == Role.GROUP_ADMIN.value:
@@ -206,6 +206,11 @@ async def get_treatment_plans(
 @router.post("/", response_model=TreatmentPlanResponse, status_code=status.HTTP_201_CREATED)
 async def create_treatment_plan(data: TreatmentPlanCreate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.CREATE_TREATMENT_PLAN)
+    case_result = await db.execute(select(Case).where(Case.id == data.case_id))
+    case = case_result.scalar_one_or_none()
+    if not case:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
+    await verify_tenant_access(current_user, case, "case", db)
     service = TreatmentPlanService(db)
     return await service.create(data.model_dump(), user_id=current_user.get("sub"))
 
@@ -323,6 +328,10 @@ async def apply_treatment_discount(plan_id: str, data: TreatmentDiscountUpdate, 
 async def suggest_appointment(plan_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.CREATE_TREATMENT_PLAN, Permission.VIEW_TREATMENT_QUEUE)
     service = TreatmentPlanService(db)
+    plan = await service.get(plan_id)
+    if not plan:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Treatment plan not found")
+    await verify_tenant_access(current_user, plan, "treatment_plan", db)
     return await service.suggest_next_appointment(plan_id)
 
 
@@ -330,6 +339,10 @@ async def suggest_appointment(plan_id: str, db: AsyncSession = Depends(get_db), 
 async def check_dependency(plan_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.CREATE_TREATMENT_PLAN, Permission.VIEW_TREATMENT_QUEUE)
     service = TreatmentPlanService(db)
+    plan = await service.get(plan_id)
+    if not plan:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Treatment plan not found")
+    await verify_tenant_access(current_user, plan, "treatment_plan", db)
     return await service.check_dependency_met(plan_id)
 
 
@@ -337,6 +350,10 @@ async def check_dependency(plan_id: str, db: AsyncSession = Depends(get_db), cur
 async def start_treatment(plan_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.CREATE_TREATMENT_PLAN)
     service = TreatmentPlanService(db)
+    plan = await service.get(plan_id)
+    if not plan:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Treatment plan not found")
+    await verify_tenant_access(current_user, plan, "treatment_plan", db)
     result = await service.update_status(plan_id, "IN_PROGRESS", user_id=current_user.get("sub"))
     patient_id = await _get_patient_id_from_plan(db, plan_id)
     await record_timeline_event(
@@ -368,6 +385,10 @@ async def start_treatment(plan_id: str, db: AsyncSession = Depends(get_db), curr
 async def complete_treatment(plan_id: str, body: CompleteTreatmentBody = Body(default=None), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.CREATE_TREATMENT_PLAN)
     service = TreatmentPlanService(db)
+    plan = await service.get(plan_id)
+    if not plan:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Treatment plan not found")
+    await verify_tenant_access(current_user, plan, "treatment_plan", db)
     update_data = {"status": "COMPLETED"}
     if body:
         if body.outcome:
@@ -634,6 +655,10 @@ async def transfer_treatment(plan_id: str, body: TransferTreatmentBody, db: Asyn
 async def report_overdue(plan_id: str, reason: str = Query(...), delay_type: str = Query(...), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.CREATE_TREATMENT_PLAN)
     service = TreatmentPlanService(db)
+    plan = await service.get(plan_id)
+    if not plan:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Treatment plan not found")
+    await verify_tenant_access(current_user, plan, "treatment_plan", db)
     result = await service.update(plan_id, {"status": "OVERDUE", "overdue_reason": reason, "overdue_delay_type": delay_type}, user_id=current_user.get("sub"))
     await db.commit()
     patient_id = await _get_patient_id_from_plan(db, plan_id)
@@ -657,6 +682,10 @@ async def report_overdue(plan_id: str, reason: str = Query(...), delay_type: str
 async def set_waiting(plan_id: str, waiting_type: str = Query(...), body: SetWaitingBody = Body(default=None), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.CREATE_TREATMENT_PLAN)
     service = TreatmentPlanService(db)
+    plan = await service.get(plan_id)
+    if not plan:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Treatment plan not found")
+    await verify_tenant_access(current_user, plan, "treatment_plan", db)
     if waiting_type not in ("WAITING_PATIENT", "WAITING_LAB"):
         raise HTTPException(status_code=400, detail="waiting_type must be WAITING_PATIENT or WAITING_LAB")
     update_data = {"status": waiting_type}

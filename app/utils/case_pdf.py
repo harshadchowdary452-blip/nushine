@@ -88,7 +88,15 @@ async def _ensure_browser():
         except Exception:
             pass
     _playwright = await async_playwright().start()
-    _browser = await _playwright.chromium.launch()
+    _browser = await _playwright.chromium.launch(
+        args=[
+            "--no-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-gpu",
+            "--disable-extensions",
+            "--single-process",
+        ],
+    )
     return _browser
 
 
@@ -97,15 +105,19 @@ async def _convert(html: str) -> Optional[bytes]:
     if _playwright_available():
         try:
             browser = await _ensure_browser()
-            page = await browser.new_page()
-            await page.set_content(html, wait_until="domcontentloaded")
-            pdf_bytes = await page.pdf(
-                format="A4",
-                margin={"top": "0", "bottom": "0", "left": "0", "right": "0"},
-                print_background=True,
-            )
-            await page.close()
-            return pdf_bytes
+            context = await browser.new_context()
+            page = await context.new_page()
+            try:
+                await page.set_content(html, wait_until="domcontentloaded", timeout=15000)
+                pdf_bytes = await page.pdf(
+                    format="A4",
+                    margin={"top": "0", "bottom": "0", "left": "0", "right": "0"},
+                    print_background=True,
+                )
+                return pdf_bytes
+            finally:
+                await page.close()
+                await context.close()
         except Exception:
             logger.exception("Playwright PDF generation failed")
 

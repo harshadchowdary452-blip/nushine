@@ -386,6 +386,8 @@ async def hospital_admin_dashboard(
         tp_base_filters.append(TreatmentPlan.case_id.in_(case_ids))
     elif doctor_id:
         tp_base_filters.append(TreatmentPlan.assigned_doctor_id == doctor_id)
+    else:
+        tp_base_filters.append(TreatmentPlan.id == None)  # no hospital scope — return zeros
 
     total_active_treatments = (await db.execute(
         select(func.count(TreatmentPlan.id)).where(*tp_base_filters, TreatmentPlan.status.in_([

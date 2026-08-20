@@ -31,7 +31,6 @@ const DialogContent = React.forwardRef<
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
-      aria-describedby={undefined}
       onCloseAutoFocus={(e) => e.preventDefault()}
       className={cn(
         "ds-motion-dialog fixed left-[50%] top-[50%] z-[var(--ds-z-dialog)] translate-x-[-50%] translate-y-[-50%]",
@@ -48,6 +47,7 @@ const DialogContent = React.forwardRef<
       {...props}
     >
       {children}
+      <DialogPrimitive.Description className="sr-only">Dialog</DialogPrimitive.Description>
       {showCloseButton && (
         <DialogPrimitive.Close className="absolute right-5 top-5 rounded-[var(--ds-radius-lg)] p-1.5 text-[var(--ds-text-tertiary)] hover:text-[var(--ds-text)] hover:bg-[var(--ds-surface-hover)] transition-all opacity-70 focus:outline-none focus:ring-2 focus:ring-[var(--ds-primary)]/20">
           <X className="h-4 w-4" />

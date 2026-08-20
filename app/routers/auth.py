@@ -6,7 +6,7 @@ from slowapi.util import get_remote_address
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.services.auth_service import AuthService
-from app.schemas.auth import LoginRequest, LoginResponse, RefreshTokenRequest, TokenResponse, ChangePasswordRequest, UpdateProfileRequest, ContextSwitchRequest, ContextSwitchResponse
+from app.schemas.auth import LoginRequest, LoginResponse, RefreshTokenRequest, TokenResponse, ChangePasswordRequest, UpdateProfileRequest, ContextSwitchRequest, ContextSwitchResponse, AdminPasswordResetRequest
 from app.schemas.common import MessageResponse
 from app.repositories.user_repository import UserRepository
 from app.core.permissions import Role
@@ -76,6 +76,13 @@ async def update_profile(request: UpdateProfileRequest, current_user: dict = Dep
 async def change_password(request: Request, change_request: ChangePasswordRequest, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     service = AuthService(db)
     return await service.change_password(current_user.get("sub"), change_request.current_password, change_request.new_password)
+
+
+@router.post("/reset-password", response_model=MessageResponse)
+@limiter.limit("10/minute")
+async def admin_reset_password(request: Request, data: AdminPasswordResetRequest, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    service = AuthService(db)
+    return await service.admin_reset_password(current_user, data.user_id, data.new_password)
 
 
 async def _resolve_hospital(db: AsyncSession, hospital_id: str):

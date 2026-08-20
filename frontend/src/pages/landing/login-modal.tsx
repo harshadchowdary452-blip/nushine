@@ -102,10 +102,11 @@ export default function LoginModal({ open, onClose }: LoginModalProps) {
 
               <form noValidate onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">Email</label>
+                  <label htmlFor="login-email" className="block text-xs font-semibold text-gray-600 mb-1.5">Email</label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-300" />
                     <input
+                      id="login-email"
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -117,10 +118,11 @@ export default function LoginModal({ open, onClose }: LoginModalProps) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">Password</label>
+                  <label htmlFor="login-password" className="block text-xs font-semibold text-gray-600 mb-1.5">Password</label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-300" />
                     <input
+                      id="login-password"
                       type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}

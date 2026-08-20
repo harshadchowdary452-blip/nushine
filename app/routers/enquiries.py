@@ -175,13 +175,23 @@ DEFAULT_TEMPLATES_BY_TYPE = {
 }
 
 
-def _verify_hospital_access(entity, current_user):
+async def _verify_hospital_access(entity, current_user, db=None):
     role = current_user.get("role")
     if role in ("HOSPITAL_ADMIN", "DOCTOR"):
         ehid = getattr(entity, "hospital_id", None)
         uhid = current_user.get("hospital_id")
         if ehid and uhid and str(ehid) != str(uhid):
             raise HTTPException(status_code=403, detail="Access denied: belongs to another hospital")
+    elif role == "GROUP_ADMIN" and db is not None:
+        ehid = getattr(entity, "hospital_id", None)
+        if ehid:
+            agid = current_user.get("admin_group_id")
+            if agid:
+                hosp_check = await db.execute(select(Hospital.id).where(Hospital.id == ehid, Hospital.admin_group_id == agid))
+                if not hosp_check.scalar_one_or_none():
+                    raise HTTPException(status_code=403, detail="Access denied: belongs to another hospital")
+            else:
+                raise HTTPException(status_code=403, detail="Access denied")
 
 
 # --- Schemas ---
@@ -257,8 +267,20 @@ async def list_enquiries(
     db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.VIEW_CRM_DASHBOARD)
     hospital_id = current_user.get("hospital_id")
+    role = current_user.get("role")
     q = select(Enquiry)
-    if hospital_id:
+    if role == "GROUP_ADMIN":
+        agid = current_user.get("admin_group_id")
+        if agid:
+            hosp_r = await db.execute(select(Hospital.id).where(Hospital.admin_group_id == agid))
+            hids = [r[0] for r in hosp_r.all()]
+            if hids:
+                q = q.where(Enquiry.hospital_id.in_(hids))
+            else:
+                q = q.where(Enquiry.id == None)
+        else:
+            q = q.where(Enquiry.id == None)
+    elif hospital_id:
         q = q.where(Enquiry.hospital_id == hospital_id)
     if status_filter:
         q = q.where(Enquiry.status == status_filter)
@@ -506,6 +528,7 @@ async def get_enquiry_calendar(
     db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.VIEW_CRM_DASHBOARD)
     hospital_id = current_user.get("hospital_id")
+    role = current_user.get("role")
     start = date.fromisoformat(start_date)
     end = date.fromisoformat(end_date)
 
@@ -521,7 +544,18 @@ async def get_enquiry_calendar(
         GeneratedEnquiry.due_date <= end,
         GeneratedEnquiry.enquiry_type.in_(VALID_ENQUIRY_TYPES),
     )
-    if hospital_id:
+    if role == "GROUP_ADMIN":
+        agid = current_user.get("admin_group_id")
+        if agid:
+            hosp_r = await db.execute(select(Hospital.id).where(Hospital.admin_group_id == agid))
+            hids = [r[0] for r in hosp_r.all()]
+            if hids:
+                ge_q = ge_q.where(GeneratedEnquiry.hospital_id.in_(hids))
+            else:
+                ge_q = ge_q.where(GeneratedEnquiry.id == None)
+        else:
+            ge_q = ge_q.where(GeneratedEnquiry.id == None)
+    elif hospital_id:
         ge_q = ge_q.where(GeneratedEnquiry.hospital_id == hospital_id)
     if status_filter:
         ge_q = ge_q.where(GeneratedEnquiry.status == status_filter)
@@ -857,6 +891,7 @@ async def get_calendar_summary(
     db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.VIEW_CRM_DASHBOARD)
     hospital_id = current_user.get("hospital_id")
+    role = current_user.get("role")
     start = date.fromisoformat(start_date)
     end = date.fromisoformat(end_date)
 
@@ -875,13 +910,31 @@ async def get_calendar_summary(
         "TREATMENT_WELLNESS", "CASE_WELLNESS", "RECALL", "MISSED_APPOINTMENT",
     ]
 
+    # --- Resolve hospital filter for this role ---
+    _hosp_filter = None
+    if role == "GROUP_ADMIN":
+        agid = current_user.get("admin_group_id")
+        if agid:
+            hosp_r = await db.execute(select(Hospital.id).where(Hospital.admin_group_id == agid))
+            hids = [r[0] for r in hosp_r.all()]
+            _hosp_filter = hids if hids else []
+        else:
+            _hosp_filter = []
+    elif hospital_id:
+        _hosp_filter = hospital_id
+
     # --- Base filter for valid, non-terminal enquiries in date range ---
     base_filters = [
         GeneratedEnquiry.due_date.between(start, end),
         GeneratedEnquiry.enquiry_type.in_(VALID_ENQUIRY_TYPES),
     ]
-    if hospital_id:
-        base_filters.append(GeneratedEnquiry.hospital_id == hospital_id)
+    if _hosp_filter == []:
+        base_filters.append(GeneratedEnquiry.id == None)
+    elif _hosp_filter:
+        if isinstance(_hosp_filter, list):
+            base_filters.append(GeneratedEnquiry.hospital_id.in_(_hosp_filter))
+        else:
+            base_filters.append(GeneratedEnquiry.hospital_id == _hosp_filter)
     if not include_terminal:
         base_filters.append(GeneratedEnquiry.status.notin_(terminal_statuses))
 
@@ -915,8 +968,13 @@ async def get_calendar_summary(
         GeneratedEnquiry.enquiry_type.in_(VALID_ENQUIRY_TYPES),
         GeneratedEnquiry.status.in_(overdue_statuses),
     ]
-    if hospital_id:
-        ov_filters.append(GeneratedEnquiry.hospital_id == hospital_id)
+    if _hosp_filter == []:
+        ov_filters.append(GeneratedEnquiry.id == None)
+    elif _hosp_filter:
+        if isinstance(_hosp_filter, list):
+            ov_filters.append(GeneratedEnquiry.hospital_id.in_(_hosp_filter))
+        else:
+            ov_filters.append(GeneratedEnquiry.hospital_id == _hosp_filter)
     counts["overdue"] = (await db.execute(
         select(func.count()).select_from(GeneratedEnquiry).where(and_(*ov_filters))
     )).scalar() or 0
@@ -927,8 +985,13 @@ async def get_calendar_summary(
         GeneratedEnquiry.enquiry_type.in_(VALID_ENQUIRY_TYPES),
         GeneratedEnquiry.status.in_(overdue_statuses),
     ]
-    if hospital_id:
-        dt_filters.append(GeneratedEnquiry.hospital_id == hospital_id)
+    if _hosp_filter == []:
+        dt_filters.append(GeneratedEnquiry.id == None)
+    elif _hosp_filter:
+        if isinstance(_hosp_filter, list):
+            dt_filters.append(GeneratedEnquiry.hospital_id.in_(_hosp_filter))
+        else:
+            dt_filters.append(GeneratedEnquiry.hospital_id == _hosp_filter)
     counts["due_today"] = (await db.execute(
         select(func.count()).select_from(GeneratedEnquiry).where(and_(*dt_filters))
     )).scalar() or 0
@@ -939,8 +1002,13 @@ async def get_calendar_summary(
         GeneratedEnquiry.enquiry_type.in_(VALID_ENQUIRY_TYPES),
         GeneratedEnquiry.status.in_(overdue_statuses),
     ]
-    if hospital_id:
-        dtm_filters.append(GeneratedEnquiry.hospital_id == hospital_id)
+    if _hosp_filter == []:
+        dtm_filters.append(GeneratedEnquiry.id == None)
+    elif _hosp_filter:
+        if isinstance(_hosp_filter, list):
+            dtm_filters.append(GeneratedEnquiry.hospital_id.in_(_hosp_filter))
+        else:
+            dtm_filters.append(GeneratedEnquiry.hospital_id == _hosp_filter)
     counts["due_tomorrow"] = (await db.execute(
         select(func.count()).select_from(GeneratedEnquiry).where(and_(*dtm_filters))
     )).scalar() or 0
@@ -965,6 +1033,7 @@ async def calendar_overdue_items(
 ):
     """Return overdue items (due_date < today, active status) — NOT part of calendar grid."""
     hospital_id = current_user.get("hospital_id")
+    role = current_user.get("role")
     today = date.today()
     terminal_statuses = ["COMPLETED", "CANCELLED", "LOST", "CONVERTED"]
     overdue_statuses = ["PENDING", "CONTACTED", "INTERESTED", "APPOINTMENT_REQUIRED",
@@ -982,7 +1051,18 @@ async def calendar_overdue_items(
         GeneratedEnquiry.status.in_(overdue_statuses),
         GeneratedEnquiry.enquiry_type.in_(VALID_ENQUIRY_TYPES),
     )
-    if hospital_id:
+    if role == "GROUP_ADMIN":
+        agid = current_user.get("admin_group_id")
+        if agid:
+            hosp_r = await db.execute(select(Hospital.id).where(Hospital.admin_group_id == agid))
+            hids = [r[0] for r in hosp_r.all()]
+            if hids:
+                ge_q = ge_q.where(GeneratedEnquiry.hospital_id.in_(hids))
+            else:
+                ge_q = ge_q.where(GeneratedEnquiry.id == None)
+        else:
+            ge_q = ge_q.where(GeneratedEnquiry.id == None)
+    elif hospital_id:
         ge_q = ge_q.where(GeneratedEnquiry.hospital_id == hospital_id)
     if type_filter:
         ge_q = ge_q.where(GeneratedEnquiry.enquiry_type == type_filter)
@@ -1078,7 +1158,7 @@ async def reschedule_enquiry(
     # Try follow_up first
     fu = await db.get(FollowUp, enquiry_id)
     if fu:
-        _verify_hospital_access(fu, current_user)
+        await _verify_hospital_access(fu, current_user, db)
         fu.follow_up_date = new_date
         await db.commit()
         return {"success": True, "source": "follow_up", "new_date": new_date.isoformat()}
@@ -1086,7 +1166,7 @@ async def reschedule_enquiry(
     # Try generated_enquiry
     ge = await db.get(GeneratedEnquiry, enquiry_id)
     if ge:
-        _verify_hospital_access(ge, current_user)
+        await _verify_hospital_access(ge, current_user, db)
         ge.due_date = new_date
         ge.updated_at = datetime.now(timezone.utc)
         await db.commit()
@@ -1095,7 +1175,7 @@ async def reschedule_enquiry(
     # Try enquiry
     enq = await db.get(Enquiry, enquiry_id)
     if enq:
-        _verify_hospital_access(enq, current_user)
+        await _verify_hospital_access(enq, current_user, db)
         enq.next_follow_up_date = new_date
         enq.updated_at = datetime.now(timezone.utc)
         await db.commit()
@@ -1117,7 +1197,7 @@ async def update_enquiry_status(
     # Try follow_up
     fu = await db.get(FollowUp, enquiry_id)
     if fu:
-        _verify_hospital_access(fu, current_user)
+        await _verify_hospital_access(fu, current_user, db)
         fu.status = data.status
         if data.status == "COMPLETED":
             fu.completed_date = datetime.now(timezone.utc)
@@ -1128,7 +1208,7 @@ async def update_enquiry_status(
     # Try generated_enquiry
     ge = await db.get(GeneratedEnquiry, enquiry_id)
     if ge:
-        _verify_hospital_access(ge, current_user)
+        await _verify_hospital_access(ge, current_user, db)
         old_status = ge.status
         ge.status = data.status
         if data.status == "COMPLETED":
@@ -1192,7 +1272,7 @@ async def update_enquiry_status(
     # Try enquiry
     enq = await db.get(Enquiry, enquiry_id)
     if enq:
-        _verify_hospital_access(enq, current_user)
+        await _verify_hospital_access(enq, current_user, db)
         old_status = enq.status
         enq.status = data.status
         enq.updated_at = datetime.now(timezone.utc)
@@ -1226,7 +1306,7 @@ async def assign_enquiry(
     # Try follow_up
     fu = await db.get(FollowUp, enquiry_id)
     if fu:
-        _verify_hospital_access(fu, current_user)
+        await _verify_hospital_access(fu, current_user, db)
         fu.doctor_id = data.assigned_staff_id
         await db.commit()
         return {"success": True, "source": "follow_up"}
@@ -1234,7 +1314,7 @@ async def assign_enquiry(
     # Try generated_enquiry
     ge = await db.get(GeneratedEnquiry, enquiry_id)
     if ge:
-        _verify_hospital_access(ge, current_user)
+        await _verify_hospital_access(ge, current_user, db)
         ge.assigned_staff_id = data.assigned_staff_id
         await db.commit()
         return {"success": True, "source": "generated_enquiry"}
@@ -1242,7 +1322,7 @@ async def assign_enquiry(
     # Try enquiry
     enq = await db.get(Enquiry, enquiry_id)
     if enq:
-        _verify_hospital_access(enq, current_user)
+        await _verify_hospital_access(enq, current_user, db)
         enq.assigned_staff_id = data.assigned_staff_id
         enq.updated_at = datetime.now(timezone.utc)
         await db.commit()
@@ -1257,7 +1337,7 @@ async def get_enquiry(enquiry_id: str, db: AsyncSession = Depends(get_db), curre
     e = await db.get(Enquiry, enquiry_id)
     if not e:
         raise HTTPException(status_code=404, detail="Enquiry not found")
-    _verify_hospital_access(e, current_user)
+    await _verify_hospital_access(e, current_user, db)
     patient = await db.get(Patient, e.patient_id)
     staff = await db.get(User, e.assigned_staff_id) if e.assigned_staff_id else None
     return {
@@ -1279,7 +1359,7 @@ async def update_enquiry(enquiry_id: str, data: EnquiryUpdate, db: AsyncSession 
     e = await db.get(Enquiry, enquiry_id)
     if not e:
         raise HTTPException(status_code=404, detail="Enquiry not found")
-    _verify_hospital_access(e, current_user)
+    await _verify_hospital_access(e, current_user, db)
     old_status = e.status
     old_interest = e.treatment_interest
     if data.treatment_interest is not None: e.treatment_interest = data.treatment_interest
@@ -1305,7 +1385,7 @@ async def delete_enquiry(enquiry_id: str, db: AsyncSession = Depends(get_db), cu
     e = await db.get(Enquiry, enquiry_id)
     if not e:
         raise HTTPException(status_code=404, detail="Enquiry not found")
-    _verify_hospital_access(e, current_user)
+    await _verify_hospital_access(e, current_user, db)
     patient_id = e.patient_id
     await db.execute(sa_delete(EnquiryFollowUp).where(EnquiryFollowUp.enquiry_id == enquiry_id))
     await db.delete(e)
@@ -1326,7 +1406,7 @@ async def create_enquiry_follow_up(enquiry_id: str, data: EnquiryFollowUpAction,
     e = await db.get(Enquiry, enquiry_id)
     if not e:
         raise HTTPException(status_code=404, detail="Enquiry not found")
-    _verify_hospital_access(e, current_user)
+    await _verify_hospital_access(e, current_user, db)
     fu = EnquiryFollowUp(enquiry_id=enquiry_id, staff_id=current_user.get("sub"), action=data.action, notes=data.notes)
     db.add(fu)
     # Update enquiry status based on action
@@ -1399,7 +1479,16 @@ async def get_enriched_enquiry_detail(
     if not ge:
         raise HTTPException(status_code=404, detail="Enquiry not found")
     hospital_id = current_user.get("hospital_id")
-    if hospital_id and str(ge.hospital_id) != hospital_id:
+    role = current_user.get("role")
+    if role == "GROUP_ADMIN":
+        agid = current_user.get("admin_group_id")
+        if agid:
+            hosp_check = await db.execute(select(Hospital.id).where(Hospital.id == ge.hospital_id, Hospital.admin_group_id == agid))
+            if not hosp_check.scalar_one_or_none():
+                raise HTTPException(status_code=403, detail="Access denied")
+        else:
+            raise HTTPException(status_code=403, detail="Access denied")
+    elif hospital_id and str(ge.hospital_id) != hospital_id:
         raise HTTPException(status_code=403, detail="Access denied")
 
     # --- Batch load all related entities ---
@@ -1789,7 +1878,16 @@ async def get_whatsapp_preview(
     if not ge:
         raise HTTPException(status_code=404, detail="Enquiry not found")
     hospital_id = current_user.get("hospital_id")
-    if hospital_id and str(ge.hospital_id) != hospital_id:
+    role = current_user.get("role")
+    if role == "GROUP_ADMIN":
+        agid = current_user.get("admin_group_id")
+        if agid:
+            hosp_check = await db.execute(select(Hospital.id).where(Hospital.id == ge.hospital_id, Hospital.admin_group_id == agid))
+            if not hosp_check.scalar_one_or_none():
+                raise HTTPException(status_code=403, detail="Access denied")
+        else:
+            raise HTTPException(status_code=403, detail="Access denied")
+    elif hospital_id and str(ge.hospital_id) != hospital_id:
         raise HTTPException(status_code=403, detail="Access denied")
 
     # Find template

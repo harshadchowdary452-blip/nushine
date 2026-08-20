@@ -1,4 +1,4 @@
-import { memo, useState, useEffect } from "react"
+import { memo, useState, useEffect, useId } from "react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select"
 import { Input } from "./input"
 import { Label } from "./label"
@@ -72,14 +72,16 @@ function DashboardFilterBar({ filters, onChange, doctors = [] }: DashboardFilter
     setLocal((prev) => ({ ...prev, [key]: value }))
   }
 
+  const [periodId, fromDateId, toDateId, doctorId, patientStatusId, caseStatusId, paymentStatusId, treatmentStatusId, apptStatusId] = [useId(), useId(), useId(), useId(), useId(), useId(), useId(), useId(), useId()]
+
   return (
     <div className="rounded-[var(--ds-radius-xl)] border border-[var(--ds-border)] bg-[var(--ds-surface)] p-4 shadow-[var(--ds-shadow-card)]">
       <div className="flex flex-wrap items-end gap-3">
         {/* Period */}
         <div className="space-y-1">
-          <Label className="ds-form-label font-medium text-[var(--ds-text-tertiary)]">Date Range</Label>
+          <Label htmlFor={periodId} className="ds-form-label font-medium text-[var(--ds-text-tertiary)]">Date Range</Label>
           <Select value={local.period} onValueChange={(v) => set("period", v)}>
-            <SelectTrigger className="h-9 w-[150px] bg-[var(--ds-surface)] text-sm">
+            <SelectTrigger id={periodId} className="h-9 w-[150px] bg-[var(--ds-surface)] text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -94,12 +96,12 @@ function DashboardFilterBar({ filters, onChange, doctors = [] }: DashboardFilter
         {local.period === "custom" && (
           <>
             <div className="space-y-1">
-              <Label className="ds-form-label font-medium text-[var(--ds-text-tertiary)]">From</Label>
-              <Input type="date" value={local.startDate} onChange={(e) => set("startDate", e.target.value)} className="h-9 w-[140px] bg-[var(--ds-surface)] text-sm" />
+              <Label htmlFor={fromDateId} className="ds-form-label font-medium text-[var(--ds-text-tertiary)]">From</Label>
+              <Input id={fromDateId} type="date" value={local.startDate} onChange={(e) => set("startDate", e.target.value)} className="h-9 w-[140px] bg-[var(--ds-surface)] text-sm" />
             </div>
             <div className="space-y-1">
-              <Label className="ds-form-label font-medium text-[var(--ds-text-tertiary)]">To</Label>
-              <Input type="date" value={local.endDate} onChange={(e) => set("endDate", e.target.value)} className="h-9 w-[140px] bg-[var(--ds-surface)] text-sm" />
+              <Label htmlFor={toDateId} className="ds-form-label font-medium text-[var(--ds-text-tertiary)]">To</Label>
+              <Input id={toDateId} type="date" value={local.endDate} onChange={(e) => set("endDate", e.target.value)} className="h-9 w-[140px] bg-[var(--ds-surface)] text-sm" />
             </div>
           </>
         )}
@@ -107,9 +109,9 @@ function DashboardFilterBar({ filters, onChange, doctors = [] }: DashboardFilter
         {/* Doctor */}
         {doctors.length > 0 && (
           <div className="space-y-1">
-            <Label className="ds-form-label font-medium text-[var(--ds-text-tertiary)]">Doctor</Label>
+            <Label htmlFor={doctorId} className="ds-form-label font-medium text-[var(--ds-text-tertiary)]">Doctor</Label>
             <Select value={local.doctorId} onValueChange={(v) => set("doctorId", v)}>
-              <SelectTrigger className="h-9 w-[160px] bg-[var(--ds-surface)] text-sm">
+              <SelectTrigger id={doctorId} className="h-9 w-[160px] bg-[var(--ds-surface)] text-sm">
                 <SelectValue placeholder="All Doctors" />
               </SelectTrigger>
               <SelectContent>
@@ -124,9 +126,9 @@ function DashboardFilterBar({ filters, onChange, doctors = [] }: DashboardFilter
 
         {/* Patient Status */}
         <div className="space-y-1">
-          <Label className="ds-form-label font-medium text-[var(--ds-text-tertiary)]">Patient Status</Label>
+          <Label htmlFor={patientStatusId} className="ds-form-label font-medium text-[var(--ds-text-tertiary)]">Patient Status</Label>
           <Select value={local.patientStatus} onValueChange={(v) => set("patientStatus", v)}>
-            <SelectTrigger className="h-9 w-[150px] bg-[var(--ds-surface)] text-sm">
+            <SelectTrigger id={patientStatusId} className="h-9 w-[150px] bg-[var(--ds-surface)] text-sm">
               <SelectValue placeholder="All" />
             </SelectTrigger>
             <SelectContent>
@@ -140,9 +142,9 @@ function DashboardFilterBar({ filters, onChange, doctors = [] }: DashboardFilter
 
         {/* Case Status */}
         <div className="space-y-1">
-          <Label className="ds-form-label font-medium text-[var(--ds-text-tertiary)]">Case Status</Label>
+          <Label htmlFor={caseStatusId} className="ds-form-label font-medium text-[var(--ds-text-tertiary)]">Case Status</Label>
           <Select value={local.caseStatus} onValueChange={(v) => set("caseStatus", v)}>
-            <SelectTrigger className="h-9 w-[140px] bg-[var(--ds-surface)] text-sm">
+            <SelectTrigger id={caseStatusId} className="h-9 w-[140px] bg-[var(--ds-surface)] text-sm">
               <SelectValue placeholder="All" />
             </SelectTrigger>
             <SelectContent>
@@ -156,9 +158,9 @@ function DashboardFilterBar({ filters, onChange, doctors = [] }: DashboardFilter
 
         {/* Payment Status */}
         <div className="space-y-1">
-          <Label className="ds-form-label font-medium text-[var(--ds-text-tertiary)]">Payment Status</Label>
+          <Label htmlFor={paymentStatusId} className="ds-form-label font-medium text-[var(--ds-text-tertiary)]">Payment Status</Label>
           <Select value={local.paymentStatus} onValueChange={(v) => set("paymentStatus", v)}>
-            <SelectTrigger className="h-9 w-[140px] bg-[var(--ds-surface)] text-sm">
+            <SelectTrigger id={paymentStatusId} className="h-9 w-[140px] bg-[var(--ds-surface)] text-sm">
               <SelectValue placeholder="All" />
             </SelectTrigger>
             <SelectContent>
@@ -172,9 +174,9 @@ function DashboardFilterBar({ filters, onChange, doctors = [] }: DashboardFilter
 
         {/* Treatment Status */}
         <div className="space-y-1">
-          <Label className="ds-form-label font-medium text-[var(--ds-text-tertiary)]">Treatment Status</Label>
+          <Label htmlFor={treatmentStatusId} className="ds-form-label font-medium text-[var(--ds-text-tertiary)]">Treatment Status</Label>
           <Select value={local.treatmentStatus} onValueChange={(v) => set("treatmentStatus", v)}>
-            <SelectTrigger className="h-9 w-[150px] bg-[var(--ds-surface)] text-sm">
+            <SelectTrigger id={treatmentStatusId} className="h-9 w-[150px] bg-[var(--ds-surface)] text-sm">
               <SelectValue placeholder="All" />
             </SelectTrigger>
             <SelectContent>
@@ -188,9 +190,9 @@ function DashboardFilterBar({ filters, onChange, doctors = [] }: DashboardFilter
 
         {/* Appointment Status */}
         <div className="space-y-1">
-          <Label className="ds-form-label font-medium text-[var(--ds-text-tertiary)]">Appt. Status</Label>
+          <Label htmlFor={apptStatusId} className="ds-form-label font-medium text-[var(--ds-text-tertiary)]">Appt. Status</Label>
           <Select value={local.appointmentStatus} onValueChange={(v) => set("appointmentStatus", v)}>
-            <SelectTrigger className="h-9 w-[140px] bg-[var(--ds-surface)] text-sm">
+            <SelectTrigger id={apptStatusId} className="h-9 w-[140px] bg-[var(--ds-surface)] text-sm">
               <SelectValue placeholder="All" />
             </SelectTrigger>
             <SelectContent>

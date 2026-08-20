@@ -77,8 +77,22 @@ async def create_lead(data: LeadCreate, db: AsyncSession = Depends(get_db), curr
     role = current_user.get("role")
     if role in ("HOSPITAL_ADMIN", "DOCTOR"):
         data_dict["hospital_id"] = current_user.get("hospital_id")
-    elif not data_dict.get("hospital_id") and current_user.get("hospital_id"):
-        data_dict["hospital_id"] = current_user.get("hospital_id")
+    elif role == "GROUP_ADMIN":
+        hospital_id = data_dict.get("hospital_id")
+        if not hospital_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="hospital_id is required")
+        agid = current_user.get("admin_group_id")
+        if agid:
+            from app.models.hospital import Hospital as HospitalModel
+            from sqlalchemy import select
+            hosp_check = await db.execute(select(HospitalModel.id).where(HospitalModel.id == hospital_id, HospitalModel.admin_group_id == agid))
+            if not hosp_check.scalar_one_or_none():
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Hospital does not belong to your group")
+        else:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Group admin group not found")
+    else:
+        if not data_dict.get("hospital_id") and current_user.get("hospital_id"):
+            data_dict["hospital_id"] = current_user.get("hospital_id")
     if not data_dict.get("hospital_id"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="hospital_id is required")
     lead = await service.create(data_dict, user_id=current_user.get("sub"))
@@ -523,6 +537,26 @@ async def get_lead_analytics(db: AsyncSession = Depends(get_db), current_user: d
     base = select(Lead)
     if role in ("HOSPITAL_ADMIN", "DOCTOR") and current_user.get("hospital_id"):
         base = base.where(Lead.hospital_id == current_user["hospital_id"])
+    elif role == "GROUP_ADMIN":
+        agid = current_user.get("admin_group_id")
+        if agid:
+            from app.models.hospital import Hospital as HospitalModel
+            hosp_r = await db.execute(select(HospitalModel.id).where(HospitalModel.admin_group_id == agid))
+            hospital_ids = [r[0] for r in hosp_r.all()]
+            if hospital_ids:
+                base = base.where(Lead.hospital_id.in_(hospital_ids))
+            else:
+                return {
+                    "total": 0, "by_status": {}, "by_source": {},
+                    "converted": 0, "lost": 0, "conversion_rate": 0,
+                    "avg_score": 0, "high_priority": 0, "follow_up_due_today": 0,
+                }
+        else:
+            return {
+                "total": 0, "by_status": {}, "by_source": {},
+                "converted": 0, "lost": 0, "conversion_rate": 0,
+                "avg_score": 0, "high_priority": 0, "follow_up_due_today": 0,
+            }
     rows = (await db.execute(base)).scalars().all()
     total = len(rows)
     by_status = {}

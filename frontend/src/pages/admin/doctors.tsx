@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
-import { Plus, Edit, Stethoscope, UserX, UserCheck, Trash2 } from "lucide-react"
+import { Plus, Edit, Stethoscope, UserX, UserCheck, Trash2, KeyRound } from "lucide-react"
 import { format } from "date-fns"
 import { PageHeader } from "@/design-system"
 import { Button } from "@/components/ui/button"
@@ -26,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { doctorsApi, hospitalsApi, groupsApi } from "@/services/endpoints"
+import { doctorsApi, hospitalsApi, groupsApi, authApi } from "@/services/endpoints"
 import { useAuthStore } from "@/store/authStore"
 import { useToast } from "@/components/ui/toast"
 import DentalEmptyState from "@/components/ui/dental-empty-state"
@@ -66,6 +66,9 @@ export default function AdminDoctors() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingDoctor, setEditingDoctor] = useState<User | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<User | null>(null)
+  const [resetTarget, setResetTarget] = useState<User | null>(null)
+  const [resetPassword, setResetPassword] = useState("")
+  const [resetConfirm, setResetConfirm] = useState("")
   const [form, setForm] = useState<DoctorForm>(getEmptyDoctorForm)
 
   const { data: hospitals } = useQuery({
@@ -138,6 +141,19 @@ export default function AdminDoctors() {
       queryClient.invalidateQueries({ queryKey: ["doctors"] })
       addToast({ title: "Success", description: "Doctor deleted", variant: "success" })
       setDeleteTarget(null)
+    },
+    onError: (err: unknown) => {
+      showErrorToast(err, addToast)
+    },
+  })
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: (data: { user_id: string; new_password: string }) => authApi.resetPassword(data),
+    onSuccess: () => {
+      addToast({ title: "Success", description: "Password reset successfully", variant: "success" })
+      setResetTarget(null)
+      setResetPassword("")
+      setResetConfirm("")
     },
     onError: (err: unknown) => {
       showErrorToast(err, addToast)
@@ -306,6 +322,14 @@ export default function AdminDoctors() {
                             onClick={() => openEditDialog(doctor)}
                           >
                             <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => { setResetTarget(doctor); setResetPassword(""); setResetConfirm("") }}
+                            title="Reset Password"
+                          >
+                            <KeyRound className="h-4 w-4" />
                           </Button>
                           {doctor.is_active ? (
                             <Button
@@ -525,6 +549,56 @@ export default function AdminDoctors() {
               onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
             >
               {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!resetTarget} onOpenChange={(open) => { if (!open) { setResetTarget(null); setResetPassword(""); setResetConfirm("") } }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Reset Password</DialogTitle>
+            <DialogDescription>
+              Set a new password for <span className="font-medium text-[var(--ds-text)]">{resetTarget?.full_name}</span>.
+              Their existing sessions will be revoked.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid gap-2">
+              <Label htmlFor="reset-pw">New Password</Label>
+              <Input
+                id="reset-pw"
+                type="password"
+                value={resetPassword}
+                onChange={(e) => setResetPassword(e.target.value)}
+                placeholder="Min. 8 characters"
+                autoComplete="new-password"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="reset-pw-confirm">Confirm Password</Label>
+              <Input
+                id="reset-pw-confirm"
+                type="password"
+                value={resetConfirm}
+                onChange={(e) => setResetConfirm(e.target.value)}
+                placeholder="Re-enter password"
+                autoComplete="new-password"
+              />
+            </div>
+            {resetPassword && resetConfirm && resetPassword !== resetConfirm && (
+              <p className="text-xs text-red-500">Passwords do not match</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setResetTarget(null); setResetPassword(""); setResetConfirm("") }}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!resetPassword || resetPassword.length < 8 || resetPassword !== resetConfirm || resetPasswordMutation.isPending}
+              onClick={() => resetTarget && resetPasswordMutation.mutate({ user_id: resetTarget.id, new_password: resetPassword })}
+            >
+              {resetPasswordMutation.isPending ? "Resetting..." : "Reset Password"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -452,12 +452,29 @@ async def dashboard_stats(
     )).scalar() or 0
 
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    # Expected monthly revenue from active/trial subscriptions (plan price × count)
+    expected_result = await db.execute(
+        select(
+            func.coalesce(func.sum(SubscriptionPlan.price), 0)
+        ).join(
+            Subscription, Subscription.plan_id == SubscriptionPlan.id
+        ).where(
+            Subscription.status.in_([SubscriptionStatus.ACTIVE.value, SubscriptionStatus.TRIAL.value])
+        )
+    )
+    expected_revenue = _decimal(expected_result.scalar())
+
+    # Also sum actual payments recorded this month
     revenue_result = await db.execute(
         select(func.coalesce(func.sum(SubscriptionPayment.amount), 0)).where(
             SubscriptionPayment.payment_date >= month_start
         )
     )
-    revenue_this_month = _decimal(revenue_result.scalar())
+    revenue_payments = _decimal(revenue_result.scalar())
+
+    # Show expected revenue (from active subscriptions); fall back to recorded payments
+    revenue_this_month = expected_revenue if expected_revenue > 0 else revenue_payments
 
     return {
         "total_active": total_active,

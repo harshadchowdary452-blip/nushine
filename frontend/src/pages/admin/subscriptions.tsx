@@ -61,7 +61,7 @@ function subKey(s: Subscription) {
   return `${s.subscriber_type}__${s.subscriber_id}`
 }
 
-const GROUP_BASE_PRICE = 5999
+const GROUP_BASE_PRICE = 4999
 const SINGLE_HOSPITAL_PRICE = 2999
 const ADDITIONAL_HOSPITAL_PRICE = 2999
 
@@ -592,26 +592,26 @@ export default function AdminSubscriptions() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
-              <Label>Amount (INR)</Label>
-              <Input type="number" value={paymentForm.amount} onChange={(e) => setPaymentForm(f => ({ ...f, amount: e.target.value }))} placeholder="0" />
+              <Label htmlFor="sub-pay-amount">Amount (INR)</Label>
+              <Input id="sub-pay-amount" name="amount" type="number" value={paymentForm.amount} onChange={(e) => setPaymentForm(f => ({ ...f, amount: e.target.value }))} placeholder="0" />
             </div>
             <div>
-              <Label>Payment Method</Label>
-              <select value={paymentForm.payment_method} onChange={(e) => setPaymentForm(f => ({ ...f, payment_method: e.target.value as PaymentMethod }))} className="w-full h-9 rounded-lg border border-[var(--ds-border)] bg-[var(--ds-background)] px-3 text-sm">
+              <Label htmlFor="sub-pay-method">Payment Method</Label>
+              <select id="sub-pay-method" name="payment_method" value={paymentForm.payment_method} onChange={(e) => setPaymentForm(f => ({ ...f, payment_method: e.target.value as PaymentMethod }))} className="w-full h-9 rounded-lg border border-[var(--ds-border)] bg-[var(--ds-background)] px-3 text-sm">
                 {PAYMENT_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
               </select>
             </div>
             <div>
-              <Label>Payment Date</Label>
-              <Input type="date" value={paymentForm.payment_date} onChange={(e) => setPaymentForm(f => ({ ...f, payment_date: e.target.value }))} />
+              <Label htmlFor="sub-pay-date">Payment Date</Label>
+              <Input id="sub-pay-date" name="payment_date" type="date" value={paymentForm.payment_date} onChange={(e) => setPaymentForm(f => ({ ...f, payment_date: e.target.value }))} />
             </div>
             <div>
-              <Label>Reference Number</Label>
-              <Input value={paymentForm.reference_number} onChange={(e) => setPaymentForm(f => ({ ...f, reference_number: e.target.value }))} placeholder="Optional" />
+              <Label htmlFor="sub-pay-ref">Reference Number</Label>
+              <Input id="sub-pay-ref" name="reference_number" value={paymentForm.reference_number} onChange={(e) => setPaymentForm(f => ({ ...f, reference_number: e.target.value }))} placeholder="Optional" />
             </div>
             <div>
-              <Label>Notes</Label>
-              <Input value={paymentForm.notes} onChange={(e) => setPaymentForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional" />
+              <Label htmlFor="sub-pay-notes">Notes</Label>
+              <Input id="sub-pay-notes" name="notes" value={paymentForm.notes} onChange={(e) => setPaymentForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional" />
             </div>
           </div>
           <DialogFooter>
@@ -654,8 +654,8 @@ export default function AdminSubscriptions() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
-              <Label>Plan</Label>
-              <select value={grantFreeForm.plan_id} onChange={(e) => setGrantFreeForm(f => ({ ...f, plan_id: e.target.value }))} className="w-full h-9 rounded-lg border border-[var(--ds-border)] bg-[var(--ds-background)] px-3 text-sm">
+              <Label htmlFor="sub-grant-plan">Plan</Label>
+              <select id="sub-grant-plan" name="plan_id" value={grantFreeForm.plan_id} onChange={(e) => setGrantFreeForm(f => ({ ...f, plan_id: e.target.value }))} className="w-full h-9 rounded-lg border border-[var(--ds-border)] bg-[var(--ds-background)] px-3 text-sm">
                 {plans.map(p => <option key={p.id} value={p.id}>{p.name} — {fmtCurrency(p.price)}/mo</option>)}
               </select>
             </div>
@@ -664,12 +664,12 @@ export default function AdminSubscriptions() {
               <Label htmlFor="free-forever">Free forever</Label>
             </div>
             <div>
-              <Label>Reason *</Label>
-              <Input value={grantFreeForm.reason} onChange={(e) => setGrantFreeForm(f => ({ ...f, reason: e.target.value }))} placeholder="Why is this free?" />
+              <Label htmlFor="sub-grant-reason">Reason *</Label>
+              <Input id="sub-grant-reason" name="reason" value={grantFreeForm.reason} onChange={(e) => setGrantFreeForm(f => ({ ...f, reason: e.target.value }))} placeholder="Why is this free?" />
             </div>
             <div>
-              <Label>Notes</Label>
-              <Input value={grantFreeForm.notes} onChange={(e) => setGrantFreeForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional" />
+              <Label htmlFor="sub-grant-notes">Notes</Label>
+              <Input id="sub-grant-notes" name="notes" value={grantFreeForm.notes} onChange={(e) => setGrantFreeForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional" />
             </div>
           </div>
           <DialogFooter>
@@ -690,14 +690,14 @@ export default function AdminSubscriptions() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
-              <Label>New Plan</Label>
-              <select value={changePlanForm.plan_id} onChange={(e) => setChangePlanForm(f => ({ ...f, plan_id: e.target.value }))} className="w-full h-9 rounded-lg border border-[var(--ds-border)] bg-[var(--ds-background)] px-3 text-sm">
+              <Label htmlFor="sub-cp-plan">New Plan</Label>
+              <select id="sub-cp-plan" name="plan_id" value={changePlanForm.plan_id} onChange={(e) => setChangePlanForm(f => ({ ...f, plan_id: e.target.value }))} className="w-full h-9 rounded-lg border border-[var(--ds-border)] bg-[var(--ds-background)] px-3 text-sm">
                 {plans.map(p => <option key={p.id} value={p.id}>{p.name} — {fmtCurrency(p.price)}/mo</option>)}
               </select>
             </div>
             <div>
-              <Label>Effective</Label>
-              <select value={changePlanForm.effective} onChange={(e) => setChangePlanForm(f => ({ ...f, effective: e.target.value }))} className="w-full h-9 rounded-lg border border-[var(--ds-border)] bg-[var(--ds-background)] px-3 text-sm">
+              <Label htmlFor="sub-cp-effective">Effective</Label>
+              <select id="sub-cp-effective" name="effective" value={changePlanForm.effective} onChange={(e) => setChangePlanForm(f => ({ ...f, effective: e.target.value }))} className="w-full h-9 rounded-lg border border-[var(--ds-border)] bg-[var(--ds-background)] px-3 text-sm">
                 <option value="immediate">Immediate</option>
                 <option value="next_renewal">Next Renewal</option>
               </select>
@@ -770,14 +770,14 @@ export default function AdminSubscriptions() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
-              <Label>Plan</Label>
-              <select value={createForm.plan_id} onChange={(e) => setCreateForm(f => ({ ...f, plan_id: e.target.value }))} className="w-full h-9 rounded-lg border border-[var(--ds-border)] bg-[var(--ds-background)] px-3 text-sm">
+              <Label htmlFor="sub-create-plan">Plan</Label>
+              <select id="sub-create-plan" name="plan_id" value={createForm.plan_id} onChange={(e) => setCreateForm(f => ({ ...f, plan_id: e.target.value }))} className="w-full h-9 rounded-lg border border-[var(--ds-border)] bg-[var(--ds-background)] px-3 text-sm">
                 {plans.map(p => <option key={p.id} value={p.id}>{p.name} — {fmtCurrency(p.price)}/mo</option>)}
               </select>
             </div>
             <div>
-              <Label>Type</Label>
-              <select value={createForm.subscription_type} onChange={(e) => setCreateForm(f => ({ ...f, subscription_type: e.target.value as "PAID" | "TRIAL" | "FREE" }))} className="w-full h-9 rounded-lg border border-[var(--ds-border)] bg-[var(--ds-background)] px-3 text-sm">
+              <Label htmlFor="sub-create-type">Type</Label>
+              <select id="sub-create-type" name="subscription_type" value={createForm.subscription_type} onChange={(e) => setCreateForm(f => ({ ...f, subscription_type: e.target.value as "PAID" | "TRIAL" | "FREE" }))} className="w-full h-9 rounded-lg border border-[var(--ds-border)] bg-[var(--ds-background)] px-3 text-sm">
                 <option value="PAID">Paid</option>
                 <option value="TRIAL">Trial</option>
                 <option value="FREE">Free</option>
@@ -785,13 +785,13 @@ export default function AdminSubscriptions() {
             </div>
             {createForm.subscription_type === "TRIAL" && (
               <div>
-                <Label>Trial Days</Label>
-                <Input type="number" min={1} value={createForm.trial_days} onChange={(e) => setCreateForm(f => ({ ...f, trial_days: e.target.value }))} />
+                <Label htmlFor="sub-create-trial-days">Trial Days</Label>
+                <Input id="sub-create-trial-days" name="trial_days" type="number" min={1} value={createForm.trial_days} onChange={(e) => setCreateForm(f => ({ ...f, trial_days: e.target.value }))} />
               </div>
             )}
             <div>
-              <Label>Notes</Label>
-              <Input value={createForm.notes} onChange={(e) => setCreateForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional" />
+              <Label htmlFor="sub-create-notes">Notes</Label>
+              <Input id="sub-create-notes" name="notes" value={createForm.notes} onChange={(e) => setCreateForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional" />
             </div>
           </div>
           <DialogFooter>

@@ -64,6 +64,12 @@ async def create_case(data: CaseCreate, db: AsyncSession = Depends(get_db), curr
     verify_permission(current_user, Permission.CREATE_CASE)
     service = CaseService(db)
     case_data = data.model_dump()
+    # Validate patient belongs to caller's tenant
+    patient_result = await db.execute(select(Patient).where(Patient.id == data.patient_id))
+    patient = patient_result.scalar_one_or_none()
+    if not patient:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+    await verify_tenant_access(current_user, patient, "patient", db)
     case = await service.create(case_data, user_id=current_user.get("sub"), user_role=current_user.get("role"))
     svc = StatusAutomationService(db)
     await svc.update_patient_status(case.patient_id)
@@ -203,6 +209,7 @@ async def generate_case_pdf(
     case = await _load_case_with_findings(db, case_id)
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
+    await verify_tenant_access(current_user, case, "case", db)
 
     from app.utils.case_report_html import render_case_to_html
     html = render_case_to_html(case)
@@ -420,6 +427,7 @@ async def get_case_odontogram(case_id: str, db: AsyncSession = Depends(get_db), 
     case = await _load_case_with_findings(db, case_id)
     if not case:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case Report not found")
+    await verify_tenant_access(current_user, case, "case", db)
     findings = case.findings or []
     fd_list = [
         FindingData(finding_type=f.finding_type, tooth_number=f.tooth_number, notes=f.notes)

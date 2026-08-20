@@ -239,9 +239,11 @@ function ExportMenu({
 function AddOtherItemDialog({
   open,
   onOpenChange,
+  isStandalone,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
+  isStandalone?: boolean
 }) {
   const { addToast } = useToast()
   const queryClient = useQueryClient()
@@ -333,13 +335,14 @@ function AddOtherItemDialog({
               id="other-item-remarks"
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
-              placeholder="Why do you need this item? (shown to your group admin)"
+              placeholder={isStandalone ? "Why do you need this item?" : "Why do you need this item? (shown to your group admin)"}
               rows={2}
             />
           </div>
           <p className="ds-caption text-[var(--ds-text-tertiary)]">
-            Your group admin reviews requests inside the Inventory page. Once approved, the item is added to the
-            master catalogue and you never need to request it again.
+            {isStandalone
+              ? "You review and approve requests inside the Inventory page. Once approved, the item is added to the master catalogue and you never need to request it again."
+              : "Your group admin reviews requests inside the Inventory page. Once approved, the item is added to the master catalogue and you never need to request it again."}
           </p>
         </DialogBody>
         <DialogFooter>
@@ -2490,7 +2493,7 @@ function HospitalPendingSection({ hospitalId, orderPeriod }: { hospitalId: strin
                   <TableCell className="ds-numeric text-right">{i.required_quantity ? formatNumber(i.required_quantity, 0) : "—"}</TableCell>
                   <TableCell className="ds-numeric text-right">{formatIndianRupees(i.estimated_cost)}</TableCell>
                   <TableCell className="max-w-56 text-[var(--ds-text-secondary)]">
-                    {i.status === "REJECTED" ? (i.review_notes || "Rejected by group admin") : i.remarks || "—"}
+                    {i.status === "REJECTED" ? (i.review_notes || "Rejected by reviewer") : i.remarks || "—"}
                   </TableCell>
                   <TableCell className="text-[var(--ds-text-secondary)]">
                     {i.reviewed_at ? (
@@ -2547,7 +2550,7 @@ export default function InventoryPage() {
   const pendingCountQuery = useQuery<PendingInventoryItemsResponse>({
     queryKey: ["inventory-pending-count"],
     queryFn: () => pendingInventoryItemsApi.list({ page_size: 1, status: "PENDING" }),
-    enabled: ctx.isGroupAdmin,
+    enabled: ctx.isGroupAdmin || ctx.isStandaloneIndentMaster,
     refetchInterval: 30_000,
   })
   const pendingCount = pendingCountQuery.data?.total ?? 0
@@ -2595,7 +2598,7 @@ export default function InventoryPage() {
   })
 
   const existingOrder = orderQuery.data?.items?.[0] ?? null
-  const readOnly = !!existingOrder && existingOrder.status !== "DRAFT"
+  const readOnly = !!existingOrder && !["DRAFT", "SUBMITTED"].includes(existingOrder.status)
 
   const allHospitalsMode = ctx.showSelector && !ctx.effectiveHospitalId
 
@@ -2639,7 +2642,7 @@ export default function InventoryPage() {
       setRemarksDraft({})
       return
     }
-    if (existingOrder.status !== "DRAFT") return
+    if (!["DRAFT", "SUBMITTED"].includes(existingOrder.status)) return
     const q: Record<string, string> = {}
     const c: Record<string, string> = {}
     const r: Record<string, string> = {}
@@ -2741,6 +2744,9 @@ export default function InventoryPage() {
       if (lines.length === 0) {
         throw new Error("Enter at least one required quantity above zero")
       }
+      if (existingOrder && existingOrder.status === "SUBMITTED") {
+        return monthlyOrdersApi.update(existingOrder.id, { items: lines })
+      }
       return monthlyOrdersApi.submit({
         hospital_id: ctx.effectiveHospitalId,
         order_period: period,
@@ -2748,9 +2754,12 @@ export default function InventoryPage() {
       })
     },
     onSuccess: async (order) => {
+      const isUpdate = existingOrder?.status === "SUBMITTED"
       addToast({
-        title: "Indent Submitted",
-        description: `Monthly indent for ${period} submitted for review`,
+        title: isUpdate ? "Indent Updated" : "Indent Submitted",
+        description: isUpdate
+          ? `Monthly indent for ${period} updated`
+          : `Monthly indent for ${period} submitted for review`,
         variant: "success",
       })
       await queryClient.invalidateQueries({ queryKey: ["monthly-orders-list", ctx.effectiveHospitalId, period] })
@@ -2848,7 +2857,7 @@ export default function InventoryPage() {
           disabled={!ctx.effectiveHospitalId || readOnly || submitDisabled()}
         >
           <Send className="h-4 w-4" />
-          Submit Monthly Indent
+          {existingOrder?.status === "SUBMITTED" ? "Update Indent" : "Submit Monthly Indent"}
         </Button>
       )}
     </>
@@ -2960,7 +2969,7 @@ export default function InventoryPage() {
         <HospitalPendingSection hospitalId={ctx.effectiveHospitalId} orderPeriod={period} />
       )}
 
-      <AddOtherItemDialog open={addItemOpen} onOpenChange={setAddItemOpen} />
+      <AddOtherItemDialog open={addItemOpen} onOpenChange={setAddItemOpen} isStandalone={ctx.isStandaloneIndentMaster} />
 
       <CatalogueManagerDialog open={catalogueOpen} onOpenChange={setCatalogueOpen} />
 

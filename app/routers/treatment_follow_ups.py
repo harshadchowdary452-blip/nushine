@@ -18,13 +18,23 @@ from app.models.hospital import Hospital
 router = APIRouter(prefix="/crm/treatment-follow-ups", tags=["CRM Treatment Follow-Ups"])
 
 
-def _verify_hospital_access(entity, current_user):
+async def _verify_hospital_access(entity, current_user, db):
     role = current_user.get("role")
     if role in ("HOSPITAL_ADMIN", "DOCTOR"):
         ehid = getattr(entity, "hospital_id", None)
         uhid = current_user.get("hospital_id")
         if ehid and uhid and str(ehid) != str(uhid):
             raise HTTPException(status_code=403, detail="Access denied")
+    elif role == "GROUP_ADMIN":
+        ehid = getattr(entity, "hospital_id", None)
+        if ehid:
+            agid = current_user.get("admin_group_id")
+            if agid:
+                hosp_check = await db.execute(select(Hospital.id).where(Hospital.id == ehid, Hospital.admin_group_id == agid))
+                if not hosp_check.scalar_one_or_none():
+                    raise HTTPException(status_code=403, detail="Access denied")
+            else:
+                raise HTTPException(status_code=403, detail="Access denied")
 
 
 class CompleteFollowUpRequest(BaseModel):
@@ -198,11 +208,23 @@ async def list_treatment_follow_ups(
     db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.VIEW_CRM_DASHBOARD)
     hospital_id = current_user.get("hospital_id")
+    role = current_user.get("role")
     treatment_types = [FollowUpType.ONE_DAY_FOLLOW_UP.value, FollowUpType.SEVEN_DAY_FOLLOW_UP.value,
                        FollowUpType.SIX_MONTH_RECALL.value, FollowUpType.TWELVE_MONTH_RECALL.value,
                        FollowUpType.CUSTOM_FOLLOW_UP.value]
     q = select(FollowUp).where(FollowUp.follow_up_type.in_(treatment_types))
-    if hospital_id:
+    if role == "GROUP_ADMIN":
+        agid = current_user.get("admin_group_id")
+        if agid:
+            hosp_r = await db.execute(select(Hospital.id).where(Hospital.admin_group_id == agid))
+            hids = [r[0] for r in hosp_r.all()]
+            if hids:
+                q = q.where(FollowUp.hospital_id.in_(hids))
+            else:
+                q = q.where(FollowUp.id == None)
+        else:
+            q = q.where(FollowUp.id == None)
+    elif hospital_id:
         q = q.where(FollowUp.hospital_id == hospital_id)
     if type_filter:
         q = q.where(FollowUp.follow_up_type == type_filter)
@@ -228,7 +250,7 @@ async def complete_follow_up(follow_up_id: str, data: CompleteFollowUpRequest, d
     fu = await db.get(FollowUp, follow_up_id)
     if not fu:
         raise HTTPException(status_code=404, detail="Follow-up not found")
-    _verify_hospital_access(fu, current_user)
+    await _verify_hospital_access(fu, current_user, db)
     fu.status = FollowUpStatus.COMPLETED.value
     fu.outcome = data.outcome
     if data.notes:
@@ -259,13 +281,25 @@ async def get_doctor_follow_ups(db: AsyncSession = Depends(get_db), current_user
     verify_permission(current_user, Permission.MANAGE_CASES)
     doctor_id = current_user.get("sub")
     hospital_id = current_user.get("hospital_id")
+    role = current_user.get("role")
     treatment_types = [FollowUpType.ONE_DAY_FOLLOW_UP.value, FollowUpType.SEVEN_DAY_FOLLOW_UP.value]
     q = select(FollowUp).where(
         FollowUp.doctor_id == doctor_id,
         FollowUp.follow_up_type.in_(treatment_types),
         FollowUp.status != FollowUpStatus.COMPLETED.value,
     )
-    if hospital_id:
+    if role == "GROUP_ADMIN":
+        agid = current_user.get("admin_group_id")
+        if agid:
+            hosp_r = await db.execute(select(Hospital.id).where(Hospital.admin_group_id == agid))
+            hids = [r[0] for r in hosp_r.all()]
+            if hids:
+                q = q.where(FollowUp.hospital_id.in_(hids))
+            else:
+                q = q.where(FollowUp.id == None)
+        else:
+            q = q.where(FollowUp.id == None)
+    elif hospital_id:
         q = q.where(FollowUp.hospital_id == hospital_id)
     q = q.order_by(FollowUp.follow_up_date)
     rows = (await db.execute(q)).scalars().all()
@@ -281,13 +315,25 @@ async def get_doctor_recall_patients(db: AsyncSession = Depends(get_db), current
     verify_permission(current_user, Permission.MANAGE_CASES)
     doctor_id = current_user.get("sub")
     hospital_id = current_user.get("hospital_id")
+    role = current_user.get("role")
     recall_types = [FollowUpType.SIX_MONTH_RECALL.value, FollowUpType.TWELVE_MONTH_RECALL.value, FollowUpType.CUSTOM_FOLLOW_UP.value]
     q = select(FollowUp).where(
         FollowUp.doctor_id == doctor_id,
         FollowUp.follow_up_type.in_(recall_types),
         FollowUp.status.in_([FollowUpStatus.PENDING.value]),
     )
-    if hospital_id:
+    if role == "GROUP_ADMIN":
+        agid = current_user.get("admin_group_id")
+        if agid:
+            hosp_r = await db.execute(select(Hospital.id).where(Hospital.admin_group_id == agid))
+            hids = [r[0] for r in hosp_r.all()]
+            if hids:
+                q = q.where(FollowUp.hospital_id.in_(hids))
+            else:
+                q = q.where(FollowUp.id == None)
+        else:
+            q = q.where(FollowUp.id == None)
+    elif hospital_id:
         q = q.where(FollowUp.hospital_id == hospital_id)
     q = q.order_by(FollowUp.follow_up_date)
     rows = (await db.execute(q)).scalars().all()
@@ -302,11 +348,23 @@ async def get_doctor_recall_patients(db: AsyncSession = Depends(get_db), current
 async def get_treatment_follow_up_stats(db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     verify_permission(current_user, Permission.VIEW_CRM_DASHBOARD)
     hospital_id = current_user.get("hospital_id")
+    role = current_user.get("role")
     treatment_types = [FollowUpType.ONE_DAY_FOLLOW_UP.value, FollowUpType.SEVEN_DAY_FOLLOW_UP.value,
                        FollowUpType.SIX_MONTH_RECALL.value, FollowUpType.TWELVE_MONTH_RECALL.value,
                        FollowUpType.CUSTOM_FOLLOW_UP.value]
     q = select(FollowUp).where(FollowUp.follow_up_type.in_(treatment_types))
-    if hospital_id:
+    if role == "GROUP_ADMIN":
+        agid = current_user.get("admin_group_id")
+        if agid:
+            hosp_r = await db.execute(select(Hospital.id).where(Hospital.admin_group_id == agid))
+            hids = [r[0] for r in hosp_r.all()]
+            if hids:
+                q = q.where(FollowUp.hospital_id.in_(hids))
+            else:
+                q = q.where(FollowUp.id == None)
+        else:
+            q = q.where(FollowUp.id == None)
+    elif hospital_id:
         q = q.where(FollowUp.hospital_id == hospital_id)
     rows = (await db.execute(q)).scalars().all()
     total = len(rows)

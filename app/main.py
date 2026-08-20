@@ -196,6 +196,18 @@ async def lifespan(app: FastAPI):
     overdue_task = asyncio.create_task(check_overdue_treatments())
     recurring_recall_task = asyncio.create_task(check_recurring_recalls())
 
+    async def _pool_monitor():
+        """Log DB pool health every 5 minutes to catch exhaustion early."""
+        from app.database import log_pool_status
+        while True:
+            await asyncio.sleep(300)
+            try:
+                log_pool_status()
+            except Exception:
+                pass
+
+    pool_monitor_task = asyncio.create_task(_pool_monitor())
+
     logger.info("Application startup complete!")
     yield
 
@@ -203,6 +215,7 @@ async def lifespan(app: FastAPI):
     from app.utils.case_pdf import _cleanup
     await _cleanup()
 
+    pool_monitor_task.cancel()
     for task in [reminder_task, same_day_task, missed_task, overdue_task, recurring_recall_task]:
         task.cancel()
         try:
@@ -358,16 +371,30 @@ async def health(request: Request):
         checks["checks"]["database"] = f"error: {type(e).__name__}"
         checks["status"] = "degraded"
 
-    # Redis check
+    # Redis check — use a short-lived client to avoid connection leaks
     try:
         import redis.asyncio as aioredis
-        r = aioredis.from_url(settings.REDIS_URL)
-        await r.ping()
-        await r.aclose()
-        checks["checks"]["redis"] = "ok"
+        r = aioredis.from_url(settings.REDIS_URL, socket_connect_timeout=2)
+        try:
+            await r.ping()
+            checks["checks"]["redis"] = "ok"
+        finally:
+            await r.aclose()
     except Exception:
         checks["checks"]["redis"] = "unavailable"
-        # Redis is optional, don't degrade for it
+
+    # DB pool stats
+    try:
+        from app.database import engine as _eng
+        pool = _eng.pool
+        checks["checks"]["db_pool"] = {
+            "size": pool.size(),
+            "checked_in": pool.checkedin(),
+            "checked_out": pool.checkedout(),
+            "overflow": pool.overflow(),
+        }
+    except Exception:
+        pass
 
     status_code = 200 if checks["status"] == "healthy" else 503
     return JSONResponse(status_code=status_code, content=checks)
@@ -429,8 +456,8 @@ DEFAULT_SUBSCRIPTION_PLANS = [
     },
     {
         "name": "Group",
-        "description": "Group admin with first hospital included (₹5,999/mo). Each additional hospital adds ₹2,999/mo automatically based on hospital count.",
-        "price": 5999.00,
+        "description": "Group admin with first hospital included (₹4,999/mo). Each additional hospital adds ₹2,999/mo automatically based on hospital count.",
+        "price": 4999.00,
         "currency": "INR",
         "duration_months": 1,
         "max_hospitals": None,

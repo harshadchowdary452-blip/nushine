@@ -36,6 +36,11 @@ class LoginResponse(BaseModel):
     user: dict
 
 
+class AdminPasswordResetRequest(BaseModel):
+    user_id: str
+    new_password: str = Field(..., min_length=8)
+
+
 class ContextSwitchRequest(BaseModel):
     hospital_id: Optional[str] = None
 

@@ -9,6 +9,7 @@ from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.repositories.audit_log_repository import AuditLogRepository
 from app.core.security import hash_password, verify_password
 from app.core.jwt import create_access_token, create_refresh_token, decode_token
+from app.core.permissions import Role
 from app.config import settings
 
 
@@ -78,3 +79,42 @@ class AuthService:
         await self.refresh_token_repo.revoke_user_tokens(user_id)
         await self.audit_log_repo.create(user_id=user_id, action="CHANGE_PASSWORD", entity_type="USER", entity_id=user_id, details="Password changed")
         return {"message": "Password changed successfully"}
+
+    async def admin_reset_password(self, admin_user: dict, target_user_id: str, new_password: str):
+        admin_role = admin_user.get("role")
+        admin_hospital_id = admin_user.get("hospital_id")
+        admin_group_id = admin_user.get("admin_group_id")
+
+        target = await self.user_repo.get(target_user_id)
+        if not target:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target user not found")
+
+        target_role = target.role.value
+
+        allowed = False
+        if admin_role == Role.SUPER_ADMIN.value:
+            if target_role in (Role.GROUP_ADMIN.value, Role.HOSPITAL_ADMIN.value, Role.DOCTOR.value):
+                allowed = True
+        elif admin_role == Role.GROUP_ADMIN.value:
+            if target_role in (Role.HOSPITAL_ADMIN.value, Role.DOCTOR.value):
+                if target.admin_group_id and str(target.admin_group_id) == str(admin_group_id):
+                    allowed = True
+        elif admin_role == Role.HOSPITAL_ADMIN.value:
+            if target_role == Role.DOCTOR.value:
+                if target.hospital_id and str(target.hospital_id) == str(admin_hospital_id):
+                    allowed = True
+
+        if not allowed:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have permission to reset this user's password")
+
+        target.password_hash = hash_password(new_password)
+        await self.db.flush()
+        await self.refresh_token_repo.revoke_user_tokens(target_user_id)
+        await self.audit_log_repo.create(
+            user_id=admin_user.get("sub"),
+            action="ADMIN_RESET_PASSWORD",
+            entity_type="USER",
+            entity_id=target_user_id,
+            details=f"Password reset for user {target.email} (role: {target_role}) by {admin_role}",
+        )
+        return {"message": f"Password reset successfully for {target.full_name}"}
